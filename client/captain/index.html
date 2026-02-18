@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — CAPTAIN</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="captain.css">
+</head>
+<body>
+  <div class="station-container">
+
+    <header class="station-header panel">
+      <div class="panel__header station-header__bar">
+        <span class="text-title">CAPTAIN</span>
+        <div class="station-header__status">
+          <span class="status-dot status-dot--disconnected" data-status-dot></span>
+          <span class="text-label" data-status-label>CONNECTING</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="station-main">
+      <div class="station-standby" data-standby>
+        <p class="text-header">STANDING BY</p>
+        <p class="text-body">This station is not yet operational.</p>
+        <p class="text-label">Phase 3 — Coming soon</p>
+        <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+      </div>
+      <div class="station-briefing panel" data-briefing style="display:none">
+        <div class="panel__header">
+          <span class="text-header">MISSION BRIEFING</span>
+        </div>
+        <div class="station-briefing__body">
+          <p class="text-data" data-mission-name></p>
+          <p class="text-body" data-briefing-text></p>
+        </div>
+      </div>
+    </main>
+
+  </div>
+  <script type="module" src="captain.js"></script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+/*
+ * Starbridge — Wire Aesthetic Base Theme
+ *
+ * Global styles, CSS custom properties, typography, and base components
+ * shared across all stations. See docs/STYLE_GUIDE.md for full reference.
+ */
+
+/* =========================================================================
+   Fonts
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+/* =========================================================================
+   Custom Properties
+   ========================================================================= */
+
+:root {
+  /* --- Base backgrounds --- */
+  --bg-primary:      #0a0a0a;
+  --bg-secondary:    #111111;
+  --bg-panel:        #0d0d0d;
+  --bg-panel-header: #151515;
+
+  /* --- Alert level colour families --- */
+  --alert-green:      #00ff41;
+  --alert-green-dim:  rgba(0, 255, 65, 0.3);
+  --alert-green-glow: rgba(0, 255, 65, 0.15);
+
+  --alert-yellow:      #ffb000;
+  --alert-yellow-dim:  rgba(255, 176, 0, 0.3);
+  --alert-yellow-glow: rgba(255, 176, 0, 0.15);
+
+  --alert-red:      #ff2020;
+  --alert-red-dim:  rgba(255, 32, 32, 0.3);
+  --alert-red-glow: rgba(255, 32, 32, 0.15);
+
+  /* --- Active primary (swapped by alert level) --- */
+  --primary:      var(--alert-green);
+  --primary-dim:  var(--alert-green-dim);
+  --primary-glow: var(--alert-green-glow);
+
+  /* --- Functional colours (do not change with alert level) --- */
+  --friendly:     #00aaff;
+  --friendly-dim: rgba(0, 170, 255, 0.3);
+  --hostile:      #ff3333;
+  --hostile-dim:  rgba(255, 51, 51, 0.3);
+  --neutral:      #888888;
+  --neutral-dim:  rgba(136, 136, 136, 0.3);
+  --unknown:      #ffff00;
+  --unknown-dim:  rgba(255, 255, 0, 0.3);
+
+  /* --- System status --- */
+  --system-healthy:  #00ff41;
+  --system-warning:  #ffb000;
+  --system-critical: #ff2020;
+  --system-offline:  #444444;
+  --hull-damage:     #ff6600;
+
+  /* --- Text --- */
+  --text-bright:  var(--primary);
+  --text-normal:  color-mix(in srgb, var(--primary) 70%, transparent);
+  --text-dim:     color-mix(in srgb, var(--primary) 40%, transparent);
+  --text-muted:   #555555;
+
+  /* --- Borders and lines --- */
+  --border-primary: var(--primary-dim);
+  --border-bright:  var(--primary);
+  --grid-line:      rgba(255, 255, 255, 0.05);
+}
+
+/* =========================================================================
+   Reset and Base
+   ========================================================================= */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-normal);
+  font-family: 'Share Tech Mono', 'Courier New', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+
+/* Scanline overlay — subtle, non-interactive */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+}
+
+/* =========================================================================
+   Typography utilities
+   ========================================================================= */
+
+.text-title {
+  font-size: 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-bright);
+  text-shadow: 0 0 10px var(--primary-glow);
+}
+
+.text-header {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--text-normal);
+}
+
+.text-data {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-bright);
+}
+
+.text-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.text-body {
+  font-size: 0.85rem;
+  color: var(--text-normal);
+  line-height: 1.5;
+}
+
+.text-muted {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* =========================================================================
+   Station container
+   ========================================================================= */
+
+.station-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  animation: flicker 4s infinite;
+}
+
+/* =========================================================================
+   Panels
+   ========================================================================= */
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-primary);
+  box-shadow: 0 0 6px var(--primary-glow), inset 0 0 6px var(--primary-glow);
+}
+
+.panel__header {
+  background: var(--bg-panel-header);
+  border-bottom: 1px solid var(--border-primary);
+  padding: 0.5rem 1rem;
+}
+
+/* =========================================================================
+   Buttons
+   ========================================================================= */
+
+.btn {
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-normal);
+  padding: 0.5rem 1.5rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--text-bright);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.btn--primary {
+  border-color: var(--primary);
+  color: var(--text-bright);
+}
+
+.btn--danger {
+  border-color: var(--hostile);
+  color: var(--hostile);
+}
+
+.btn:disabled {
+  border-color: var(--neutral-dim);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* =========================================================================
+   Gauges
+   ========================================================================= */
+
+.gauge {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  height: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gauge__fill {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+/* =========================================================================
+   Connection status dot
+   ========================================================================= */
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.status-dot--connected {
+  background: var(--system-healthy);
+  box-shadow: 0 0 6px var(--system-healthy);
+}
+
+.status-dot--reconnecting {
+  background: var(--system-warning);
+  animation: pulse 1s infinite;
+}
+
+.status-dot--disconnected {
+  background: var(--system-critical);
+}
+
+/* =========================================================================
+   Animations
+   ========================================================================= */
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.98; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+@keyframes hit-flash {
+  0%   { box-shadow: inset 0 0 50px var(--hostile-dim); }
+  100% { box-shadow: inset 0 0 0 transparent; }
+}
+
+.station-container.hit {
+  animation: hit-flash 0.3s ease-out;
+}
+
+/* =========================================================================
+   Station lobby return link (used on placeholder station standby screens)
+   ========================================================================= */
+
+.station-lobby-link {
+  display: inline-block;
+  margin-top: 1.25rem;
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+.station-lobby-link:hover {
+  opacity: 0.75;
+}

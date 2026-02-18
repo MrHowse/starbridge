@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — HELM</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="helm.css">
+</head>
+<body>
+  <div class="station-container">
+
+    <!-- ─── Header bar ──────────────────────────────────────────────────── -->
+    <header class="station-header panel">
+      <div class="panel__header station-header__bar">
+        <span class="text-title">HELM</span>
+        <div class="station-header__center">
+          <span class="text-label" id="mission-label">STANDING BY</span>
+        </div>
+        <div class="station-header__status">
+          <span class="text-label helm-keys-hint" id="keys-hint">
+            A/D — HEADING &nbsp;|&nbsp; W/S — THROTTLE
+          </span>
+          <span class="status-dot status-dot--disconnected" data-status-dot></span>
+          <span class="text-label" data-status-label>CONNECTING</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── Standby overlay (visible until game.started) ───────────────── -->
+    <div class="helm-standby" data-standby>
+      <p class="text-header">STANDING BY</p>
+      <p class="text-body">Awaiting mission orders from the Captain.</p>
+      <a class="text-label helm-standby__lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+    </div>
+
+    <!-- ─── Main game layout (hidden until game.started) ──────────────── -->
+    <main class="helm-main" data-helm-main style="display:none">
+
+      <!-- Left: forward viewscreen canvas -->
+      <section class="helm-view panel" aria-label="Forward view">
+        <div class="panel__header">
+          <span class="text-header">FORWARD VIEW</span>
+          <span class="text-label helm-speed-badge" id="speed-badge">0.0 u/s</span>
+        </div>
+        <div class="helm-view__canvas-wrap">
+          <canvas id="viewscreen"></canvas>
+        </div>
+      </section>
+
+      <!-- Right column: compass + throttle -->
+      <aside class="helm-controls-column">
+
+        <!-- Compass panel -->
+        <section class="helm-compass panel" aria-label="Heading control">
+          <div class="panel__header">
+            <span class="text-header">HEADING</span>
+            <span class="text-label">CLICK OR A/D</span>
+          </div>
+          <div class="helm-compass__body">
+            <canvas id="compass" width="220" height="220"></canvas>
+            <div class="helm-compass__target-row">
+              <span class="text-label">TARGET</span>
+              <span class="text-data" id="target-heading-display">000°</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Throttle panel -->
+        <section class="helm-throttle panel" aria-label="Throttle control">
+          <div class="panel__header">
+            <span class="text-header">THROTTLE</span>
+            <span class="text-label">W/S OR SLIDER</span>
+          </div>
+          <div class="helm-throttle__body">
+            <div class="helm-throttle__slider-wrap">
+              <input
+                type="range"
+                id="throttle-slider"
+                class="throttle-slider"
+                min="0" max="100" step="5" value="0"
+                aria-label="Throttle"
+              >
+            </div>
+            <div class="helm-throttle__readout">
+              <span class="text-data" id="throttle-display">000</span>
+              <span class="text-label">%</span>
+            </div>
+            <div class="helm-throttle__gauge gauge">
+              <div class="gauge__fill" id="throttle-gauge-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- Bottom: minimap + telemetry -->
+      <div class="helm-bottom">
+
+        <!-- Minimap -->
+        <section class="helm-minimap panel" aria-label="Sector map">
+          <div class="panel__header">
+            <span class="text-header">SECTOR MAP</span>
+          </div>
+          <div class="helm-minimap__canvas-wrap">
+            <canvas id="minimap" width="160" height="160"></canvas>
+          </div>
+        </section>
+
+        <!-- Telemetry -->
+        <section class="helm-telemetry panel" aria-label="Ship telemetry">
+          <div class="panel__header">
+            <span class="text-header">TELEMETRY</span>
+          </div>
+          <div class="helm-telemetry__body">
+            <div class="telem-row">
+              <span class="text-label">HEADING</span>
+              <span class="text-data" id="telem-heading">000°</span>
+            </div>
+            <div class="telem-row">
+              <span class="text-label">SPEED</span>
+              <span class="text-data" id="telem-speed">0.0 u/s</span>
+            </div>
+            <div class="telem-row">
+              <span class="text-label">THROTTLE</span>
+              <span class="text-data" id="telem-throttle">0%</span>
+            </div>
+            <div class="telem-row">
+              <span class="text-label">POSITION&nbsp;X</span>
+              <span class="text-data" id="telem-pos-x">50000</span>
+            </div>
+            <div class="telem-row">
+              <span class="text-label">POSITION&nbsp;Y</span>
+              <span class="text-data" id="telem-pos-y">50000</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+
+  </div>
+  <script type="module" src="helm.js"></script>
+</body>
+</html>
