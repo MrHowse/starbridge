@@ -1,126 +1,117 @@
-# Current Phase: Phase 2 — Game Loop + Ship Model + Helm Station
+# Current Phase: Phase 3 — Engineering Station + Power System
 
 > Replace this file's contents when moving to a new phase.
 
 ## Goal
 
-A ship that exists in a 2D world, can be steered by the Helm station, and whose
-movement is visible on a canvas viewscreen. This phase proves that the game loop
-architecture works, ship physics are deterministic, and client rendering can stay
-smooth between server ticks.
+Engineering controls power distribution across the ship's six systems. Other systems
+respond to power levels in real time — reducing engine power slows the ship, boosting
+manoeuvring makes turns snappier, and running systems above 100% risks gradual
+heat/damage. This phase proves that multi-station interdependence works: Engineering
+actions have immediate, visible effects on Helm.
 
 ## What This Phase Proves
 
-- The asyncio game loop runs independently of WebSocket message handling
-- The ship model is server-authoritative (clients send intentions, server moves the ship)
-- Physics are deterministic and testable (thrust, heading, speed limits, turn rate)
-- State is broadcast every tick to connected clients in a role-filtered way
-- The Helm client can control the ship and see its own movement in real time
-- A non-Helm client (e.g. a second browser tab) sees the same ship state update
+- The Engineering station can adjust power levels and those changes propagate to physics
+- System health degrades efficiency and can be repaired over time
+- Overclock (>100%) works as a risk/reward mechanic
+- The ship's behaviour visibly changes when power is redistributed (Helm sees this)
+- A second player at Engineering and a first at Helm can coordinate meaningfully
 
-## Ship Model (Section 3.4)
+## Power System (Section 3.4 / 4.1)
 
 ```
-Ship: "TSS Endeavour"
-├── Hull: 100 HP
-├── Systems (each has power: 0-150%):
-│   ├── engines      — affects max speed
-│   ├── beams        — affects beam damage + recharge (Phase 4)
-│   ├── torpedoes    — affects reload speed (Phase 4)
-│   ├── shields      — affects shield strength (Phase 4)
-│   ├── sensors      — affects scan range + speed (Phase 5)
-│   └── manoeuvring  — affects turn rate
-├── Shields: front 0-100%, rear 0-100%
-├── Weapons: 2 beam banks, 2 torpedo tubes (Phase 4)
-└── Movement:
-    ├── position:  (x, y) in world units
-    ├── heading:   0-359° (0 = north/up, clockwise)
-    ├── velocity:  current speed (world units/sec)
-    ├── throttle:  0-100% (player-set target speed fraction)
-    ├── max_speed: f(engines power)
-    └── turn_rate: f(manoeuvring power)
-```
+Power Pool: 300 units total (6 systems × 50 average = 300 baseline)
+Each system: 0–150% power (0–150 units)
+Overclock threshold: >100% per system → gradual heat/damage risk (Phase 3 Tier 1: damage risk only)
 
-All 6 systems present in the model from Phase 2. Only engines and manoeuvring
-actively affect physics in Phase 2. Others default to 100% power and are connected
-in Phase 3 (Engineering).
+Systems:
+├── engines      — max_speed    = BASE_MAX_SPEED    × efficiency
+├── beams        — (Phase 4 — beam damage + recharge)
+├── torpedoes    — (Phase 4 — reload speed)
+├── shields      — (Phase 4 — shield strength)
+├── sensors      — (Phase 5 — scan range + speed)
+└── manoeuvring  — turn_rate    = BASE_TURN_RATE     × efficiency
+
+efficiency = (power / 100) × (health / 100)    ← already implemented in ship.py
+```
 
 ## Tasks (from Scope Document)
 
 ### Server
-- [ ] Game loop — `asyncio` task, 10 ticks/sec, fixed timestep (TICK_RATE = 10)
-- [ ] Ship model — `Ship` dataclass: position, heading, velocity, throttle, hull, shields, systems
-- [ ] `ShipSystem` dataclass — name, power, health, efficiency
-- [ ] Physics system — apply throttle → velocity, move in heading direction, clamp to max_speed(engine power), apply turn_rate(manoeuvring power)
-- [ ] World model — `World` dataclass: sector bounds (100k × 100k), entity list
-- [ ] State broadcast each tick — `ship.state` to all connected clients (role-filtered later)
-- [ ] Handle `helm.set_heading` and `helm.set_throttle` messages
-- [ ] Add `helm` to routing table in main.py
-- [ ] Add Phase 2 payload schemas to messages.py
-- [ ] Add Phase 2 messages to docs/MESSAGE_PROTOCOL.md
+- [ ] Power allocation message — `engineering.set_power` handler + payload schema
+- [ ] Power budget enforcement — reject allocations that exceed pool (300 units total)
+- [ ] Repair allocation message — `engineering.set_repair` handler + payload schema
+- [ ] Repair mechanic — focused system heals at `REPAIR_RATE` HP/tick; only one system at a time
+- [ ] Overclock risk mechanic — system at >100% power has a chance per tick of taking damage
+- [ ] `engineering.py` — `handle_engineering_message()`: validates and enqueues inputs
+- [ ] Add `engineering` to routing table in `main.py`
+- [ ] Add Phase 3 payload schemas to `messages.py`
+- [ ] Game loop: drain engineering queue inputs each tick (alongside helm inputs)
+- [ ] `ship.state` broadcast: already includes system power + health — no change needed
 
 ### Client
-- [ ] Helm client: heading control (compass dial, keyboard arrow support)
-- [ ] Helm client: throttle control (vertical slider)
-- [ ] Helm client: forward viewscreen (canvas — wire starfield that rotates with heading)
-- [ ] Helm client: sector minimap (canvas — ship position + heading in 100k × 100k sector)
-- [ ] Client-side tick interpolation (smooth 60fps between 10tps server updates)
+- [ ] Engineering client: ship cross-section diagram (canvas or SVG) showing all 6 systems
+- [ ] Engineering client: power sliders for each system (0–150%) with live readout
+- [ ] Engineering client: total power budget indicator (used / 300, red when over)
+- [ ] Engineering client: system health bars (0–100%)
+- [ ] Engineering client: repair allocation buttons (click to focus repair on a system)
+- [ ] Engineering client: connect to WS, handle `game.started`, receive `ship.state`
+
+### Tests
+- [ ] `tests/test_engineering.py` — handler validates payload, enqueues, rejects invalid
+- [ ] `tests/test_physics.py` — extend: verify max_speed / turn_rate change with power levels
+- [ ] Integration test: set engine power → next tick ship_state shows changed max_speed
 
 ## Session Breakdown
 
-### Session 2a: Game Loop + Ship Model + Physics
-**Build**: Game loop task, `Ship`/`ShipSystem`/`World` models in `server/models/ship.py`
-and `server/models/world.py`, physics in `server/systems/physics.py`, helm message
-handler in `server/helm.py`, state broadcast each tick, wire up routing in main.py.
-**Test**: Physics unit tests, tick timing, state broadcast shape.
+### Session 3a: Power System + Engineering Handler
+**Build**: `engineering.py` handler, Phase 3 message schemas, power budget enforcement,
+overclock risk mechanic, repair mechanic, game loop drain of engineering queue.
+**Test**: Unit tests for handler, power budget, overclock, repair.
 
-### Session 2b: Helm Client
-**Build**: Heading and throttle controls, forward viewscreen canvas (parallax wire starfield),
-sector minimap canvas, client-side interpolation between server ticks.
-**Test**: Visual verification — ship moves on minimap when throttle increases, viewscreen
-rotates when heading changes. A second tab sees position update.
+### Session 3b: Engineering Client
+**Build**: Engineering station HTML/JS/CSS — power sliders, budget indicator, health bars,
+repair allocation, cross-section diagram. Connect to WS, receive ship.state updates.
+**Test**: Visual verification — adjust engine slider → Helm sees speed change. Reduce
+manoeuvring → Helm turns sluggishly. Overclock engines → health degrades over time.
 
 ## Key Files to Create / Modify
 
 ### Server (new)
-- `server/models/ship.py` — `Ship`, `ShipSystem`, `Shields`, `Weapon` dataclasses
-- `server/models/world.py` — `World`, `Entity`, `Position` dataclasses
-- `server/systems/physics.py` — `tick(ship, dt)` — apply movement physics
-- `server/game_loop.py` — asyncio task, fixed timestep, calls physics.tick + broadcast
-- `server/helm.py` — `handle_helm_message()`, queues heading/throttle intents
+- `server/engineering.py` — `handle_engineering_message()`, power + repair queue processing
 
 ### Server (modified)
-- `server/main.py` — start/stop game loop task on game start; add `helm` handler
-- `server/models/messages.py` — add `HelmSetHeadingPayload`, `HelmSetThrottlePayload`, `ShipStatePayload`
-- `server/utils/math_helpers.py` — add `angle_towards()` or `delta_angle()` helper if needed
+- `server/models/messages.py` — add `EngineeringSetPowerPayload`, `EngineeringSetRepairPayload`
+- `server/game_loop.py` — drain engineering inputs each tick; apply repair + overclock damage
+- `server/main.py` — add `engineering` handler to routing table; wire engineering queue
 
-### Client (new/modified)
-- `client/helm/index.html` — full Helm station layout
-- `client/helm/helm.js` — heading + throttle controls, ship.state handler, interpolation
-- `client/helm/helm.css` — layout for helm station panels
+### Client (new)
+- `client/engineering/index.html` — full Engineering station layout
+- `client/engineering/engineering.js` — power sliders, budget, health, repair allocation, WS handling
+- `client/engineering/engineering.css` — layout for engineering panels
 
 ### Tests (new)
-- `tests/test_physics.py` — ship movement, heading, speed clamping, turn rate
-- `tests/test_ship.py` — Ship model defaults, system efficiency
+- `tests/test_engineering.py` — handler unit tests
 
 ## Acceptance Criteria (Phase Gate)
 
-- [ ] Game loop starts when game is launched and ticks at 10 Hz
-- [ ] Helm station loads with viewscreen canvas, heading control, throttle slider, minimap
-- [ ] Moving throttle slider makes the ship move (minimap shows position changing)
-- [ ] Changing heading rotates the viewscreen starfield
-- [ ] Ship position wraps or clamps at sector boundary (decision to be made)
-- [ ] A second browser tab (any role) receives `ship.state` updates and can log them
+- [ ] Engineering can adjust power sliders for each of the 6 systems
+- [ ] Total power budget indicator shows used / available and highlights over-allocation
+- [ ] Reducing engine power → Helm's ship moves slower (max_speed decreases)
+- [ ] Boosting manoeuvring power → Helm's ship turns faster
+- [ ] Running a system above 100% → that system's health gradually decreases
+- [ ] Allocating repair to a damaged system → health recovers at a visible rate
+- [ ] System at 0 health → offline (efficiency = 0), power slider still moveable
 - [ ] All new tests pass (`pytest`)
-- [ ] `docs/MESSAGE_PROTOCOL.md` updated with Phase 2 messages
-- [ ] `.ai/STATE.md` accurately reflects Phase 2 state
+- [ ] `.ai/STATE.md` accurately reflects Phase 3 state
 
-## Out of Scope for Phase 2
+## Out of Scope for Phase 3
 
-- Engineering power sliders (Phase 3)
+- Beam/torpedo/shield power effects (Phase 4)
+- Sensor power effects (Phase 5)
+- Coolant system / heat routing (Tier 2, post-v0.01)
+- Individual component failure within a system (Tier 3, post-v0.01)
+- Power conduit routing (Tier 4, post-v0.01)
 - Enemy ships / combat (Phase 4)
-- Science scanning (Phase 5)
-- Captain's station UI (Phase 6)
-- Weapon firing
-- Shield damage / hull damage
-- Mission objectives
+- Mission objectives (Phase 6)

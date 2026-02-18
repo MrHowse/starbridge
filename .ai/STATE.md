@@ -3,9 +3,9 @@
 > **LIVING DOCUMENT** — Update after every AI engineering session.
 > This is the single source of truth for what exists in the project.
 
-**Last updated**: 2026-02-18 (Session 2c — Late-join fix, placeholder UX)
-**Current phase**: Phase 2 — Ship Physics & Helm
-**Overall status**: Phase 2 complete (server + client). 141 tests passing.
+**Last updated**: 2026-02-18 (Session 2c — Phase 2 gate: game loop tests, visual polish, AI file updates)
+**Current phase**: Phase 3 — Engineering Station + Power System
+**Overall status**: Phase 2 COMPLETE. 169 tests passing. Ready for Phase 3.
 
 ## What Exists
 
@@ -51,6 +51,7 @@
 - `tests/test_math_helpers.py` — 13 tests: wrap_angle (identity, zero, 359, 360, negative, large), angle_diff (CW, CCW, across zero, same, 180°, full circle)
 - `tests/test_ship.py` — 15 tests: ShipSystem efficiency (full, half power, half health, combined, overclock, zero health), Shields defaults, Ship defaults (name, position, heading, velocity/throttle, hull, 6 systems, full efficiency, independence)
 - `tests/test_physics.py` — 22 tests: max_speed/turn_rate scaling, heading turn (CW/CCW, snap, wrap, shortest path, at target), thrust (accel, decel, cap, floor), movement (N/S/E/W, displacement), boundary clamping (N/S/E, velocity zeroed, mid-sector safe)
+- `tests/test_game_loop.py` — 28 tests: init() stores world/manager/queue, start/stop lifecycle, task replacement, tick count reset, loop broadcasts ship.state, _drain_queue() applies heading/throttle/all-items/empty, _build_ship_state() all payload fields
 - `pytest.ini` — `asyncio_mode = auto` configured
 
 ### Missions
@@ -72,7 +73,7 @@
 - Physics: heading turns toward target (shortest path), velocity accelerates/decelerates to throttle target, ship translates in heading direction, clamped at sector boundary (velocity zeroed on hit)
 - Helm station fully operational: forward viewscreen with parallax starfield, rotating compass dial, throttle lever, sector minimap, telemetry readout
 - Ship.state interpolation: two-state buffer with `lerpAngle`/`lerp` gives smooth 60fps motion between 10Hz server ticks
-- 139 pytest tests pass (`pytest`)
+- 169 pytest tests pass (`pytest`)
 
 ## Known Issues
 
@@ -177,7 +178,8 @@ starbridge/
 │   ├── test_main.py          — 13 HTTP + WebSocket integration tests
 │   ├── test_math_helpers.py  — 13 math helper tests (wrap_angle, angle_diff)
 │   ├── test_ship.py          — 15 ship model tests (ShipSystem, Shields, Ship)
-│   └── test_physics.py       — 22 physics tests (derived quantities, turn, thrust, move, boundary)
+│   ├── test_physics.py       — 22 physics tests (derived quantities, turn, thrust, move, boundary)
+│   └── test_game_loop.py     — 28 game loop tests (init, start/stop, tick, drain_queue, build_ship_state)
 ├── pytest.ini                — asyncio_mode = auto
 ├── requirements.txt          — Python dependencies
 ├── run.py                    — Entry point: starts uvicorn server
@@ -193,10 +195,11 @@ starbridge/
 - [x] `helm.py` — validates and enqueues `helm.set_heading` / `helm.set_throttle`
 - [x] `lobby.register_game_start_callback()` wired; `_start_game()` triggers loop
 - [x] `main.py` wires `input_queue`, `World`, `helm.init`, `game_loop.init`
-- [x] 139 tests pass
+- [x] 169 tests pass (139 pre-existing + 28 new game loop tests)
 - [x] **Session 2b**: Helm client UI — compass dial, throttle lever, forward viewscreen, minimap, telemetry
+- [x] **Session 2c**: Late-join fix (lobby._game_payload), placeholder UX, DEFAULT_STATE fallback, minimap ctx caching, test_game_loop.py (28 tests)
 - [x] Phase 2 acceptance test: launch game → open Helm → A/D to turn, W/S for throttle, watch starfield rotate and minimap update
 
 ## Next Steps
 
-- **Phase 3**: Captain's station — alert level control, orders/comms, ship status overview
+- **Phase 3**: Engineering station — power distribution system, system health model, repair mechanic, Engineering client UI

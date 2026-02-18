@@ -99,6 +99,7 @@ const stars = createStarfield(STAR_COUNT);
 // Canvas contexts (obtained after game start when canvases are visible).
 let vsCtx  = null; // viewscreen
 let cmpCtx = null; // compass
+let mmCtx  = null; // minimap
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -139,6 +140,7 @@ function handleGameStarted(payload) {
   requestAnimationFrame(() => {
     vsCtx  = viewscreenCanvas.getContext('2d');
     cmpCtx = compassCanvas.getContext('2d');
+    mmCtx  = minimapCanvas.getContext('2d');
 
     resizeViewscreen();
     window.addEventListener('resize', resizeViewscreen);
@@ -218,9 +220,8 @@ function drawCompassPanel(state) {
 }
 
 function drawMinimapPanel(state) {
-  const ctx  = minimapCanvas.getContext('2d');
   const size = minimapCanvas.width;
-  drawMinimap(ctx, size, state.position.x, state.position.y, state.heading);
+  drawMinimap(mmCtx, size, state.position.x, state.position.y, state.heading);
 }
 
 function updateTelemetry(state) {

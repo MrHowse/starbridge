@@ -144,6 +144,42 @@
 
 ---
 
+## 2026-02-18 — Late-join clients receive game.started from stored payload
+
+**Decision**: When a client connects while a game is already running, the server sends `game.started` directly to that connection from a stored `lobby._game_payload`, rather than relying on the broadcast that fired at game start.
+
+**Reasoning**: `game.started` is a one-shot broadcast — it fires once when the host launches. Any browser that connects after that point (station pages load fresh after the lobby redirect) would never receive it and would stay on their standby screen indefinitely. Storing the payload and re-sending it on connect costs nothing and solves the problem completely.
+
+**Alternatives considered**:
+- Periodic re-broadcast — rejected: would trigger state changes on already-active clients
+- Polling / "are we in a game?" message — rejected: adds round-trip latency and complexity; storing the payload is simpler
+
+---
+
+## 2026-02-18 — DEFAULT_STATE fallback in helm.js prevents blank canvas on game start
+
+**Decision**: `helm.js` defines a `DEFAULT_STATE` constant (heading 0, velocity 0, throttle 0, position at sector centre). `getInterpolatedState()` returns this when `currState` is `null` (no server tick received yet), instead of returning `null` and skipping rendering.
+
+**Reasoning**: The helm station receives `game.started`, hides the standby screen, and starts the render loop — but the first `ship.state` tick won't arrive for up to 100 ms. Without a fallback state the canvases would remain blank (no draw calls) until the first tick. With `DEFAULT_STATE`, the starfield, compass, and minimap render immediately on game start.
+
+**Alternatives considered**:
+- Delay showing the helm UI until first tick — rejected: introduces a visible flash/delay
+- Initialise `currState` with a hardcoded object — equivalent, but a named constant is clearer and easier to document
+
+---
+
+## 2026-02-18 — Placeholder station pages show "not yet operational" + lobby link
+
+**Decision**: All unimplemented station pages (captain, weapons, engineering, science, viewscreen) display "This station is not yet operational." and a "← RETURN TO LOBBY" link in their standby screen, rather than a generic "STANDING BY / Awaiting mission orders." message with no exit path.
+
+**Reasoning**: Testing revealed that a player who claimed the wrong role (e.g., Captain instead of Helm) was stuck on a blank standby screen with no indication of what went wrong or how to recover. Three symptoms: (1) no explanation that the page is unimplemented, (2) no phase info to set expectations, (3) no navigation back. All three are fixed by this change.
+
+**Alternatives considered**:
+- HTTP 404/redirect for unimplemented stations — rejected: would make the role unavailable in the lobby, affecting game flow
+- Single generic "coming soon" page served for all placeholder routes — rejected: would break the role-specific redirect logic in lobby.js
+
+---
+
 ## 2026-02-18 — Lobby module uses init(manager) to receive ConnectionManager
 
 **Decision**: `server/lobby.py` exposes an `init(manager: ConnectionManager)` function that stores the manager as a module-level variable. `main.py` calls `lobby.init(manager)` once on startup after creating the `ConnectionManager` singleton. `init()` also resets the `LobbySession` to a fresh state, which doubles as the test injection point.
