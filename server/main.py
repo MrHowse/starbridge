@@ -10,27 +10,32 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from server import game_loop, helm, lobby
+from server import engineering, game_loop, helm, lobby
 from server.connections import ConnectionManager
-from server.models.messages import Message
+from server.models.messages import Message, VALID_SYSTEMS
 from server.models.world import World
 
 logger = logging.getLogger("starbridge")
+
+# Debug endpoints are enabled by default in development.
+# Set STARBRIDGE_DEBUG=false to disable before deploying.
+DEBUG: bool = os.getenv("STARBRIDGE_DEBUG", "true").lower() == "true"
 
 app = FastAPI(title="Starbridge", version="0.0.1")
 
 # Single connection manager for the process lifetime.
 manager = ConnectionManager()
 
-# Shared input queue: helm (and future stations) enqueue commands here;
+# Shared input queue: all stations enqueue commands here;
 # the game loop drains it at the start of each tick.
 input_queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
 
@@ -40,6 +45,7 @@ world = World()
 # Inject dependencies into each module.
 lobby.init(manager)
 helm.init(manager, input_queue)
+engineering.init(manager, input_queue)
 game_loop.init(world, manager, input_queue)
 
 # When the host starts a game the lobby calls this to kick off the loop.
@@ -60,6 +66,7 @@ _MessageHandler = Callable[[str, Message], Awaitable[None]]
 _HANDLERS: dict[str, _MessageHandler] = {
     "lobby": lobby.handle_lobby_message,
     "helm": helm.handle_helm_message,
+    "engineering": engineering.handle_engineering_message,
 }
 
 
@@ -119,7 +126,7 @@ async def root() -> dict[str, str]:
         "name": "Starbridge",
         "version": "0.0.1",
         "status": "online",
-        "phase": "2 — Ship Physics & Helm",
+        "phase": "3 — Engineering Station + Power System",
     }
 
 
@@ -135,3 +142,56 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         manager.disconnect(connection_id)
         await lobby.on_disconnect(connection_id)
+
+
+# ---------------------------------------------------------------------------
+# Debug endpoints (disabled when STARBRIDGE_DEBUG != "true")
+# ---------------------------------------------------------------------------
+
+
+@app.post("/debug/damage")
+async def debug_damage(
+    system: str = Query(..., description="System name to damage"),
+    amount: float = Query(20.0, description="HP to remove (default 20)"),
+) -> dict[str, Any]:
+    """[DEBUG] Deal damage to a named ship system.
+
+    Example: POST /debug/damage?system=engines&amount=40
+    """
+    if not DEBUG:
+        raise HTTPException(status_code=404, detail="Not found")
+    if system not in VALID_SYSTEMS:
+        raise HTTPException(status_code=400, detail=f"Unknown system: {system!r}")
+    sys_obj = world.ship.systems[system]
+    old_health = sys_obj.health
+    sys_obj.health = max(0.0, sys_obj.health - amount)
+    logger.info("[DEBUG] Damaged %s: %.1f → %.1f HP", system, old_health, sys_obj.health)
+    return {"system": system, "old_health": old_health, "new_health": sys_obj.health}
+
+
+@app.get("/debug/ship_status")
+async def debug_ship_status() -> dict[str, Any]:
+    """[DEBUG] Return the current ship state as JSON.
+
+    Useful for verifying server state without a client connected.
+    """
+    if not DEBUG:
+        raise HTTPException(status_code=404, detail="Not found")
+    ship = world.ship
+    return {
+        "name": ship.name,
+        "position": {"x": round(ship.x, 1), "y": round(ship.y, 1)},
+        "heading": round(ship.heading, 2),
+        "velocity": round(ship.velocity, 2),
+        "throttle": ship.throttle,
+        "hull": ship.hull,
+        "repair_focus": ship.repair_focus,
+        "systems": {
+            name: {
+                "power": s.power,
+                "health": s.health,
+                "efficiency": round(s.efficiency, 3),
+            }
+            for name, s in ship.systems.items()
+        },
+    }

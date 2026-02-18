@@ -4,7 +4,9 @@ Game Loop — Fixed Timestep Simulation.
 Runs as an asyncio background task at TICK_RATE Hz. Each tick:
   1. Drains the input queue and applies inputs to the ship.
   2. Runs the physics simulation step.
-  3. Broadcasts ship.state to all connected clients.
+  3. Applies engineering effects (repair healing, overclock damage).
+  4. Broadcasts ship.state to all connected clients.
+  5. Broadcasts ship.system_damaged for any overclock damage events.
 
 Call init(world, manager, queue) once from main.py on startup.
 Call start(mission_id) when the host launches a game.
@@ -14,11 +16,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from typing import Protocol
 
 from pydantic import BaseModel
 
-from server.models.messages import HelmSetHeadingPayload, HelmSetThrottlePayload, Message
+from server.models.messages import (
+    EngineeringSetPowerPayload,
+    EngineeringSetRepairPayload,
+    HelmSetHeadingPayload,
+    HelmSetThrottlePayload,
+    Message,
+)
 from server.models.ship import Ship
 from server.models.world import World
 from server.systems import physics
@@ -27,6 +36,16 @@ logger = logging.getLogger("starbridge.game_loop")
 
 TICK_RATE: int = 10             # simulation ticks per second
 TICK_DT: float = 1.0 / TICK_RATE  # seconds per tick (0.1 s)
+
+# ---------------------------------------------------------------------------
+# Engineering constants — tunable for gameplay feel
+# ---------------------------------------------------------------------------
+
+POWER_BUDGET: float = 600.0           # Total available power (6 systems × 100%)
+OVERCLOCK_THRESHOLD: float = 100.0    # Power above this risks damage each tick
+OVERCLOCK_DAMAGE_CHANCE: float = 0.10 # Probability of damage per tick while overclocked
+OVERCLOCK_DAMAGE_HP: float = 3.0      # HP deducted per overclock damage event
+REPAIR_HP_PER_TICK: float = 1.0       # HP restored per tick to the focused system
 
 
 # ---------------------------------------------------------------------------
@@ -110,12 +129,24 @@ async def _loop() -> None:
         physics.tick(_world.ship, TICK_DT, _world.width, _world.height)
         _tick_count += 1
 
-        # 3. Broadcast ship state.
+        # 3. Engineering effects: repair healing and overclock damage.
+        damaged_systems = _apply_engineering(_world.ship)
+
+        # 4. Broadcast ship state.
         # TODO (Phase 5): role-filter this broadcast — not all roles need all
         #                 ship data. Captain gets full state; others get subsets.
         await _manager.broadcast(_build_ship_state(_world.ship, _tick_count))
 
-        # 4. Sleep for the remainder of the tick budget.
+        # 5. Broadcast damage events produced by overclock this tick.
+        for system_name, new_health in damaged_systems:
+            await _manager.broadcast(
+                Message.build(
+                    "ship.system_damaged",
+                    {"system": system_name, "new_health": new_health, "cause": "overclock"},
+                )
+            )
+
+        # 6. Sleep for the remainder of the tick budget.
         elapsed = asyncio.get_event_loop().time() - tick_start
         await asyncio.sleep(max(0.0, TICK_DT - elapsed))
 
@@ -132,8 +163,51 @@ def _drain_queue(ship: Ship) -> None:
             ship.target_heading = payload.heading
         elif msg_type == "helm.set_throttle" and isinstance(payload, HelmSetThrottlePayload):
             ship.throttle = payload.throttle
+        elif msg_type == "engineering.set_power" and isinstance(payload, EngineeringSetPowerPayload):
+            _apply_power(ship, payload.system, payload.level)
+        elif msg_type == "engineering.set_repair" and isinstance(payload, EngineeringSetRepairPayload):
+            ship.repair_focus = payload.system
         else:
             logger.warning("Unrecognised queued input type: %s", msg_type)
+
+
+def _apply_power(ship: Ship, system_name: str, requested: float) -> None:
+    """Set a system's power level, clamped to the remaining budget.
+
+    If the requested level would push total power above POWER_BUDGET, the
+    level is silently reduced to whatever headroom remains. The client UI
+    shows this constraint in real time so the clamp is expected rather than
+    surprising.
+    """
+    sys_obj = ship.systems[system_name]
+    other_total = sum(s.power for name, s in ship.systems.items() if name != system_name)
+    available = POWER_BUDGET - other_total
+    sys_obj.power = max(0.0, min(requested, available))
+
+
+def _apply_engineering(ship: Ship) -> list[tuple[str, float]]:
+    """Apply repair healing and overclock damage for this tick.
+
+    Returns a list of (system_name, new_health) tuples for each system that
+    took overclock damage this tick. The caller broadcasts ship.system_damaged
+    for each entry.
+    """
+    damaged: list[tuple[str, float]] = []
+
+    # Repair: heal the focused system by REPAIR_HP_PER_TICK, capped at 100.
+    if ship.repair_focus is not None:
+        sys_obj = ship.systems.get(ship.repair_focus)
+        if sys_obj is not None and sys_obj.health < 100.0:
+            sys_obj.health = min(100.0, sys_obj.health + REPAIR_HP_PER_TICK)
+
+    # Overclock damage: each overclocked system has a chance to take damage.
+    for name, sys_obj in ship.systems.items():
+        if sys_obj.power > OVERCLOCK_THRESHOLD and sys_obj.health > 0.0:
+            if random.random() < OVERCLOCK_DAMAGE_CHANCE:
+                sys_obj.health = max(0.0, sys_obj.health - OVERCLOCK_DAMAGE_HP)
+                damaged.append((name, sys_obj.health))
+
+    return damaged
 
 
 def _build_ship_state(ship: Ship, tick: int) -> Message:
@@ -158,6 +232,7 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
                 }
                 for name, s in ship.systems.items()
             },
+            "repair_focus": ship.repair_focus,
             "alert_level": "green",  # TODO (Phase 6): use captain's alert level
         },
         tick=tick,

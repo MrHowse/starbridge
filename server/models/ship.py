@@ -94,3 +94,6 @@ class Ship:
 
     # --- Subsystems ---
     systems: dict[str, ShipSystem] = field(default_factory=_default_systems)
+
+    # --- Engineering ---
+    repair_focus: str | None = None  # System currently receiving repair attention

@@ -228,64 +228,47 @@
 
 ---
 
-## 2026-02-18 — Single Message envelope model with tick: int | None
+## 2026-02-18 — Power budget = 600 units (6 systems × 100% baseline)
 
-**Decision**: All WebSocket messages use a single `Message` Pydantic model with `tick: int | None = None`. The field is `None` for client→server messages and lobby messages, and populated by the server for in-game state updates. Outbound messages serialise with `exclude_none=True` so `tick` is absent from the JSON when not set.
+**Decision**: The Engineering power pool is 600 units total (6 systems × 100% each). All systems start at 100% power, which is the sustainable baseline. To overclock any system above 100%, the Engineer must cut power from others to stay within the 600-unit budget.
 
-**Reasoning**: One envelope model means one parse path, one validation path, and one serialisation call. Splitting into separate client-message and server-message models would add complexity with no real benefit — the protocol is uniform by design. Using `exclude_none=True` keeps the wire format clean (no `"tick": null` in lobby messages) without requiring a second model.
+**Reasoning**: At 600, the ship starts in a comfortable equilibrium — all systems functional, no scarcity. The drama escalates with the mission: when combat starts and Weapons wants 150% beams and Shields wants 150% shields, the Engineer is suddenly 300 units over budget and must make hard choices. This creates a gameplay arc (calm patrol → crisis under fire) rather than constant stress from mission start. Contrast with a 300-unit pool where the engineer is immediately resource-constrained before anything interesting happens.
 
 **Alternatives considered**:
-- Separate `ClientMessage` / `ServerMessage` models — rejected: duplication, two parse paths, no meaningful type-safety gain at the boundary where JSON is parsed
-- Always include `tick` as 0 or -1 in non-game messages — rejected: pollutes the protocol with a sentinel value that has no meaning in lobby context
+- Pool = 300 (50% per system at rest) — rejected: constant maximum tension removes the arc; engineer is always overloaded, making the role feel punishing rather than dramatic
 
 ---
 
-## 2026-02-18 — Stub lobby handler wired up in Session 1a
+## 2026-02-18 — Power budget enforcement via silent clamp at tick drain
 
-**Decision**: `server/lobby.py` contains a real handler function (`handle_lobby_message`) that is imported and registered in the routing table in `server/main.py`. For Session 1a it only logs the message type and connection ID. The actual claim/release/launch logic is implemented in Session 1b.
+**Decision**: When an `engineering.set_power` input would push the total system power above the 600-unit budget, the requested level is silently clamped to whatever headroom remains. The clamping happens in `game_loop._drain_queue()` where the ship model is available. The Engineering client shows the budget and clamped result in real time; the server never sends an error response.
 
-**Reasoning**: The WebSocket routing infrastructure (envelope parse → category dispatch → handler call) is the thing being tested in Session 1a. Having the router call a real function through the real dispatch table verifies the full path end-to-end. A stub that is never imported or called would not test the wiring at all.
+**Reasoning**: Error messages feel like software feedback, not physical constraints. The reactor "can't give any more" — this should feel like a dial hitting a hard stop, not an administrative rejection. The client UI (budget bar, slider behaviour) communicates the constraint before the message is sent; by the time the server processes it, the clamp is expected. Silent clamping also avoids a round-trip latency before the UI updates.
 
 **Alternatives considered**:
-- No lobby handler in 1a (just log "unhandled message" in the router) — rejected: doesn't test the routing wiring that will be used for all future message types
-- Fully implement lobby logic in 1a — rejected: lobby state management belongs in Session 1b where it can be tested properly with its own test suite
+- Hard reject with `error.state` — rejected: administrative feel; client must wait for server rejection before updating UI; error message framing is wrong for a physical constraint
 
 ---
 
-## 2026-02-18 — Game input processed via queue at start of each tick
+## 2026-02-18 — Engineering mechanics defined as named constants in game_loop.py
 
-**Decision**: Station clients (Helm, Engineering, Weapons, etc.) send intention messages that are appended to a shared `asyncio.Queue`. At the start of each game loop tick, the loop drains this queue and applies all pending inputs to the game state before running the physics step.
+**Decision**: All tunable engineering parameters are defined as module-level constants at the top of `server/game_loop.py`: `POWER_BUDGET`, `OVERCLOCK_THRESHOLD`, `OVERCLOCK_DAMAGE_CHANCE`, `OVERCLOCK_DAMAGE_HP`, `REPAIR_HP_PER_TICK`.
 
-**Reasoning**: Cleanly separates message receipt (async WebSocket events) from simulation (fixed schedule). Matches the convention in CONVENTIONS.md: "Client messages are queued and processed at the start of each tick." Setting this pattern in Phase 2 means Engineering, Weapons, and Science all use the same queue in later phases — one infrastructure piece, multiple consumers.
+**Reasoning**: These values are inevitably adjusted during playtesting — "feels too punishing / too lenient" are expected feedback. Named constants at the top of a single file are trivially findable and changeable. They are also inspectable from tests (e.g., `assert game_loop.REPAIR_HP_PER_TICK == 1.0`), which makes test assertions self-documenting. Phase 3 values: repair 1 HP/tick (10 HP/sec), overclock 10% chance/tick of 3 HP damage (~1 event/sec expected).
 
 **Alternatives considered**:
-- Direct mutation (messages write to ship model immediately on receipt) — rejected: simpler, but inconsistent with stated convention; harder to reason about game state mid-tick
-- Per-station queues — rejected: unnecessary; a single typed queue is sufficient and avoids synchronisation overhead
+- Hardcoded magic numbers inline — rejected: unfindable, not self-documenting, guaranteed to need a grep when tuning
+- Config file / environment variables — deferred: unnecessary indirection for values that change only during development
 
 ---
 
-## 2026-02-18 — Sector boundary: clamp position, stop velocity
+## 2026-02-18 — Debug endpoints gated by STARBRIDGE_DEBUG environment variable
 
-**Decision**: When the ship reaches the edge of the 100,000 × 100,000 unit sector, its position is clamped to the boundary and velocity is set to zero. The player must change heading and reapply throttle to move away from the wall.
+**Decision**: Two debug HTTP endpoints are added to `server/main.py`: `POST /debug/damage` (deal HP damage to a named system) and `GET /debug/ship_status` (return full ship state as JSON). Both return HTTP 404 when `STARBRIDGE_DEBUG` env var is not `"true"`. The var defaults to `"true"` in development.
 
-**Reasoning**: Simple, predictable, clear feedback. No teleportation confusion (wrap), no invisible wall mystery (position clamped but velocity persisting). The ship visibly stops.
-
-**Alternatives considered**:
-- Wrap-around — rejected for Phase 2: disorienting on minimap, better as a mission-level option in a future phase
-- Allow unbounded movement — rejected: breaks minimap rendering and world entity coordinates
-
-**Future**: A TODO comment marks the clamp site in physics.py. Some missions may want wrap-around or open boundaries. Should become configurable per-mission when the mission engine is built in Phase 6.
-
----
-
-## 2026-02-18 — ship.state broadcast to all clients each tick (deferred role-filtering)
-
-**Decision**: Every game loop tick broadcasts the full `ship.state` payload to all connected clients, regardless of role.
-
-**Reasoning**: Phase 2 only has the Helm station. Broadcasting everything to everyone costs nothing on LAN, is easy to debug (any tab can log ship.state), and avoids premature design work on which roles see which fields. Role-filtering becomes a design concern in Phase 5 when Science creates information asymmetry.
+**Reasoning**: A quick way to damage systems is essential for testing the repair mechanic and overclock risk without waiting for those mechanics to trigger naturally. HTTP endpoints work from any browser tab, from curl, and don't require a specific station client to be open. Gating behind an env var (rather than a compile flag or hardcoded boolean) means the endpoints can be disabled with a single environment change when deploying, without a code change.
 
 **Alternatives considered**:
-- Role-filter from the start — rejected: requires defining per-role field sets before those roles are implemented
-- Separate payloads per role — deferred: correct long-term design, to be implemented in Phase 5
-
-**Future**: A TODO comment marks the broadcast call in game_loop.py. In Phase 5: Captain gets full state, Helm gets nav fields, Weapons gets a contact view, Science gets sensor data, etc.
+- Browser console command (`window.debugDamage(...)`) — rejected: requires the specific station page to be open; awkward when testing with two tabs
+- Debug WebSocket message category — rejected: requires the WS connection to be open and authenticated; more code for the same result
+- No debug mechanism — rejected: would require manual editing of ship state in memory, which is not viable during interactive testing

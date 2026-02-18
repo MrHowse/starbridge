@@ -92,6 +92,35 @@ class HelmSetThrottlePayload(BaseModel):
     throttle: float = Field(ge=0.0, le=100.0)
 
 
+# Phase 3 — Engineering control inputs
+VALID_SYSTEMS: frozenset[str] = frozenset(
+    {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring"}
+)
+
+
+class EngineeringSetPowerPayload(BaseModel):
+    system: str
+    level: float = Field(ge=0.0, le=150.0)
+
+    @field_validator("system")
+    @classmethod
+    def system_must_be_valid(cls, v: str) -> str:
+        if v not in VALID_SYSTEMS:
+            raise ValueError(f"Unknown system: {v!r}")
+        return v
+
+
+class EngineeringSetRepairPayload(BaseModel):
+    system: str
+
+    @field_validator("system")
+    @classmethod
+    def system_must_be_valid(cls, v: str) -> str:
+        if v not in VALID_SYSTEMS:
+            raise ValueError(f"Unknown system: {v!r}")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # Server → Client payload schemas (Phase 1)
 # ---------------------------------------------------------------------------
@@ -164,6 +193,9 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     # Phase 2 — Helm
     "helm.set_heading": HelmSetHeadingPayload,
     "helm.set_throttle": HelmSetThrottlePayload,
+    # Phase 3 — Engineering
+    "engineering.set_power": EngineeringSetPowerPayload,
+    "engineering.set_repair": EngineeringSetRepairPayload,
 }
 
 
