@@ -7,6 +7,17 @@
 import { connect, on, send } from "/client/shared/connection.js";
 import { setStatusDot, showBriefing, showGameOver } from "/client/shared/ui_components.js";
 import { initPuzzleRenderer } from "/client/shared/puzzle_renderer.js";
+import { SoundBank } from "/client/shared/audio.js";
+import "/client/shared/audio_events.js";
+import { wireButtonSounds } from "/client/shared/audio_ui.js";
+import { registerHelp, initHelpOverlay } from "/client/shared/help_overlay.js";
+
+registerHelp([
+  { selector: '#scanner-canvas',    text: 'Frequency scanner — find faction signal bands on the spectrum.', position: 'right' },
+  { selector: '#freq-slider',       text: 'Frequency tuner — slide to lock onto a faction\'s band.', position: 'below' },
+  { selector: '#hail-controls',     text: 'Hailing controls — choose message type and send to contact.', position: 'left' },
+  { selector: '#transmission-log',  text: 'Transmission log — incoming NPC responses appear here.', position: 'left' },
+]);
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -79,13 +90,17 @@ function init() {
   on("comms.npc_response", handleNPCResponse);
   on("puzzle.assist_available", handleAssistAvailable);
   on("game.started",   payload => showBriefing(payload.mission_name, payload.briefing_text));
-  on("game.over",      payload => showGameOver(payload.result, payload.stats));
-  on("ship.hull_hit",  () => document.getElementById("station-container")?.classList.add("hit"));
+  on("game.over",      payload => { SoundBank.play(payload.result === 'victory' ? 'victory' : 'defeat'); showGameOver(payload.result, payload.stats); });
+  on("ship.hull_hit",  () => { SoundBank.play('hull_hit'); document.getElementById("station-container")?.classList.add("hit"); });
   on("ship.state",     () => document.getElementById("station-container")?.classList.remove("hit"));
   on("ship.alert_changed", ({ level }) => setAlertLevel(level));
 
   // Connection
   on("statusChange", status => setStatusDot(document.getElementById("conn-status"), status));
+
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  initHelpOverlay();
 
   const callsign = sessionStorage.getItem("callsign") || "—";
   document.getElementById("callsign-display").textContent = callsign;
@@ -154,6 +169,7 @@ function handleCommsState(payload) {
 }
 
 function handleNPCResponse(payload) {
+  SoundBank.play('incoming_transmission');
   addLogEntry(`[${payload.faction.toUpperCase()}]: ${payload.response_text}`, "incoming");
 }
 

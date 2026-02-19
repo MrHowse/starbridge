@@ -21,6 +21,19 @@ import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, showBriefing, showGameOver } from '../shared/ui_components.js';
 import { drawBackground } from '../shared/renderer.js';
 import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_ambient.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+import { initNotifications } from '../shared/notifications.js';
+import { initRoleBar } from '../shared/role_bar.js';
+
+registerHelp([
+  { selector: '#schematic',         text: 'Ship schematic — click a system node to set repair focus.', position: 'right' },
+  { selector: '#systems-container', text: 'System sliders — drag to allocate power (0–150%). Budget is 600 total.', position: 'left' },
+  { selector: '#budget-readout',    text: 'Power budget — stay under 600 to avoid overload.', position: 'below' },
+]);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -115,9 +128,10 @@ const systemsContainer = document.getElementById('systems-container');
 // Game state
 // ---------------------------------------------------------------------------
 
-let gameActive  = false;
-let currState   = null;    // most recent ship.state payload
-let repairFocus = null;    // key of the system currently being repaired (or null)
+let gameActive    = false;
+let hintsEnabled  = false;  // true when difficulty === 'cadet'
+let currState     = null;   // most recent ship.state payload
+let repairFocus   = null;   // key of the system currently being repaired (or null)
 
 /**
  * Timestamp (performance.now()) of the most recent damage event per system.
@@ -140,6 +154,7 @@ let sctx = null;
  *   pwrText: HTMLElement,
  *   effText: HTMLElement,
  *   repairBtn: HTMLButtonElement,
+ *   hintBadge: HTMLElement,
  * }>}
  */
 const sysEls = {};
@@ -169,6 +184,11 @@ function init() {
 
   initPuzzleRenderer(send);
   setupSchematicClick();
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  initHelpOverlay();
+  initNotifications(send, 'engineering');
+  initRoleBar(send, 'engineering');
   connect();
 }
 
@@ -199,11 +219,16 @@ function handleGameStarted(payload) {
     showBriefing(payload.mission_name, payload.briefing_text);
   }
 
+  hintsEnabled = payload.difficulty === 'cadet';
   console.log(`[engineering] Game started — mission: ${payload.mission_id}`);
+  SoundBank.setAmbient('reactor_drone', { powerLoad: 0.5 });
 }
 
 function handleGameOver(payload) {
   gameActive = false;
+  SoundBank.play(payload.result === 'victory' ? 'victory' : 'defeat');
+  SoundBank.stopAmbient('reactor_drone');
+  SoundBank.stopAmbient('alert_level');
   showGameOver(payload.result, payload.stats || {});
 }
 
@@ -211,12 +236,15 @@ function handleShipState(payload) {
   if (!gameActive) return;
   currState = payload;
   applyState(payload);
+  const totalPwr = Object.values(payload.systems || {}).reduce((s, sys) => s + (sys.power || 0), 0);
+  SoundBank.setAmbient('reactor_drone', { powerLoad: totalPwr / POWER_BUDGET });
 }
 
 /**
  * Hull took damage from an incoming hit — flash the station border red.
  */
 function handleHullHit() {
+  SoundBank.play('hull_hit');
   const el = document.querySelector('.station-container') || document.body;
   el.style.transition = 'outline 0.05s ease';
   el.style.outline    = '3px solid #ff2020';
@@ -276,6 +304,7 @@ function handleAssistSent(payload) {
  * next ship.state tick.
  */
 function handleSystemDamaged(payload) {
+  SoundBank.play('system_damage');
   flashSystems[payload.system] = performance.now();
 
   // Optimistically update health so the bar reflects damage instantly.
@@ -329,6 +358,10 @@ function applyState(state) {
     // Overclock indicator on row + slider thumb colour.
     els.row.classList.toggle('sys-row--overclocked', sys.power > OVERCLOCK_THRESHOLD);
     els.row.classList.toggle('sys-row--offline',     sys.health <= 0);
+
+    // Cadet hint: flag critical systems (health < 50%) that are underpowered (< 75%).
+    const needsHint = hintsEnabled && sys.health < 50 && sys.power < 75;
+    els.hintBadge.style.display = needsHint ? '' : 'none';
   }
 
   // Budget bar
@@ -398,7 +431,14 @@ function buildSystemRows() {
     repairBtn.textContent = 'REPAIR';
     repairBtn.addEventListener('click', () => selectRepair(def.key));
 
+    // Cadet hint badge — shown when system is damaged and underpowered.
+    const hintBadge = document.createElement('span');
+    hintBadge.className   = 'sys-row__hint-badge';
+    hintBadge.textContent = 'RECOMMENDED';
+    hintBadge.style.display = 'none';
+
     header.appendChild(nameEl);
+    header.appendChild(hintBadge);
     header.appendChild(repairBtn);
 
     // ── Power slider ─────────────────────────────────────────────────────
@@ -475,7 +515,7 @@ function buildSystemRows() {
     systemsContainer.appendChild(row);
 
     // Cache element refs for fast access in update loops.
-    sysEls[def.key] = { row, slider, healthFill, healthText, pwrText, effText, repairBtn };
+    sysEls[def.key] = { row, slider, healthFill, healthText, pwrText, effText, repairBtn, hintBadge };
 
     // Set initial slider gradient.
     updateSliderBackground(slider, 100);

@@ -70,7 +70,8 @@ def apply_hit_to_player(
         absorbed = min(ship.shields.rear * SHIELD_ABSORPTION_COEFF, damage)
         ship.shields.rear = max(0.0, ship.shields.rear - absorbed / SHIELD_ABSORPTION_COEFF)
 
-    hull_damage = damage - absorbed
+    # Apply difficulty enemy damage multiplier.
+    hull_damage = (damage - absorbed) * ship.difficulty.enemy_damage_mult
 
     # 3. Hull damage + optional system damage roll + crew casualties.
     damaged_systems: list[tuple[str, float]] = []
@@ -81,9 +82,9 @@ def apply_hit_to_player(
             dmg = rng.uniform(SYSTEM_DAMAGE_MIN, SYSTEM_DAMAGE_MAX)
             ship.systems[system_name].health = max(0.0, ship.systems[system_name].health - dmg)
             damaged_systems.append((system_name, ship.systems[system_name].health))
-        # Crew casualties: deterministic count (1 per CREW_CASUALTY_PER_HULL_DAMAGE points).
+        # Crew casualties scaled by difficulty.crew_casualty_mult.
         # Uses rng.choice only for deck selection; does not add an extra rng.random() call.
-        casualties = int(hull_damage / CREW_CASUALTY_PER_HULL_DAMAGE)
+        casualties = int((hull_damage * ship.difficulty.crew_casualty_mult) / CREW_CASUALTY_PER_HULL_DAMAGE)
         if casualties > 0 and ship.crew.decks:
             deck_name = rng.choice(list(ship.crew.decks.keys()))
             ship.crew.apply_casualties(deck_name, casualties)

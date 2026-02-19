@@ -35,3 +35,8 @@ class GameTickPayload(BaseModel):
 class GameOverPayload(BaseModel):
     result: Literal["victory", "defeat"]
     stats: dict[str, Any]
+
+
+class GameBriefingLaunchPayload(BaseModel):
+    """Sent by captain from the briefing screen to advance all players to stations."""
+    pass

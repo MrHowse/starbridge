@@ -9,7 +9,9 @@ Call on_connect / on_disconnect from the WebSocket endpoint in main.py.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -20,6 +22,7 @@ from pydantic import ValidationError
 from server.game_logger import log_event as _log, start_logging
 from server.missions.loader import load_mission
 from server.models.interior import make_default_interior
+from server.models.ship_class import list_ship_classes
 from server.models.messages import (
     LobbyClaimRolePayload,
     LobbyStartGamePayload,
@@ -74,11 +77,16 @@ class LobbySession:
 
 _manager: _ManagerProtocol | None = None
 _session: LobbySession = LobbySession()
-_on_game_start: Callable[[str], Awaitable[None]] | None = None
+_on_game_start: Callable[[str, str, str], Awaitable[None]] | None = None
 # Stored once game.started is broadcast; re-sent to any client that joins later.
 _game_payload: dict[str, str] | None = None
 # True from game.started until game.over; controls whether new joins get replay.
 _game_active: bool = False
+
+# Reserved roles: role → (player_name, disconnect_timestamp)
+# Within ROLE_RESERVE_SECS of disconnect the role is held for the player.
+_reserved_roles: dict[str, tuple[str, float]] = {}
+ROLE_RESERVE_SECS: float = 60.0
 
 
 # ---------------------------------------------------------------------------
@@ -92,18 +100,19 @@ def init(manager: _ManagerProtocol) -> None:
     Called once from main.py on server startup with the real ConnectionManager.
     Calling again (e.g. in tests) resets the session to a clean state.
     """
-    global _manager, _session, _game_payload, _game_active
+    global _manager, _session, _game_payload, _game_active, _reserved_roles
     _manager = manager
     _session = LobbySession()
     _game_payload = None
     _game_active = False
+    _reserved_roles = {}
 
 
-def register_game_start_callback(callback: Callable[[str], Awaitable[None]]) -> None:
+def register_game_start_callback(callback: Callable[[str, str, str], Awaitable[None]]) -> None:
     """Register a coroutine to call when the host starts a game.
 
     Called from main.py to wire game_loop.start into the lobby flow.
-    The callback receives the mission_id string.
+    The callback receives (mission_id, difficulty, ship_class) strings.
     """
     global _on_game_start
     _on_game_start = callback
@@ -115,9 +124,10 @@ async def on_game_end() -> None:
     Clears the stored game.started payload so reconnecting clients receive a
     fresh lobby view rather than being replayed into the finished game.
     """
-    global _game_payload, _game_active
+    global _game_payload, _game_active, _reserved_roles
     _game_payload = None
     _game_active = False
+    _reserved_roles = {}  # Release all reservations — game is over.
     logger.info("Game ended — lobby reset to pre-game state")
 
 
@@ -127,19 +137,37 @@ async def on_game_end() -> None:
 
 
 def _roles_for_broadcast() -> dict[str, str | None]:
-    """Return {role: player_name | None} for the lobby.state payload."""
-    return {
-        role: occupant[1] if occupant is not None else None
-        for role, occupant in _session.roles.items()
-    }
+    """Return {role: player_name | None} for the lobby.state payload.
+
+    Reserved (disconnected) roles are shown as 'DISCONNECTED:<player_name>'
+    so the lobby UI can distinguish them from empty slots.
+    """
+    result: dict[str, str | None] = {}
+    for role, occupant in _session.roles.items():
+        if occupant is not None:
+            result[role] = occupant[1]
+        elif role in _reserved_roles:
+            result[role] = f"DISCONNECTED:{_reserved_roles[role][0]}"
+        else:
+            result[role] = None
+    return result
 
 
 def _find_connection_role(connection_id: str) -> str | None:
-    """Return the role currently held by connection_id, or None."""
+    """Return the first role held by connection_id, or None."""
     for role, occupant in _session.roles.items():
         if occupant is not None and occupant[0] == connection_id:
             return role
     return None
+
+
+def _find_connection_roles(connection_id: str) -> list[str]:
+    """Return all roles currently held by connection_id."""
+    return [
+        role
+        for role, occupant in _session.roles.items()
+        if occupant is not None and occupant[0] == connection_id
+    ]
 
 
 async def _broadcast_lobby_state() -> None:
@@ -193,15 +221,28 @@ async def on_connect(connection_id: str) -> None:
 async def on_disconnect(connection_id: str) -> None:
     """Called from main.py after manager.disconnect() has removed the connection.
 
-    Releases the departing player's role (if any), reassigns host to the next
-    connection if needed, then broadcasts lobby.state to remaining clients.
+    During an active game, reserves the role for ROLE_RESERVE_SECS seconds so
+    the player can reconnect. After the window, the role is released automatically.
+    Outside of a game, releases the role immediately.
     """
     assert _manager is not None
 
-    role = _find_connection_role(connection_id)
-    if role is not None:
+    held_roles = _find_connection_roles(connection_id)
+    for role in held_roles:
+        player_name = _session.roles[role][1]  # type: ignore[index]
         _session.roles[role] = None
-        logger.info("Role '%s' released by disconnected connection %s", role, connection_id)
+        if _game_active:
+            # Reserve the role for 60 s.
+            _reserved_roles[role] = (player_name, time.monotonic())
+            asyncio.get_event_loop().call_later(
+                ROLE_RESERVE_SECS, _expire_reserved_role, role, player_name
+            )
+            logger.info(
+                "Role '%s' reserved for %.0fs (player '%s' disconnected mid-game)",
+                role, ROLE_RESERVE_SECS, player_name,
+            )
+        else:
+            logger.info("Role '%s' released by disconnected connection %s", role, connection_id)
 
     if _session.host_connection_id == connection_id:
         remaining = _manager.all_ids()  # already excludes disconnected connection
@@ -211,6 +252,20 @@ async def on_disconnect(connection_id: str) -> None:
             logger.info("Host reassigned to %s", _session.host_connection_id)
 
     await _broadcast_lobby_state()
+
+
+def _expire_reserved_role(role: str, player_name: str) -> None:
+    """Release a reserved role if it hasn't been reclaimed.
+
+    Called by asyncio.call_later() after ROLE_RESERVE_SECS seconds.
+    """
+    if _reserved_roles.get(role, (None,))[0] == player_name:
+        _reserved_roles.pop(role, None)
+        logger.info("Reserved role '%s' expired for player '%s'", role, player_name)
+        # Schedule async broadcast since call_later can't await.
+        loop = asyncio.get_event_loop()
+        if _manager and loop.is_running():
+            loop.create_task(_broadcast_lobby_state())
 
 
 # ---------------------------------------------------------------------------
@@ -230,23 +285,58 @@ async def _claim_role(connection_id: str, payload: LobbyClaimRolePayload) -> Non
 
     occupant = _session.roles[role]
     if occupant is not None and occupant[0] != connection_id:
+        # Another connection holds the role.
+        other_player = occupant[1]
         await _manager.send(
             connection_id,
-            Message.build("lobby.error", {"message": f"Role '{role}' is already taken."}),
+            Message.build("lobby.error", {
+                "message": f"Role '{role}' is already taken.",
+                "code": "role_occupied",
+                "occupant": other_player,
+            }),
         )
         return
 
-    # Release any role this connection currently holds before claiming the new one
-    current_role = _find_connection_role(connection_id)
-    if current_role is not None and current_role != role:
-        _session.roles[current_role] = None
+    # Check if the role is reserved (mid-game reconnect scenario).
+    reserved = _reserved_roles.get(role)
+    if reserved is not None:
+        res_player, _ts = reserved
+        if res_player == payload.player_name:
+            # Same player reclaiming their reserved slot — allow silently.
+            _reserved_roles.pop(role, None)
+            logger.info(
+                "Connection %s reclaimed reserved role '%s' as '%s'",
+                connection_id, role, payload.player_name,
+            )
+        else:
+            # Different player trying to claim a reserved role during the reserve window.
+            await _manager.send(
+                connection_id,
+                Message.build("lobby.error", {
+                    "message": f"Role '{role}' is temporarily reserved for '{res_player}'.",
+                    "code": "role_reserved",
+                    "occupant": res_player,
+                }),
+            )
+            return
+
+    # In single-role mode (default), release any other role this connection holds.
+    # In additional mode, the connection keeps its existing roles.
+    if not payload.additional:
+        for held in _find_connection_roles(connection_id):
+            if held != role:
+                _session.roles[held] = None
 
     _session.roles[role] = (connection_id, payload.player_name)
     _manager.tag(connection_id, role=role, player_name=payload.player_name)
-    _log("lobby", "role_claimed", {"role": role, "player": payload.player_name})
+    _log("lobby", "role_claimed", {
+        "role": role,
+        "player": payload.player_name,
+        "additional": payload.additional,
+    })
     logger.info(
-        "Connection %s claimed role '%s' as '%s'",
-        connection_id, role, payload.player_name,
+        "Connection %s claimed role '%s' as '%s' (additional=%s)",
+        connection_id, role, payload.player_name, payload.additional,
     )
     await _broadcast_lobby_state()
 
@@ -296,22 +386,40 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
         for room_id, room in _default_interior.rooms.items()
     }
 
+    # Build available ship classes list for client display.
+    ship_classes = [
+        {"id": sc.id, "name": sc.name, "description": sc.description, "max_hull": sc.max_hull}
+        for sc in list_ship_classes()
+    ]
+
+    players = {role: occ[1] for role, occ in _session.roles.items() if occ is not None}
+
     _game_payload = {
         "mission_id": payload.mission_id,
         "mission_name": mission_data.get("name", "Awaiting Orders"),
         "briefing_text": mission_data.get("briefing", "All stations report ready."),
         "signal_location": {"x": sig["x"], "y": sig["y"]} if sig else None,
         "interior_layout": interior_layout,
+        "difficulty": payload.difficulty,
+        "ship_class": payload.ship_class,
+        "ship_classes": ship_classes,
+        "players": players,
     }
     _game_active = True
-    players = {role: occ[1] for role, occ in _session.roles.items() if occ is not None}
     start_logging(payload.mission_id, players)
-    _log("lobby", "game_started", {"mission_id": payload.mission_id, "players": players})
+    _log("lobby", "game_started", {
+        "mission_id": payload.mission_id,
+        "ship_class": payload.ship_class,
+        "players": players,
+    })
     await _manager.broadcast(Message.build("game.started", _game_payload))
-    logger.info("Game started by host %s, mission: %s", connection_id, payload.mission_id)
+    logger.info(
+        "Game started by host %s, mission: %s, ship: %s",
+        connection_id, payload.mission_id, payload.ship_class,
+    )
 
     if _on_game_start is not None:
-        await _on_game_start(payload.mission_id)
+        await _on_game_start(payload.mission_id, payload.difficulty, payload.ship_class)
 
 
 # ---------------------------------------------------------------------------

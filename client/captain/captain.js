@@ -12,26 +12,27 @@
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, redirectToStation, showBriefing } from '../shared/ui_components.js';
-import {
-  C_PRIMARY, C_PRIMARY_DIM, C_BG, C_GRID,
-  drawBackground, worldToScreen, drawShipChevron,
-} from '../shared/renderer.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+import { initNotifications } from '../shared/notifications.js';
+import { initRoleBar } from '../shared/role_bar.js';
+
+registerHelp([
+  { selector: '#captain-canvas',    text: 'Tactical map — North-up overview of all contacts and torpedoes.', position: 'right' },
+  { selector: '#ship-status-panel', text: 'Ship status — hull, shields, and power at a glance.', position: 'left' },
+  { selector: '.alert-btn',         text: 'Alert level — GREEN (normal), YELLOW (elevated), RED (battle stations).', position: 'below' },
+  { selector: '#science-panel',     text: 'Science summary — live scan progress and last scan result.', position: 'left' },
+]);
+import { MapRenderer } from '../shared/map_renderer.js';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const MAP_WORLD_RADIUS = 80_000;  // half-width of tactical map in world units
-const TORP_DOT_RADIUS  = 3;
-const HIT_FLASH_MS     = 400;
-const TRAIL_LENGTH     = 5;       // torpedo trail positions to keep
-
-// Enemy wireframe shapes (mirrors weapons.js)
-const ENEMY_SHAPES = {
-  scout:     { size: 8,  color: '#ff4040' },
-  cruiser:   { size: 12, color: '#ff4040' },
-  destroyer: { size: 16, color: '#ff4040' },
-};
+const HIT_FLASH_MS = 400;
 
 // ---------------------------------------------------------------------------
 // DOM references
@@ -89,8 +90,8 @@ let shipState = null;
 /** Enemy and torpedo lists from world.entities */
 let entities = { enemies: [], torpedoes: [] };
 
-/** Torpedo trail ring buffers: Map<torpedoId, [{x,y}]> */
-const torpedoTrails = new Map();
+/** Shared map renderer instance (created on game start). */
+let mapRenderer = null;
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -132,6 +133,11 @@ function init() {
   on('captain.log_entry',           handleLogEntry);
   on('game.over',                   handleGameOver);
 
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  initHelpOverlay();
+  initNotifications(send, 'captain');
+  initRoleBar(send, 'captain');
   connect();
 }
 
@@ -144,6 +150,19 @@ function handleGameStarted(payload) {
   standbyEl.style.display     = 'none';
   captainMainEl.style.display = '';
   gameActive = true;
+
+  // Create MapRenderer for the tactical map.
+  if (mapCanvas) {
+    mapRenderer = new MapRenderer(mapCanvas, {
+      range: MAP_WORLD_RADIUS,
+      orientation: 'north-up',
+      showGrid: true,
+      showRangeRings: false,
+      zoom: { enabled: true, min: 0.3, max: 4.0 },
+    });
+    _buildDamageToggle();
+  }
+
   resizeCanvas();
   requestAnimationFrame(renderLoop);
   _buildAuthPanel();
@@ -156,6 +175,7 @@ function handleGameStarted(payload) {
 function handleShipState(payload) {
   shipState = payload;
   if (!gameActive) return;
+  if (mapRenderer) mapRenderer.updateShipState(payload);
   updateShipStatus(payload);
 }
 
@@ -163,31 +183,28 @@ function handleAlertChanged({ level }) {
   currentAlert = level;
   setAlertLevel(level);
   updateAlertButtons(level);
+  SoundBank.setAmbient('alert_level', { level });
 }
 
 function handleWorldEntities(payload) {
   entities = payload;
-  // Update torpedo trail ring buffers.
-  const currentIds = new Set((payload.torpedoes || []).map(t => t.id));
-  // Prune trails for torpedoes that no longer exist.
-  for (const id of torpedoTrails.keys()) {
-    if (!currentIds.has(id)) torpedoTrails.delete(id);
-  }
-  // Append current positions.
-  for (const torp of (payload.torpedoes || [])) {
-    if (!torpedoTrails.has(torp.id)) torpedoTrails.set(torp.id, []);
-    const trail = torpedoTrails.get(torp.id);
-    trail.push({ x: torp.x, y: torp.y });
-    if (trail.length > TRAIL_LENGTH) trail.shift();
+  if (mapRenderer) {
+    mapRenderer.updateContacts(payload.enemies || [], payload.torpedoes || []);
+    mapRenderer.updateHazards(payload.hazards || []);
   }
 }
 
 function handleHullHit() {
   if (!gameActive) return;
+  SoundBank.play('hull_hit');
   const el = document.getElementById('station-container') || document.querySelector('.station-container');
   if (el) {
     el.classList.add('hit');
     setTimeout(() => el.classList.remove('hit'), HIT_FLASH_MS);
+  }
+  // Add damage event at ship position for overlay.
+  if (mapRenderer && shipState?.position) {
+    mapRenderer.addDamageEvent(shipState.position.x, shipState.position.y);
   }
 }
 
@@ -212,6 +229,8 @@ function handleObjectiveUpdate({ objectives }) {
 
 function handleGameOver({ result, stats = {} }) {
   gameActive = false;
+  SoundBank.play(result === 'victory' ? 'victory' : 'defeat');
+  SoundBank.stopAmbient('alert_level');
   gameOverTitle.textContent = result === 'victory' ? 'MISSION COMPLETE' : 'SHIP DESTROYED';
   const dur  = stats.duration_s != null
     ? `${Math.floor(stats.duration_s / 60)}:${String(Math.round(stats.duration_s % 60)).padStart(2, '0')}`
@@ -424,152 +443,47 @@ function resizeCanvas() {
 
 function renderLoop() {
   if (!gameActive) return;
-  drawTacticalMap();
+  const now = performance.now();
+  if (mapRenderer) {
+    mapRenderer.render(now);
+    // Heading label overlay.
+    if (mapCtx && shipState) {
+      const cw  = mapCanvas.width;
+      const ch  = mapCanvas.height;
+      const hdg = Math.round(shipState.heading ?? 0).toString().padStart(3, '0');
+      mapCtx.fillStyle    = 'rgba(0, 255, 65, 0.3)';
+      mapCtx.font         = '10px "Share Tech Mono", monospace';
+      mapCtx.textAlign    = 'center';
+      mapCtx.textBaseline = 'top';
+      mapCtx.fillText(`HDG ${hdg}°`, cw / 2, ch / 2 + 14);
+    }
+  }
   requestAnimationFrame(renderLoop);
 }
 
-function drawTacticalMap() {
-  if (!mapCtx || !mapCanvas) return;
+/** Build a small damage-overlay toggle button in the map corner. */
+function _buildDamageToggle() {
+  const wrap = mapCanvas.parentElement;
+  if (!wrap || wrap.querySelector('.map-overlay-btn')) return;
 
-  const cw = mapCanvas.width;
-  const ch = mapCanvas.height;
+  const btn = document.createElement('button');
+  btn.className   = 'map-overlay-btn';
+  btn.textContent = 'DMG';
+  btn.title       = 'Toggle damage impact overlay';
+  btn.style.cssText = 'position:absolute;right:6px;top:6px;font:9px "Share Tech Mono",monospace;' +
+    'background:transparent;border:1px solid rgba(0,255,65,0.3);color:rgba(0,255,65,0.5);' +
+    'padding:2px 6px;cursor:pointer;letter-spacing:.08em;';
 
-  // Keep canvas sized to element
-  if (cw !== mapCanvas.offsetWidth || ch !== mapCanvas.offsetHeight) {
-    resizeCanvas();
-  }
+  let active = false;
+  btn.addEventListener('click', () => {
+    active = !active;
+    mapRenderer.setDamageOverlay(active);
+    btn.style.color  = active ? '#00ff41' : 'rgba(0,255,65,0.5)';
+    btn.style.borderColor = active ? '#00ff41' : 'rgba(0,255,65,0.3)';
+  });
 
-  drawBackground(mapCtx, cw, ch);
-
-  if (!shipState) return;
-
-  const camX = shipState.position?.x ?? 50_000;
-  const camY = shipState.position?.y ?? 50_000;
-  const zoom = MAP_WORLD_RADIUS / (Math.min(cw, ch) / 2);
-
-  // Grid lines (faint 20k grid)
-  drawGrid(mapCtx, cw, ch, camX, camY, zoom);
-
-  // Enemy contacts
-  for (const enemy of (entities.enemies || [])) {
-    drawEnemy(mapCtx, enemy, camX, camY, zoom, cw, ch);
-  }
-
-  // Torpedo dots with trails
-  for (const torp of (entities.torpedoes || [])) {
-    const trail = torpedoTrails.get(torp.id) || [];
-    // Draw trail (older = dimmer).
-    for (let i = 0; i < trail.length - 1; i++) {
-      const alpha = (i + 1) / trail.length * 0.5;
-      const sp = worldToScreen(trail[i].x, trail[i].y, camX, camY, zoom, cw, ch);
-      mapCtx.fillStyle = `rgba(0, 255, 65, ${alpha})`;
-      mapCtx.beginPath();
-      mapCtx.arc(sp.x, sp.y, 2, 0, Math.PI * 2);
-      mapCtx.fill();
-    }
-    // Draw bright head.
-    const sp = worldToScreen(torp.x, torp.y, camX, camY, zoom, cw, ch);
-    mapCtx.beginPath();
-    mapCtx.arc(sp.x, sp.y, TORP_DOT_RADIUS, 0, Math.PI * 2);
-    mapCtx.fillStyle = C_PRIMARY;
-    mapCtx.fill();
-  }
-
-  // Ship chevron at centre
-  const heading = shipState.heading ?? 0;
-  const headRad = heading * Math.PI / 180;
-  drawShipChevron(mapCtx, cw / 2, ch / 2, headRad, 8, C_PRIMARY);
-
-  // Heading label
-  mapCtx.fillStyle    = C_PRIMARY_DIM;
-  mapCtx.font         = '10px "Share Tech Mono", monospace';
-  mapCtx.textAlign    = 'center';
-  mapCtx.textBaseline = 'top';
-  const hdgStr = Math.round(heading).toString().padStart(3, '0');
-  mapCtx.fillText(`HDG ${hdgStr}°`, cw / 2, ch / 2 + 14);
-}
-
-function drawGrid(ctx, cw, ch, camX, camY, zoom) {
-  const GRID_SPACING = 20_000;
-  ctx.strokeStyle = C_GRID;
-  ctx.lineWidth   = 0.5;
-
-  // Vertical lines
-  const xStart = Math.floor((camX - MAP_WORLD_RADIUS) / GRID_SPACING) * GRID_SPACING;
-  const xEnd   = camX + MAP_WORLD_RADIUS;
-  for (let wx = xStart; wx <= xEnd; wx += GRID_SPACING) {
-    const sp = worldToScreen(wx, camY, camX, camY, zoom, cw, ch);
-    ctx.beginPath();
-    ctx.moveTo(sp.x, 0);
-    ctx.lineTo(sp.x, ch);
-    ctx.stroke();
-  }
-
-  // Horizontal lines
-  const yStart = Math.floor((camY - MAP_WORLD_RADIUS) / GRID_SPACING) * GRID_SPACING;
-  const yEnd   = camY + MAP_WORLD_RADIUS;
-  for (let wy = yStart; wy <= yEnd; wy += GRID_SPACING) {
-    const sp = worldToScreen(camX, wy, camX, camY, zoom, cw, ch);
-    ctx.beginPath();
-    ctx.moveTo(0, sp.y);
-    ctx.lineTo(cw, sp.y);
-    ctx.stroke();
-  }
-}
-
-function drawEnemy(ctx, enemy, camX, camY, zoom, cw, ch) {
-  const sp = worldToScreen(enemy.x, enemy.y, camX, camY, zoom, cw, ch);
-  const shape = ENEMY_SHAPES[enemy.type] || ENEMY_SHAPES.scout;
-
-  ctx.save();
-  ctx.translate(sp.x, sp.y);
-
-  const headRad = (enemy.heading || 0) * Math.PI / 180;
-  ctx.rotate(headRad);
-
-  ctx.strokeStyle = shape.color;
-  ctx.lineWidth   = 1.5;
-
-  const s = shape.size;
-  if (enemy.type === 'scout') {
-    // Diamond
-    ctx.beginPath();
-    ctx.moveTo(0, -s);
-    ctx.lineTo(s, 0);
-    ctx.lineTo(0, s);
-    ctx.lineTo(-s, 0);
-    ctx.closePath();
-    ctx.stroke();
-  } else if (enemy.type === 'cruiser') {
-    // Triangle
-    ctx.beginPath();
-    ctx.moveTo(0, -s);
-    ctx.lineTo(s, s);
-    ctx.lineTo(-s, s);
-    ctx.closePath();
-    ctx.stroke();
-  } else {
-    // Hexagon for destroyer / unknown
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = (i * Math.PI) / 3 - Math.PI / 6;
-      const px = Math.cos(a) * s;
-      const py = Math.sin(a) * s;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.stroke();
-  }
-
-  ctx.restore();
-
-  // Entity ID label
-  ctx.fillStyle    = 'rgba(255, 64, 64, 0.6)';
-  ctx.font         = '9px "Share Tech Mono", monospace';
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText(enemy.id, sp.x, sp.y + s + 2);
+  wrap.style.position = 'relative';
+  wrap.appendChild(btn);
 }
 
 // ---------------------------------------------------------------------------

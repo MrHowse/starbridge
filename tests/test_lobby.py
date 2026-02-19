@@ -433,3 +433,170 @@ async def test_late_join_does_not_receive_lobby_state():
     await lobby.on_connect("b")
 
     assert not any(t_msg.type == "lobby.state" for _, t_msg in m.sent if _ == "b")
+
+
+# ---------------------------------------------------------------------------
+# Reconnect fix: reserved roles during active game
+# ---------------------------------------------------------------------------
+
+
+async def test_disconnect_mid_game_reserves_role():
+    """Disconnecting mid-game puts the role in _reserved_roles, not released."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    lobby._session.roles["helm"] = ("a", "Alice")
+    # Simulate active game.
+    lobby._game_active = True
+    m.remove("a")
+    await lobby.on_disconnect("a")
+
+    # Role should be None in session (slot is free) but reserved.
+    assert lobby._session.roles["helm"] is None
+    assert "helm" in lobby._reserved_roles
+    assert lobby._reserved_roles["helm"][0] == "Alice"
+
+
+async def test_disconnect_outside_game_releases_role_immediately():
+    """Disconnecting when no game is active releases the role right away."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    lobby._session.roles["helm"] = ("a", "Alice")
+    # Game is NOT active.
+    lobby._game_active = False
+    m.remove("a")
+    await lobby.on_disconnect("a")
+
+    assert lobby._session.roles["helm"] is None
+    assert "helm" not in lobby._reserved_roles
+
+
+async def test_reserved_role_shown_as_disconnected_in_lobby_state():
+    """Reserved roles appear as 'DISCONNECTED:<name>' in lobby.state payload."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    lobby._session.roles["helm"] = ("a", "Alice")
+    lobby._game_active = True
+    m.remove("a")
+    await lobby.on_disconnect("a")
+
+    # The broadcast after disconnect should show DISCONNECTED status.
+    state = last_broadcast(m)
+    assert state.type == "lobby.state"
+    assert state.payload["roles"]["helm"] == "DISCONNECTED:Alice"
+
+
+async def test_reconnect_within_reserve_window_reclaims_role():
+    """Same player reconnecting within 60s gets their role back silently."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    lobby._session.roles["helm"] = ("a", "Alice")
+    lobby._game_active = True
+    m.remove("a")
+    await lobby.on_disconnect("a")
+
+    # Player reconnects with same name.
+    m.add("a2")
+    await lobby.on_connect("a2")
+    m.sent.clear()
+    msg = Message.build("lobby.claim_role", {"role": "helm", "player_name": "Alice"})
+    await lobby.handle_lobby_message("a2", msg)
+
+    # Should succeed: no error sent, role assigned, reservation cleared.
+    errors = [msg for cid, msg in m.sent if cid == "a2" and msg.type == "lobby.error"]
+    assert not errors, "Should not get an error when reclaiming reserved role"
+    assert lobby._session.roles["helm"] == ("a2", "Alice")
+    assert "helm" not in lobby._reserved_roles
+
+
+async def test_different_player_blocked_from_reserved_role():
+    """A different player cannot claim a role reserved for the disconnected player."""
+    m = fresh("a", "b")
+    await lobby.on_connect("a")
+    await lobby.on_connect("b")
+    lobby._session.roles["helm"] = ("a", "Alice")
+    lobby._game_active = True
+    m.remove("a")
+    await lobby.on_disconnect("a")
+
+    m.sent.clear()
+    msg = Message.build("lobby.claim_role", {"role": "helm", "player_name": "Bob"})
+    await lobby.handle_lobby_message("b", msg)
+
+    # Bob should get a role_reserved error.
+    errs = [msg for cid, msg in m.sent if cid == "b" and msg.type == "lobby.error"]
+    assert errs, "Should get lobby.error when trying to claim a reserved role"
+    assert errs[0].payload["code"] == "role_reserved"
+
+
+async def test_expire_reserved_role_releases_slot():
+    """_expire_reserved_role clears the reservation when called after timeout."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    # Manually set up a reservation.
+    lobby._reserved_roles["helm"] = ("Alice", 0.0)
+
+    lobby._expire_reserved_role("helm", "Alice")
+    assert "helm" not in lobby._reserved_roles
+
+
+async def test_expire_reserved_role_does_not_clear_if_player_differs():
+    """_expire_reserved_role is a no-op if the reservation has changed."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    # Different player has the reservation now.
+    lobby._reserved_roles["helm"] = ("Bob", 0.0)
+
+    lobby._expire_reserved_role("helm", "Alice")
+    assert "helm" in lobby._reserved_roles  # Bob's reservation untouched
+
+
+async def test_on_game_end_clears_reserved_roles():
+    """Reserved roles are released when the game ends."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    lobby._reserved_roles["helm"] = ("Alice", 0.0)
+
+    await lobby.on_game_end()
+    assert lobby._reserved_roles == {}
+
+
+# ---------------------------------------------------------------------------
+# Difficulty preset in start_game
+# ---------------------------------------------------------------------------
+
+
+async def test_start_game_includes_difficulty_in_payload():
+    """game.started payload contains the chosen difficulty string."""
+    received_difficulty: list[str] = []
+
+    async def fake_start(mission_id: str, difficulty: str, ship_class: str = "frigate") -> None:
+        received_difficulty.append(difficulty)
+
+    m = fresh("a")
+    await lobby.on_connect("a")
+    lobby.register_game_start_callback(fake_start)
+
+    msg = Message.build("lobby.start_game", {"mission_id": "sandbox", "difficulty": "cadet"})
+    await lobby.handle_lobby_message("a", msg)
+
+    assert received_difficulty == ["cadet"]
+    # game.started broadcast should include difficulty.
+    gs = next(msg for msg in m.broadcasts if msg.type == "game.started")
+    assert gs.payload["difficulty"] == "cadet"
+
+
+async def test_start_game_default_difficulty_is_officer():
+    """Omitting difficulty in lobby.start_game defaults to 'officer'."""
+    received_difficulty: list[str] = []
+
+    async def fake_start(mission_id: str, difficulty: str, ship_class: str = "frigate") -> None:
+        received_difficulty.append(difficulty)
+
+    m = fresh("a")
+    await lobby.on_connect("a")
+    lobby.register_game_start_callback(fake_start)
+
+    msg = Message.build("lobby.start_game", {"mission_id": "sandbox"})
+    await lobby.handle_lobby_message("a", msg)
+
+    assert received_difficulty == ["officer"]

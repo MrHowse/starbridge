@@ -60,8 +60,12 @@ function init() {
   on('game.started',  handleGameStarted);
 
   launchBtnEl.addEventListener('click', () => {
-    const mission_id = missionSelectEl ? missionSelectEl.value : 'sandbox';
-    send('lobby.start_game', { mission_id });
+    const mission_id   = missionSelectEl ? missionSelectEl.value : 'sandbox';
+    const difficultyEl = document.querySelector('[data-difficulty-select]');
+    const difficulty   = difficultyEl ? difficultyEl.value : 'officer';
+    const shipClassEl  = document.querySelector('[data-ship-class-select]');
+    const ship_class   = shipClassEl ? shipClassEl.value : 'frigate';
+    send('lobby.start_game', { mission_id, difficulty, ship_class });
   });
 
   connect();
@@ -142,31 +146,43 @@ function handleLobbyState(payload) {
   myRole = null;
 
   for (const role of ROLES) {
-    const playerName  = roles[role];
+    const rawValue    = roles[role];
     const occupantEl  = document.querySelector(`[data-occupant="${role}"]`);
     const claimBtn    = document.querySelector(`[data-claim="${role}"]`);
     const releaseBtn  = document.querySelector(`[data-release="${role}"]`);
     const card        = document.querySelector(`[data-role-card="${role}"]`);
 
-    if (playerName) {
+    // Parse reserved-role sentinel: "DISCONNECTED:<player_name>"
+    const isReserved  = typeof rawValue === 'string' && rawValue.startsWith('DISCONNECTED:');
+    const playerName  = isReserved ? rawValue.slice('DISCONNECTED:'.length) : rawValue;
+
+    if (isReserved) {
+      occupantEl.textContent = `${playerName} [DC]`;
+      card.classList.add('role-card--occupied');
+      card.classList.add('role-card--disconnected');
+    } else if (playerName) {
       occupantEl.textContent = playerName;
       card.classList.add('role-card--occupied');
+      card.classList.remove('role-card--disconnected');
     } else {
       occupantEl.textContent = 'VACANT';
       card.classList.remove('role-card--occupied');
+      card.classList.remove('role-card--disconnected');
     }
 
     const isMine = callsign && playerName === callsign;
     if (isMine) myRole = role;
 
     card.classList.toggle('role-card--mine', Boolean(isMine));
-    claimBtn.style.display  = (!playerName || isMine) ? '' : 'none';
-    releaseBtn.style.display = isMine ? '' : 'none';
-    claimBtn.disabled = Boolean(playerName && !isMine);
+    // Allow reclaim if reserved for this player; block others from reserved roles.
+    const blocked = playerName && !isMine;
+    claimBtn.style.display  = (!blocked) ? '' : 'none';
+    releaseBtn.style.display = (isMine && !isReserved) ? '' : 'none';
+    claimBtn.disabled = Boolean(blocked);
   }
 
-  // Enable launch if host and at least one role is claimed
-  const anyRoleClaimed = Object.values(roles).some(v => v !== null);
+  // Enable launch if host and at least one role is claimed (reserved don't count)
+  const anyRoleClaimed = Object.values(roles).some(v => v !== null && !String(v).startsWith('DISCONNECTED:'));
   launchBtnEl.disabled = !(isHost && anyRoleClaimed);
 }
 
@@ -181,13 +197,19 @@ function handleLobbyError(payload) {
 /** @param {{ mission_id: string, mission_name: string, briefing_text: string }} payload */
 function handleGameStarted(payload) {
   console.log(`[lobby] Game started: ${payload.mission_name}`);
-  // Persist callsign so station pages can re-claim the role on reconnect.
+  // Persist callsign and role so station/briefing pages can re-claim on reconnect.
   const callsign = callsignInput.value.trim();
   if (callsign) sessionStorage.setItem('player_name', callsign);
+  if (myRole)   sessionStorage.setItem('my_role', myRole);
+  // Persist game payload so briefing page can display mission info.
+  try {
+    sessionStorage.setItem('game_started_payload', JSON.stringify(payload));
+  } catch (_) { /* storage full — ignore */ }
   // Freeze all interactive controls before navigating away.
   document.querySelectorAll('.btn').forEach(btn => { btn.disabled = true; });
   launchStatusEl.textContent = `LAUNCHING — ${payload.mission_name.toUpperCase()}`;
-  redirectToStation(myRole);
+  // Navigate to briefing room (which will then route to station after countdown).
+  window.location.href = '/client/briefing/';
 }
 
 // ---------------------------------------------------------------------------

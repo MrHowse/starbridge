@@ -551,10 +551,200 @@ Host negotiations between rival factions. Comms mediates, Security monitors, Sci
 | v0.02g Weapons + Captain | 3-4 | Mixed | Less novel, more expansion |
 | v0.02h Diplomatic + Balance | 4-5 | Primary | Playtesting-heavy |
 
-**Total: ~40-50 sessions.** Roughly 2-3× the effort of v0.01, which tracks given the scope expansion.
+| v0.02i Science Scan Modes | 4-5 | Primary | Transforms Science from passive to active |
+
+**Total: ~45-55 sessions.** Roughly 2-3× the effort of v0.01, which tracks given the scope expansion.
 
 ---
 
-*Document version: v0.02-scope-final-1.0*
+## 14. ADDENDUM: SCIENCE SCAN MODES
+
+> Added post-finalisation. Slots into the implementation plan as v0.02i
+> (after v0.02h, or earlier if scheduling allows — depends only on v0.02b2
+> for the frequency matching puzzle integration).
+
+### 14.1 Problem Statement
+
+In v0.01, Science has one interaction: point at contact, wait for progress bar, read results. Between scans, Science is idle. The role lacks the active decision-making and attention management that makes other stations engaging under pressure. Science needs to be a role where expertise, prioritisation, and situational awareness matter — and where mistakes have consequences.
+
+### 14.2 Core Concept: Scan Modes as Frequency Bands
+
+The sensor array operates in one mode at a time. Each mode reveals different categories of information about contacts and the environment. Switching modes takes time (the array reconfigures). Science must constantly triage: what's most important to scan for right now?
+
+The constraint is simple: **you can only actively scan one mode at a time.** This creates a permanent attention budget. While you're doing a deep electromagnetic scan of that enemy cruiser, you're not detecting the cloaked mines on subspace. While you're sweeping for life signs on the derelict, you're not reading the gravimetric anomaly ahead.
+
+### 14.3 Scan Modes
+
+#### Electromagnetic (EM)
+
+**Reveals**: Ship energy signatures, power levels, weapon charge states, shield frequencies, engine output.
+
+**Use cases**: Combat preparation, threat assessment, identifying ship classes, detecting weapon charging.
+
+**Passive detection** (always-on, short range ~8k units): "Energy source detected at bearing 045." Shows a blip with no detail.
+
+**Active scan** (targeted, long range ~30k units): Full ship profile — type (scout/cruiser/destroyer), hull percentage, shield status, weapon loadout, power distribution. This is the current v0.01 scan behaviour, now gated behind EM mode.
+
+**What you miss without it**: Ship type, weapon status, shield frequencies. Weapons is flying blind without EM scan data.
+
+**Interdependencies**: Weapons needs EM scan results for targeting priorities. Captain needs EM data for threat assessment. Engineering can optimise shield frequencies if Science provides enemy weapon data.
+
+#### Gravimetric (GRAV)
+
+**Reveals**: Mass concentrations, asteroid fields, gravity wells, minefields, spatial distortions, nebula boundaries, debris fields.
+
+**Use cases**: Navigation hazard detection, route safety assessment, detecting hidden objects in asteroid fields.
+
+**Passive detection** (always-on, short range ~10k units): "Mass anomaly at bearing 270." Shows approximate hazard boundary.
+
+**Active scan** (targeted, long range ~25k units): Precise hazard boundaries, density maps, safe corridors through fields, gravity well strength and falloff.
+
+**What you miss without it**: Navigation hazards. Helm flies blind through minefields and asteroid fields. The gravimetric anomaly ahead might be a gentle gravity well or a ship-crushing singularity — you won't know until you're in it.
+
+**Interdependencies**: Helm needs GRAV data for route planning and hazard avoidance. The route calculation puzzle (v0.02f) is dramatically harder without GRAV scan data. Engineering can prepare shields for specific hazard types if Science identifies them.
+
+#### Biological (BIO)
+
+**Reveals**: Life signs, organic compounds, atmospheric composition, pathogen indicators, species identification, crew counts on ships/stations.
+
+**Use cases**: Search and rescue (locating survivors), medical preparation, planetary survey, detecting biological weapons, assessing boarding party strength.
+
+**Passive detection** (always-on, very short range ~5k units): "Life signs detected at bearing 180." Count and general classification (humanoid/non-humanoid).
+
+**Active scan** (targeted, medium range ~15k units): Precise life sign count and distribution, species match against database, health/vitality indicators, atmospheric analysis (breathable? toxic? contagious?), pathogen detection.
+
+**What you miss without it**: Crew counts (relevant for boarding assessment), disease indicators (Medical needs this before docking with a plague ship), survivor locations (Search and Rescue missions), environmental hazards for away teams.
+
+**Interdependencies**: Medical needs BIO data for disease preparation and triage planning. Security needs crew counts to assess boarding threat scale. The triage puzzle (v0.02e) is harder without BIO data providing early pathogen identification.
+
+#### Subspace (SUB)
+
+**Reveals**: Cloaked objects, warp signatures (incoming ships), subspace communications leakage, hidden sensor beacons, dimensional anomalies.
+
+**Use cases**: Detecting cloaked enemies, early warning of reinforcements, finding hidden listening posts, detecting traps.
+
+**Passive detection** (always-on, short range ~6k units): "Subspace distortion at bearing 315." Something is there, but what?
+
+**Active scan** (targeted, long range ~35k units): Cloaked ship detection (reveal position and heading), warp signature analysis (how many ships, how far away, ETA), subspace communication interception (encrypted data passed to Comms for decoding).
+
+**What you miss without it**: Cloaked ships and mines are completely invisible. Incoming reinforcements arrive without warning. Enemy listening posts go undetected. Traps spring without any advance warning.
+
+**Interdependencies**: Comms receives subspace intercepts from SUB scans for decoding. Weapons can't target what they can't see — SUB scans reveal cloaked threats. Captain needs SUB data for strategic situational awareness (reinforcements incoming in 2 minutes vs. no subspace activity).
+
+### 14.4 Mode Switching Mechanic
+
+**Switch time**: 3 seconds (30 ticks). During the switch, no mode is active — passive detection on ALL bands drops to zero. This is the cost of switching and the reason you can't just rapidly cycle through all modes.
+
+**Visual**: A mode selector with 4 buttons (EM / GRAV / BIO / SUB). The active mode glows. During switching, all buttons dim and a "RECONFIGURING..." indicator appears. The sensor canvas shows static/noise during reconfiguration.
+
+**Keyboard shortcuts**: 1-4 for mode selection. Quick access matters during combat when Science is switching between EM (threat assessment) and SUB (cloaked mine detection) rapidly.
+
+### 14.5 Passive vs Active Detection
+
+Each mode operates at two levels simultaneously:
+
+**Passive detection** runs automatically on the active mode. Short range, low detail. Shows contacts as blips with minimal information. Passive detection is what populates the sensor display with "something is there" markers.
+
+**Active scan** is targeted at a specific contact or region. Long range, high detail. This is the existing scan mechanic (point, wait for progress, get results) but now the results depend on which mode you're scanning in. Active EM scan of a ship gives combat data. Active BIO scan of the same ship gives crew data. You might need to scan the same contact twice in different modes to get a complete picture.
+
+**Passive detection range and detail by mode**:
+
+| Mode | Passive Range | Passive Detail |
+|------|---------------|----------------|
+| EM | 8,000 units | "Energy source" — bearing and approximate range |
+| GRAV | 10,000 units | "Mass anomaly" — bearing and approximate boundary |
+| BIO | 5,000 units | "Life signs" — bearing and count |
+| SUB | 6,000 units | "Subspace distortion" — bearing only |
+
+**Active scan range and time by mode**:
+
+| Mode | Active Range | Base Scan Time | Detail Level |
+|------|-------------|----------------|--------------|
+| EM | 30,000 units | 5 seconds | Full ship profile |
+| GRAV | 25,000 units | 8 seconds | Precise hazard mapping |
+| BIO | 15,000 units | 6 seconds | Life signs + atmosphere |
+| SUB | 35,000 units | 10 seconds | Cloaked object reveal |
+
+Scan time is modified by sensor power (Engineering) and efficiency (crew factor). Higher power = faster scans. Damaged sensors = slower scans.
+
+### 14.6 The "Miss It and Pay for It" Design
+
+The scan mode system creates natural failure states that are the Science player's responsibility:
+
+**Combat ambush**: Science was scanning BIO (checking a derelict for survivors) when enemies dropped out of warp. No EM passive detection meant no early warning. Weapons had no target data. The first volley hit shields before anyone knew what was happening. Science should have switched to EM when entering potentially hostile space.
+
+**Minefield**: Science was running EM scans on the enemy fleet composition and missed the GRAV signature of a minefield between the ship and the enemy. Helm flew straight in. The mines were detectable on GRAV passive at 10k units — plenty of time to reroute — but Science wasn't looking.
+
+**Plague contact**: Science did a thorough EM scan of the docked ship (all clear, no weapons) but didn't switch to BIO before the crew boarded. The ship was carrying a pathogen that BIO passive would have flagged at 5k units. Now Medical is dealing with a contagion because Science didn't think to check.
+
+**Cloaked ambush**: Science was on GRAV (navigating an asteroid field) and missed the SUB signatures of three cloaked ships waiting in ambush. The ships decloaked at point-blank range. A SUB scan would have revealed them at 35k units — over a minute of advance warning.
+
+These aren't punishments — they're the consequences of attention management under pressure. The Science player can't scan everything simultaneously, so they must prioritise. The Captain should be helping: "Science, we're entering contested space — go to EM and give me a threat picture." A good crew develops scan discipline. A bad crew gets surprised.
+
+### 14.7 Integration with Existing Systems
+
+**sensor.contacts (v0.01 system)**: Currently broadcasts all detected entities to Science and Weapons. After scan modes: sensor.contacts includes only entities detectable in the current mode's passive range, plus any entities that have been actively scanned in any mode (scan results persist per-entity until the entity is destroyed or leaves max sensor range).
+
+**Scan results storage**: Each entity accumulates scan data across modes. An entity scanned on EM and BIO has both datasets. This data is accessible to all stations that receive scan results (Science, Captain, and via relay to Weapons/Medical). The scan results panel on Science shows tabs per mode: "EM: Cruiser, shields 80%, weapons charged" / "BIO: 340 crew, no pathogen" / "GRAV: N/A" / "SUB: No cloaking detected."
+
+**Frequency matching puzzle**: When Science does an active scan that triggers a frequency matching puzzle (complex contacts, anomalies), the puzzle parameters are influenced by the scan mode. EM puzzles look like signal processing. GRAV puzzles look like waveform analysis. BIO puzzles look like spectrum matching. SUB puzzles look like noise filtering. Same mechanic, different skin, different difficulty curves.
+
+**Engineering interaction**: Sensor power affects all modes equally (range and scan speed). But a future tier could add per-mode power allocation — Engineering decides whether to boost EM range at the cost of SUB sensitivity. This is a natural Tier 3 complexity addition.
+
+**Comms interaction**: SUB mode intercepts subspace communications that are passed to Comms for decoding. This creates a Science → Comms → Intelligence pipeline: Science detects the signal on SUB, Comms decodes it, and the intel (enemy fleet movements, reinforcement ETA) goes to Captain.
+
+### 14.8 UI Changes to Science Station
+
+**Mode selector bar**: Horizontal bar below the station header. Four buttons: EM / GRAV / BIO / SUB. Active mode highlighted with glow. Switching shows a 3-second progress indicator. Keyboard shortcuts 1-4.
+
+**Sensor canvas changes**: The canvas rendering style subtly changes per mode to reinforce which mode is active:
+- EM: Contacts shown as energy signature shapes (current wireframe style)
+- GRAV: Contacts shown as mass density contours (concentric dashed circles)
+- BIO: Contacts shown as life sign pulses (pulsing dots, brighter = more life signs)
+- SUB: Contacts shown as subspace distortions (wavy/shimmering outlines)
+
+These are cosmetic variations on the same rendering system — different `strokeStyle` and draw patterns, not fundamentally different rendering code.
+
+**Contact detail panel**: Expands to show tabs for each mode's scan data on the selected contact. Unscanned modes show "NO DATA — REQUIRES [MODE] SCAN."
+
+**Passive detection indicators**: Small markers around the edge of the sensor canvas showing the passive detection range ring for the current mode. Contacts outside active scan range but inside passive range appear as dim, undetailed blips.
+
+### 14.9 Server Changes
+
+**ScanMode enum**: `"em"`, `"grav"`, `"bio"`, `"sub"` — stored on the Science station's connection state (or in a sensors module).
+
+**New message types**:
+- Client → Server: `science.set_scan_mode { mode: str }` — request mode switch
+- Server → Client: `science.mode_changed { mode: str, switch_time: float }` — confirm switch, countdown
+- Server → Client: `science.mode_ready { mode: str }` — switch complete, scanning active
+
+**sensor.contacts filtering**: The existing `_build_sensor_contacts()` in the game loop filters entities by current mode's detection capabilities. Entities outside the mode's passive range that haven't been actively scanned in any mode are excluded entirely.
+
+**Active scan modification**: `science.start_scan` now requires the current mode to determine what data is generated on completion. The scan result payload includes a `mode` field so clients know what type of data they received.
+
+**Scan result accumulation**: A `scan_results: dict[str, dict[str, Any]]` on each entity tracks per-mode scan data. Key is mode name, value is the mode-specific result data. Persists until entity is destroyed or leaves max range.
+
+### 14.10 Complexity Tiers
+
+| Tier | Feature |
+|------|---------|
+| 1 | Four scan modes, passive detection, active scan per mode, mode switching with delay. Scan results accumulate per entity. All modes use same scan time. |
+| 2 | Per-mode scan time variation (SUB takes longer). Per-mode frequency puzzle skins. Passive detection shows mode-appropriate blip styles. Mode-specific Science→other station data pipelines. |
+| 3 | Per-mode power allocation (Engineering decides which mode gets boosted). Scan interference (nebulae block EM, asteroids block GRAV). Adaptive scan difficulty (harder to scan contacts that are actively jamming). |
+| 4 | Science can run two modes simultaneously at reduced effectiveness. Scan spoofing (enemies emit false signatures on specific modes). Sensor ghosts and false positives requiring cross-mode verification. |
+
+### 14.11 Implementation Scheduling
+
+**Dependencies**: Requires v0.02b2 (frequency matching puzzle — scan modes influence puzzle parameters) and the existing v0.01 sensor system.
+
+**Does NOT depend on**: v0.02c (Security), v0.02d (Comms — the SUB→Comms pipeline is additive), v0.02e (Medical — the BIO→Medical pipeline is additive).
+
+**Recommended slot**: v0.02i, after v0.02h. By this point all other stations exist and the cross-station data pipelines (Science→Weapons, Science→Medical, Science→Comms, Science→Security) can be validated end-to-end. Alternatively, Tier 1 could be built earlier (after v0.02b2) if Science feeling flat during playtesting becomes a concern — it only touches the Science station and the sensor system.
+
+**Estimated sessions**: 4-5 (server: scan mode state machine + contact filtering, 1 session; client: mode selector + canvas per-mode rendering + contact panel tabs, 2 sessions; integration + per-mode puzzle skins + testing, 1-2 sessions).
+
+---
+
+*Document version: v0.02-scope-final-1.1*
 *Last updated: 2026-02-19*
-*Status: FINALISED — Implementation begins with v0.01.1 tech debt cleanup*
+*Status: FINALISED — v0.02i (Science Scan Modes) added as addendum*

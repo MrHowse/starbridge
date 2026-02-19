@@ -23,6 +23,19 @@ import {
   setStatusDot, setAlertLevel, showBriefing, showGameOver,
 } from '../shared/ui_components.js';
 import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+import { initNotifications } from '../shared/notifications.js';
+import { initRoleBar } from '../shared/role_bar.js';
+
+registerHelp([
+  { selector: '#deck-list',         text: 'Crew by deck — shows active, injured, critical, dead counts.', position: 'right' },
+  { selector: '#supply-count',      text: 'Medical supplies — each treatment costs 2 units.', position: 'below' },
+  { selector: '#btn-treat-injured', text: 'Start treatment for injured crew on selected deck.', position: 'above' },
+  { selector: '#btn-treat-critical',text: 'Start treatment for critical crew (higher priority).', position: 'above' },
+]);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -247,6 +260,7 @@ function handleDiseaseState(payload) {
 }
 
 function handleHullHit() {
+  SoundBank.play('hull_hit');
   stationEl.classList.add('hit');
   setTimeout(() => stationEl.classList.remove('hit'), HIT_FLASH_MS);
 }
@@ -265,10 +279,16 @@ function init() {
   on('ship.state',            handleShipState);
   on('ship.alert_changed',    (p) => setAlertLevel(p.level));
   on('ship.hull_hit',         handleHullHit);
-  on('game.over',             (p) => showGameOver(p.result, p.stats));
+  on('game.over',             (p) => { SoundBank.play(p.result === 'victory' ? 'victory' : 'defeat'); showGameOver(p.result, p.stats); });
   on('medical.disease_state', handleDiseaseState);
 
   initPuzzleRenderer(send);
+
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  initHelpOverlay();
+  initNotifications(send, 'medical');
+  initRoleBar(send, 'medical');
 
   on('lobby.welcome', () => {
     const callsign = sessionStorage.getItem('callsign') || 'MEDIC';

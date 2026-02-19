@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from server.difficulty import DifficultySettings, get_preset
 from server.models.crew import CrewRoster, DECK_SYSTEM_MAP
 from server.models.interior import ShipInterior, make_default_interior
 
@@ -115,6 +116,9 @@ class Ship:
 
     # --- Ship interior (added v0.02c) ---
     interior: ShipInterior = field(default_factory=make_default_interior)
+
+    # --- Difficulty (set at game start by game_loop.start()) ---
+    difficulty: DifficultySettings = field(default_factory=lambda: get_preset("officer"))
 
     def update_crew_factors(self) -> None:
         """Propagate deck crew_factors into the corresponding ship systems.

@@ -31,6 +31,17 @@ import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import {
   setStatusDot, setAlertLevel, showBriefing, showGameOver,
 } from '../shared/ui_components.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+
+registerHelp([
+  { selector: '#ship-canvas',       text: 'Ship interior — rooms shown with squad (blue) and intruder (red) tokens.', position: 'right' },
+  { selector: '#squad-list',        text: 'Marine squads — click to select, then click a room to move.', position: 'left' },
+  { selector: '#btn-toggle-door',   text: 'Toggle door — seal/unseal adjacent room to control intruder movement.', position: 'above' },
+  { selector: '#intruder-list',     text: 'Known intruder positions — updated from adjacent marine squads.', position: 'left' },
+]);
 
 // ---------------------------------------------------------------------------
 // Canvas constants
@@ -595,6 +606,7 @@ function handlePuzzleResult(payload) {
 }
 
 function handleHullHit() {
+  SoundBank.play('hull_hit');
   stationEl.classList.add('hit');
   setTimeout(() => stationEl.classList.remove('hit'), HIT_FLASH_MS);
 }
@@ -618,7 +630,12 @@ function init() {
   on('puzzle.result',           handlePuzzleResult);
   on('ship.alert_changed',      (p) => setAlertLevel(p.level));
   on('ship.hull_hit',           handleHullHit);
-  on('game.over',               (p) => showGameOver(p.result, p.stats));
+  on('game.over',               (p) => { SoundBank.play(p.result === 'victory' ? 'victory' : 'defeat'); showGameOver(p.result, p.stats); });
+  on('security.boarding_started', () => SoundBank.play('boarding_alert'));
+
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  initHelpOverlay();
 
   on('lobby.welcome', () => {
     const callsign = sessionStorage.getItem('callsign') || 'SECURITY';

@@ -17,13 +17,14 @@
  */
 
 import { on } from './connection.js';
+import { SoundBank } from './audio.js';
 
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
 let _send = null;
-let _activePuzzle = null;  // { puzzleId, module, overlayEl, timerFill, timeLimit, startTime }
+let _activePuzzle = null;  // { puzzleId, module, overlayEl, timerFill, timeLimit, startTime, lastTickSec }
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -84,6 +85,7 @@ async function handlePuzzleStarted(payload) {
     timeLimit: time_limit,
     startTime: performance.now(),
     successMessage: data.success_message || 'COMPLETE',
+    lastTickSec: null,
   };
 
   // Start the client-side timer animation loop.
@@ -93,6 +95,7 @@ async function handlePuzzleStarted(payload) {
 function handlePuzzleResult(payload) {
   if (!_activePuzzle || _activePuzzle.puzzleId !== payload.puzzle_id) return;
 
+  SoundBank.play(payload.success ? 'puzzle_success' : 'puzzle_failure');
   const success = payload.success;
   const resultEl = _activePuzzle.overlayEl.querySelector('.puzzle-result-msg');
 
@@ -196,6 +199,15 @@ function _tickTimer() {
   const timeEl = overlayEl.querySelector('.puzzle-time-display');
   if (timeEl) {
     timeEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+  }
+
+  // Countdown tick sound when ≤10 seconds remain (once per second).
+  if (remaining <= 10 && remaining > 0 && _activePuzzle) {
+    const secFloor = Math.floor(remaining);
+    if (secFloor !== _activePuzzle.lastTickSec) {
+      _activePuzzle.lastTickSec = secFloor;
+      SoundBank.play('puzzle_timeout_tick');
+    }
   }
 
   if (pct > 0 && _activePuzzle) {

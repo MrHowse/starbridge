@@ -55,6 +55,9 @@ from server.models.messages.medical import MedicalCancelTreatmentPayload, Medica
 # Security
 from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
 
+# Crew
+from server.models.messages.crew import CrewNotifyPayload
+
 # Comms
 from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPayload
 
@@ -66,6 +69,7 @@ from server.models.messages.game import (
     ErrorPermissionPayload,
     ErrorStatePayload,
     ErrorValidationPayload,
+    GameBriefingLaunchPayload,
     GameOverPayload,
     GameStartedPayload,
     GameTickPayload,
@@ -112,6 +116,8 @@ __all__ = [
     # security
     "SecurityMoveSquadPayload",
     "SecurityToggleDoorPayload",
+    # crew
+    "CrewNotifyPayload",
     # comms
     "CommsTuneFrequencyPayload",
     "CommsHailPayload",
@@ -123,6 +129,7 @@ __all__ = [
     "ErrorValidationPayload",
     "ErrorPermissionPayload",
     "ErrorStatePayload",
+    "GameBriefingLaunchPayload",
     "GameStartedPayload",
     "GameTickPayload",
     "GameOverPayload",

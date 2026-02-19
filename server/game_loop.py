@@ -25,6 +25,8 @@ from server.models.messages import (
     CaptainAuthorizePayload,
     CommsHailPayload,
     CommsTuneFrequencyPayload,
+    CrewNotifyPayload,
+    GameBriefingLaunchPayload,
     EngineeringSetPowerPayload,
     EngineeringSetRepairPayload,
     HelmSetHeadingPayload,
@@ -47,6 +49,8 @@ from server.models.messages import (
 )
 from server.models.crew import CrewRoster
 from server.models.interior import make_default_interior
+from server.models.ship_class import load_ship_class
+from server.difficulty import get_preset
 from server.models.ship import Ship
 from server.models.world import World
 from server.systems import physics, sensors
@@ -139,12 +143,20 @@ def register_game_end_callback(cb: Callable[[], Awaitable[None]]) -> None:
     _on_game_end = cb
 
 
-async def start(mission_id: str) -> None:
+async def start(mission_id: str, difficulty: str = "officer", ship_class: str = "frigate") -> None:
     """Begin the game loop. Called when the host launches a game."""
     global _task, _tick_count, _game_start_time
     _tick_count = 0
     _game_start_time = _time.monotonic()
-    glw.reset()
+
+    # Apply ship class stats before subsystem resets (so ammo uses class defaults).
+    try:
+        sc = load_ship_class(ship_class)
+    except FileNotFoundError:
+        logger.warning("Unknown ship class %r — using frigate defaults", ship_class)
+        sc = load_ship_class("frigate")
+
+    glw.reset(initial_ammo=sc.torpedo_ammo)
     glmed.reset()
     gls.reset()
     glco.reset()
@@ -167,8 +179,14 @@ async def start(mission_id: str) -> None:
     _world.asteroids.clear()
     _world.hazards.clear()
     _world.ship.alert_level = "green"
+    _world.ship.hull = sc.max_hull
     _world.ship.crew = CrewRoster()
     _world.ship.interior = make_default_interior()
+    _world.ship.difficulty = get_preset(difficulty)
+    logger.info(
+        "Ship class: %s (hull=%.0f, ammo=%d), difficulty: %s",
+        sc.id, sc.max_hull, sc.torpedo_ammo, difficulty,
+    )
 
     glm.init_mission(mission_id, _world)
 
@@ -295,12 +313,14 @@ async def _loop() -> None:
                     "interior": _world.ship.interior,
                     "intruder_specs": pstart.get("intruder_specs", []),
                 }
+            base_time = pstart.get("time_limit", 30.0)
+            time_mult = _world.ship.difficulty.puzzle_time_mult if _world else 1.0
             inst = _puzzle_engine.create_puzzle(
                 puzzle_type=pstart["puzzle_type"],
                 station=pstart["station"],
                 label=pstart["label"],
                 difficulty=pstart.get("difficulty", 1),
-                time_limit=pstart.get("time_limit", 30.0),
+                time_limit=base_time * time_mult,
                 **extra_kwargs,
             )
             # Assist chain: triage on Medical → notify Science (pathogen analysis).
@@ -617,6 +637,15 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             _puzzle_engine.apply_assist(payload.puzzle_id, payload.assist_type, payload.data)
         elif msg_type == "puzzle.cancel" and isinstance(payload, PuzzleCancelPayload):
             _puzzle_engine.cancel(payload.puzzle_id)
+        elif msg_type == "crew.notify" and isinstance(payload, CrewNotifyPayload):
+            msg_text = payload.message.strip()[:120]
+            if msg_text:
+                events.append(("crew.notification", {
+                    "message":   msg_text,
+                    "from_role": payload.from_role.strip()[:20] or "crew",
+                }))
+        elif msg_type == "game.briefing_launch" and isinstance(payload, GameBriefingLaunchPayload):
+            events.append(("game.all_ready", {}))
         else:
             logger.warning("Unrecognised queued input type: %s", msg_type)
 

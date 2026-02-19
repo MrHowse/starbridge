@@ -25,10 +25,22 @@
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, showBriefing, showGameOver } from '../shared/ui_components.js';
 import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
-import {
-  C_PRIMARY, C_BG, C_GRID,
-  drawBackground, worldToScreen, drawShipChevron,
-} from '../shared/renderer.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_ambient.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+import { initNotifications } from '../shared/notifications.js';
+import { initRoleBar } from '../shared/role_bar.js';
+
+registerHelp([
+  { selector: '#sensor-canvas',     text: 'Sensor display — contacts shown within detection range.', position: 'right' },
+  { selector: '#contact-list',      text: 'Contact list — click a contact to select it for scanning.', position: 'right' },
+  { selector: '#scan-btn',          text: 'Initiate active scan — detailed readout on target\'s hull, shields, weakness.', position: 'left' },
+  { selector: '#cancel-btn',        text: 'Cancel scan in progress.', position: 'left' },
+]);
+import { C_PRIMARY } from '../shared/renderer.js';
+import { MapRenderer } from '../shared/map_renderer.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -91,8 +103,8 @@ const sensorEffEl   = document.getElementById('sensor-efficiency');
 // Game state
 // ---------------------------------------------------------------------------
 
-let gameActive  = false;
-let sensorCtx   = null;
+let gameActive     = false;
+let sensorRenderer = null;
 
 let shipState   = null;               // most recent ship.state payload
 let contacts    = [];                 // most recent sensor.contacts list
@@ -133,6 +145,11 @@ function init() {
 
   initPuzzleRenderer(send);
   setupControls();
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  initHelpOverlay();
+  initNotifications(send, 'science');
+  initRoleBar(send, 'science');
   connect();
 }
 
@@ -152,9 +169,21 @@ function handleGameStarted(payload) {
   signalScanCount = 0;
 
   requestAnimationFrame(() => {
-    sensorCtx = sensorCanvas.getContext('2d');
-    resizeSensor();
-    window.addEventListener('resize', resizeSensor);
+    sensorRenderer = new MapRenderer(sensorCanvas, {
+      range:         sensorRange,
+      orientation:   'north-up',
+      showGrid:      false,
+      showRangeRings: true,
+      interactive:   true,
+      drawContact:   (ctx, sx, sy, contact, selected, _now) => {
+        if (contact.scan_state === 'scanned') {
+          drawScannedContact(ctx, sx, sy, contact.type, selected);
+        } else {
+          drawUnknownContact(ctx, sx, sy, selected);
+        }
+      },
+    });
+    sensorRenderer.onContactClick((id) => selectContact(id));
     requestAnimationFrame(renderLoop);
   });
 
@@ -169,6 +198,7 @@ function handleGameStarted(payload) {
   }
 
   console.log(`[science] Game started — mission: ${payload.mission_id}`);
+  SoundBank.setAmbient('sensor_sweep', { active: true });
 }
 
 function handleShipState(payload) {
@@ -178,6 +208,11 @@ function handleShipState(payload) {
   // Derive sensor range from sensor system efficiency.
   const sensorEff = payload.systems?.sensors?.efficiency ?? 1.0;
   sensorRange     = BASE_SENSOR_RANGE * sensorEff;
+
+  if (sensorRenderer) {
+    sensorRenderer._range = sensorRange;
+    sensorRenderer.updateShipState(payload);
+  }
 
   // Update sensor status panel.
   const power = payload.systems?.sensors?.power ?? 0;
@@ -202,6 +237,8 @@ function handleSensorContacts(payload) {
     resetScanProgress();
   }
 
+  if (sensorRenderer) sensorRenderer.updateContacts(contacts);
+
   renderContactList();
   updateScanUI();
 }
@@ -221,6 +258,7 @@ function handleScanProgress(payload) {
 
 function handleScanComplete(payload) {
   if (!gameActive) return;
+  SoundBank.play('scan_complete');
   scanningId = null;
   resetScanProgress();
 
@@ -270,12 +308,15 @@ function handleSignalBearing(payload) {
 
 function handleHullHit() {
   if (!gameActive) return;
+  SoundBank.play('hull_hit');
   stationEl.classList.add('hit');
   setTimeout(() => stationEl.classList.remove('hit'), HIT_FLASH_MS);
 }
 
 function handleGameOver(payload) {
   gameActive = false;
+  SoundBank.play(payload.result === 'victory' ? 'victory' : 'defeat');
+  SoundBank.stopAmbient('sensor_sweep');
   showGameOver(payload.result, payload.stats || {});
 }
 
@@ -306,42 +347,11 @@ function setupControls() {
     scanningId = null;
     resetScanProgress();
   });
-
-  sensorCanvas.addEventListener('click', handleCanvasClick);
-}
-
-function handleCanvasClick(e) {
-  if (!gameActive || !sensorCtx || !shipState) return;
-
-  const rect   = sensorCanvas.getBoundingClientRect();
-  const scaleX = sensorCanvas.width  / rect.width;
-  const scaleY = sensorCanvas.height / rect.height;
-  const mx     = (e.clientX - rect.left) * scaleX;
-  const my     = (e.clientY - rect.top)  * scaleY;
-
-  const zoom = sensorRange / Math.min(sensorCanvas.width / 2, sensorCanvas.height / 2);
-
-  const HIT_RADIUS = 18;
-  for (const contact of contacts) {
-    const sp = worldToScreen(
-      contact.x, contact.y,
-      shipState.position.x, shipState.position.y,
-      zoom, sensorCanvas.width, sensorCanvas.height
-    );
-    const dx = mx - sp.x;
-    const dy = my - sp.y;
-    if (dx * dx + dy * dy <= HIT_RADIUS * HIT_RADIUS) {
-      selectContact(contact.id);
-      return;
-    }
-  }
-
-  // Click on empty space — deselect.
-  selectContact(null);
 }
 
 function selectContact(id) {
   selectedId = id;
+  if (sensorRenderer) sensorRenderer.selectContact(id);
   renderContactList();
   updateScanUI();
 }
@@ -456,89 +466,21 @@ function resetScanProgress() {
 }
 
 // ---------------------------------------------------------------------------
-// Sensor canvas rendering
+// Render loop
 // ---------------------------------------------------------------------------
 
-function resizeSensor() {
-  const wrap = sensorCanvas.parentElement;
-  sensorCanvas.width  = wrap.clientWidth;
-  sensorCanvas.height = wrap.clientHeight;
-}
-
-function renderLoop() {
+function renderLoop(now) {
   if (!gameActive) return;
-  drawSensor();
-  requestAnimationFrame(renderLoop);
-}
 
-function drawSensor() {
-  if (!sensorCtx || !shipState) return;
+  sensorRenderer.render(now);
 
-  const ctx = sensorCtx;
-  const cw  = sensorCanvas.width;
-  const ch  = sensorCanvas.height;
-  const cx  = cw / 2;
-  const cy  = ch / 2;
-
-  // zoom: world units per pixel so that sensorRange fills to canvas edge.
-  const zoom = sensorRange / Math.min(cx, cy);
-
-  // 1. Background.
-  drawBackground(ctx, cw, ch);
-
-  // 2. Faint grid.
-  ctx.strokeStyle = C_GRID;
-  ctx.lineWidth   = 0.5;
-  const gridStep  = 40;
-  for (let x = cx % gridStep; x < cw; x += gridStep) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke();
-  }
-  for (let y = cy % gridStep; y < ch; y += gridStep) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
-  }
-
-  // 3. Range rings at 1/3, 2/3, and full sensor range.
-  ctx.strokeStyle = 'rgba(255, 176, 0, 0.18)';
-  ctx.lineWidth   = 1;
-  for (let i = 1; i <= 3; i++) {
-    const r = Math.min(cx, cy) * (i / 3);
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  // 4. Contacts.
-  for (const contact of contacts) {
-    const sp = worldToScreen(
-      contact.x, contact.y,
-      shipState.position.x, shipState.position.y,
-      zoom, cw, ch
-    );
-    const isSelected = contact.id === selectedId;
-
-    if (contact.scan_state === 'scanned') {
-      drawScannedContact(ctx, sp.x, sp.y, contact.type, isSelected);
-    } else {
-      drawUnknownContact(ctx, sp.x, sp.y, isSelected);
-    }
-  }
-
-  // 4b. Triangulation bearing lines (Mission 3).
+  // Science-specific overlay: triangulation bearing lines drawn on top.
   if (bearingLines.length > 0) {
-    drawBearingLines(ctx, cx, cy, cw, ch, zoom);
+    const ctx = sensorCanvas.getContext('2d');
+    drawBearingLines(ctx, sensorCanvas.width, sensorCanvas.height);
   }
 
-  // 5. Player ship at centre — chevron points in actual heading direction (North-up map).
-  const headRad = (shipState.heading * Math.PI) / 180;
-  drawShipChevron(ctx, cx, cy, headRad, 8, C_PRIMARY);
-
-  // 6. Range readout.
-  const km = (sensorRange / 1000).toFixed(0);
-  ctx.fillStyle    = 'rgba(0, 255, 65, 0.45)';
-  ctx.font         = '9px "Share Tech Mono", monospace';
-  ctx.textAlign    = 'right';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(`RANGE: ${km}km`, cw - 6, ch - 4);
+  requestAnimationFrame(renderLoop);
 }
 
 // ---------------------------------------------------------------------------
@@ -628,18 +570,12 @@ function drawScannedContact(ctx, sx, sy, type, selected) {
  * If 2 bearings exist and a signal_location is known, also draw a cross-hair
  * at the estimated intersection.
  */
-function drawBearingLines(ctx, cx, cy, cw, ch, zoom) {
+function drawBearingLines(ctx, cw, ch) {
   ctx.save();
 
-  for (let i = 0; i < bearingLines.length; i++) {
-    const { bearing, ship_x, ship_y } = bearingLines[i];
-
-    // Map the scan ship position to screen coords.
-    const origin = worldToScreen(
-      ship_x, ship_y,
-      shipState.position.x, shipState.position.y,
-      zoom, cw, ch
-    );
+  for (const { bearing, ship_x, ship_y } of bearingLines) {
+    // Map the scan ship position to canvas coords via MapRenderer.
+    const origin = sensorRenderer.worldToCanvas(ship_x, ship_y);
 
     // Bearing is degrees CW from North. Convert to canvas angle (North-up, y-down).
     const rad = (bearing * Math.PI) / 180;
@@ -675,11 +611,7 @@ function drawBearingLines(ctx, cx, cy, cw, ch, zoom) {
 
   // If triangulated, draw a pulsing cross-hair at the signal location.
   if (bearingLines.length >= 2 && signalLocation) {
-    const sp = worldToScreen(
-      signalLocation.x, signalLocation.y,
-      shipState.position.x, shipState.position.y,
-      zoom, cw, ch
-    );
+    const sp = sensorRenderer.worldToCanvas(signalLocation.x, signalLocation.y);
     const R = 10;
     ctx.strokeStyle = C_BEARING;
     ctx.lineWidth   = 1.5;

@@ -1,0 +1,7 @@
+{
+  "id": "corvette",
+  "name": "Corvette",
+  "description": "Light patrol vessel. Good balance of speed and resilience.",
+  "max_hull": 80,
+  "torpedo_ammo": 10
+}

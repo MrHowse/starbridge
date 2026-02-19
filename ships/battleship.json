@@ -1,0 +1,7 @@
+{
+  "id": "battleship",
+  "name": "Battleship",
+  "description": "Massive capital ship. Formidable hull and firepower; sluggish but near-unstoppable.",
+  "max_hull": 200,
+  "torpedo_ammo": 20
+}

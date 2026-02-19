@@ -1,0 +1,7 @@
+{
+  "id": "cruiser",
+  "name": "Cruiser",
+  "description": "Heavy warship with strong hull and generous armament. Sacrifices speed.",
+  "max_hull": 140,
+  "torpedo_ammo": 16
+}

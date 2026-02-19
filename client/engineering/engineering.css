@@ -211,6 +211,23 @@
   color: var(--text-normal);
 }
 
+/* Cadet hint badge */
+.sys-row__hint-badge {
+  font-size: 0.58rem;
+  padding: 0.1rem 0.4rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid #ffb000;
+  color: #ffb000;
+  background: rgba(255, 176, 0, 0.08);
+  animation: hint-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes hint-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
 /* Repair button */
 .sys-row__repair-btn {
   font-size: 0.62rem;

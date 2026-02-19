@@ -15,6 +15,7 @@ VALID_ROLES: frozenset[str] = frozenset(
 class LobbyClaimRolePayload(BaseModel):
     role: Role
     player_name: str = Field(min_length=1, max_length=20)
+    additional: bool = False  # If True, keep any existing roles (multi-role mode)
 
     @field_validator("player_name")
     @classmethod
@@ -31,6 +32,8 @@ class LobbyReleaseRolePayload(BaseModel):
 
 class LobbyStartGamePayload(BaseModel):
     mission_id: str
+    difficulty: str = "officer"
+    ship_class: str = "frigate"
 
 
 class LobbyStatePayload(BaseModel):

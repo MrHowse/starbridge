@@ -18,6 +18,20 @@
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, showBriefing, showGameOver } from '../shared/ui_components.js';
 import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_ambient.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+import { initNotifications } from '../shared/notifications.js';
+import { initRoleBar } from '../shared/role_bar.js';
+
+registerHelp([
+  { selector: '#compass',          text: 'Heading dial — click to set target heading. Ship turns toward it.', position: 'right' },
+  { selector: '#throttle-slider',  text: 'Throttle — ship speed 0–100%. W/S or ↑↓ to adjust.', position: 'right' },
+  { selector: '#minimap',          text: 'Sector minimap — green chevron = you, red = enemies.', position: 'left' },
+  { selector: '#viewscreen',       text: 'Forward view — rotates with your heading.', position: 'below' },
+]);
 import {
   lerp,
   lerpAngle,
@@ -78,7 +92,8 @@ let hazards = [];
 // Beam flash: { targetX, targetY, startTime } — shown on minimap
 let beamFlash = null;
 
-let gameActive = false;
+let gameActive    = false;
+let hintsEnabled  = false;  // true when difficulty === 'cadet'
 
 /**
  * Server-provided ship state snapshots.
@@ -127,14 +142,18 @@ function init() {
   on('game.started',       handleGameStarted);
   on('ship.state',         handleShipState);
   on('world.entities',     handleWorldEntities);
-  on('ship.alert_changed', ({ level }) => setAlertLevel(level));
+  on('ship.alert_changed', ({ level }) => { setAlertLevel(level); SoundBank.setAmbient('alert_level', { level }); });
   on('ship.hull_hit',      handleHullHit);
   on('weapons.beam_fired', handleBeamFired);
   on('game.over',          handleGameOver);
 
   initPuzzleRenderer(send);
   setupKeyboard();
-
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  initHelpOverlay();
+  initNotifications(send, 'helm');
+  initRoleBar(send, 'helm');
   connect();
 }
 
@@ -170,7 +189,10 @@ function handleGameStarted(payload) {
     showBriefing(payload.mission_name, payload.briefing_text);
   }
 
+  hintsEnabled = payload.difficulty === 'cadet';
   console.log(`[helm] Game started — mission: ${payload.mission_id}`);
+  SoundBank.setAmbient('life_support', { active: true });
+  SoundBank.setAmbient('engine_hum', { throttle: 0, enginePower: 1 });
 }
 
 function handleShipState(payload) {
@@ -178,6 +200,7 @@ function handleShipState(payload) {
   prevState    = currState;
   currState    = payload;
   lastTickTime = performance.now();
+  SoundBank.setAmbient('engine_hum', { throttle: payload.throttle ?? 0, enginePower: payload.systems?.engines?.efficiency ?? 1 });
 }
 
 function handleWorldEntities(payload) {
@@ -188,6 +211,7 @@ function handleWorldEntities(payload) {
 
 function handleHullHit() {
   if (!gameActive) return;
+  SoundBank.play('hull_hit');
   const el = document.querySelector('.station-container');
   if (el) {
     el.classList.add('hit');
@@ -202,6 +226,10 @@ function handleBeamFired(payload) {
 
 function handleGameOver(payload) {
   gameActive = false;
+  SoundBank.play(payload.result === 'victory' ? 'victory' : 'defeat');
+  SoundBank.stopAmbient('engine_hum');
+  SoundBank.stopAmbient('life_support');
+  SoundBank.stopAmbient('alert_level');
   showGameOver(payload.result, payload.stats || {});
 }
 
@@ -272,6 +300,69 @@ function drawMinimapPanel(state) {
   drawMinimapHazards(mmCtx, size);
   drawMinimapContacts(mmCtx, size, state);
   drawMinimapBeamFlash(mmCtx, size, state);
+  if (hintsEnabled) drawMinimapThreatArrow(mmCtx, size, state);
+}
+
+/**
+ * Cadet hint: amber arrow on minimap edge pointing toward nearest enemy.
+ */
+function drawMinimapThreatArrow(ctx, size, state) {
+  if (!contacts.length) return;
+
+  // Find nearest enemy.
+  let nearest = null, minDist = Infinity;
+  for (const c of contacts) {
+    const d = Math.hypot(c.x - state.position.x, c.y - state.position.y);
+    if (d < minDist) { minDist = d; nearest = c; }
+  }
+  if (!nearest) return;
+
+  const PAD    = 6;
+  const SECTOR = 100_000;
+  const mapW   = size - PAD * 2;
+
+  // Player and target map positions.
+  const px = PAD + (state.position.x / SECTOR) * mapW;
+  const py = PAD + (state.position.y / SECTOR) * mapW;
+  const tx = PAD + (nearest.x / SECTOR) * mapW;
+  const ty = PAD + (nearest.y / SECTOR) * mapW;
+
+  // Direction angle and arrow tip clamped to minimap edge.
+  const angle = Math.atan2(ty - py, tx - px);
+  const cx    = size / 2;
+  const cy    = size / 2;
+  const MARGIN = 12;
+  const R      = cx - MARGIN;
+  const tipX   = cx + Math.cos(angle) * R;
+  const tipY   = cy + Math.sin(angle) * R;
+
+  // Arrow size.
+  const A = 8;
+  const left  = angle + Math.PI * 0.8;
+  const right = angle - Math.PI * 0.8;
+  const alpha = 0.7 + 0.3 * Math.sin(performance.now() * 0.004);
+
+  ctx.save();
+  ctx.fillStyle = `rgba(255, 176, 0, ${alpha})`;
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(tipX + Math.cos(left)  * A, tipY + Math.sin(left)  * A);
+  ctx.lineTo(tipX + Math.cos(right) * A, tipY + Math.sin(right) * A);
+  ctx.closePath();
+  ctx.fill();
+
+  // Label below the arrow tip.
+  ctx.fillStyle    = `rgba(255, 176, 0, ${alpha})`;
+  ctx.font         = '7px "Share Tech Mono", monospace';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  const labelX = cx + Math.cos(angle) * (R + 10);
+  const labelY = cy + Math.sin(angle) * (R + 10);
+  // Only draw label if it fits inside canvas.
+  if (labelX > 2 && labelX < size - 2 && labelY > 2 && labelY < size - 2) {
+    ctx.fillText('THREAT', labelX, labelY);
+  }
+  ctx.restore();
 }
 
 function drawMinimapBeamFlash(ctx, size, state) {

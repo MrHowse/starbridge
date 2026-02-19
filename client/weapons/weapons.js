@@ -23,11 +23,23 @@
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, showBriefing, showGameOver } from '../shared/ui_components.js';
-import {
-  C_PRIMARY, C_PRIMARY_DIM, C_FRIENDLY, C_BG, C_GRID,
-  drawBackground, worldToScreen, drawShipChevron,
-} from '../shared/renderer.js';
+import { C_PRIMARY_DIM, C_FRIENDLY } from '../shared/renderer.js';
+import { MapRenderer } from '../shared/map_renderer.js';
 import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+import { initNotifications } from '../shared/notifications.js';
+import { initRoleBar } from '../shared/role_bar.js';
+
+registerHelp([
+  { selector: '#radar-canvas',     text: 'Tactical radar — click enemy to select as target.', position: 'right' },
+  { selector: '#beam-fire-btn',    text: 'Fire beams — hold for sustained fire within weapon arc.', position: 'left' },
+  { selector: '#tube1-fire-btn',   text: 'Fire torpedo tube 1 — needs ammo loaded.', position: 'left' },
+  { selector: '#tube2-fire-btn',   text: 'Fire torpedo tube 2 — independent reload timer.', position: 'left' },
+  { selector: '#shield-slider',    text: 'Shield balance — slide forward (100%) vs rear (0%).', position: 'above' },
+]);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -98,13 +110,16 @@ const shieldAftPct  = document.getElementById('shield-aft-pct');
 // Game state
 // ---------------------------------------------------------------------------
 
-let gameActive  = false;
-let radarCtx    = null;
+let gameActive    = false;
+let radarCtx      = null;
+let radarRenderer = null;  // MapRenderer instance
+let hintsEnabled  = false;  // true when difficulty === 'cadet'
 
 let shipState   = null;   // most recent ship.state payload
 let contacts    = [];     // world.entities enemies array
 let torpedoes   = [];     // world.entities torpedoes array
 let selectedId  = null;   // selected enemy entity_id or null
+let suggestedId = null;   // cadet hint: nearest/lowest-hull contact
 
 // Tube state (from ship.state).
 let tubeTypes   = ['standard', 'standard'];
@@ -118,9 +133,6 @@ let beamFlash   = null;
 
 // Hull-hit flash timestamp
 let hitFlashTime = -Infinity;
-
-// Torpedo trail ring buffers: Map<torpedoId, [{x,y}]>
-const torpedoTrails = new Map();
 
 // Explosion rings: [{x, y, startTime}]
 const explosions = [];
@@ -157,6 +169,12 @@ function init() {
 
   initPuzzleRenderer(send);
   setupControls();
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  initHelpOverlay();
+  initNotifications(send, 'weapons');
+  initRoleBar(send, 'weapons');
+  on('weapons.torpedo_fired', () => SoundBank.play('torpedo_launch'));
   connect();
 }
 
@@ -168,12 +186,49 @@ function handleGameStarted(payload) {
   missionLabelEl.textContent = payload.mission_name.toUpperCase();
   standbyEl.style.display    = 'none';
   weaponsMainEl.style.display = 'grid';
+  hintsEnabled = payload.difficulty === 'cadet';
   gameActive = true;
 
   requestAnimationFrame(() => {
     radarCtx = radarCanvas.getContext('2d');
     resizeRadar();
     window.addEventListener('resize', resizeRadar);
+
+    // Create MapRenderer for radar (contacts + grid; beam arc drawn separately).
+    radarRenderer = new MapRenderer(radarCanvas, {
+      range: RADAR_WORLD_RADIUS,
+      orientation: 'north-up',
+      showGrid: false,
+      showRangeRings: true,
+      interactive: true,
+      zoom: { enabled: false },
+      drawContact: (ctx, sx, sy, contact, selected, now) => {
+        // Cadet hint pulsing ring before the shape.
+        if (hintsEnabled && contact.id === suggestedId && !selected) {
+          const pulse = 0.5 + 0.5 * Math.sin(now * 0.004);
+          const shape = ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser;
+          ctx.save();
+          ctx.strokeStyle = `rgba(255, 176, 0, ${0.5 + 0.4 * pulse})`;
+          ctx.lineWidth   = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.arc(sx, sy, shape.size + 10, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle  = `rgba(255, 176, 0, ${0.6 + 0.3 * pulse})`;
+          ctx.font       = '8px "Share Tech Mono", monospace';
+          ctx.textAlign  = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText('SUGGESTED TARGET', sx, sy - shape.size - 14);
+          ctx.restore();
+        }
+        drawEnemyShape(ctx, sx, sy, contact.type,
+          (ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser).size,
+          '#ff4040', selected);
+      },
+    });
+    radarRenderer.onContactClick((id) => selectTarget(id));
+
     requestAnimationFrame(renderLoop);
   });
 
@@ -187,6 +242,7 @@ function handleGameStarted(payload) {
 function handleShipState(payload) {
   if (!gameActive) return;
   shipState = payload;
+  if (radarRenderer) radarRenderer.updateShipState(payload);
   if (payload.tube_types)   tubeTypes   = payload.tube_types;
   if (payload.tube_loading) tubeLoading = payload.tube_loading;
   updateTubeUI(payload);
@@ -197,56 +253,67 @@ function handleSensorContacts(payload) {
   contacts  = payload.contacts  || [];
   torpedoes = payload.torpedoes || [];
 
-  // Update torpedo trail ring buffers.
-  const currentIds = new Set(torpedoes.map(t => t.id));
-  for (const id of torpedoTrails.keys()) {
-    if (!currentIds.has(id)) torpedoTrails.delete(id);
-  }
-  for (const torp of torpedoes) {
-    if (!torpedoTrails.has(torp.id)) torpedoTrails.set(torp.id, []);
-    const trail = torpedoTrails.get(torp.id);
-    trail.push({ x: torp.x, y: torp.y });
-    if (trail.length > TRAIL_LENGTH) trail.shift();
+  // Cadet hint: keep suggestedId pointing at the nearest enemy contact.
+  if (hintsEnabled && contacts.length > 0 && shipState) {
+    let nearest = null, minDist = Infinity;
+    for (const c of contacts) {
+      const dx = c.x - shipState.position.x;
+      const dy = c.y - shipState.position.y;
+      const d  = Math.hypot(dx, dy);
+      if (d < minDist) { minDist = d; nearest = c; }
+    }
+    suggestedId = nearest ? nearest.id : null;
+  } else {
+    suggestedId = null;
   }
 
+  if (radarRenderer) radarRenderer.updateContacts(contacts, torpedoes);
   updateTargetPanel();
 }
 
 function handleHullHit() {
   if (!gameActive) return;
+  SoundBank.play('hull_hit');
   hitFlashTime = performance.now();
   stationEl.classList.add('hit');
   setTimeout(() => stationEl.classList.remove('hit'), HIT_FLASH_MS);
+  if (radarRenderer && shipState?.position) {
+    radarRenderer.addDamageEvent(shipState.position.x, shipState.position.y);
+  }
 }
 
 function handleSystemDamaged(payload) {
   if (!gameActive) return;
+  SoundBank.play('system_damage');
   console.log(`[weapons] System damaged: ${payload.system} → ${payload.new_health.toFixed(1)} HP`);
 }
 
 function handleBeamFired(payload) {
   if (!gameActive) return;
+  SoundBank.play('beam_fire');
   beamFlash = {
     targetX:   payload.target_x,
     targetY:   payload.target_y,
     startTime: performance.now(),
   };
+  // Also tell MapRenderer (for its beam flash line).
+  if (radarRenderer) radarRenderer.setBeamFlash(payload.target_x, payload.target_y);
 }
 
 function handleTorpedoHit(payload) {
   if (!gameActive) return;
+  SoundBank.play('torpedo_impact');
   // Spawn explosion at last known position of the torpedo.
-  const trail = torpedoTrails.get(payload.torpedo_id);
-  if (trail && trail.length > 0) {
-    const last = trail[trail.length - 1];
-    explosions.push({ x: last.x, y: last.y, startTime: performance.now() });
+  if (radarRenderer) {
+    const last = radarRenderer.getLastTorpedoPosition(payload.torpedo_id);
+    if (last) explosions.push({ x: last.x, y: last.y, startTime: performance.now() });
   }
-  torpedoTrails.delete(payload.torpedo_id);
   torpedoes = torpedoes.filter(t => t.id !== payload.torpedo_id);
 }
 
 function handleGameOver(payload) {
   gameActive = false;
+  SoundBank.play(payload.result === 'victory' ? 'victory' : 'defeat');
   showGameOver(payload.result, payload.stats || {});
 }
 
@@ -322,11 +389,13 @@ function setupControls() {
   // Torpedo tubes.
   tube1FireBtn.addEventListener('click', () => {
     if (!gameActive) return;
+    SoundBank.play('torpedo_launch');
     send('weapons.fire_torpedo', { tube: 1 });
   });
 
   tube2FireBtn.addEventListener('click', () => {
     if (!gameActive) return;
+    SoundBank.play('torpedo_launch');
     send('weapons.fire_torpedo', { tube: 2 });
   });
 
@@ -344,8 +413,7 @@ function setupControls() {
     send('weapons.set_shields', { front: front, rear: rear });
   });
 
-  // Radar click — select target.
-  radarCanvas.addEventListener('click', handleRadarClick);
+  // Radar click is handled by MapRenderer's onContactClick callback.
 }
 
 function _buildLoadControls() {
@@ -394,39 +462,9 @@ function _buildLoadControls() {
   });
 }
 
-function handleRadarClick(e) {
-  if (!gameActive || !radarCtx || !shipState) return;
-
-  const rect = radarCanvas.getBoundingClientRect();
-  const scaleX = radarCanvas.width  / rect.width;
-  const scaleY = radarCanvas.height / rect.height;
-  const mx = (e.clientX - rect.left) * scaleX;
-  const my = (e.clientY - rect.top)  * scaleY;
-
-  const zoom = RADAR_WORLD_RADIUS / (Math.min(radarCanvas.width, radarCanvas.height) / 2);
-
-  // Hit-test each contact.
-  const HIT_RADIUS = 18;
-  for (const contact of contacts) {
-    const sp = worldToScreen(
-      contact.x, contact.y,
-      shipState.position.x, shipState.position.y,
-      zoom, radarCanvas.width, radarCanvas.height
-    );
-    const dx = mx - sp.x;
-    const dy = my - sp.y;
-    if (dx * dx + dy * dy <= HIT_RADIUS * HIT_RADIUS) {
-      selectTarget(contact.id);
-      return;
-    }
-  }
-
-  // Click on empty space — deselect.
-  selectTarget(null);
-}
-
 function selectTarget(id) {
   selectedId = id;
+  if (radarRenderer) radarRenderer.selectContact(id);
   send('weapons.select_target', { entity_id: id });
   updateTargetPanel();
 }
@@ -581,138 +619,54 @@ function renderLoop() {
 }
 
 function drawRadar(now) {
-  if (!radarCtx || !shipState) return;
+  if (!radarCtx || !shipState || !radarRenderer) return;
+
+  // MapRenderer draws: background, range rings, contacts (with cadet hint via drawContact),
+  // torpedo trails, ship chevron, beam flash.
+  radarRenderer.render(now);
 
   const ctx = radarCtx;
   const cw  = radarCanvas.width;
   const ch  = radarCanvas.height;
   const cx  = cw / 2;
   const cy  = ch / 2;
-  const zoom = RADAR_WORLD_RADIUS / Math.min(cx, cy);
 
-  // 1. Background.
-  drawBackground(ctx, cw, ch);
+  // Station-specific overlays drawn on top:
 
-  // 2. Faint grid.
-  ctx.strokeStyle = C_GRID;
-  ctx.lineWidth   = 0.5;
-  const gridStep = 40;
-  for (let x = cx % gridStep; x < cw; x += gridStep) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke();
-  }
-  for (let y = cy % gridStep; y < ch; y += gridStep) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
-  }
-
-  // 3. Range rings (3 rings at 1/3, 2/3, full radar radius).
-  ctx.strokeStyle = 'rgba(255, 176, 0, 0.18)';
-  ctx.lineWidth   = 1;
-  for (let i = 1; i <= 3; i++) {
-    const r = (Math.min(cx, cy)) * (i / 3);
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  // 4. Beam arc overlay (player fires from ship centre, arc ±45° from heading).
+  // Beam arc (±45° from ship heading).
   const ARC_DEG = 45;
-  if (shipState) {
-    const headRad = shipState.heading * Math.PI / 180;
-    // In radar view heading is always "up" (subtract heading rotation).
-    // Because we draw in world-screen space without rotating the canvas,
-    // "up" is canvas -y (north), and heading 0 means "up".
-    // We draw from centre outward at ±ARC from "up" (−π/2 in canvas).
-    const arcR    = Math.min(cx, cy) * (8000 / RADAR_WORLD_RADIUS);
-    const upAngle = -Math.PI / 2;  // canvas "north"
-    const leftArc  = upAngle - ARC_DEG * Math.PI / 180;
-    const rightArc = upAngle + ARC_DEG * Math.PI / 180;
+  const headRad = shipState.heading * Math.PI / 180;
+  const zoom    = radarRenderer.getZoom();
+  const arcR    = Math.min(cx, cy) * (8000 / RADAR_WORLD_RADIUS);
+  const upAngle = -Math.PI / 2;
+  const leftArc  = upAngle - ARC_DEG * Math.PI / 180;
+  const rightArc = upAngle + ARC_DEG * Math.PI / 180;
 
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(headRad);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(headRad);
+  ctx.fillStyle = 'rgba(0, 255, 65, 0.05)';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, arcR, leftArc, rightArc);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = C_PRIMARY_DIM;
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(Math.cos(leftArc) * arcR, Math.sin(leftArc) * arcR);
+  ctx.moveTo(0, 0); ctx.lineTo(Math.cos(rightArc) * arcR, Math.sin(rightArc) * arcR);
+  ctx.stroke();
+  ctx.restore();
 
-    ctx.fillStyle = 'rgba(0, 255, 65, 0.05)';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.arc(0, 0, arcR, leftArc, rightArc);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.strokeStyle = C_PRIMARY_DIM;
-    ctx.lineWidth   = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(Math.cos(leftArc) * arcR, Math.sin(leftArc) * arcR);
-    ctx.moveTo(0, 0);
-    ctx.lineTo(Math.cos(rightArc) * arcR, Math.sin(rightArc) * arcR);
-    ctx.stroke();
-
-    ctx.restore();
-  }
-
-  // 5. Beam flash — line from centre to target.
-  if (beamFlash) {
-    const age = now - beamFlash.startTime;
-    if (age < BEAM_FLASH_MS) {
-      const alpha = (1 - age / BEAM_FLASH_MS) * 0.85;
-      const sp = worldToScreen(
-        beamFlash.targetX, beamFlash.targetY,
-        shipState.position.x, shipState.position.y,
-        zoom, cw, ch
-      );
-      ctx.strokeStyle = `rgba(0, 255, 65, ${alpha})`;
-      ctx.lineWidth   = 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(sp.x, sp.y);
-      ctx.stroke();
-    } else {
-      beamFlash = null;
-    }
-  }
-
-  // 6. Enemy contacts.
-  for (const contact of contacts) {
-    const sp  = worldToScreen(
-      contact.x, contact.y,
-      shipState.position.x, shipState.position.y,
-      zoom, cw, ch
-    );
-    const shape = ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser;
-    const isSelected = contact.id === selectedId;
-
-    drawEnemyShape(ctx, sp.x, sp.y, contact.type, shape.size, shape.color, isSelected);
-  }
-
-  // 7. Torpedo entities with trails.
-  for (const torp of torpedoes) {
-    const trail = torpedoTrails.get(torp.id) || [];
-    for (let i = 0; i < trail.length - 1; i++) {
-      const alpha = (i + 1) / trail.length * 0.55;
-      const sp = worldToScreen(trail[i].x, trail[i].y,
-        shipState.position.x, shipState.position.y, zoom, cw, ch);
-      ctx.fillStyle = `rgba(0, 170, 255, ${alpha})`;
-      ctx.beginPath();
-      ctx.arc(sp.x, sp.y, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    const sp = worldToScreen(torp.x, torp.y,
-      shipState.position.x, shipState.position.y, zoom, cw, ch);
-    ctx.fillStyle = C_FRIENDLY;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // 7b. Explosions — expanding wireframe circles.
+  // Explosions — expanding wireframe circles.
   {
     const done = [];
     for (const exp of explosions) {
       const age = now - exp.startTime;
       if (age >= EXPLOSION_DURATION) { done.push(exp); continue; }
-      const t   = age / EXPLOSION_DURATION;
-      const sp  = worldToScreen(exp.x, exp.y,
-        shipState.position.x, shipState.position.y, zoom, cw, ch);
+      const t  = age / EXPLOSION_DURATION;
+      const sp = radarRenderer.worldToCanvas(exp.x, exp.y);
       ctx.save();
       for (let ring = 0; ring < 3; ring++) {
         const ringT  = Math.min(1, (t + ring * 0.1));
@@ -728,17 +682,6 @@ function drawRadar(now) {
     }
     for (const exp of done) explosions.splice(explosions.indexOf(exp), 1);
   }
-
-  // 8. Player ship at centre (always pointing up = heading is always "up" in this view).
-  drawShipChevron(ctx, cx, cy, 0, 8, C_PRIMARY);
-
-  // 9. Range readout.
-  const km = (RADAR_WORLD_RADIUS / 1000).toFixed(0);
-  ctx.fillStyle    = 'rgba(0, 255, 65, 0.45)';
-  ctx.font         = '9px "Share Tech Mono", monospace';
-  ctx.textAlign    = 'right';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(`RANGE: ${km}km`, cw - 6, ch - 4);
 }
 
 // ---------------------------------------------------------------------------

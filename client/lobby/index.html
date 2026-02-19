@@ -62,6 +62,21 @@
             <option value="puzzle_poc">PUZZLE FRAMEWORK PoC</option>
             <option value="engineering_drill">ENGINEERING DRILL</option>
           </select>
+          <label class="text-label" for="difficulty-select">DIFFICULTY</label>
+          <select id="difficulty-select" class="lobby-select" data-difficulty-select>
+            <option value="cadet">CADET — Easy (hints enabled)</option>
+            <option value="officer" selected>OFFICER — Normal</option>
+            <option value="commander">COMMANDER — Hard</option>
+            <option value="admiral">ADMIRAL — Expert</option>
+          </select>
+          <label class="text-label" for="ship-class-select">SHIP CLASS</label>
+          <select id="ship-class-select" class="lobby-select" data-ship-class-select>
+            <option value="scout">SCOUT — Light hull, fast</option>
+            <option value="corvette">CORVETTE — Light patrol</option>
+            <option value="frigate" selected>FRIGATE — Standard (default)</option>
+            <option value="cruiser">CRUISER — Heavy warship</option>
+            <option value="battleship">BATTLESHIP — Capital ship</option>
+          </select>
           <button class="btn btn--primary lobby-launch__btn" data-launch-btn disabled>
             LAUNCH
           </button>

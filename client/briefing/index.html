@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mission Briefing — Starbridge</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <link rel="stylesheet" href="briefing.css" />
+</head>
+<body class="briefing-body">
+
+  <div class="briefing-layout">
+
+    <!-- Left column: star chart -->
+    <div class="briefing-chart-col">
+      <canvas id="star-chart"></canvas>
+      <div class="briefing-chart-label" id="chart-sector-label">SECTOR MAP</div>
+    </div>
+
+    <!-- Right column: mission data -->
+    <div class="briefing-data-col">
+
+      <!-- Header -->
+      <div class="briefing-header">
+        <span class="briefing-header__tag text-label">MISSION BRIEFING</span>
+        <h1 class="briefing-header__title" id="mission-title">—</h1>
+        <div class="briefing-header__meta">
+          <span class="text-label">SHIP</span>
+          <span id="ship-name" class="briefing-meta-value">—</span>
+          <span class="text-label">CLASS</span>
+          <span id="ship-class-name" class="briefing-meta-value">—</span>
+          <span class="text-label">DIFFICULTY</span>
+          <span id="difficulty-name" class="briefing-meta-value">—</span>
+        </div>
+      </div>
+
+      <!-- Briefing text -->
+      <div class="briefing-section panel">
+        <div class="panel__header">MISSION ORDERS</div>
+        <p class="briefing-text" id="briefing-text">Loading…</p>
+      </div>
+
+      <!-- Player roster -->
+      <div class="briefing-section panel">
+        <div class="panel__header">CREW MANIFEST</div>
+        <div class="briefing-roster" id="crew-roster"></div>
+      </div>
+
+      <!-- Ship class summary -->
+      <div class="briefing-section panel">
+        <div class="panel__header">VESSEL STATS</div>
+        <div class="briefing-ship-stats" id="ship-stats"></div>
+      </div>
+
+      <!-- Launch controls -->
+      <div class="briefing-launch">
+        <div class="briefing-countdown">
+          <span class="text-label">LAUNCHING IN</span>
+          <span class="briefing-countdown__num" id="countdown-num">30</span>
+          <span class="text-label">SECONDS</span>
+        </div>
+        <div class="briefing-launch-btns">
+          <button class="btn btn--secondary" id="ready-btn">READY</button>
+          <button class="btn btn--primary briefing-launch__override" id="launch-btn" style="display:none">
+            LAUNCH NOW
+          </button>
+        </div>
+        <div class="briefing-ready-status" id="ready-status"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="briefing.js"></script>
+</body>
+</html>

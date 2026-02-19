@@ -1,0 +1,7 @@
+{
+  "id": "scout",
+  "name": "Scout",
+  "description": "Fast and nimble courier vessel. Light hull — relies on speed and sensors to survive.",
+  "max_hull": 60,
+  "torpedo_ammo": 8
+}
