@@ -41,6 +41,7 @@ class PuzzleEngine:
         self._label_to_id: dict[str, str] = {}          # label → puzzle_id
         self._pending: list[tuple[list[str], Message]] = []
         self._resolved: list[tuple[str, str, bool]] = []  # (puzzle_id, label, success)
+        self._relay_data: list[tuple[str, dict]] = []    # (station, relay_component)
         self._counter: int = 0
 
     def reset(self) -> None:
@@ -49,6 +50,7 @@ class PuzzleEngine:
         self._label_to_id.clear()
         self._pending.clear()
         self._resolved.clear()
+        self._relay_data.clear()
         self._counter = 0
 
     # ------------------------------------------------------------------
@@ -82,6 +84,7 @@ class PuzzleEngine:
             station=station,
             difficulty=difficulty,
             time_limit=time_limit,
+            **params,
         )
         data = instance.generate()
 
@@ -113,6 +116,9 @@ class PuzzleEngine:
         for puzzle_id, puzzle in list(self._puzzles.items()):
             if puzzle._resolved and puzzle_id not in already_reported:
                 self._resolved.append((puzzle_id, puzzle.label, puzzle._success))
+                # Capture relay data from puzzles that provide it on success.
+                if puzzle._success and hasattr(puzzle, "_relay_component") and puzzle._relay_component:  # type: ignore[union-attr]
+                    self._relay_data.append((puzzle.station, puzzle._relay_component))  # type: ignore[union-attr]
 
         # Prune resolved puzzles.
         self._puzzles = {
@@ -128,6 +134,9 @@ class PuzzleEngine:
         puzzle._resolve(success)
         # Report resolution immediately (before tick() runs).
         self._resolved.append((puzzle_id, puzzle.label, puzzle._success))
+        # Capture relay data if present.
+        if success and hasattr(puzzle, "_relay_component") and puzzle._relay_component:  # type: ignore[union-attr]
+            self._relay_data.append((puzzle.station, puzzle._relay_component))  # type: ignore[union-attr]
         # Prune now so tick() doesn't double-report.
         del self._puzzles[puzzle_id]
         # Collect broadcasts immediately so they go out this tick.
@@ -173,6 +182,16 @@ class PuzzleEngine:
         resolved = list(self._resolved)
         self._resolved.clear()
         return resolved
+
+    def pop_relay_data(self) -> list[tuple[str, dict]]:
+        """Return and clear (station, relay_component) for resolved puzzles with relay data.
+
+        Used by the game loop to implement cross-station assist chains
+        (e.g., Comms transmission_decoding → Science relay_frequency).
+        """
+        data = list(self._relay_data)
+        self._relay_data.clear()
+        return data
 
     def get_active_for_station(self, station: str) -> PuzzleInstance | None:
         """Return the active puzzle for a station, or None."""

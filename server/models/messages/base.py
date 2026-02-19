@@ -6,9 +6,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from server.models.messages.captain import CaptainSetAlertPayload
+from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainSetAlertPayload
+from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPayload
 from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
+from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
 from server.models.messages.engineering import EngineeringSetPowerPayload, EngineeringSetRepairPayload
 from server.models.messages.helm import HelmSetHeadingPayload, HelmSetThrottlePayload
 from server.models.messages.lobby import LobbyClaimRolePayload, LobbyReleaseRolePayload, LobbyStartGamePayload
@@ -16,6 +18,7 @@ from server.models.messages.science import ScienceCancelScanPayload, ScienceStar
 from server.models.messages.weapons import (
     WeaponsFireBeamsPayload,
     WeaponsFireTorpedoPayload,
+    WeaponsLoadTubePayload,
     WeaponsSelectTargetPayload,
     WeaponsSetShieldsPayload,
 )
@@ -69,15 +72,24 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "weapons.select_target": WeaponsSelectTargetPayload,
     "weapons.fire_beams": WeaponsFireBeamsPayload,
     "weapons.fire_torpedo": WeaponsFireTorpedoPayload,
+    "weapons.load_tube": WeaponsLoadTubePayload,
     "weapons.set_shields": WeaponsSetShieldsPayload,
     # Science
     "science.start_scan": ScienceStartScanPayload,
     "science.cancel_scan": ScienceCancelScanPayload,
     # Captain
     "captain.set_alert": CaptainSetAlertPayload,
+    "captain.authorize": CaptainAuthorizePayload,
+    "captain.add_log": CaptainAddLogPayload,
     # Medical
     "medical.treat_crew": MedicalTreatCrewPayload,
     "medical.cancel_treatment": MedicalCancelTreatmentPayload,
+    # Security
+    "security.move_squad": SecurityMoveSquadPayload,
+    "security.toggle_door": SecurityToggleDoorPayload,
+    # Comms
+    "comms.tune_frequency": CommsTuneFrequencyPayload,
+    "comms.hail": CommsHailPayload,
     # Puzzle
     "puzzle.submit": PuzzleSubmitPayload,
     "puzzle.request_assist": PuzzleAssistPayload,

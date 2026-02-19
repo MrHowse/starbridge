@@ -1,0 +1,53 @@
+{
+  "name": "First Contact Protocol",
+  "briefing": "An unknown vessel has entered sensor range on an unusual frequency. Science: begin long-range analysis. Comms: monitor all channels and prepare to decode any transmissions. The nature of this contact is unknown.",
+  "defeat_condition": "player_hull_zero",
+  "victory_condition": "all_objectives_complete",
+  "objectives": [
+    {
+      "id": "obj_signal",
+      "text": "Intercept alien transmissions",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 5 },
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "frequency_matching",
+          "station": "science",
+          "label": "alien_freq",
+          "difficulty": 2,
+          "time_limit": 90.0
+        },
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "transmission_decoding",
+          "station": "comms",
+          "label": "alien_transmission",
+          "difficulty": 2,
+          "time_limit": 90.0
+        }
+      ]
+    },
+    {
+      "id": "obj_freq",
+      "text": "Lock on to the alien frequency",
+      "trigger": "puzzle_resolved",
+      "args": { "puzzle_label": "alien_freq" },
+      "on_complete": []
+    },
+    {
+      "id": "obj_decode",
+      "text": "Decode the alien transmission",
+      "trigger": "puzzle_resolved",
+      "args": { "puzzle_label": "alien_transmission" },
+      "on_complete": []
+    },
+    {
+      "id": "obj_contact",
+      "text": "Maintain contact for 30 seconds",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 120 },
+      "on_complete": []
+    }
+  ]
+}

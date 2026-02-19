@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from server import captain, engineering, game_loop, helm, lobby, medical, science, weapons
+from server import captain, comms, engineering, game_loop, helm, lobby, medical, science, security, weapons
 from server.connections import ConnectionManager
 from server.models.messages import Message, VALID_SYSTEMS
 from server.models.world import World, spawn_enemy
@@ -49,6 +49,8 @@ engineering.init(manager, input_queue)
 weapons.init(manager, input_queue)
 science.init(manager, input_queue)
 medical.init(manager, input_queue)
+security.init(manager, input_queue)
+comms.init(manager, input_queue)
 captain.init(manager, world.ship)
 game_loop.init(world, manager, input_queue)
 
@@ -76,6 +78,8 @@ _HANDLERS: dict[str, _MessageHandler] = {
     "weapons": weapons.handle_weapons_message,
     "science": science.handle_science_message,
     "medical": medical.handle_medical_message,
+    "security": security.handle_security_message,
+    "comms": comms.handle_comms_message,
     "captain": captain.handle_captain_message,
 }
 

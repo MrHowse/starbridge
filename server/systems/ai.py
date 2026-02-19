@@ -91,8 +91,12 @@ def tick_enemies(
         # ── Beam cooldown ─────────────────────────────────────────────────
         enemy.beam_cooldown = max(0.0, enemy.beam_cooldown - dt)
 
-        # ── Beam fire ─────────────────────────────────────────────────────
-        if enemy.ai_state == "attack" and enemy.beam_cooldown <= 0.0:
+        # ── EMP stun decay ────────────────────────────────────────────────
+        if enemy.stun_ticks > 0:
+            enemy.stun_ticks -= 1
+
+        # ── Beam fire (blocked when EMP-stunned) ──────────────────────────
+        if enemy.ai_state == "attack" and enemy.beam_cooldown <= 0.0 and enemy.stun_ticks == 0:
             brg = bearing_to(enemy.x, enemy.y, target_x, target_y)
             if beam_in_arc(enemy.heading, brg, params["arc_deg"]):
                 events.append(

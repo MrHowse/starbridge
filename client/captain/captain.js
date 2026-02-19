@@ -119,15 +119,18 @@ function init() {
   });
 
   // Server messages
-  on('game.started',             handleGameStarted);
-  on('ship.state',               handleShipState);
-  on('ship.alert_changed',       handleAlertChanged);
-  on('world.entities',           handleWorldEntities);
-  on('science.scan_progress',    handleScanProgress);
-  on('science.scan_complete',    handleScanComplete);
-  on('mission.objective_update', handleObjectiveUpdate);
-  on('ship.hull_hit',            handleHullHit);
-  on('game.over',                handleGameOver);
+  on('game.started',                handleGameStarted);
+  on('ship.state',                  handleShipState);
+  on('ship.alert_changed',          handleAlertChanged);
+  on('world.entities',              handleWorldEntities);
+  on('science.scan_progress',       handleScanProgress);
+  on('science.scan_complete',       handleScanComplete);
+  on('mission.objective_update',    handleObjectiveUpdate);
+  on('ship.hull_hit',               handleHullHit);
+  on('captain.authorization_request', handleAuthorizationRequest);
+  on('weapons.authorization_result',  handleAuthorizationResult);
+  on('captain.log_entry',           handleLogEntry);
+  on('game.over',                   handleGameOver);
 
   connect();
 }
@@ -143,6 +146,8 @@ function handleGameStarted(payload) {
   gameActive = true;
   resizeCanvas();
   requestAnimationFrame(renderLoop);
+  _buildAuthPanel();
+  _buildLogPanel();
   if (payload.briefing_text) {
     showBriefing(payload.mission_name, payload.briefing_text);
   }
@@ -216,6 +221,138 @@ function handleGameOver({ result, stats = {} }) {
     ? `All objectives achieved. Duration: ${dur}. Hull: ${hull}.`
     : `Hull integrity zero. Duration: ${dur}.`;
   gameOverOverlay.style.display = '';
+}
+
+// ---------------------------------------------------------------------------
+// Authorization panel
+// ---------------------------------------------------------------------------
+
+let _pendingAuthId = null;
+
+function _buildAuthPanel() {
+  const sidebar = document.querySelector('.captain-sidebar');
+  if (!sidebar || document.getElementById('auth-panel')) return;
+
+  const panel = document.createElement('section');
+  panel.id        = 'auth-panel';
+  panel.className = 'captain-panel panel';
+  panel.style.display = 'none';
+  panel.innerHTML = `
+    <div class="panel__header">
+      <span class="text-header" style="color:#ff4040">⚠ AUTHORIZATION REQUIRED</span>
+    </div>
+    <div class="captain-panel__body">
+      <p class="text-body" id="auth-message">Nuclear torpedo launch requested.</p>
+      <div class="auth-btns">
+        <button class="btn btn--danger" id="auth-approve-btn">AUTHORIZE LAUNCH</button>
+        <button class="btn btn--secondary" id="auth-deny-btn">DENY</button>
+      </div>
+    </div>
+  `;
+  sidebar.insertBefore(panel, sidebar.firstChild);
+
+  document.getElementById('auth-approve-btn').addEventListener('click', () => {
+    if (_pendingAuthId) {
+      send('captain.authorize', { request_id: _pendingAuthId, approved: true });
+      _hideAuthPanel();
+    }
+  });
+
+  document.getElementById('auth-deny-btn').addEventListener('click', () => {
+    if (_pendingAuthId) {
+      send('captain.authorize', { request_id: _pendingAuthId, approved: false });
+      _hideAuthPanel();
+    }
+  });
+}
+
+function _showAuthPanel(request_id, tube) {
+  _pendingAuthId = request_id;
+  const panel = document.getElementById('auth-panel');
+  const msg   = document.getElementById('auth-message');
+  if (!panel) return;
+  if (msg) msg.textContent = `Tube ${tube} — Nuclear torpedo launch requested. Authorize?`;
+  panel.style.display = '';
+}
+
+function _hideAuthPanel() {
+  _pendingAuthId = null;
+  const panel = document.getElementById('auth-panel');
+  if (panel) panel.style.display = 'none';
+}
+
+function handleAuthorizationRequest({ request_id, action, tube }) {
+  if (!gameActive) return;
+  _showAuthPanel(request_id, tube);
+}
+
+function handleAuthorizationResult({ request_id, approved }) {
+  if (_pendingAuthId === request_id) _hideAuthPanel();
+}
+
+// ---------------------------------------------------------------------------
+// Captain's log panel
+// ---------------------------------------------------------------------------
+
+const _logEntries = [];
+
+function _buildLogPanel() {
+  const sidebar = document.querySelector('.captain-sidebar');
+  if (!sidebar || document.getElementById('log-panel')) return;
+
+  const panel = document.createElement('section');
+  panel.id        = 'log-panel';
+  panel.className = 'captain-panel panel';
+  panel.innerHTML = `
+    <div class="panel__header">
+      <span class="text-header">CAPTAIN'S LOG</span>
+    </div>
+    <div class="captain-panel__body">
+      <div class="log-entries" id="log-entries">
+        <div class="text-dim">No entries.</div>
+      </div>
+      <div class="log-input-row">
+        <input type="text" class="log-input text-data" id="log-input"
+               placeholder="Record log entry…" maxlength="500">
+        <button class="btn btn--secondary btn--small" id="log-add-btn">ADD</button>
+      </div>
+    </div>
+  `;
+  sidebar.appendChild(panel);
+
+  function submitLog() {
+    const input = document.getElementById('log-input');
+    const text  = (input?.value || '').trim();
+    if (!text || !gameActive) return;
+    send('captain.add_log', { text });
+    if (input) input.value = '';
+  }
+
+  document.getElementById('log-add-btn').addEventListener('click', submitLog);
+  document.getElementById('log-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitLog();
+  });
+}
+
+function handleLogEntry({ text, timestamp }) {
+  _logEntries.push({ text, timestamp });
+  _renderLog();
+}
+
+function _renderLog() {
+  const el = document.getElementById('log-entries');
+  if (!el) return;
+  if (_logEntries.length === 0) {
+    el.innerHTML = '<div class="text-dim">No entries.</div>';
+    return;
+  }
+  el.innerHTML = _logEntries.map(e => {
+    const d   = new Date(e.timestamp * 1000);
+    const hh  = String(d.getHours()).padStart(2, '0');
+    const mm  = String(d.getMinutes()).padStart(2, '0');
+    return `<div class="log-entry"><span class="log-ts text-dim">${hh}:${mm}</span><span class="text-body log-text">${e.text}</span></div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
 }
 
 // ---------------------------------------------------------------------------

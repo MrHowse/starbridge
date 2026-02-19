@@ -5,10 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-Role = Literal["captain", "helm", "weapons", "engineering", "science", "medical", "viewscreen"]
+Role = Literal["captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "viewscreen"]
 
 VALID_ROLES: frozenset[str] = frozenset(
-    {"captain", "helm", "weapons", "engineering", "science", "medical", "viewscreen"}
+    {"captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "viewscreen"}
 )
 
 

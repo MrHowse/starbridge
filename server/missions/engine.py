@@ -242,4 +242,12 @@ class MissionEngine:
         if trigger == "puzzle_failed":
             return args["puzzle_label"] in self._failed_puzzle_labels
 
+        if trigger == "puzzle_resolved":
+            # Fires when label is in either completed or failed (regardless of outcome).
+            label = args["puzzle_label"]
+            return (
+                label in self._completed_puzzle_labels
+                or label in self._failed_puzzle_labels
+            )
+
         return False

@@ -22,6 +22,7 @@ import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import {
   setStatusDot, setAlertLevel, showBriefing, showGameOver,
 } from '../shared/ui_components.js';
+import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -56,6 +57,8 @@ const supplyFillEl   = document.getElementById('supply-fill');
 const supplyCountEl  = document.getElementById('supply-count');
 const deckListEl     = document.getElementById('deck-list');
 
+const diseaseListEl     = document.getElementById('disease-list');
+
 const treatmentNoneEl   = document.getElementById('treatment-none');
 const treatmentActiveEl = document.getElementById('treatment-active');
 const treatDeckLabelEl  = document.getElementById('treatment-deck-label');
@@ -76,6 +79,7 @@ let selectedDeck = null;     // deck name or null
 let latestCrewData = {};     // deck_name → { active, injured, critical, dead, crew_factor }
 let activeTreatments = {};   // deck_name → 'injured' | 'critical'
 let medicalSupplies = SUPPLY_MAX;
+let diseaseState = {};       // { infected_decks: {...} }
 
 // ---------------------------------------------------------------------------
 // Rendering
@@ -172,10 +176,27 @@ function renderTreatmentPanel() {
   btnCancelEl.disabled       = !treatment;
 }
 
+function renderDiseasePanel() {
+  if (!diseaseListEl) return;
+  const infected = diseaseState.infected_decks || {};
+  const decks = Object.keys(infected);
+  if (decks.length === 0) {
+    diseaseListEl.innerHTML = '<span class="disease-clean text-dim label-sm">CLEAN — no outbreaks detected</span>';
+    return;
+  }
+  diseaseListEl.innerHTML = decks.map(deck =>
+    `<div class="disease-deck-row">
+      <span class="disease-deck-name">${deck}</span>
+      <span class="disease-pathogen">${infected[deck]}</span>
+    </div>`
+  ).join('');
+}
+
 function render() {
   renderSupplies();
   renderDeckList();
   renderTreatmentPanel();
+  renderDiseasePanel();
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +241,11 @@ function handleGameStarted(payload) {
   showBriefing(payload.mission_name, payload.briefing_text);
 }
 
+function handleDiseaseState(payload) {
+  diseaseState = payload;
+  renderDiseasePanel();
+}
+
 function handleHullHit() {
   stationEl.classList.add('hit');
   setTimeout(() => stationEl.classList.remove('hit'), HIT_FLASH_MS);
@@ -235,11 +261,14 @@ function init() {
     statusLabelEl.textContent = status.toUpperCase();
   });
 
-  on('game.started',       handleGameStarted);
-  on('ship.state',         handleShipState);
-  on('ship.alert_changed', (p) => setAlertLevel(p.level));
-  on('ship.hull_hit',      handleHullHit);
-  on('game.over',          (p) => showGameOver(p.result, p.stats));
+  on('game.started',          handleGameStarted);
+  on('ship.state',            handleShipState);
+  on('ship.alert_changed',    (p) => setAlertLevel(p.level));
+  on('ship.hull_hit',         handleHullHit);
+  on('game.over',             (p) => showGameOver(p.result, p.stats));
+  on('medical.disease_state', handleDiseaseState);
+
+  initPuzzleRenderer(send);
 
   on('lobby.welcome', () => {
     const callsign = sessionStorage.getItem('callsign') || 'MEDIC';

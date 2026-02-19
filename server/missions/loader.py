@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from server.models.world import Asteroid, World, spawn_enemy, spawn_station
+from server.models.world import Asteroid, Hazard, World, spawn_enemy, spawn_hazard, spawn_station
 
 # missions/ directory is at the project root (two levels up from this file).
 _MISSIONS_DIR = Path(__file__).parent.parent.parent / "missions"
@@ -86,6 +86,19 @@ def spawn_from_mission(mission: dict, world: World, entity_counter: int) -> int:
                 x=float(entry["x"]),
                 y=float(entry["y"]),
                 radius=float(entry.get("radius", 1_000.0)),
+            )
+        )
+
+    # Spawn hazard zones (Session 2c).
+    for i, entry in enumerate(mission.get("hazards", [])):
+        world.hazards.append(
+            spawn_hazard(
+                hazard_id=entry.get("id", f"hazard_{i}"),
+                x=float(entry["x"]),
+                y=float(entry["y"]),
+                radius=float(entry.get("radius", 10_000.0)),
+                hazard_type=entry.get("hazard_type", "nebula"),
+                label=entry.get("label"),
             )
         )
 

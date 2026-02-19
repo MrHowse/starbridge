@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — SECURITY</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="security.css">
+</head>
+<body>
+  <div class="station-container">
+
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <header class="station-header panel">
+      <div class="panel__header station-header__bar">
+        <span class="text-title">SECURITY</span>
+        <span class="text-label" id="mission-label" style="opacity:0.5">—</span>
+        <div class="station-header__status">
+          <span class="status-dot status-dot--disconnected" data-status-dot></span>
+          <span class="text-label" data-status-label>CONNECTING</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Standby ─────────────────────────────────────────────────────── -->
+    <main class="station-main" data-standby>
+      <div class="station-standby">
+        <p class="text-header">SECURITY STATION</p>
+        <p class="text-body">Awaiting mission orders.</p>
+        <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+      </div>
+    </main>
+
+    <!-- ── Active security layout ──────────────────────────────────────── -->
+    <div class="security-main" data-security-main style="display:none">
+
+      <!-- ── Left: Ship interior canvas ────────────────────────────────── -->
+      <div class="canvas-panel panel">
+        <div class="panel__header canvas-panel__header">
+          <span class="text-label">SHIP INTERIOR</span>
+          <span class="text-data text-dim" id="boarding-status">STANDBY</span>
+          <span class="text-label text-dim" id="selection-hint">Select a room to move squads</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="ship-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- ── Right: Sidebar ─────────────────────────────────────────────── -->
+      <div class="sidebar panel">
+
+        <!-- Squads section -->
+        <div class="sidebar-section sidebar-section--squads">
+          <div class="panel__header">
+            <span class="text-label">MARINE SQUADS</span>
+          </div>
+          <div id="squad-list" class="squad-list"></div>
+
+          <!-- Door control (shown when a squad is selected) -->
+          <div class="door-control" id="door-control" style="display:none">
+            <span class="text-label">DOOR CONTROL</span>
+            <div class="door-control__row">
+              <select id="door-room-select" class="door-select"></select>
+              <button class="fire-btn fire-btn--small" id="btn-toggle-door">TOGGLE</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Intruders section -->
+        <div class="sidebar-section sidebar-section--intruders">
+          <div class="panel__header">
+            <span class="text-label">HOSTILE CONTACTS</span>
+          </div>
+          <div id="intruder-list" class="intruder-list">
+            <p class="text-dim text-label intruder-list__empty">—</p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+  <script type="module" src="security.js"></script>
+</body>
+</html>

@@ -11,7 +11,7 @@ north (toward y=0), clockwise.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Optional
 
 from server.models.ship import Ship
 
@@ -87,6 +87,25 @@ class Asteroid:
 
 
 @dataclass
+class Hazard:
+    """A persistent environmental hazard in the sector.
+
+    hazard_type values:
+      ``nebula``         — sensor-obscuring cloud (visual + puzzle context).
+      ``minefield``      — deals hull damage to ships inside (5 HP/s).
+      ``gravity_well``   — caps ship velocity to 100 u/s when inside.
+      ``radiation_zone`` — deals light hull damage (2 HP/s).
+    """
+
+    id: str
+    x: float
+    y: float
+    radius: float = 10_000.0
+    hazard_type: Literal["nebula", "minefield", "gravity_well", "radiation_zone"] = "nebula"
+    label: Optional[str] = None   # display name (optional)
+
+
+@dataclass
 class Torpedo:
     """A short-lived projectile entity travelling through the sector."""
 
@@ -97,6 +116,7 @@ class Torpedo:
     heading: float
     velocity: float = 500.0
     distance_travelled: float = 0.0
+    torpedo_type: str = "standard"   # standard | emp | probe | nuclear
     MAX_RANGE: ClassVar[float] = 20_000.0
 
 
@@ -117,6 +137,8 @@ class Enemy:
     beam_cooldown: float = 0.0    # seconds until next beam fire
     # Phase 5 — Science scanning
     scan_state: Literal["unknown", "scanned"] = "unknown"
+    # v0.02g — EMP stun (ticks remaining; 0 = not stunned)
+    stun_ticks: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +164,9 @@ class World:
     stations: list[Station] = field(default_factory=list)
     asteroids: list[Asteroid] = field(default_factory=list)
 
+    # Session 2c entities — persistent hazard zones.
+    hazards: list[Hazard] = field(default_factory=list)
+
 
 # ---------------------------------------------------------------------------
 # Factory
@@ -151,6 +176,18 @@ class World:
 def spawn_station(station_id: str, x: float, y: float) -> Station:
     """Create a new Station at the given position."""
     return Station(id=station_id, x=x, y=y)
+
+
+def spawn_hazard(
+    hazard_id: str,
+    x: float,
+    y: float,
+    radius: float = 10_000.0,
+    hazard_type: Literal["nebula", "minefield", "gravity_well", "radiation_zone"] = "nebula",
+    label: str | None = None,
+) -> Hazard:
+    """Create a new Hazard zone at the given position."""
+    return Hazard(id=hazard_id, x=x, y=y, radius=radius, hazard_type=hazard_type, label=label)
 
 
 def spawn_enemy(type_: Literal["scout", "cruiser", "destroyer"], x: float, y: float, entity_id: str) -> Enemy:

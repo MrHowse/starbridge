@@ -27,6 +27,7 @@ class PuzzleInstance(abc.ABC):
         station: str,
         difficulty: int,
         time_limit: float,
+        **_kwargs: Any,
     ) -> None:
         self.puzzle_id = puzzle_id
         self.label = label

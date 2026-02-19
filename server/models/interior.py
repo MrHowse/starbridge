@@ -12,6 +12,8 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 
+from server.models.security import Intruder, MarineSquad
+
 
 # ---------------------------------------------------------------------------
 # Room
@@ -41,6 +43,10 @@ class ShipInterior:
     """The ship's interior as a graph of connected rooms."""
 
     rooms: dict[str, Room] = field(default_factory=dict)
+
+    # Security station entities (populated by game_loop_security on boarding events).
+    marine_squads: list[MarineSquad] = field(default_factory=list)
+    intruders: list[Intruder] = field(default_factory=list)
 
     def find_path(self, from_id: str, to_id: str) -> list[str]:
         """BFS shortest path between two rooms.

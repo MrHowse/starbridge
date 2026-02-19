@@ -100,18 +100,50 @@ export function init(container, puzzleData) {
   });
 }
 
-/** Apply an assist — widens the matching tolerance and updates the meter. */
+/** Apply an assist to the frequency matching puzzle.
+ *
+ * widen_tolerance (Engineering): shift the threshold marker, flash the meter.
+ * relay_frequency (Comms): pre-fill one component's sliders to the exact
+ *   target values and highlight the row.
+ */
 export function applyAssist(assistData) {
+  // widen_tolerance assist
   if (typeof assistData.tolerance === 'number') {
     _tolerance = assistData.tolerance;
-    // Shift the threshold marker left (easier).
     if (_meterThreshold) {
       _meterThreshold.style.left = `${(1 - _tolerance) * 100}%`;
     }
-    // Flash the meter to signal the assist.
     if (_meterEl) {
       _meterEl.classList.add('freq-meter--assist-applied');
       setTimeout(() => _meterEl && _meterEl.classList.remove('freq-meter--assist-applied'), 700);
+    }
+  }
+
+  // relay_frequency assist (Comms decoded transmission → pre-fill one component)
+  if (typeof assistData.component_index === 'number') {
+    const idx = assistData.component_index;
+    const amp  = assistData.amplitude;
+    const freq = assistData.frequency;
+    if (_playerComponents[idx] === undefined) return;
+    _playerComponents[idx].amplitude  = amp;
+    _playerComponents[idx].frequency  = freq;
+
+    // Update the corresponding sliders in the DOM
+    if (_container) {
+      const rows = _container.querySelectorAll('.freq-component');
+      const row  = rows[idx];
+      if (row) {
+        const sliders = row.querySelectorAll('.freq-slider');
+        const vals    = row.querySelectorAll('.freq-component__val');
+        // [0]=freq slider, [1]=amp slider
+        if (sliders[0]) { sliders[0].value = freq; }
+        if (sliders[1]) { sliders[1].value = amp; }
+        if (vals[0])    { vals[0].textContent = freq.toFixed(1); }
+        if (vals[1])    { vals[1].textContent = amp.toFixed(2); }
+        // Highlight the row briefly
+        row.style.borderColor = 'var(--system-warning)';
+        setTimeout(() => { if (row) row.style.borderColor = ''; }, 2000);
+      }
     }
   }
 }

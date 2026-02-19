@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import math
 
+import server.game_logger as gl
 from server.models.messages import Message
 from server.models.world import World, spawn_enemy
 from server.missions.engine import MissionEngine
@@ -35,6 +36,9 @@ _mission_engine: MissionEngine | None = None
 _signal_location: tuple[float, float] | None = None
 _dock_timer: float = 0.0
 _pending_puzzle_starts: list[dict] = []
+_pending_boardings: list[dict] = []
+_pending_deployments: list[dict] = []
+_pending_outbreaks: list[dict] = []
 
 
 def reset() -> None:
@@ -44,12 +48,36 @@ def reset() -> None:
     _signal_location = None
     _dock_timer = 0.0
     _pending_puzzle_starts.clear()
+    _pending_boardings.clear()
+    _pending_deployments.clear()
+    _pending_outbreaks.clear()
 
 
 def pop_pending_puzzle_starts() -> list[dict]:
     """Return and clear start_puzzle actions queued since the last tick_mission call."""
     actions = list(_pending_puzzle_starts)
     _pending_puzzle_starts.clear()
+    return actions
+
+
+def pop_pending_deployments() -> list[dict]:
+    """Return and clear deploy_squads actions queued since the last tick_mission call."""
+    actions = list(_pending_deployments)
+    _pending_deployments.clear()
+    return actions
+
+
+def pop_pending_boardings() -> list[dict]:
+    """Return and clear start_boarding actions queued since the last tick_mission call."""
+    actions = list(_pending_boardings)
+    _pending_boardings.clear()
+    return actions
+
+
+def pop_pending_outbreaks() -> list[dict]:
+    """Return and clear start_outbreak actions queued since the last tick_mission call."""
+    actions = list(_pending_outbreaks)
+    _pending_outbreaks.clear()
     return actions
 
 
@@ -205,12 +233,20 @@ async def tick_mission(
         return False, None
 
     newly_completed = _mission_engine.tick(world, ship, dt)  # type: ignore[arg-type]
+    for obj_id in newly_completed:
+        gl.log_event("mission", "objective_completed", {"objective_id": obj_id})
 
     for action in _mission_engine.pop_pending_actions():
         if action.get("action") == "spawn_wave":
             spawn_wave(action.get("enemies", []), world)
         elif action.get("action") == "start_puzzle":
             _pending_puzzle_starts.append(action)
+        elif action.get("action") == "deploy_squads":
+            _pending_deployments.append(action)
+        elif action.get("action") == "start_boarding":
+            _pending_boardings.append(action)
+        elif action.get("action") == "start_outbreak":
+            _pending_outbreaks.append(action)
 
     if newly_completed:
         await manager.broadcast(  # type: ignore[union-attr]
@@ -300,6 +336,17 @@ def build_world_entities(world: World) -> Message:
         }
         for a in world.asteroids
     ]
+    hazards = [
+        {
+            "id": h.id,
+            "x": round(h.x, 1),
+            "y": round(h.y, 1),
+            "radius": h.radius,
+            "hazard_type": h.hazard_type,
+            "label": h.label,
+        }
+        for h in world.hazards
+    ]
     return Message.build(
         "world.entities",
         {
@@ -307,5 +354,6 @@ def build_world_entities(world: World) -> Message:
             "torpedoes": torpedoes,
             "stations": stations,
             "asteroids": asteroids,
+            "hazards": hazards,
         },
     )

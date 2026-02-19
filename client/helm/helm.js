@@ -17,6 +17,7 @@
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, showBriefing, showGameOver } from '../shared/ui_components.js';
+import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
 import {
   lerp,
   lerpAngle,
@@ -72,6 +73,8 @@ const telemPosY     = document.getElementById('telem-pos-y');
 
 // Enemy contacts from world.entities (for minimap overlay).
 let contacts = [];
+// Hazard zones from world.entities.
+let hazards = [];
 // Beam flash: { targetX, targetY, startTime } — shown on minimap
 let beamFlash = null;
 
@@ -129,6 +132,7 @@ function init() {
   on('weapons.beam_fired', handleBeamFired);
   on('game.over',          handleGameOver);
 
+  initPuzzleRenderer(send);
   setupKeyboard();
 
   connect();
@@ -178,7 +182,8 @@ function handleShipState(payload) {
 
 function handleWorldEntities(payload) {
   if (!gameActive) return;
-  contacts = payload.enemies || [];
+  contacts = payload.enemies  || [];
+  hazards  = payload.hazards  || [];
 }
 
 function handleHullHit() {
@@ -264,6 +269,7 @@ function drawCompassPanel(state) {
 function drawMinimapPanel(state) {
   const size = minimapCanvas.width;
   drawMinimap(mmCtx, size, state.position.x, state.position.y, state.heading);
+  drawMinimapHazards(mmCtx, size);
   drawMinimapContacts(mmCtx, size, state);
   drawMinimapBeamFlash(mmCtx, size, state);
 }
@@ -293,6 +299,48 @@ function drawMinimapBeamFlash(ctx, size, state) {
   ctx.moveTo(sx, sy);
   ctx.lineTo(tx, ty);
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draw hazard zones as tinted circles on the minimap.
+ */
+function drawMinimapHazards(ctx, size) {
+  if (!hazards.length) return;
+
+  const PAD      = 6;
+  const mapW     = size - PAD * 2;
+  const mapH     = size - PAD * 2;
+  const SECTOR_W = 100_000;
+  const SECTOR_H = 100_000;
+
+  const HAZARD_COLOURS = {
+    nebula:         'rgba(100, 60, 200, 0.18)',
+    minefield:      'rgba(255, 80,  40, 0.22)',
+    radiation_zone: 'rgba(180, 255, 60, 0.18)',
+    gravity_well:   'rgba(60, 180, 255, 0.18)',
+  };
+  const HAZARD_BORDERS = {
+    nebula:         'rgba(140, 80, 255, 0.45)',
+    minefield:      'rgba(255, 80, 40,  0.55)',
+    radiation_zone: 'rgba(180, 255, 60, 0.45)',
+    gravity_well:   'rgba(60, 180, 255, 0.45)',
+  };
+
+  ctx.save();
+  for (const hz of hazards) {
+    const sx = PAD + (hz.x / SECTOR_W) * mapW;
+    const sy = PAD + (hz.y / SECTOR_H) * mapH;
+    const sr = (hz.radius / SECTOR_W) * mapW;
+
+    ctx.beginPath();
+    ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+    ctx.fillStyle   = HAZARD_COLOURS[hz.hazard_type] || 'rgba(255,255,255,0.1)';
+    ctx.strokeStyle = HAZARD_BORDERS[hz.hazard_type] || 'rgba(255,255,255,0.3)';
+    ctx.lineWidth   = 0.8;
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

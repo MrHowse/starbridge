@@ -11,5 +11,8 @@ __pycache__/
 venv/
 .env
 
+# Runtime-generated logs (playtest session data)
+logs/
+
 # Claude Code internal files
 .claude/

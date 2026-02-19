@@ -1,0 +1,46 @@
+{
+  "id": "deep_strike",
+  "name": "Deep Strike",
+  "briefing": "ENEMY DESTROYER DETECTED ON INTERCEPT COURSE. STANDARD TORPEDO SOLUTIONS WON'T WORK — THE TARGET IS MANOEUVRING. WEAPONS MUST CALCULATE A PRECISE FIRING SOLUTION WHILE SCIENCE TRACKS TARGET VELOCITY. NUCLEAR OPTION IS AUTHORISED AT CAPTAIN'S DISCRETION.",
+  "signal_location": { "x": 65000, "y": 30000 },
+  "defeat_condition": "player_hull_zero",
+  "victory_condition": "all_objectives_complete",
+  "spawn": [
+    {
+      "type": "destroyer",
+      "x": 65000,
+      "y": 30000,
+      "id": "destroyer_alpha"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "arm_weapons",
+      "text": "Arm advanced torpedo payload",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 5 },
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "firing_solution",
+          "station": "weapons",
+          "label": "ds_firing_solution",
+          "difficulty": 2,
+          "time_limit": 90.0
+        }
+      ]
+    },
+    {
+      "id": "firing_solution",
+      "text": "Calculate intercept firing solution for the destroyer",
+      "trigger": "puzzle_completed",
+      "args": { "puzzle_label": "ds_firing_solution" }
+    },
+    {
+      "id": "destroy_or_survive",
+      "text": "Survive the engagement (60 seconds)",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 60 }
+    }
+  ]
+}

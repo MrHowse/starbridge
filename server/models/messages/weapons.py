@@ -1,7 +1,11 @@
 """Weapons message payload schemas."""
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+VALID_TORPEDO_TYPES = ("standard", "emp", "probe", "nuclear")
 
 
 class WeaponsSelectTargetPayload(BaseModel):
@@ -14,6 +18,11 @@ class WeaponsFireBeamsPayload(BaseModel):
 
 class WeaponsFireTorpedoPayload(BaseModel):
     tube: int = Field(ge=1, le=2, default=1)
+
+
+class WeaponsLoadTubePayload(BaseModel):
+    tube: int = Field(ge=1, le=2, default=1)
+    torpedo_type: Literal["standard", "emp", "probe", "nuclear"] = "standard"
 
 
 class WeaponsSetShieldsPayload(BaseModel):

@@ -1,0 +1,44 @@
+{
+  "id": "plague_ship",
+  "name": "Plague Ship",
+  "briefing": "DISTRESS SIGNAL RECEIVED — derelict freighter MSV Korinthia, last known position Sector 7. Survivors aboard. Pathogen unknown. Board with extreme caution and prepare the medical bay. Science, run a pathogen sweep the moment we're in range. Medical, stand by for triage.",
+  "signal_location": {"x": 62000, "y": 44000},
+  "defeat_condition": "player_hull_zero",
+  "victory_condition": "all_objectives_complete",
+  "entities": [],
+  "objectives": [
+    {
+      "id": "receive_distress",
+      "text": "Receive and process the distress signal",
+      "trigger": "timer_elapsed",
+      "args": {"seconds": 5},
+      "on_complete": [
+        {
+          "action": "start_outbreak",
+          "deck": "medical",
+          "pathogen": "Kessler Plague"
+        },
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "triage",
+          "station": "medical",
+          "label": "plague_triage",
+          "difficulty": 2,
+          "time_limit": 120.0
+        }
+      ]
+    },
+    {
+      "id": "triage_survivors",
+      "text": "Diagnose and treat the infected survivors",
+      "trigger": "puzzle_resolved",
+      "args": {"puzzle_label": "plague_triage"}
+    },
+    {
+      "id": "contain_outbreak",
+      "text": "Hold position while the outbreak is contained (60 seconds)",
+      "trigger": "timer_elapsed",
+      "args": {"seconds": 60}
+    }
+  ]
+}

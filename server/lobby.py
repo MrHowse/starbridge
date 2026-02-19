@@ -17,7 +17,9 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
+from server.game_logger import log_event as _log, start_logging
 from server.missions.loader import load_mission
+from server.models.interior import make_default_interior
 from server.models.messages import (
     LobbyClaimRolePayload,
     LobbyStartGamePayload,
@@ -60,7 +62,7 @@ class LobbySession:
     roles: dict[str, tuple[str, str] | None] = field(
         default_factory=lambda: {
             r: None
-            for r in ("captain", "helm", "weapons", "engineering", "science", "medical")
+            for r in ("captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms")
         }
     )
     host_connection_id: str | None = None
@@ -241,6 +243,7 @@ async def _claim_role(connection_id: str, payload: LobbyClaimRolePayload) -> Non
 
     _session.roles[role] = (connection_id, payload.player_name)
     _manager.tag(connection_id, role=role, player_name=payload.player_name)
+    _log("lobby", "role_claimed", {"role": role, "player": payload.player_name})
     logger.info(
         "Connection %s claimed role '%s' as '%s'",
         connection_id, role, payload.player_name,
@@ -256,6 +259,7 @@ async def _release_role(connection_id: str) -> None:
 
     _session.roles[role] = None
     _manager.tag(connection_id, role=None, player_name=None)
+    _log("lobby", "role_released", {"role": role})
     logger.info("Connection %s released role '%s'", connection_id, role)
     await _broadcast_lobby_state()
 
@@ -279,13 +283,30 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
     except FileNotFoundError:
         mission_data = {}
     sig = mission_data.get("signal_location")
+
+    _default_interior = make_default_interior()
+    interior_layout = {
+        room_id: {
+            "name": room.name,
+            "deck": room.deck,
+            "col": room.position[0],
+            "row": room.position[1],
+            "connections": list(room.connections),
+        }
+        for room_id, room in _default_interior.rooms.items()
+    }
+
     _game_payload = {
         "mission_id": payload.mission_id,
         "mission_name": mission_data.get("name", "Awaiting Orders"),
         "briefing_text": mission_data.get("briefing", "All stations report ready."),
         "signal_location": {"x": sig["x"], "y": sig["y"]} if sig else None,
+        "interior_layout": interior_layout,
     }
     _game_active = True
+    players = {role: occ[1] for role, occ in _session.roles.items() if occ is not None}
+    start_logging(payload.mission_id, players)
+    _log("lobby", "game_started", {"mission_id": payload.mission_id, "players": players})
     await _manager.broadcast(Message.build("game.started", _game_payload))
     logger.info("Game started by host %s, mission: %s", connection_id, payload.mission_id)
 

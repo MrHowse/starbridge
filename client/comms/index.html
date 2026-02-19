@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STARBRIDGE — Comms</title>
+  <link rel="stylesheet" href="/client/shared/theme.css" />
+  <link rel="stylesheet" href="/client/comms/comms.css" />
+</head>
+<body>
+  <div class="station-container" id="station-container">
+    <header class="station-header">
+      <span class="station-label">COMMS</span>
+      <span class="callsign-display" id="callsign-display">—</span>
+      <span class="status-dot" id="conn-status" data-status="disconnected"></span>
+    </header>
+
+    <main class="comms-main">
+
+      <!-- ── Left: Frequency scanner ──────────────────────────────────────── -->
+      <section class="scanner-panel">
+        <div class="scanner-panel__header">
+          <span class="label-sm">FREQUENCY SCANNER</span>
+          <span class="freq-readout" id="freq-readout">0.150</span>
+          <span class="faction-badge" id="faction-badge"></span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="scanner-canvas"></canvas>
+        </div>
+        <div class="freq-control">
+          <label class="label-sm" for="freq-slider">TUNE</label>
+          <input
+            type="range" id="freq-slider"
+            min="0" max="1000" value="150" step="1"
+          />
+        </div>
+      </section>
+
+      <!-- ── Right: Sidebar ───────────────────────────────────────────────── -->
+      <aside class="comms-sidebar">
+
+        <!-- Hailing interface -->
+        <section class="sidebar-section sidebar-section--hail">
+          <div class="section-header">
+            <span class="label-sm">HAILING</span>
+            <span class="hail-status" id="hail-status">NO CONTACT</span>
+          </div>
+          <div class="hail-panel" id="hail-panel">
+            <p class="hail-hint">Tune to a faction frequency to hail.</p>
+          </div>
+          <div class="hail-controls" id="hail-controls" style="display:none">
+            <input type="text" id="contact-id-input" value="unknown_vessel" class="contact-input" placeholder="Contact ID" />
+            <div class="hail-btn-row">
+              <button class="btn btn--sm btn--primary" data-msg="negotiate">NEGOTIATE</button>
+              <button class="btn btn--sm btn--warn" data-msg="demand">DEMAND</button>
+              <button class="btn btn--sm btn--danger" data-msg="bluff">BLUFF</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Transmission log -->
+        <section class="sidebar-section sidebar-section--log">
+          <div class="section-header">
+            <span class="label-sm">TRANSMISSION LOG</span>
+          </div>
+          <div class="transmission-log" id="transmission-log">
+            <p class="log-empty label-sm c-dim">No transmissions received.</p>
+          </div>
+        </section>
+
+        <!-- Assist panel (shown when a cross-station assist is available) -->
+        <div class="assist-panel" id="assist-panel" style="display:none">
+          <span class="label-sm">ASSIST AVAILABLE</span>
+          <p id="assist-instructions"></p>
+        </div>
+
+      </aside>
+    </main>
+  </div>
+
+  <!-- Puzzle overlay injected here by puzzle_renderer.js -->
+  <div id="puzzle-overlay-mount"></div>
+
+  <script type="module" src="/client/comms/comms.js"></script>
+</body>
+</html>

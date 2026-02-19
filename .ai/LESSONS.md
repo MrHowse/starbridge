@@ -67,6 +67,15 @@ Copy this template when adding a new entry:
 
 ---
 
+## 2026-02-19 — Scope document contained incorrect AP regen math
+
+**Issue**: The v0.02 scope document (docs/SCOPE_v002.md) stated that marine action point pools fill "in 25 seconds." The correct calculation gives 5 seconds.
+**Cause**: The scope doc's maths assumed 1 AP per 25 ticks (1 AP per 2.5 seconds). The design intent was 1 AP per 5 ticks (1 AP per 0.5 seconds). At 10 ticks/second: 10 AP ÷ (1 AP / 5 ticks) × 0.1 s/tick = 5 seconds to fill from empty.
+**Fix**: Implemented correctly in `server/models/security.py` as `AP_REGEN_PER_TICK = 0.2` (= 1/5). Recorded in DECISIONS.md. Scope doc left as-is (it is a historical planning document, not a live spec).
+**Prevention**: When transcribing tuning parameters from a scope/design document, always verify the math against desired feel before implementing. At 10 ticks/second, "fill in N seconds" = AP_MAX / (N × 10) AP per tick. State the desired UX outcome ("move every 1.5 seconds from empty") alongside the constant, not just the constant — the outcome is the invariant.
+
+---
+
 ## 2026-02-18 — Budget gauge alarm at comfortable equilibrium
 
 **Issue**: The Engineering power budget gauge immediately turned red on game start because all 6 systems start at 100% each = 600/600 total = exactly at the budget cap. The threshold condition `totalPower >= POWER_BUDGET` was true from the very first server tick.

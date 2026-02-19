@@ -15,6 +15,7 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
+from server.game_logger import log_event as _log
 from server.models.messages import CaptainSetAlertPayload, Message, validate_payload
 from server.models.ship import Ship
 
@@ -76,6 +77,7 @@ async def handle_captain_message(connection_id: str, message: Message) -> None:
 
     if message.type == "captain.set_alert" and isinstance(payload, CaptainSetAlertPayload):
         _ship.alert_level = payload.level
+        _log("captain", "alert_changed", {"level": payload.level})
         await _manager.broadcast(
             Message.build("ship.alert_changed", {"level": payload.level})
         )

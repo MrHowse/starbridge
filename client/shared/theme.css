@@ -621,3 +621,463 @@ body::after {
   animation: tolerance-widen 0.6s ease-out;
 }
 
+/* ── Transmission Decoding puzzle layout ─────────────────────────────────── */
+
+.td-layout {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  min-height: 200px;
+}
+
+.td-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.td-col-header {
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border-primary);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
+}
+
+.cipher-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.cipher-code {
+  min-width: 4.5rem;
+  color: var(--text-normal);
+  letter-spacing: 0.04em;
+}
+
+.cipher-eq {
+  color: var(--text-dim);
+}
+
+.cipher-value {
+  font-size: 1.1rem;
+}
+
+.cipher-input {
+  width: 3rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 1rem;
+  text-align: center;
+  padding: 0.2rem;
+}
+
+.cipher-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.eq-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.eq-symbols {
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.eq-eq {
+  color: var(--primary);
+}
+
+/* ── Triage puzzle layout ────────────────────────────────────────────────── */
+
+.triage-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.triage-patients {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.triage-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 0.6rem;
+}
+
+.triage-card__header {
+  color: var(--primary);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.4rem;
+}
+
+.triage-symptoms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.triage-symptom {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  background: rgba(0,255,65,0.06);
+  border: 1px solid rgba(0,255,65,0.2);
+  border-radius: 2px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.triage-diagnosis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.triage-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.triage-field-row .text-label {
+  flex-shrink: 0;
+  min-width: 5rem;
+  font-size: 0.65rem;
+}
+
+.triage-pathogen-select,
+.triage-step-select {
+  flex: 1;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 2px;
+}
+
+.triage-pathogen-select:focus,
+.triage-step-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.triage-treatment-label {
+  font-size: 0.62rem;
+  margin-top: 0.2rem;
+  opacity: 0.6;
+}
+
+.triage-step-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.triage-step-num {
+  flex-shrink: 0;
+  min-width: 5rem;
+  font-size: 0.60rem;
+  opacity: 0.6;
+}
+
+/* ── Medical disease state panel ─────────────────────────────────────────── */
+
+.disease-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.disease-panel__header {
+  color: var(--system-warning);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.4rem;
+}
+
+.disease-clean {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+}
+
+.disease-deck-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.15rem 0;
+  font-size: 0.68rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.disease-deck-name {
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.disease-pathogen {
+  color: var(--system-warning);
+  font-size: 0.62rem;
+}
+
+/* ── Route Calculation puzzle ─────────────────────────────────────────────── */
+
+.rc-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+}
+
+.rc-instructions {
+  font-size: 0.62rem;
+  text-align: center;
+  max-width: 320px;
+  opacity: 0.7;
+}
+
+.rc-canvas {
+  display: block;
+  cursor: pointer;
+  max-width: 100%;
+  border: 1px solid var(--border-secondary);
+  border-radius: 3px;
+}
+
+.rc-legend {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.rc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.58rem;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
+.rc-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.rc-swatch--safe   { background: #0d2b12; }
+.rc-swatch--hazard { background: #2b0d0d; border-color: #ff4040; }
+.rc-swatch--hidden { background: #1c1c1c; }
+.rc-swatch--path   { background: #0d3320; border-color: #00ff41; }
+
+/* ── Firing Solution puzzle ───────────────────────────────────────────────── */
+
+.fs-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0;
+}
+
+.fs-info {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.fs-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.1rem 0.3rem;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.fs-label {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+}
+
+.fs-value {
+  font-size: 0.72rem;
+  color: var(--text-data);
+}
+
+.fs-canvas {
+  display: block;
+  cursor: crosshair;
+  border: 1px solid var(--border-secondary);
+  border-radius: 3px;
+}
+
+.fs-bearing-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.3rem;
+  background: var(--bg-panel-header);
+  border: 1px solid var(--border-primary);
+  border-radius: 3px;
+  width: 100%;
+}
+
+.fs-bearing-val {
+  font-size: 1.1rem;
+  color: #00c8ff;
+  letter-spacing: 0.12em;
+}
+
+/* ── Weapons tube type badge & load controls ──────────────────────────────── */
+
+.tube-type-badge {
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  min-width: 3.2rem;
+  text-align: center;
+  padding: 0 0.2rem;
+}
+
+.tube-load-section {
+  padding: 0.4rem 0.5rem 0.2rem;
+  border-top: 1px solid var(--border-primary);
+}
+
+.tube-load-row {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.load-btn {
+  font-family: inherit;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  background: var(--bg-secondary);
+  color: var(--text-dim);
+  border: 1px solid var(--border-secondary);
+  border-radius: 3px;
+  padding: 0.15rem 0.35rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.load-btn:hover {
+  background: rgba(0, 255, 65, 0.08);
+  color: var(--text-primary);
+}
+
+.load-tube-select {
+  font-family: inherit;
+  font-size: 0.62rem;
+  background: var(--bg-panel);
+  color: var(--text-data);
+  border: 1px solid var(--border-secondary);
+  border-radius: 3px;
+  padding: 0.1rem 0.2rem;
+  margin-left: auto;
+}
+
+/* ── Captain authorization panel ─────────────────────────────────────────── */
+
+.auth-btns {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.btn--danger {
+  background: rgba(255, 40, 40, 0.15);
+  color: #ff6060;
+  border-color: #ff4040;
+}
+
+.btn--danger:hover {
+  background: rgba(255, 40, 40, 0.3);
+}
+
+.btn--small {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.65rem;
+}
+
+/* ── Captain's log panel ─────────────────────────────────────────────────── */
+
+.log-entries {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.4rem;
+}
+
+.log-entry {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  font-size: 0.65rem;
+  border-bottom: 1px solid var(--border-primary);
+  padding-bottom: 0.15rem;
+}
+
+.log-ts {
+  min-width: 2.5rem;
+  font-size: 0.58rem;
+}
+
+.log-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.log-input-row {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.log-input {
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.65rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 3px;
+  padding: 0.2rem 0.4rem;
+}
+
+.log-input:focus {
+  outline: none;
+  border-color: var(--text-primary);
+}

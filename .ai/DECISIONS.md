@@ -568,6 +568,66 @@ This creates the crew dependency loop: *"Science, scan that cruiser." "I can't �
 
 ---
 
+## 2026-02-19 — v0.02c Security: AP regen = 1 per 5 ticks (Q1)
+
+**Decision**: Marine squad action points regenerate at 0.2 AP per tick (1 AP per 5 ticks). The pool is 10 AP, which fills completely in 50 ticks = 5 seconds. Moving costs 3 AP = requires 15 ticks of regen from empty = 1.5 seconds of waiting. Door control costs 2 AP.
+
+**Reasoning**: At 0.2 AP/tick, a squad with an empty pool can move again after 1.5 seconds, which is fast enough to feel responsive but slow enough to require tactical commitment. A full-pool squad can move 3 times before needing to regen (~4.5 seconds of continuous movement). This creates genuine "action economy" choices without feeling sluggish. If playtesting shows moves are too frequent, raise AP_COST_MOVE rather than slowing regen.
+
+**Correction noted**: The v0.02 scope document contained a math error ("25 seconds to fill pool"). The correct calculation is 10 AP ÷ 0.2 AP/tick × 0.1 s/tick = 5 seconds. The 25-second figure was based on an incorrect assumption of 1 AP per 25 ticks rather than 1 AP per 5 ticks.
+
+**Constants** (in `server/models/security.py`):
+- `AP_MAX = 10.0`
+- `AP_REGEN_PER_TICK = 0.2` (i.e., 1.0 / 5)
+- `AP_COST_MOVE = 3`
+- `AP_COST_DOOR = 2`
+
+**Alternatives considered**:
+- Slower regen (1 AP per 25 ticks) — rejected: too punishing; squad can only move once per ~37 seconds from empty
+- Real-time seconds instead of ticks — rejected: keeps all game logic in tick-units; seconds are only in presentation layer
+
+---
+
+## 2026-02-19 — v0.02c Security: Tactical positioning = planning phase puzzle (Q2)
+
+**Decision**: The tactical positioning puzzle uses a planning-phase design. When a boarding alert fires, Science receives a threat assessment and Security gets a 60-second window to reposition marines. Boarding begins only after the player submits their positions (or the timer expires). During the planning phase, intruders are shown on the map in their starting positions but do not move.
+
+**Reasoning**: The PuzzleInstance lifecycle (start → interact → submit → validate_submission → result broadcast) assumes a discrete "solve it, then see the outcome" structure. Bending this lifecycle for real-time scoring would require either hacking `validate_submission` to be stateful, or adding a new puzzle resolution path — neither is acceptable. The planning-phase design maps cleanly onto the existing lifecycle: `validate_submission` checks whether the submitted marine positions produce a successful defence outcome (scoring the simulated boarding encounter), and the subsequent "boarding unfolds" phase is a non-interactive consequence sequence, not a puzzle mechanic.
+
+**Gameplay benefit**: Security sees the threat assessment, can discuss with the crew (verbally), and then commits positions. The drama is in the decision and the reveal, not in frantic real-time clicking.
+
+**Alternatives considered**:
+- Live scoring (score updates as marines move during boarding) — rejected: requires bending the puzzle lifecycle; adds a new resolution path with significant complexity
+- No puzzle, just real-time boarding mini-game — deferred to v0.03: valid long-term design but requires the full boarding simulation infrastructure first
+
+---
+
+## 2026-02-19 — v0.02c Security: Fog of war via passive sensor efficiency (Q3)
+
+**Decision**: Server-side fog of war uses a passive sensor efficiency threshold (`SENSOR_FOW_THRESHOLD = 0.5`). When building the `security.interior_state` broadcast, intruders are included in the payload only if: (a) a marine squad occupies the same room, OR (b) `ship.systems["sensors"].efficiency >= SENSOR_FOW_THRESHOLD`. When sensors are below 50%, only directly-observed intruders (squads in same room) are visible.
+
+**Reasoning**: Reuses the existing sensor efficiency mechanic with no new UI or Science station interaction. Engineering's power allocation directly affects the Security station's situational awareness, reinforcing crew interdependencies. Active internal scanning is a richer mechanic but adds a full Science UI sub-feature that is out of scope for v0.02c.
+
+**Implementation**: `is_intruder_visible(intruder, marine_squads, sensor_efficiency)` in `server/models/security.py`. Called per-intruder when building the `security.interior_state` payload. Server never sends invisible intruders to the client.
+
+**Alternatives considered**:
+- Active internal scanning (Science pings a room to reveal intruders) — deferred to v0.03
+- Always-visible intruders (no fog of war) — rejected: removes strategic depth; Security would always have perfect information
+
+---
+
+## 2026-02-19 — v0.02c Security: Static interior layout in game.started (Q4)
+
+**Decision**: The static room layout (room IDs, names, positions, connections, initial states) is included in the `game.started` payload as `"interior_layout"` — a list of room dicts. Dynamic state (squad positions, intruder visibility-filtered positions, room conditions, door states) is sent per-tick in `security.interior_state` to the `["security"]` role only.
+
+**Reasoning**: The interior layout is small (~2 KB), stable for the lifetime of a game session, and needed by multiple future stations (Medical for treatment routing, Engineering for repair dispatch, Security for the tactical map). Including it in `game.started` means every station page can access the layout from session storage without a separate request/message. Dynamic state belongs in per-tick role-filtered broadcasts because it changes frequently and contains security-sensitive data (intruder positions).
+
+**Alternatives considered**:
+- Separate `interior.layout` message on connect — rejected: requires a new message type, an additional round trip, and handling on every station page that needs layout data
+- Fetch interior layout via HTTP GET — rejected: adds a REST endpoint for data that is logically part of game initialisation
+
+---
+
 ## 2026-02-19 — Cross-station sensor assist uses passive efficiency detection (Session 2b2)
 
 **Decision**: When Science has an active `frequency_matching` puzzle, Engineering assists Science automatically when `ship.sensors.efficiency >= 1.2` (120%). There is no explicit "RELAY ASSIST" button on Engineering. Engineering receives a `puzzle.assist_available` notification panel telling them what to do; the assist fires once as soon as the power threshold is crossed and is not re-applied.

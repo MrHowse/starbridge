@@ -1,0 +1,57 @@
+{
+  "id": "nebula_crossing",
+  "name": "Nebula Crossing",
+  "briefing": "LONG-RANGE SENSORS DETECT A DISTRESS BEACON DEEP IN THE VELORIAN NEBULA. THE NEBULA'S DENSE PARTICLE CLOUDS MAKE SAFE NAVIGATION TREACHEROUS — PLOT A COURSE BEFORE ENGAGING THRUSTERS. SCIENCE SENSORS CAN HELP REVEAL HIDDEN HAZARDS.",
+  "signal_location": { "x": 70000, "y": 30000 },
+  "defeat_condition": "player_hull_zero",
+  "victory_condition": "all_objectives_complete",
+  "hazards": [
+    {
+      "id": "nebula_core",
+      "x": 55000,
+      "y": 40000,
+      "radius": 20000,
+      "hazard_type": "nebula",
+      "label": "Velorian Nebula"
+    },
+    {
+      "id": "debris_field",
+      "x": 60000,
+      "y": 35000,
+      "radius": 6000,
+      "hazard_type": "radiation_zone",
+      "label": "Radiation Debris"
+    }
+  ],
+  "spawn": [],
+  "objectives": [
+    {
+      "id": "plot_course",
+      "text": "Plot a safe route through the Velorian Nebula",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 3 },
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "route_calculation",
+          "station": "helm",
+          "label": "nebula_route",
+          "difficulty": 2,
+          "time_limit": 180.0
+        }
+      ]
+    },
+    {
+      "id": "navigate_nebula",
+      "text": "Successfully navigate through the nebula",
+      "trigger": "puzzle_completed",
+      "args": { "puzzle_label": "nebula_route" }
+    },
+    {
+      "id": "reach_beacon",
+      "text": "Reach the distress beacon coordinates",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 45 }
+    }
+  ]
+}

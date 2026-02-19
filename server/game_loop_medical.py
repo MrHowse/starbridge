@@ -5,6 +5,12 @@ Manages per-deck treatment-in-progress state and applies per-tick healing.
 Starting a treatment session costs supplies immediately; healing is gradual.
 
 Treatment auto-cancels when no more crew of the target type remain on the deck.
+
+Disease mechanics (v0.02e):
+  start_outbreak(deck, pathogen) — mark a deck as infected.
+  tick_disease(interior, dt)     — spread infection each SPREAD_INTERVAL seconds;
+                                   blocked by sealed doors between decks.
+  get_disease_state()            — current infection map for broadcast.
 """
 from __future__ import annotations
 
@@ -19,6 +25,8 @@ HEAL_INTERVAL: float = 2.0        # seconds between each individual crew heal
 RESUPPLY_AMOUNT: int = 5          # supplies gained per dock resupply
 RESUPPLY_MAX: int = 20            # maximum medical supply cap
 
+SPREAD_INTERVAL: float = 30.0     # seconds between disease spread checks
+
 # ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
@@ -26,12 +34,17 @@ RESUPPLY_MAX: int = 20            # maximum medical supply cap
 _active_treatments: dict[str, str] = {}   # deck_name → "injured" | "critical"
 _heal_timers: dict[str, float] = {}       # deck_name → seconds since last heal
 
+_active_outbreak: dict[str, str] = {}     # deck_name → pathogen name
+_spread_timer: float = 0.0
+
 
 def reset() -> None:
-    """Clear all treatment state. Called at game start."""
-    global _active_treatments, _heal_timers
+    """Clear all treatment and disease state. Called at game start."""
+    global _active_treatments, _heal_timers, _active_outbreak, _spread_timer
     _active_treatments = {}
     _heal_timers = {}
+    _active_outbreak = {}
+    _spread_timer = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -104,3 +117,80 @@ def tick_treatments(ship: Ship, dt: float) -> list[str]:
         cancel_treatment(deck_name)
 
     return healed
+
+
+# ---------------------------------------------------------------------------
+# Disease / outbreak mechanics (v0.02e)
+# ---------------------------------------------------------------------------
+
+
+def start_outbreak(deck_name: str, pathogen: str) -> None:
+    """Mark a deck as infected with the given pathogen.
+
+    Has no effect if the deck is already infected.
+    """
+    if deck_name not in _active_outbreak:
+        _active_outbreak[deck_name] = pathogen
+
+
+def tick_disease(interior: object, dt: float) -> list[dict]:
+    """Advance the disease spread timer and spread infection if due.
+
+    Infection spreads from an infected deck to an adjacent deck when:
+      - The spread timer reaches SPREAD_INTERVAL.
+      - At least one room on the infected deck shares an unsealed connection
+        with a room on the target deck.
+
+    Returns a list of spread-event dicts::
+
+        {"from_deck": str, "to_deck": str, "pathogen": str}
+    """
+    global _spread_timer
+    if not _active_outbreak:
+        return []
+
+    _spread_timer += dt
+    if _spread_timer < SPREAD_INTERVAL:
+        return []
+
+    _spread_timer = 0.0
+    return _try_spread(interior)
+
+
+def _try_spread(interior: object) -> list[dict]:
+    """Attempt to spread infection through unsealed cross-deck connections."""
+    events: list[dict] = []
+    new_infections: dict[str, str] = {}
+
+    rooms = interior.rooms  # type: ignore[attr-defined]
+
+    for deck, pathogen in list(_active_outbreak.items()):
+        infected_rooms = [r for r in rooms.values() if r.deck == deck]
+        for room in infected_rooms:
+            for conn_id in room.connections:
+                conn_room = rooms.get(conn_id)
+                if conn_room is None or conn_room.deck == deck:
+                    continue
+                # Spread blocked if either room has a sealed door
+                if room.door_sealed or conn_room.door_sealed:
+                    continue
+                target_deck = conn_room.deck
+                if target_deck not in _active_outbreak and target_deck not in new_infections:
+                    new_infections[target_deck] = pathogen
+                    events.append({
+                        "from_deck": deck,
+                        "to_deck":   target_deck,
+                        "pathogen":  pathogen,
+                    })
+
+    _active_outbreak.update(new_infections)
+    return events
+
+
+def get_disease_state() -> dict:
+    """Return a snapshot of the current disease state for broadcast."""
+    return {
+        "infected_decks":  dict(_active_outbreak),
+        "spread_timer":    round(_spread_timer, 2),
+        "spread_interval": SPREAD_INTERVAL,
+    }

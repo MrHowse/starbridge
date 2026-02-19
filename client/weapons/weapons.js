@@ -27,6 +27,7 @@ import {
   C_PRIMARY, C_PRIMARY_DIM, C_FRIENDLY, C_BG, C_GRID,
   drawBackground, worldToScreen, drawShipChevron,
 } from '../shared/renderer.js';
+import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -36,6 +37,9 @@ const RADAR_WORLD_RADIUS  = 15_000;  // world units shown at radar edge
 const BEAM_FLASH_MS       = 300;     // beam fire line animation duration
 const HIT_FLASH_MS        = 500;     // hull-hit border flash duration
 const TORP_RELOAD_TIME    = 5.0;     // must match server TORPEDO_RELOAD_TIME
+const TUBE_LOAD_TIME      = 3.0;     // must match server TUBE_LOAD_TIME
+const TORPEDO_TYPES       = ['standard', 'emp', 'probe', 'nuclear'];
+const TYPE_COLORS         = { standard: '#00ff41', emp: '#00c8ff', probe: '#ffcc00', nuclear: '#ff4040' };
 const TRAIL_LENGTH        = 5;       // torpedo trail positions to store
 const EXPLOSION_DURATION  = 500;     // explosion ring animation duration ms
 
@@ -102,6 +106,13 @@ let contacts    = [];     // world.entities enemies array
 let torpedoes   = [];     // world.entities torpedoes array
 let selectedId  = null;   // selected enemy entity_id or null
 
+// Tube state (from ship.state).
+let tubeTypes   = ['standard', 'standard'];
+let tubeLoading = [0.0, 0.0];
+
+// Pending nuclear auth: request_id for each tube (or null).
+let pendingAuth = [null, null];
+
 // Beam flash: { targetX, targetY, startTime }
 let beamFlash   = null;
 
@@ -130,16 +141,21 @@ function init() {
     }
   });
 
-  on('game.started',       handleGameStarted);
-  on('ship.state',         handleShipState);
-  on('ship.alert_changed', ({ level }) => setAlertLevel(level));
-  on('sensor.contacts',    handleSensorContacts);
-  on('ship.hull_hit',      handleHullHit);
-  on('ship.system_damaged', handleSystemDamaged);
-  on('weapons.beam_fired', handleBeamFired);
-  on('weapons.torpedo_hit', handleTorpedoHit);
-  on('game.over',          handleGameOver);
+  on('game.started',                 handleGameStarted);
+  on('ship.state',                   handleShipState);
+  on('ship.alert_changed',           ({ level }) => setAlertLevel(level));
+  on('sensor.contacts',              handleSensorContacts);
+  on('ship.hull_hit',                handleHullHit);
+  on('ship.system_damaged',          handleSystemDamaged);
+  on('weapons.beam_fired',           handleBeamFired);
+  on('weapons.torpedo_hit',          handleTorpedoHit);
+  on('weapons.tube_loading',         handleTubeLoading);
+  on('weapons.tube_loaded',          handleTubeLoaded);
+  on('captain.authorization_request', handleAuthRequest);
+  on('weapons.authorization_result', handleAuthResult);
+  on('game.over',                    handleGameOver);
 
+  initPuzzleRenderer(send);
   setupControls();
   connect();
 }
@@ -171,6 +187,8 @@ function handleGameStarted(payload) {
 function handleShipState(payload) {
   if (!gameActive) return;
   shipState = payload;
+  if (payload.tube_types)   tubeTypes   = payload.tube_types;
+  if (payload.tube_loading) tubeLoading = payload.tube_loading;
   updateTubeUI(payload);
 }
 
@@ -232,6 +250,46 @@ function handleGameOver(payload) {
   showGameOver(payload.result, payload.stats || {});
 }
 
+function handleTubeLoading({ tube, torpedo_type, load_time }) {
+  if (!gameActive) return;
+  const idx = tube - 1;
+  tubeLoading[idx] = load_time;
+  console.log(`[weapons] Tube ${tube} loading: ${torpedo_type}`);
+}
+
+function handleTubeLoaded({ tube, torpedo_type }) {
+  if (!gameActive) return;
+  const idx = tube - 1;
+  tubeLoading[idx] = 0.0;
+  tubeTypes[idx]   = torpedo_type;
+  console.log(`[weapons] Tube ${tube} loaded: ${torpedo_type}`);
+}
+
+function handleAuthRequest({ request_id, action, tube }) {
+  if (!gameActive) return;
+  const idx = tube - 1;
+  pendingAuth[idx] = request_id;
+  _setTubeAuthStatus(tube, true);
+  console.log(`[weapons] Nuclear auth requested: ${request_id} (tube ${tube})`);
+}
+
+function handleAuthResult({ request_id, approved, tube }) {
+  if (!gameActive) return;
+  const idx = tube - 1;
+  if (pendingAuth[idx] === request_id) {
+    pendingAuth[idx] = null;
+    _setTubeAuthStatus(tube, false);
+  }
+  console.log(`[weapons] Nuclear auth ${approved ? 'APPROVED' : 'DENIED'} (tube ${tube})`);
+}
+
+function _setTubeAuthStatus(tube, pending) {
+  const statusEl = document.getElementById(`tube${tube}-status`);
+  const fireBtn  = document.getElementById(`tube${tube}-fire-btn`);
+  if (statusEl) statusEl.textContent = pending ? 'AWAITING AUTH' : '';
+  if (fireBtn)  fireBtn.disabled = pending;
+}
+
 // ---------------------------------------------------------------------------
 // Control setup
 // ---------------------------------------------------------------------------
@@ -272,6 +330,9 @@ function setupControls() {
     send('weapons.fire_torpedo', { tube: 2 });
   });
 
+  // Load type buttons — inject into the torpedo section dynamically.
+  _buildLoadControls();
+
   // Shield balance slider.
   shieldSlider.addEventListener('input', () => {
     if (!gameActive) return;
@@ -285,6 +346,52 @@ function setupControls() {
 
   // Radar click — select target.
   radarCanvas.addEventListener('click', handleRadarClick);
+}
+
+function _buildLoadControls() {
+  // Find the torpedo tubes section and append type-badge elements + load controls.
+  const torpSection = document.querySelector('.ctrl-section:nth-of-type(3)');
+  if (!torpSection) return;
+
+  // Add type badges to tube rows.
+  const tubeRows = torpSection.querySelectorAll('.tube-row');
+  tubeRows.forEach((row, idx) => {
+    const badge = document.createElement('span');
+    badge.id        = `tube${idx + 1}-type`;
+    badge.className = 'text-label tube-type-badge';
+    badge.textContent = 'STD';
+    row.insertBefore(badge, row.querySelector('.fire-btn'));
+  });
+
+  // Load selector for each tube.
+  const loadSection = document.createElement('div');
+  loadSection.className = 'tube-load-section';
+  loadSection.innerHTML = `
+    <div class="text-dim text-label" style="margin-bottom:4px">LOAD TYPE</div>
+    <div class="tube-load-row" id="tube-load-btns">
+      ${TORPEDO_TYPES.map(t => `
+        <button class="load-btn" data-type="${t}" style="border-color:${TYPE_COLORS[t]}"
+                title="Load ${t.toUpperCase()} torpedo">
+          ${t === 'standard' ? 'STD' : t.toUpperCase()}
+        </button>
+      `).join('')}
+      <select class="load-tube-select text-data" id="load-tube-sel">
+        <option value="1">T1</option>
+        <option value="2">T2</option>
+      </select>
+    </div>
+  `;
+  torpSection.appendChild(loadSection);
+
+  // Wire load buttons.
+  loadSection.querySelectorAll('.load-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!gameActive) return;
+      const tube = parseInt(document.getElementById('load-tube-sel').value, 10);
+      const type = btn.dataset.type;
+      send('weapons.load_tube', { tube, torpedo_type: type });
+    });
+  });
 }
 
 function handleRadarClick(e) {
@@ -399,24 +506,61 @@ function updateTargetPanel() {
 }
 
 function updateTubeUI(state) {
-  const ammo     = state.torpedo_ammo ?? 0;
+  const ammo      = state.torpedo_ammo  ?? 0;
   const cooldowns = state.tube_cooldowns ?? [0, 0];
+  const serverTypes   = state.tube_types   || tubeTypes;
+  const serverLoading = state.tube_loading || tubeLoading;
 
   ammoLabel.textContent = `AMMO: ${ammo}`;
 
-  // Tube 1
-  const c1    = cooldowns[0] ?? 0;
-  const pct1  = c1 <= 0 ? 100 : Math.max(0, (1 - c1 / TORP_RELOAD_TIME) * 100);
-  tube1ReloadFill.style.width = `${pct1}%`;
-  tube1Status.textContent     = c1 <= 0 ? 'READY' : 'LOADING';
-  tube1FireBtn.disabled       = c1 > 0 || ammo <= 0;
+  _updateSingleTube(1, cooldowns[0] ?? 0, serverTypes[0], serverLoading[0] ?? 0, ammo);
+  _updateSingleTube(2, cooldowns[1] ?? 0, serverTypes[1], serverLoading[1] ?? 0, ammo);
+}
 
-  // Tube 2
-  const c2    = cooldowns[1] ?? 0;
-  const pct2  = c2 <= 0 ? 100 : Math.max(0, (1 - c2 / TORP_RELOAD_TIME) * 100);
-  tube2ReloadFill.style.width = `${pct2}%`;
-  tube2Status.textContent     = c2 <= 0 ? 'READY' : 'LOADING';
-  tube2FireBtn.disabled       = c2 > 0 || ammo <= 0;
+function _updateSingleTube(tubeNum, cooldown, tType, loadTimer, ammo) {
+  const reloadFill = document.getElementById(`tube${tubeNum}-reload-fill`);
+  const statusEl   = document.getElementById(`tube${tubeNum}-status`);
+  const fireBtn    = document.getElementById(`tube${tubeNum}-fire-btn`);
+  if (!reloadFill || !statusEl || !fireBtn) return;
+
+  const isLoading    = loadTimer > 0;
+  const isReloading  = cooldown  > 0;
+  const authPending  = pendingAuth[tubeNum - 1] !== null;
+
+  let pct, statusText, disabled;
+
+  if (isLoading) {
+    pct        = Math.max(0, (1 - loadTimer / TUBE_LOAD_TIME) * 100);
+    statusText = `LOADING ${(tType || '').toUpperCase()}`;
+    disabled   = true;
+  } else if (isReloading) {
+    pct        = Math.max(0, (1 - cooldown / TORP_RELOAD_TIME) * 100);
+    statusText = 'RELOADING';
+    disabled   = true;
+  } else if (authPending) {
+    pct        = 100;
+    statusText = 'AWAITING AUTH';
+    disabled   = true;
+  } else {
+    pct        = 100;
+    statusText = 'READY';
+    disabled   = ammo <= 0;
+  }
+
+  reloadFill.style.width = `${pct}%`;
+  statusEl.textContent   = statusText;
+  fireBtn.disabled       = disabled;
+
+  // Colour the fill by torpedo type.
+  const col = TYPE_COLORS[tType] || TYPE_COLORS.standard;
+  reloadFill.style.backgroundColor = col;
+
+  // Show type badge next to tube label.
+  const typeEl = document.getElementById(`tube${tubeNum}-type`);
+  if (typeEl) {
+    typeEl.textContent  = (tType || 'STD').toUpperCase();
+    typeEl.style.color  = col;
+  }
 }
 
 // ---------------------------------------------------------------------------

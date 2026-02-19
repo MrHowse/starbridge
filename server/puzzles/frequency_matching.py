@@ -118,11 +118,34 @@ class FrequencyMatchingPuzzle(PuzzleInstance):
         return error < self._tolerance
 
     def apply_assist(self, assist_type: str, data: dict[str, Any]) -> dict[str, Any]:
-        """widen_tolerance: increase matching tolerance, return old and new values."""
+        """Apply an assist to the frequency matching puzzle.
+
+        widen_tolerance (Engineering sensor boost):
+            Increase matching tolerance by 0.15, capped at 0.45.
+
+        relay_frequency (Comms decoded transmission):
+            Reveal exact values for the target component whose frequency
+            is closest to the relayed frequency.
+        """
         if assist_type == "widen_tolerance":
             prev = self._tolerance
             self._tolerance = min(prev + 0.15, _MAX_TOLERANCE)
             return {"tolerance": self._tolerance, "previous_tolerance": prev}
+        if assist_type == "relay_frequency":
+            relay_freq = float(data.get("frequency", 3.0))
+            if not self._target_components:
+                return {}
+            # Find target component with frequency closest to the relayed value
+            idx = min(
+                range(len(self._target_components)),
+                key=lambda i: abs(self._target_components[i]["frequency"] - relay_freq),
+            )
+            target = self._target_components[idx]
+            return {
+                "component_index": idx,
+                "amplitude": target["amplitude"],
+                "frequency": target["frequency"],
+            }
         return {}
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from server.models.crew import CrewRoster, DECK_SYSTEM_MAP
+from server.models.interior import ShipInterior, make_default_interior
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +112,9 @@ class Ship:
     # --- Crew (added v0.02a) ---
     crew: CrewRoster = field(default_factory=CrewRoster)
     medical_supplies: int = 20   # finite treatment resource; replenished by docking
+
+    # --- Ship interior (added v0.02c) ---
+    interior: ShipInterior = field(default_factory=make_default_interior)
 
     def update_crew_factors(self) -> None:
         """Propagate deck crew_factors into the corresponding ship systems.

@@ -3,9 +3,9 @@
 > **LIVING DOCUMENT** — Update after every AI engineering session.
 > This is the single source of truth for what exists in the project.
 
-**Last updated**: 2026-02-19 (Session 2b2 — Circuit Routing + Frequency Matching puzzles)
-**Current phase**: v0.02b2 COMPLETE
-**Overall status**: 541 tests passing. 7 stations (including Medical). 4 missions + 2 real puzzle types with cross-station assist chain.
+**Last updated**: 2026-02-19 (Session c.9 + logger — v0.02h + game event logger)
+**Current phase**: v0.02h COMPLETE
+**Overall status**: 948 tests passing. 8 stations. 8 missions (diplomatic_summit added) + 8 puzzle types (route_calculation, firing_solution added) + game event logger (JSONL, logs/ dir, controllable via STARBRIDGE_LOGGING env var).
 
 ---
 
@@ -22,12 +22,13 @@
 ### Server
 
 #### Core
-- `server/main.py` — FastAPI app, `/ws` WebSocket endpoint, JSON envelope parsing, category-based message routing (lobby/helm/engineering/weapons/science/captain); all handlers wired; `POST /debug/damage`, `GET /debug/ship_status`, `POST /debug/spawn_enemy`, `POST /debug/start_game` debug endpoints; `game_loop.register_game_end_callback(lobby.on_game_end)` wired
+- `server/main.py` — FastAPI app, `/ws` WebSocket endpoint, JSON envelope parsing, category-based message routing (lobby/helm/engineering/weapons/science/medical/security/captain); **security handler wired [2c.4]**; all handlers wired; `POST /debug/damage`, `GET /debug/ship_status`, `POST /debug/spawn_enemy`, `POST /debug/start_game` debug endpoints; `game_loop.register_game_end_callback(lobby.on_game_end)` wired
 - `server/connections.py` — `ConnectionManager`: connect/disconnect, metadata tagging (player_name, role, session_id, is_host), individual send, full broadcast, role-filtered broadcast, `all_ids()`
-- `server/models/messages/` — **[0.1b split]** Messages namespace package. `__init__.py` re-exports all symbols; `base.py` (Message, validate_payload, _PAYLOAD_SCHEMAS); `lobby.py`, `helm.py`, `engineering.py`, `weapons.py`, `science.py`, `captain.py`, `game.py`, `world.py`. All existing `from server.models.messages import X` imports unchanged.
-- `server/models/ship.py` — `ShipSystem` (name, power, health, `_crew_factor=1.0`, `efficiency = (power/100)*(health/100)*_crew_factor`), `Shields` (front, rear), `Ship` dataclass (position, heading, target_heading, velocity, throttle, hull, shields, 6 systems, alert_level, crew, **medical_supplies=20**). `Ship.update_crew_factors()` propagates deck crew factors to systems each tick.
+- `server/models/messages/` — **[0.1b split]** Messages namespace package. `__init__.py` re-exports all symbols; `base.py` (Message, validate_payload, _PAYLOAD_SCHEMAS); `lobby.py`, `helm.py`, `engineering.py`, `weapons.py`, `science.py`, `captain.py`, `game.py`, `world.py`, **`security.py`** **[2c.2]** (`SecurityMoveSquadPayload`, `SecurityToggleDoorPayload`). All existing imports unchanged.
+- `server/models/ship.py` — `ShipSystem` (name, power, health, `_crew_factor=1.0`, `efficiency = (power/100)*(health/100)*_crew_factor`), `Shields` (front, rear), `Ship` dataclass (position, heading, target_heading, velocity, throttle, hull, shields, 6 systems, alert_level, crew, medical_supplies=20, **`interior: ShipInterior = make_default_interior()`** **[2c.2]**). `Ship.update_crew_factors()` propagates deck crew factors to systems each tick.
 - `server/models/crew.py` — **[2a.1]** `DeckCrew` (deck_name, total, active, injured, critical, dead, `crew_factor` property). `CrewRoster` (decks dict, `apply_casualties`, `treat_injured`, `treat_critical`, `get_deck_for_system`). `DECK_SYSTEM_MAP` (bridge→manoeuvring, sensors→sensors, weapons→beams+torpedoes, shields→shields, engineering→engines). `DECK_DEFAULT_CREW`.
-- `server/models/interior.py` — **[2a.1]** `Room` (id, name, deck, position, connections, state, door_sealed). `ShipInterior` (rooms dict, `find_path()` BFS pathfinding — blocks sealed/decompressed). `make_default_interior()` — 5 decks, 20 rooms, bidirectional connections, vertical corridor at column 1.
+- `server/models/interior.py` — **[2a.1]** `Room` (id, name, deck, position, connections, state, door_sealed). `ShipInterior` (rooms dict, `find_path()` BFS pathfinding — blocks sealed/decompressed, `marine_squads: list[MarineSquad]`, `intruders: list[Intruder]` — both empty by default). `make_default_interior()` — 5 decks, 20 rooms, bidirectional connections, vertical corridor at column 1.
+- `server/models/security.py` — **[2c.1]** `MarineSquad` (id, room_id, health, action_points, count; `regen_ap`, `can_move/deduct_move_ap`, `can_seal_door/deduct_door_ap`, `take_damage` → casualty on threshold dip, `is_eliminated`). `Intruder` (id, room_id, objective_id, health, move_timer; `tick_move_timer`, `is_ready_to_move`, `reset_move_timer`, `take_damage`, `is_defeated`). Constants: `AP_MAX=10`, `AP_REGEN_PER_TICK=0.2`, `AP_COST_MOVE=3`, `AP_COST_DOOR=2`, `INTRUDER_MOVE_INTERVAL=30`, `MARINE_DAMAGE_PER_TICK=0.2`, `INTRUDER_DAMAGE_PER_TICK=0.15`, `SQUAD_CASUALTY_THRESHOLD=25.0`, `SENSOR_FOW_THRESHOLD=0.5`. `is_intruder_visible(intruder, squads, sensor_efficiency)` — fog-of-war filter.
 - `server/models/world.py` — `World` dataclass (width, height, ship, enemies, torpedoes, stations, asteroids lists). `Enemy`, `Torpedo`, `Station`, `Asteroid` dataclasses. `ENEMY_TYPE_PARAMS` dict. `spawn_enemy()` factory. `SECTOR_WIDTH`/`SECTOR_HEIGHT` constants.
 - `server/utils/math_helpers.py` — `wrap_angle`, `angle_diff`, `distance`, `lerp`, `bearing_to`
 
@@ -35,11 +36,14 @@
 - `server/systems/physics.py` — `tick(ship, dt, w, h)`: turn + thrust + move + boundary clamp
 - `server/systems/combat.py` — `beam_in_arc`, `apply_hit_to_player` (now applies crew casualties: `int(hull_damage/5)` crew on a random deck via `rng.choice`), `apply_hit_to_enemy`, `regenerate_shields`. New constant `CREW_CASUALTY_PER_HULL_DAMAGE=5.0`.
 - `server/puzzles/` — **[2b]** Puzzle engine package:
-  - `base.py` — `PuzzleInstance` ABC (`generate`, `validate_submission`, `apply_assist`, `tick` with auto-timeout, `_resolve`, `pop_pending_broadcasts`)
-  - `engine.py` — `PuzzleEngine` class (`create_puzzle`, `tick`, `submit`, `apply_assist`, `cancel`, `pop_pending_broadcasts`, `pop_resolved`, `get_active_for_station`, `reset`). Registry via `register_puzzle_type()`. `submit()` immediately adds to `_resolved` and prunes puzzle to avoid double-reporting.
+  - `base.py` — `PuzzleInstance` ABC (`generate`, `validate_submission`, `apply_assist`, `tick` with auto-timeout, `_resolve`, `pop_pending_broadcasts`). **[2c.4]** `__init__` now accepts `**_kwargs` to absorb extra params forwarded by engine.
+  - `engine.py` — `PuzzleEngine` class (`create_puzzle`, `tick`, `submit`, `apply_assist`, `cancel`, `pop_pending_broadcasts`, `pop_resolved`, `get_active_for_station`, `reset`). Registry via `register_puzzle_type()`. `submit()` immediately adds to `_resolved` and prunes puzzle to avoid double-reporting. **[2c.4]** `create_puzzle` forwards `**params` to puzzle constructor.
   - `sequence_match.py` — `SequenceMatchPuzzle` PoC: random colour sequence, `reveal_start` assist, self-registers at import.
   - `circuit_routing.py` — **[2b2]** `CircuitRoutingPuzzle` (Engineering): BFS grid routing, `_GRID_SIZES` (3×3–5×5 by diff), `_SLACK` extra conduits, damaged nodes, `highlight_nodes` assist → solution path. Helpers: `_node_id`, `_parse_node_id`, `_are_adjacent`, `_canon_edge`, `_build_all_edges`, `_bfs_path`.
   - `frequency_matching.py` — **[2b2]** `FrequencyMatchingPuzzle` (Science): multi-component sine waveform matching, `_DIFFICULTY_PARAMS` (2–5 components, tolerance 0.30–0.08), `_relative_rms_error` validation, `widen_tolerance` assist (+0.15, capped at 0.45). Helpers: `_sample_waveform`, `_relative_rms_error`.
+  - `tactical_positioning.py` — **[2c.4]** `TacticalPositioningPuzzle` (Security): receives `interior` (live ShipInterior ref) and `intruder_specs` via **kwargs. `generate()` returns intruder_threats list. `validate_submission({"confirmed": True})` deep-copies interior, runs 300-tick mini-simulation to check if current squad positions can defeat all intruders; returns True/False. `apply_assist("reveal_interception_points")` returns midpoint rooms on each intruder's BFS path.
+  - `transmission_decoding.py` — **[2c.5]** `TransmissionDecodingPuzzle` (Comms): N cipher symbols (difficulty 1–5: 3–6 symbols), some revealed as hints. Generates sum-equation clues. `validate_submission({"mappings": {sym: int}})` checks all unknowns correct. `apply_assist("reveal_symbol")` reveals one more symbol. `_relay_component` stored on success for Comms→Science relay chain.
+- `server/game_logger.py` — **[c.9+]** `GameLogger` class + module-level singleton. `start_logging(mission_id, players)`, `log_event(cat, event, data)`, `set_tick(n)`, `stop_logging(result, stats)`, `is_logging()`. JSONL format, one line per event. Writes to `logs/game_YYYYMMDD_HHMMSS.jsonl`. Controlled via `STARBRIDGE_LOGGING` env var (default enabled). Never raises. Integrated into: lobby.py (role_claimed/released/game_started), captain.py (alert_changed), game_loop.py (tick_summary/200+ hook sites), game_loop_weapons.py (enemy_destroyed/ship_hit), game_loop_mission.py (objective_completed).
 - `server/medical.py` — **[2a.2]** Queue-based handler for `medical.treat_crew` and `medical.cancel_treatment`. Same pattern as science.py.
 - `server/game_loop_medical.py` — **[2a.2]** Stateful treatment module. `reset()`, `start_treatment(deck, type, ship)` (costs TREATMENT_COST=2 supplies), `cancel_treatment(deck)`, `tick_treatments(ship, dt)` (heals 1 crew per HEAL_INTERVAL=2.0s, auto-cancels when no crew left), `get_active_treatments()`.
 - `server/models/messages/medical.py` — **[2a.2]** `MedicalTreatCrewPayload`, `MedicalCancelTreatmentPayload`.
@@ -52,13 +56,18 @@
 - `server/weapons.py` — validates + enqueues weapons messages
 - `server/science.py` — validates + enqueues science messages (start_scan, cancel_scan)
 - `server/captain.py` — **[Phase 6]** `captain.set_alert`: validates level, updates `ship.alert_level`, broadcasts `ship.alert_changed` directly (instant, no queue)
-- `server/lobby.py` — full lobby logic, role management, host launch, `register_game_start_callback()`, `_game_active` flag (prevents game.started replay after game ends), `on_game_end()` callback clears state, `game.started` payload includes real mission name/briefing/signal_location from mission JSON
+- `server/medical.py` — **[2a.2]** validates + enqueues medical messages
+- `server/security.py` — **[2c.2]** validates + enqueues `security.move_squad` and `security.toggle_door` messages; same init(sender, queue) pattern
+- `server/comms.py` — **[2c.5]** validates + enqueues `comms.tune_frequency` and `comms.hail` messages; same init(sender, queue) pattern
+- `server/lobby.py` — full lobby logic, role management; roles now include "security" **[2c.2]** and **"comms" [2c.5]**; `register_game_start_callback()`, `_game_active` flag, `on_game_end()` callback, `game.started` payload includes real mission data + **`interior_layout`** (static room data) **[2c.3]**
 
-#### Game Loop (split into 4 files — Session 0.1a)
-- `server/game_loop.py` — Orchestrator. `start()` also calls `glmed.reset()`, `_puzzle_engine.reset()`, resets crew, clears `_applied_sensor_assists`. `_loop()` calls `glmed.tick_treatments()`, `_puzzle_engine.tick()`, and `_check_sensor_assist()` each tick; collects puzzle broadcasts; notifies mission engine of resolved puzzles; processes `start_puzzle` on_complete actions. `_drain_queue()` handles `medical.*` and `puzzle.*` messages. `_build_ship_state()` includes `crew`, `medical_supplies`, `active_treatments` in payload. `SENSOR_ASSIST_THRESHOLD = 1.2`. `_check_sensor_assist(ship)` → `puzzle.assist_sent` Message when sensors overclocked + frequency puzzle active (one-shot via `_applied_sensor_assists` set).
+#### Game Loop (split into 5 files — Session 0.1a + 2c.2)
+- `server/game_loop.py` — Orchestrator. `start()` calls `gls.reset()` + **`glco.reset()` [2c.5]**; resets `ship.interior`. `_loop()` calls `gls.tick_security()` + **`glco.tick_comms()` [2c.5]** each tick; broadcasts `security.interior_state` to `["security"]` + **`comms.state` + NPC responses to `["comms"]` [2c.5]**; handles `start_boarding` + **Comms→Science relay chain [2c.5]** (step 8.65: `pop_relay_data()` → `apply_assist("relay_frequency")` on Science). `_drain_queue()` handles `security.*` + **`comms.tune_frequency` + `comms.hail` [2c.5]**. When `frequency_matching` puzzle starts on Science, now notifies both `["engineering"]` and **`["comms"]` [2c.5]** via `puzzle.assist_available`.
 - `server/game_loop_physics.py` — `TICK_RATE=10`, `TICK_DT=0.1`
 - `server/game_loop_weapons.py` — Stateful weapons module. `reset()`, `get/set_target()`, `get/set_ammo()`, `get_cooldowns()`, `tick_cooldowns()`, `next_entity_id()`, `fire_player_beams()`, `fire_torpedo()`, `tick_torpedoes()`, `handle_enemy_beam_hits()`
-- `server/game_loop_mission.py` — Stateful mission module. `init_mission()`, `get_mission_engine()`, `is_signal_scan()`, `handle_signal_scans()`, `apply_asteroid_collisions()`, `tick_docking()`, `tick_mission()` (now queues `start_puzzle` on_complete actions in `_pending_puzzle_starts`), `pop_pending_puzzle_starts()`, `build_sensor_contacts()`, `build_world_entities()`
+- `server/game_loop_mission.py` — Stateful mission module. `init_mission()`, `tick_mission()` (queues `start_puzzle`, `start_boarding`, and **`deploy_squads` [2c.4]** on_complete actions), `pop_pending_puzzle_starts()`, `pop_pending_boardings()` **[2c.2]**, **`pop_pending_deployments()` [2c.4]**, `build_sensor_contacts()`, `build_world_entities()`
+- `server/game_loop_comms.py` — **[2c.5]** Stateful comms module. `reset()`, `tune(freq)`, `hail(contact_id, message_type)`, `tick_comms(dt)` → NPC responses when hail timer expires, passive interception fragments on tuned hostile bands. `get_tuned_faction()` checks `FACTION_BANDS` (imperial=0.15, rebel=0.42, alien=0.71, emergency=0.90) ±0.05. `build_comms_state()` → `{active_frequency, tuned_faction, transmissions, pending_hails}`.
+- `server/game_loop_security.py` — **[2c.2]** Stateful boarding module. `reset()`, **`deploy_squads(interior, squad_specs)` [2c.4]** (places squads without activating boarding — planning phase), `start_boarding(interior, squad_specs, intruder_specs)` **[2c.4 modified: empty squad_specs preserves existing squads from deploy_squads]**, `move_squad(interior, squad_id, room_id) → bool`, `toggle_door(interior, room_id, squad_id) → bool`, `tick_security(interior, ship, dt) → list[tuple[str, dict]]` (AP regen, intruder movement, combat, events), `is_boarding_active()`, `build_interior_state(interior, ship) → dict` (fog-of-war filtered). `_eliminated_reported: set[str]` prevents duplicate elimination events.
 
 #### Mission System (`server/missions/`)
 - `server/missions/__init__.py`
@@ -68,7 +77,7 @@
   - Trigger types: `player_in_area`, `scan_completed`, `entity_destroyed`, `all_enemies_destroyed`, `player_hull_zero`, `timer_elapsed`, `wave_complete`, `signal_located`, `proximity_with_shields`
   - `record_signal_scan(x, y)` — rejects scans within 8 000 world units of previous scan
   - `_proximity_timer` for shields-held-in-range tracking
-  - New trigger types: `puzzle_completed` (checks `args["puzzle_label"]`), `puzzle_failed`
+  - New trigger types: `puzzle_completed` (checks `args["puzzle_label"]`), `puzzle_failed`, **`puzzle_resolved` [2c.4]** (fires for either success or failure)
   - `notify_puzzle_result(label, success)` — called by game loop when a puzzle resolves
   - `tick(world, ship, dt) → list[newly_completed_ids]`
   - `get_objectives() → list[Objective]`
@@ -84,6 +93,9 @@
 - `missions/search_rescue.json` — **[Phase 7c]** signal triangulation (2 scans ≥ 8 000 units apart), asteroid field, proximity_with_shields (hold shields near damaged vessel for 10s)
 - `missions/puzzle_poc.json` — **[2b]** Puzzle framework PoC: `timer_elapsed` (3s) → `start_puzzle` sequence_match on Science → `puzzle_completed` → victory
 - `missions/engineering_drill.json` — **[2b2]** Engineering Drill test mission: `timer_elapsed` (5s) → list on_complete fires `frequency_matching` on Science + `circuit_routing` on Engineering simultaneously; briefing hints at sensor overclock assist; 3 sequential objectives.
+- `missions/boarding_action.json` — **[2c.4]** Boarding Action mission.
+- `missions/first_contact_protocol.json` — **[2c.5]** First Contact Protocol: 4 objectives — `timer_elapsed(5)` → fires `frequency_matching(science)` + `transmission_decoding(comms)` simultaneously → `puzzle_resolved(alien_freq)` + `puzzle_resolved(alien_transmission)` → `timer_elapsed(120)` victory. Comms→Science relay assist chain active: decoding success auto-relays frequency component to Science.
+- `missions/diplomatic_summit.json` — **[c.9]** Flagship 9-objective mission using all 7 active puzzle types across all 7 stations. Faction ships (meridian_ship, talon_ship) as station entities. All-departments challenge: science(frequency_matching) + comms(transmission_decoding) + engineering(circuit_routing) + medical(triage) + security(tactical_positioning) fire simultaneously; after security clears, helm(route_calculation) + weapons(firing_solution) activate; 240s final timer for victory.
 
 ### Client
 
@@ -132,6 +144,28 @@
 - Mission objectives panel: real-time updates from `mission.objective_update`
 - **[7d]**: torpedo trails; `ship.hull_hit` → CSS `.hit` flash; `showBriefing()` on game.started; stats in existing HTML game-over overlay
 
+#### Comms (`client/comms/`) **[2c.5]**
+- `index.html`, `comms.js`, `comms.css`
+- Frequency scanner canvas: horizontal frequency axis (0.0–1.0), faction signal blips (imperial/rebel/alien/emergency with unique colours), draggable tuner line, noise baseline static effect
+- Faction bands auto-detected (BAND_TOLERANCE ±0.05): badge shows tuned faction name in faction colour
+- Hailing interface: shows faction contact controls (contact-id input + NEGOTIATE/DEMAND/BLUFF buttons) only when tuned to a faction band; greyed hint when not tuned
+- Transmission log: rolling last-10 entries, colour-coded by type (incoming=green border, intercepted=amber italic)
+- Assist panel: shows `puzzle.assist_available` notifications (Science frequency puzzle) with instructions; auto-hides after 15s
+- `initPuzzleRenderer(send)` wired for `transmission_decoding` puzzle overlay
+- `puzzle.assist_sent` notifies Comms when relay_frequency was applied to Science
+- Handles: `comms.state`, `comms.npc_response`, `puzzle.assist_available`, game lifecycle messages
+
+#### Security (`client/security/`) **[2c.3 + 2c.4]**
+- `index.html`, `security.js`, `security.css`
+- Ship interior canvas: 5-row × 4-column room grid, connection lines (dashed red when door sealed), room state colour-coding (normal=green, damaged=amber, decompressed=grey, fire=orange, hostile=red)
+- Marine squad tokens: blue circles with member count, offset for multiple squads in same room
+- Intruder tokens: red circles with `!`, fog-of-war filtered server-side
+- Click interaction: click room → select squad in room; with squad selected → click target room → `security.move_squad` (deselects after send); click own room → deselect (works during both planning and boarding)
+- Door control sidebar: appears when squad selected and boarding active; dropdown of own room + adjacent rooms with `[SEALED]` tag; TOGGLE button → `security.toggle_door` (now dynamically recreated in renderSidebar)
+- **Planning phase [2c.4]**: `puzzle.started` (tactical_positioning) → threat markers drawn on canvas (orange fill + "THREAT" for spawn rooms, red X + "OBJ" for objective rooms); countdown badge "POSITIONING — XXs"; COMMIT POSITIONS button → `puzzle.submit {confirmed: true}`; client-side countdown via setInterval. `puzzle.result` clears planning state.
+- Sidebar: squad cards (health gauge, AP gauge, member count, room name); intruder contacts (location + objective + health gauge); boarding/planning status badge with pulse animation
+- `interior_layout` (static) from `game.started`; `security.interior_state` (dynamic) from each tick
+
 #### Viewscreen (`client/viewscreen/`)
 - `index.html`, `viewscreen.js`, `viewscreen.css` — **[Phase 7a] FULL**
 - Third-person forward view: starfield parallax, contact chevrons with range text, torpedo dots with trails (5-point ring buffer), beam flash lines (orange/magenta per type), shield arc impact effect at hull hit, explosion rings (500ms, 3 expanding circles)
@@ -151,19 +185,26 @@
 - `tests/test_combat.py` — 22 tests (unmodified; crew logic uses rng.choice → "engines" is not a valid deck key → graceful no-op in existing tests)
 - `tests/test_crew.py` — **[2a.1]** 31 tests (DeckCrew.crew_factor, CrewRoster defaults + apply/treat methods, Ship.update_crew_factors integration)
 - `tests/test_interior.py` — **[2a.1]** 19 tests (make_default_interior, find_path basic + cross-deck + sealed + decompressed)
+- `tests/test_security_models.py` — **[2c.1]** 58 tests (constants, AP regen/deduction, casualties, intruder move timer, combat, pathfinding, fog-of-war, ShipInterior fields)
+- `tests/test_security_loop.py` — **[2c.2]** 50 tests (reset, start_boarding, move_squad, toggle_door, tick_security AP/movement/combat/events, build_interior_state fog-of-war, Ship.interior field)
 - `tests/test_medical.py` — **[2a.2]** 21 tests (glmed module functions, handle_medical_message validate+queue, ship defaults)
 - `tests/test_puzzle_engine.py` — **[2b]** 39 tests (SequenceMatchPuzzle generate/validate/assist; PuzzleEngine lifecycle, timeout, submit, assist, cancel, multi-puzzle, reset)
 - `tests/test_puzzle_mission.py` — **[2b]** 11 tests (puzzle_completed/failed triggers, notify_puzzle_result, pop_pending_puzzle_starts, full lifecycle integration)
 - `tests/test_circuit_routing.py` — **[2b2]** 44 tests (grid helpers, generate at each difficulty, validate_submission, apply_assist, engine integration)
 - `tests/test_frequency_matching.py` — **[2b2]** 35 tests (waveform helpers, generate params, validate_submission, apply_assist, engine integration)
 - `tests/test_assist_chain.py` — **[2b2]** 10 tests (_check_sensor_assist conditions + one-shot, mission engine list on_complete)
+- `tests/test_tactical_positioning.py` — **[2c.4]** 31 tests (TacticalPositioningPuzzle generate/validate/assist, deploy_squads, start_boarding empty squads, PuzzleEngine params forwarding, puzzle_resolved trigger, pop_pending_deployments, tick_mission deploy_squads, integration)
+- `tests/test_transmission_decoding.py` — **[2c.5]** 39 tests (TransmissionDecodingPuzzle generate/validate/assist, relay_data capture, FrequencyMatchingPuzzle relay_frequency assist, game_loop_comms module, lobby comms role, handler registration, message schemas)
+- `tests/test_triage.py` — **[2c.6]** 42 tests (TriagePuzzle generate/validate/assist, game_loop_medical disease mechanics, game_loop_mission start_outbreak, plague_ship mission loadable)
+- `tests/test_torpedo_types.py` — **[c.8]** 34 tests (torpedo types/damage constants, tube loading, fire by type, nuclear auth, EMP stun/decay/fire-block, probe scan, nuclear hits, deep_strike mission)
+- `tests/test_diplomatic_summit.py` — **[c.9]** 51 tests (mission load/structure, objective chain via MissionEngine, balance validation for all 8 puzzle types)
 - `tests/test_weapons.py` — 12 tests
 - `tests/test_sensors.py` — 21 tests
 - `tests/test_science.py` — 8 tests
 - `tests/test_captain.py` — **[Phase 6]** 6 tests
 - `tests/test_mission_engine.py` — **[Phases 6–7]** ~40 tests (all mission triggers, loader, spawn, wave logic, signal triangulation, proximity_with_shields)
 
-**Total: 541 tests** (+89 in 2b2: circuit_routing 44, frequency_matching 35, assist_chain 10)
+**Total: 761 tests** (+89 in 2b2; +58 in 2c.1; +50 in 2c.2; +31 in 2c.4; +39 in 2c.5; **+42 in 2c.6: triage 42**)
 
 ## What Works (v0.01)
 
@@ -245,7 +286,9 @@
 - [x] Mission engine `on_complete` supports list of actions (backward-compatible)
 - [x] `engineering_drill.json` — fires both puzzles simultaneously via list on_complete
 - [x] `client/shared/puzzle_types/circuit_routing.js` + `frequency_matching.js` implemented
-- [x] 541 tests pass; 0 regressions
+- [x] 541 tests pass; 0 regressions (v0.02b2)
+- [x] 599 tests pass; 0 regressions (v0.02c.1 Security models)
+- [x] 649 tests pass; 0 regressions (v0.02c.2 Boarding event system)
 
 ## File Manifest (v0.01)
 
@@ -318,7 +361,8 @@ starbridge/
 │   │   ├── puzzle_renderer.js [2b; successMessage 2b2]
 │   │   └── puzzle_types/
 │   │       ├── sequence_match.js   [2b]
-│   │       ├── circuit_routing.js  [2b2]
+│   │       ├── circuit_routing.js         [2b2]
+│   │       └── transmission_decoding.js   [2c.5]
 │   │       └── frequency_matching.js [2b2]
 │   ├── lobby/
 │   │   ├── index.html

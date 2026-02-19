@@ -38,6 +38,7 @@ from server.models.messages.engineering import (
 from server.models.messages.weapons import (
     WeaponsFireBeamsPayload,
     WeaponsFireTorpedoPayload,
+    WeaponsLoadTubePayload,
     WeaponsSelectTargetPayload,
     WeaponsSetShieldsPayload,
 )
@@ -46,10 +47,16 @@ from server.models.messages.weapons import (
 from server.models.messages.science import ScienceCancelScanPayload, ScienceStartScanPayload
 
 # Captain
-from server.models.messages.captain import CaptainSetAlertPayload
+from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainSetAlertPayload
 
 # Medical
 from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
+
+# Security
+from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
+
+# Comms
+from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPayload
 
 # Puzzle
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
@@ -90,15 +97,24 @@ __all__ = [
     "WeaponsSelectTargetPayload",
     "WeaponsFireBeamsPayload",
     "WeaponsFireTorpedoPayload",
+    "WeaponsLoadTubePayload",
     "WeaponsSetShieldsPayload",
     # science
     "ScienceStartScanPayload",
     "ScienceCancelScanPayload",
     # captain
     "CaptainSetAlertPayload",
+    "CaptainAuthorizePayload",
+    "CaptainAddLogPayload",
     # medical
     "MedicalTreatCrewPayload",
     "MedicalCancelTreatmentPayload",
+    # security
+    "SecurityMoveSquadPayload",
+    "SecurityToggleDoorPayload",
+    # comms
+    "CommsTuneFrequencyPayload",
+    "CommsHailPayload",
     # puzzle
     "PuzzleSubmitPayload",
     "PuzzleAssistPayload",
