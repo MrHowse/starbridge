@@ -76,6 +76,15 @@ Copy this template when adding a new entry:
 
 ---
 
+## 2026-02-19 — File manifest drift: synthetic mission listed as a JSON file
+
+**Issue**: During v0.02 gate verification, `missions/sandbox.json` appeared to be missing — it was listed in STATE.md's file manifest but absent from the filesystem.
+**Cause**: The file manifest in STATE.md was written during Phase 6 when sandbox was originally planned as a JSON file, then the implementation switched to a synthetic dict in `loader.py`. The manifest was never corrected.
+**Fix**: Removed `missions/sandbox.json` from the manifest and added a clear note: "Sandbox is synthetic — no JSON file. Handled in loader.py."
+**Prevention**: When a design decision changes the form of an artefact (file vs synthetic, module vs config), update the file manifest immediately, not at gate time. File manifests are load-bearing context for future sessions.
+
+---
+
 ## 2026-02-18 — Budget gauge alarm at comfortable equilibrium
 
 **Issue**: The Engineering power budget gauge immediately turned red on game start because all 6 systems start at 100% each = 600/600 total = exactly at the budget cap. The threshold condition `totalPower >= POWER_BUDGET` was true from the very first server tick.

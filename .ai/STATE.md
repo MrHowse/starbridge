@@ -3,9 +3,9 @@
 > **LIVING DOCUMENT** — Update after every AI engineering session.
 > This is the single source of truth for what exists in the project.
 
-**Last updated**: 2026-02-19 (Session c.9 + logger — v0.02h + game event logger)
-**Current phase**: v0.02h COMPLETE
-**Overall status**: 948 tests passing. 8 stations. 8 missions (diplomatic_summit added) + 8 puzzle types (route_calculation, firing_solution added) + game event logger (JSONL, logs/ dir, controllable via STARBRIDGE_LOGGING env var).
+**Last updated**: 2026-02-19 (v0.02 CLOSED — gate verification complete)
+**Current phase**: v0.02 COMPLETE ✓
+**Overall status**: 948 tests passing. 8 stations. 11 JSON missions + sandbox (synthetic). 8 puzzle types. Game event logger (JSONL, logs/ dir, STARBRIDGE_LOGGING env var).
 
 ---
 
@@ -87,15 +87,18 @@
 ### Missions
 
 #### Mission Files
-- `missions/sandbox.json` — free play, no objectives, continuous enemy spawns
+- **Sandbox** — synthetic dict in `loader.py`; no JSON file. Free play, no objectives, continuous enemy spawns via `_spawn_sandbox_enemies()`. No `missions/sandbox.json` exists or is needed.
 - `missions/first_contact.json` — 4 sequential objectives: patrol waypoint, scan scout, destroy all, return to origin
 - `missions/defend_station.json` — **[Phase 7b]** 3 waves + station defence; `protect_station` objective, wave_complete triggers, station entity in world
 - `missions/search_rescue.json` — **[Phase 7c]** signal triangulation (2 scans ≥ 8 000 units apart), asteroid field, proximity_with_shields (hold shields near damaged vessel for 10s)
 - `missions/puzzle_poc.json` — **[2b]** Puzzle framework PoC: `timer_elapsed` (3s) → `start_puzzle` sequence_match on Science → `puzzle_completed` → victory
-- `missions/engineering_drill.json` — **[2b2]** Engineering Drill test mission: `timer_elapsed` (5s) → list on_complete fires `frequency_matching` on Science + `circuit_routing` on Engineering simultaneously; briefing hints at sensor overclock assist; 3 sequential objectives.
-- `missions/boarding_action.json` — **[2c.4]** Boarding Action mission.
-- `missions/first_contact_protocol.json` — **[2c.5]** First Contact Protocol: 4 objectives — `timer_elapsed(5)` → fires `frequency_matching(science)` + `transmission_decoding(comms)` simultaneously → `puzzle_resolved(alien_freq)` + `puzzle_resolved(alien_transmission)` → `timer_elapsed(120)` victory. Comms→Science relay assist chain active: decoding success auto-relays frequency component to Science.
-- `missions/diplomatic_summit.json` — **[c.9]** Flagship 9-objective mission using all 7 active puzzle types across all 7 stations. Faction ships (meridian_ship, talon_ship) as station entities. All-departments challenge: science(frequency_matching) + comms(transmission_decoding) + engineering(circuit_routing) + medical(triage) + security(tactical_positioning) fire simultaneously; after security clears, helm(route_calculation) + weapons(firing_solution) activate; 240s final timer for victory.
+- `missions/engineering_drill.json` — **[2b2]** Engineering Drill: `timer_elapsed` (5s) → list on_complete fires `frequency_matching` on Science + `circuit_routing` on Engineering simultaneously; sensor overclock assist chain active
+- `missions/boarding_action.json` — **[2c.4]** Boarding Action: deploys marine squads, activates intruder boarding, `tactical_positioning` puzzle for Security pre-combat
+- `missions/first_contact_protocol.json` — **[2c.5]** First Contact Protocol: `frequency_matching(science)` + `transmission_decoding(comms)` simultaneously; Comms→Science relay assist chain; 120s hold for victory
+- `missions/nebula_crossing.json` — **[c.8]** Nebula Crossing: `route_calculation` puzzle for Helm (hazard field navigation); weapon stagger assist chain (Weapons→Helm)
+- `missions/deep_strike.json` — **[c.8]** Deep Strike: `firing_solution` puzzle for Weapons; Captain's log + nuclear authorisation
+- `missions/plague_ship.json` — **[2c.6]** Plague Ship: `triage` puzzle for Medical + disease outbreak mechanics
+- `missions/diplomatic_summit.json` — **[c.9]** Flagship 9-objective mission: all 7 active puzzle types across all 7 stations simultaneously; faction ships as station entities; 240s final timer for victory
 
 ### Client
 
@@ -196,15 +199,18 @@
 - `tests/test_tactical_positioning.py` — **[2c.4]** 31 tests (TacticalPositioningPuzzle generate/validate/assist, deploy_squads, start_boarding empty squads, PuzzleEngine params forwarding, puzzle_resolved trigger, pop_pending_deployments, tick_mission deploy_squads, integration)
 - `tests/test_transmission_decoding.py` — **[2c.5]** 39 tests (TransmissionDecodingPuzzle generate/validate/assist, relay_data capture, FrequencyMatchingPuzzle relay_frequency assist, game_loop_comms module, lobby comms role, handler registration, message schemas)
 - `tests/test_triage.py` — **[2c.6]** 42 tests (TriagePuzzle generate/validate/assist, game_loop_medical disease mechanics, game_loop_mission start_outbreak, plague_ship mission loadable)
-- `tests/test_torpedo_types.py` — **[c.8]** 34 tests (torpedo types/damage constants, tube loading, fire by type, nuclear auth, EMP stun/decay/fire-block, probe scan, nuclear hits, deep_strike mission)
+- `tests/test_torpedo_types.py` — **[c.8]** 40 tests (torpedo types/damage constants, tube loading, fire by type, nuclear auth, EMP stun/decay/fire-block, probe scan, nuclear hits, deep_strike mission)
+- `tests/test_route_calculation.py` — **[c.8]** 65 tests (RouteCalculationPuzzle generate/validate/assist, hazard model, BFS path, nebula_crossing mission)
+- `tests/test_firing_solution.py` — **[c.8]** 35 tests (FiringSolutionPuzzle generate/validate/assist, intercept bearing, captain log, engine integration)
 - `tests/test_diplomatic_summit.py` — **[c.9]** 51 tests (mission load/structure, objective chain via MissionEngine, balance validation for all 8 puzzle types)
 - `tests/test_weapons.py` — 12 tests
-- `tests/test_sensors.py` — 21 tests
-- `tests/test_science.py` — 8 tests
-- `tests/test_captain.py` — **[Phase 6]** 6 tests
-- `tests/test_mission_engine.py` — **[Phases 6–7]** ~40 tests (all mission triggers, loader, spawn, wave logic, signal triangulation, proximity_with_shields)
+- `tests/test_sensors.py` — 24 tests
+- `tests/test_science.py` — 5 tests
+- `tests/test_captain.py` — **[Phase 6]** 7 tests
+- `tests/test_mission_engine.py` — **[Phases 6–7]** 46 tests (all mission triggers, loader, spawn, wave logic, signal triangulation, proximity_with_shields)
+- `tests/test_ai.py` — 26 tests
 
-**Total: 761 tests** (+89 in 2b2; +58 in 2c.1; +50 in 2c.2; +31 in 2c.4; +39 in 2c.5; **+42 in 2c.6: triage 42**)
+**Total: 948 tests** ✓ (verified by pytest run 2026-02-19)
 
 ## What Works (v0.01)
 
@@ -290,7 +296,39 @@
 - [x] 599 tests pass; 0 regressions (v0.02c.1 Security models)
 - [x] 649 tests pass; 0 regressions (v0.02c.2 Boarding event system)
 
-## File Manifest (v0.01)
+### v0.02 Gate (FULL): COMPLETE ✓ — 2026-02-19
+- [x] 948 tests pass; 0 regressions from v0.01 baseline (331 tests)
+- [x] All 8 stations functional: captain, helm, weapons, engineering, science, medical, security, comms
+- [x] All 8 puzzle types: sequence_match, circuit_routing, frequency_matching, tactical_positioning, transmission_decoding, triage, route_calculation, firing_solution
+- [x] All 7 client puzzle renderers present (tactical_positioning rendered in security.js; 7 overlay JS files for other 7 types)
+- [x] All 11 JSON missions present + sandbox (synthetic — no JSON file, handled in loader.py)
+- [x] Cross-station assist chains: Engineering→Science (sensor power), Comms→Science (relay_frequency), Captain→Weapons (log_entry), Weapons→Helm (weapon_stagger)
+- [x] `puzzle_resolved` trigger type supports either success OR failure (for mission branching)
+- [x] `deploy_squads` pre-planning phase: squads placed before boarding starts
+- [x] Game event logger: JSONL output, logs/ dir, STARBRIDGE_LOGGING env var, never raises, integrated across 5 server files
+- [x] Diplomatic Summit: 9-objective flagship mission exercising all 7 active puzzle types
+- [x] Torpedo types: standard/emp/probe/nuclear + per-tube loading + nuclear auth flow
+- [x] Disease outbreak mechanics: `triage` puzzle + `start_outbreak` action + deck infection spread
+- [x] Comms station: frequency scanner, hailing, NPC responses, passive interception
+- [x] Security station: boarding, squad movement, door control, fog-of-war filtering, AP system
+- [x] Medical station: crew treatment, heal-over-time, resupply at station docking
+- [x] All stations handle `ship.alert_changed` (captain → all stations)
+- [x] All stations handle `game.started` briefing overlay + `game.over` result overlay
+- [x] Lobby: all 8 roles listed; mission select covers all playable missions
+- [x] README.md accurate for v0.02 feature set
+- [x] All .ai/ state files updated (STATE.md, DECISIONS.md, LESSONS.md, CONVENTIONS.md, PHASE_CURRENT.md)
+- [x] Commit: fe339fc "v0.02h: Security, Comms, Medical expansion, 8 puzzle types, Diplomatic Summit, game event logger"
+
+**Known gaps at v0.02 close (not blocking)**:
+- No audio — audio.js is a placeholder
+- No tablet layout verification on physical hardware
+- No automated end-to-end tests (Playwright/Selenium)
+- `missions/sandbox.json` in old file manifest was always wrong — sandbox is synthetic
+- Science bearing lines never clear (session-lifetime storage in science.js)
+
+## File Manifest (v0.02 — updated 2026-02-19)
+
+> Note: this manifest reflects v0.02 COMPLETE. The "v0.01" label below is from the original template.
 
 ```
 starbridge/
@@ -303,24 +341,32 @@ starbridge/
 │   └── PHASE_CURRENT.md
 ├── server/
 │   ├── main.py
-│   ├── game_loop.py          (343 lines — orchestrator only)
+│   ├── game_loop.py          (orchestrator; security + comms + puzzle handling wired)
 │   ├── game_loop_physics.py  [0.1a — TICK_RATE/TICK_DT constants]
 │   ├── game_loop_weapons.py  [0.1a — weapons state + helpers]
 │   ├── game_loop_mission.py  [0.1a — mission state + broadcast builders]
+│   ├── game_loop_medical.py  [2a.2 — treatment state + tick]
+│   ├── game_loop_security.py [2c.2 — boarding state + tick]
+│   └── game_loop_comms.py    [2c.5 — comms state + tick]
 │   ├── helm.py
 │   ├── engineering.py
 │   ├── weapons.py
 │   ├── science.py
 │   ├── captain.py            [Phase 6]
+│   ├── medical.py            [2a.2]
+│   ├── security.py           [2c.2]
+│   ├── comms.py              [2c.5]
+│   ├── game_logger.py        [c.9+]
 │   ├── lobby.py
 │   ├── connections.py
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── ship.py           (_crew_factor + crew + update_crew_factors() added 2a.1)
-│   │   ├── world.py          (Station, Asteroid added Phase 7)
-│   │   ├── mission.py        [0.1b — MissionDefinition, ObjectiveDefinition, TriggerDefinition, EventDefinition]
-│   │   ├── crew.py           [2a.1 — DeckCrew, CrewRoster, DECK_SYSTEM_MAP, DECK_DEFAULT_CREW]
-│   │   ├── interior.py       [2a.1 — Room, ShipInterior, make_default_interior()]
+│   │   ├── world.py          (Station, Asteroid, Hazard added; ENEMY_TYPE_PARAMS)
+│   │   ├── mission.py        [0.1b]
+│   │   ├── crew.py           [2a.1]
+│   │   ├── interior.py       [2a.1]
+│   │   ├── security.py       [2c.1 — MarineSquad, Intruder, constants, fog-of-war]
 │   │   └── messages/         [0.1b — split into namespace package]
 │   │       ├── __init__.py   (re-exports all symbols)
 │   │       ├── base.py       (Message, validate_payload)
@@ -331,7 +377,9 @@ starbridge/
 │   │       ├── science.py
 │   │       ├── captain.py
 │   │       ├── game.py
-│   │       └── world.py
+│   │       ├── world.py
+│   │       ├── medical.py    [2a.2]
+│   │       └── security.py   [2c.2]
 │   ├── systems/
 │   │   ├── __init__.py
 │   │   ├── physics.py
@@ -342,12 +390,18 @@ starbridge/
 │   │   ├── __init__.py
 │   │   ├── loader.py         [Phase 6]
 │   │   └── engine.py         [Phase 6–7; list on_complete added 2b2]
-│   └── puzzles/
-│       ├── base.py           [2b]
-│       ├── engine.py         [2b; submit→_resolved fix 2b2]
-│       ├── sequence_match.py [2b]
-│       ├── circuit_routing.py [2b2]
-│       └── frequency_matching.py [2b2]
+│   ├── puzzles/
+│   │   ├── __init__.py
+│   │   ├── base.py                    [2b]
+│   │   ├── engine.py                  [2b; submit→_resolved fix 2b2]
+│   │   ├── sequence_match.py          [2b]
+│   │   ├── circuit_routing.py         [2b2]
+│   │   ├── frequency_matching.py      [2b2]
+│   │   ├── tactical_positioning.py    [2c.4]
+│   │   ├── transmission_decoding.py   [2c.5]
+│   │   ├── triage.py                  [2c.6]
+│   │   ├── route_calculation.py       [c.8]
+│   │   └── firing_solution.py         [c.8]
 │   └── utils/
 │       ├── __init__.py
 │       └── math_helpers.py
@@ -360,10 +414,13 @@ starbridge/
 │   │   ├── audio.js          (placeholder)
 │   │   ├── puzzle_renderer.js [2b; successMessage 2b2]
 │   │   └── puzzle_types/
-│   │       ├── sequence_match.js   [2b]
+│   │       ├── sequence_match.js          [2b]
 │   │       ├── circuit_routing.js         [2b2]
-│   │       └── transmission_decoding.js   [2c.5]
-│   │       └── frequency_matching.js [2b2]
+│   │       ├── frequency_matching.js      [2b2]
+│   │       ├── transmission_decoding.js   [2c.5]
+│   │       ├── triage.js                  [2c.6]
+│   │       ├── route_calculation.js       [c.8]
+│   │       └── firing_solution.js         [c.8]
 │   ├── lobby/
 │   │   ├── index.html
 │   │   ├── lobby.js          (mission select added Phase 7)
@@ -388,17 +445,34 @@ starbridge/
 │   │   ├── index.html
 │   │   ├── science.js        (bearing lines, signal contact Phase 7c; briefing, showGameOver Phase 7)
 │   │   └── science.css
+│   ├── medical/              [2a.2]
+│   │   ├── index.html
+│   │   ├── medical.js
+│   │   └── medical.css
+│   ├── security/             [2c.3 + 2c.4]
+│   │   ├── index.html
+│   │   ├── security.js
+│   │   └── security.css
+│   ├── comms/                [2c.5]
+│   │   ├── index.html
+│   │   ├── comms.js
+│   │   └── comms.css
 │   └── viewscreen/
 │       ├── index.html        [Phase 7a — full]
 │       ├── viewscreen.js     [Phase 7a — full, briefing Phase 7]
 │       └── viewscreen.css    [Phase 7a — full]
-├── missions/
-│   ├── sandbox.json          [Phase 6]
-│   ├── first_contact.json    [Phase 6]
-│   ├── defend_station.json   [Phase 7b]
-│   ├── search_rescue.json    [Phase 7c]
-│   ├── puzzle_poc.json       [2b]
-│   └── engineering_drill.json [2b2]
+├── missions/                    (sandbox is synthetic — no JSON file)
+│   ├── first_contact.json        [Phase 6]
+│   ├── defend_station.json       [Phase 7b]
+│   ├── search_rescue.json        [Phase 7c]
+│   ├── puzzle_poc.json           [2b]
+│   ├── engineering_drill.json    [2b2]
+│   ├── boarding_action.json      [2c.4]
+│   ├── first_contact_protocol.json [2c.5]
+│   ├── plague_ship.json          [2c.6]
+│   ├── nebula_crossing.json      [c.8]
+│   ├── deep_strike.json          [c.8]
+│   └── diplomatic_summit.json    [c.9]
 ├── docs/
 │   ├── MESSAGE_PROTOCOL.md
 │   ├── MISSION_FORMAT.md
@@ -406,29 +480,39 @@ starbridge/
 │   └── SCOPE.md
 ├── tests/
 │   ├── __init__.py
-│   ├── test_messages.py      — 28 tests
-│   ├── test_connections.py   — 21 tests
-│   ├── test_lobby.py         — 29 tests
-│   ├── test_main.py          — 13 tests
-│   ├── test_math_helpers.py  — 13 tests
-│   ├── test_ship.py          — 15 tests
-│   ├── test_physics.py       — 22 tests
-│   ├── test_game_loop.py     — 28 tests
-│   ├── test_engineering.py   — 18 tests
-│   ├── test_ai.py            — 23 tests
-│   ├── test_combat.py        — 22 tests
-│   ├── test_crew.py          — 31 tests  [2a.1]
-│   ├── test_interior.py      — 19 tests  [2a.1]
-│   ├── test_weapons.py       — 12 tests
-│   ├── test_sensors.py       — 21 tests
-│   ├── test_science.py       — 8 tests
-│   ├── test_captain.py       — 6 tests  [Phase 6]
-│   ├── test_mission_engine.py — ~40 tests [Phases 6–7]
-│   ├── test_puzzle_engine.py  — 39 tests  [2b]
-│   ├── test_puzzle_mission.py — 11 tests  [2b]
-│   ├── test_circuit_routing.py — 44 tests [2b2]
-│   ├── test_frequency_matching.py — 35 tests [2b2]
-│   └── test_assist_chain.py  — 10 tests  [2b2]
+│   ├── test_messages.py           — 28 tests
+│   ├── test_connections.py        — 21 tests
+│   ├── test_lobby.py              — 31 tests
+│   ├── test_main.py               — 13 tests
+│   ├── test_math_helpers.py       — 13 tests
+│   ├── test_ship.py               — 15 tests
+│   ├── test_physics.py            — 22 tests
+│   ├── test_game_loop.py          — 28 tests
+│   ├── test_engineering.py        — 18 tests
+│   ├── test_ai.py                 — 26 tests
+│   ├── test_combat.py             — 22 tests
+│   ├── test_crew.py               — 31 tests  [2a.1]
+│   ├── test_interior.py           — 19 tests  [2a.1]
+│   ├── test_security_models.py    — 58 tests  [2c.1]
+│   ├── test_security_loop.py      — 50 tests  [2c.2]
+│   ├── test_medical.py            — 21 tests  [2a.2]
+│   ├── test_weapons.py            — 12 tests
+│   ├── test_sensors.py            — 24 tests
+│   ├── test_science.py            — 5 tests
+│   ├── test_captain.py            — 7 tests   [Phase 6]
+│   ├── test_mission_engine.py     — 46 tests  [Phases 6–7]
+│   ├── test_puzzle_engine.py      — 39 tests  [2b]
+│   ├── test_puzzle_mission.py     — 11 tests  [2b]
+│   ├── test_circuit_routing.py    — 44 tests  [2b2]
+│   ├── test_frequency_matching.py — 35 tests  [2b2]
+│   ├── test_assist_chain.py       — 10 tests  [2b2]
+│   ├── test_tactical_positioning.py — 31 tests [2c.4]
+│   ├── test_transmission_decoding.py — 39 tests [2c.5]
+│   ├── test_triage.py             — 42 tests  [2c.6]
+│   ├── test_torpedo_types.py      — 40 tests  [c.8]
+│   ├── test_route_calculation.py  — 65 tests  [c.8]
+│   ├── test_firing_solution.py    — 35 tests  [c.8]
+│   └── test_diplomatic_summit.py  — 51 tests  [c.9]
 ├── pytest.ini
 ├── requirements.txt
 ├── run.py
