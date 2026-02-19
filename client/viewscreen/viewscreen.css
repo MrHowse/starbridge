@@ -1,49 +1,181 @@
 /*
- * Viewscreen — Placeholder layout.
- * Full styles implemented in Phase 7.
+ * Viewscreen — Full-viewport forward display.
+ * Pure canvas. Wire aesthetic.
  */
 
-.station-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  gap: 1rem;
-  padding: 1rem;
+/* =========================================================================
+   Root — full black viewport
+   ========================================================================= */
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #0a0a0a;
 }
 
-.station-header__bar {
+.station-container {
+  position: fixed;
+  inset: 0;
+}
+
+#viewscreen-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* =========================================================================
+   HUD overlay
+   ========================================================================= */
+
+.vs-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+}
+
+.vs-hud__top {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.station-header__status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.vs-hud__mission {
+  letter-spacing: 0.15em;
+  color: var(--primary-dim, rgba(0, 255, 65, 0.4));
+  font-size: 0.7rem;
 }
 
-.station-main {
-  flex: 1;
+.vs-hud__status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  opacity: 0.5;
+}
+
+.vs-hud__bottom {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.vs-hud__gauge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vs-hud__gauge-label {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  width: 2.5ch;
+  text-align: right;
+  letter-spacing: 0.08em;
+}
+
+.vs-hud__gauge-bar {
+  width: 80px;
+  height: 4px;
+  background: rgba(0, 255, 65, 0.1);
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.vs-hud__gauge-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.15s linear;
+}
+
+.vs-hud__gauge-fill--hull {
+  background: var(--hull-damage, #ff4040);
+}
+
+.vs-hud__gauge-val {
+  font-size: 0.7rem;
+  width: 3ch;
+  color: var(--text-dim);
+}
+
+.vs-hud__hdg {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  margin-left: auto;
+}
+
+/* =========================================================================
+   Standby screen
+   ========================================================================= */
+
+.vs-standby {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #0a0a0a;
 }
 
-.station-standby {
+.vs-standby__inner {
   text-align: center;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.75rem;
 }
 
-.station-briefing {
-  width: min(600px, 100%);
+.vs-standby__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
-.station-briefing__body {
-  padding: 1rem;
+/* =========================================================================
+   Game-over overlay
+   ========================================================================= */
+
+.vs-game-over {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.vs-game-over__box {
+  text-align: center;
+  padding: 2rem 3rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
+}
+
+/* =========================================================================
+   Hull-hit screen flash
+   ========================================================================= */
+
+.vs-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(255, 64, 64, 0);
+  transition: background 0.05s;
+  z-index: 5;
+}
+
+.vs-flash.active {
+  background: rgba(255, 64, 64, 0.25);
+  transition: none;
 }

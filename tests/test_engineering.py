@@ -37,6 +37,9 @@ class MockManager:
     async def broadcast(self, message: Message) -> None:
         self.broadcasts.append(message)
 
+    async def broadcast_to_roles(self, roles: list[str], message: Message) -> None:
+        self.broadcasts.append(message)
+
 
 class MockSender:
     """Minimal send sink for handler tests."""

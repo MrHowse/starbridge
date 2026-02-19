@@ -1,0 +1,47 @@
+{
+  "id": "engineering_drill",
+  "name": "Engineering Drill",
+  "briefing": "Systems diagnostic underway. Science — calibrate the sensor frequency signature. Engineering — repair the circuit routing damage. Engineering: boost SENSORS above 120% to assist Science's frequency calibration. Both tasks must be completed to clear the drill.",
+  "signal_location": null,
+  "defeat_condition": "player_hull_zero",
+  "victory_condition": "all_objectives_complete",
+  "entities": [],
+  "objectives": [
+    {
+      "id": "await_drill_start",
+      "text": "Awaiting drill sequence activation",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 5 },
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "frequency_matching",
+          "station": "science",
+          "label": "freq_calibration",
+          "difficulty": 2,
+          "time_limit": 90.0
+        },
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "circuit_routing",
+          "station": "engineering",
+          "label": "circuit_repair",
+          "difficulty": 2,
+          "time_limit": 90.0
+        }
+      ]
+    },
+    {
+      "id": "freq_calibration_complete",
+      "text": "Science: complete frequency calibration",
+      "trigger": "puzzle_completed",
+      "args": { "puzzle_label": "freq_calibration" }
+    },
+    {
+      "id": "circuit_repair_complete",
+      "text": "Engineering: complete circuit routing repair",
+      "trigger": "puzzle_completed",
+      "args": { "puzzle_label": "circuit_repair" }
+    }
+  ]
+}

@@ -336,8 +336,9 @@ async def test_start_game_by_host_broadcasts_game_started():
     game_msg = last_broadcast(m)
     assert game_msg.type == "game.started"
     assert game_msg.payload["mission_id"] == "sandbox"
-    assert game_msg.payload["mission_name"] == "Awaiting Orders"
-    assert game_msg.payload["briefing_text"] == "All stations report ready."
+    assert game_msg.payload["mission_name"] == "Sandbox"
+    assert "Free play" in game_msg.payload["briefing_text"]
+    assert game_msg.payload["signal_location"] is None
 
 
 async def test_start_game_mission_id_is_forwarded():
@@ -347,6 +348,30 @@ async def test_start_game_mission_id_is_forwarded():
     msg = Message.build("lobby.start_game", {"mission_id": "first_contact"})
     await lobby.handle_lobby_message("a", msg)
     assert last_broadcast(m).payload["mission_id"] == "first_contact"
+
+
+async def test_start_game_search_rescue_includes_signal_location():
+    """search_rescue mission.started payload includes signal_location."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    m.broadcasts.clear()
+    msg = Message.build("lobby.start_game", {"mission_id": "search_rescue"})
+    await lobby.handle_lobby_message("a", msg)
+    payload = last_broadcast(m).payload
+    assert payload["mission_id"] == "search_rescue"
+    assert payload["signal_location"] is not None
+    assert "x" in payload["signal_location"]
+    assert "y" in payload["signal_location"]
+
+
+async def test_start_game_first_contact_no_signal_location():
+    """first_contact has no signal — signal_location is None."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+    m.broadcasts.clear()
+    msg = Message.build("lobby.start_game", {"mission_id": "first_contact"})
+    await lobby.handle_lobby_message("a", msg)
+    assert last_broadcast(m).payload["signal_location"] is None
 
 
 async def test_start_game_by_non_host_returns_permission_error():

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from server.models.crew import CrewRoster, DECK_SYSTEM_MAP
+
 
 # ---------------------------------------------------------------------------
 # Subsystem
@@ -29,13 +31,18 @@ class ShipSystem:
     """
 
     name: str
-    power: float = 100.0   # 0-150 (%)
-    health: float = 100.0  # 0-100 (%)
+    power: float = 100.0         # 0-150 (%)
+    health: float = 100.0        # 0-100 (%)
+    _crew_factor: float = 1.0    # Updated each tick by Ship.update_crew_factors()
 
     @property
     def efficiency(self) -> float:
-        """Effective output fraction. 0.0 (offline) to 1.5 (overclocked, healthy)."""
-        return (self.power / 100.0) * (self.health / 100.0)
+        """Effective output fraction. 0.0 (offline) to 1.5 (overclocked, healthy).
+
+        Multiplied by _crew_factor (0.0–1.0) so crew casualties reduce system output.
+        _crew_factor defaults to 1.0 — existing behaviour is unchanged when crew is full.
+        """
+        return (self.power / 100.0) * (self.health / 100.0) * self._crew_factor
 
 
 # ---------------------------------------------------------------------------
@@ -97,3 +104,25 @@ class Ship:
 
     # --- Engineering ---
     repair_focus: str | None = None  # System currently receiving repair attention
+
+    # --- Alert level (set by Captain station) ---
+    alert_level: str = "green"  # "green" | "yellow" | "red"
+
+    # --- Crew (added v0.02a) ---
+    crew: CrewRoster = field(default_factory=CrewRoster)
+    medical_supplies: int = 20   # finite treatment resource; replenished by docking
+
+    def update_crew_factors(self) -> None:
+        """Propagate deck crew_factors into the corresponding ship systems.
+
+        Called once per tick (after engineering). Each system's _crew_factor is
+        set to the crew_factor of the deck that operates it (see DECK_SYSTEM_MAP).
+        Systems on decks with no crew entry default to 1.0.
+        """
+        for deck_name, system_names in DECK_SYSTEM_MAP.items():
+            deck = self.crew.decks.get(deck_name)
+            factor = deck.crew_factor if deck is not None else 1.0
+            for sys_name in system_names:
+                sys_obj = self.systems.get(sys_name)
+                if sys_obj is not None:
+                    sys_obj._crew_factor = factor

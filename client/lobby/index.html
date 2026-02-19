@@ -52,9 +52,20 @@
       </div>
       <div class="lobby-launch__body">
         <span class="text-label" data-launch-status>AWAITING HOST</span>
-        <button class="btn btn--primary lobby-launch__btn" data-launch-btn disabled>
-          LAUNCH MISSION
-        </button>
+        <div class="lobby-launch__controls">
+          <label class="text-label" for="mission-select">MISSION</label>
+          <select id="mission-select" class="lobby-select" data-mission-select>
+            <option value="sandbox">SANDBOX</option>
+            <option value="first_contact">FIRST CONTACT</option>
+            <option value="defend_station">DEFEND THE STATION</option>
+            <option value="search_rescue">SEARCH AND RESCUE</option>
+            <option value="puzzle_poc">PUZZLE FRAMEWORK PoC</option>
+            <option value="engineering_drill">ENGINEERING DRILL</option>
+          </select>
+          <button class="btn btn--primary lobby-launch__btn" data-launch-btn disabled>
+            LAUNCH
+          </button>
+        </div>
       </div>
     </section>
 

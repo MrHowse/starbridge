@@ -272,3 +272,313 @@
 - Browser console command (`window.debugDamage(...)`) — rejected: requires the specific station page to be open; awkward when testing with two tabs
 - Debug WebSocket message category — rejected: requires the WS connection to be open and authenticated; more code for the same result
 - No debug mechanism — rejected: would require manual editing of ship state in memory, which is not viable during interactive testing
+
+---
+
+## 2026-02-18 — Budget gauge is informational only; never changes colour
+
+**Decision**: The Engineering power budget bar stays green (primary colour) at all times, regardless of how much of the 600-unit pool is consumed. It does not shift to amber or red as the pool fills.
+
+**Reasoning**: At game start all 6 systems run at 100% each = 600/600 total — exactly at the budget cap. A threshold-based colour scheme triggers red at game start, which communicates "crisis" at the exact moment the ship is in its most comfortable default state. The design intent (per the 600-unit pool decision) is that 600/600 is the sustainable equilibrium. Overclock warnings are already communicated per-system via the amber slider thumb (`.sys-row--overclocked` CSS class) and the per-node health colour on the schematic. The budget bar's role is purely informational — how much of the pool is allocated — not a warning system.
+
+**Alternatives considered**:
+- Amber at 88%, red at 100% — rejected: both thresholds trigger immediately at game start (600 >= 528 and 600 >= 600)
+- Shift thresholds higher (e.g. red only above 120%) — rejected: overclock zone is already per-system; the budget bar would duplicate information already shown in the slider/row overrides
+- Remove budget bar entirely — rejected: useful reference for the engineer to understand headroom at a glance
+
+---
+
+## 2026-02-18 — Entity IDs are consistent string identifiers assigned at spawn
+
+**Decision**: Every world entity (enemy ships, torpedo projectiles, future stations/asteroids) carries a string `id` field assigned at spawn time. Format: `"enemy_1"`, `"enemy_2"`, `"torpedo_1"` etc. (incrementing counter per category). IDs are stable for the lifetime of the entity and referenced consistently in all messages: `world.entities`, `weapons.select_target`, `world.entity_destroyed`, `weapons.torpedo_hit`, and future `science.start_scan`.
+
+**Reasoning**: Weapons needs to reference a specific target when firing. Science needs to reference a specific contact when scanning. Without stable IDs, clients have no reliable way to refer to individual entities across message types. UUID v4 would also work but incrementing strings are human-readable in logs, easier to type in test data, and sufficient for the number of entities in a single mission.
+
+**Alternatives considered**:
+- UUID v4 — rejected for v0.01: debugging is harder with opaque IDs; incrementing strings are functionally equivalent at this scale
+- Position-based referencing ("target at bearing X, range Y") — rejected: ambiguous if two contacts are close, unusable for scan targeting
+
+---
+
+## 2026-02-18 — Enemy AI behaviours are role-differentiated, not uniform
+
+**Decision**: Each enemy type has a distinct AI behaviour profile beyond the base idle/chase/attack/flee state machine. Scouts break off and circle at close range before re-engaging (flanking behaviour). Cruisers press the attack even when taking damage, only fleeing below 20% hull. Destroyers hold position at max weapon range and let their heavy beams do work ("standoff attack"). Individual enemies feel purposeful rather than identical.
+
+**Reasoning**: Enemies that fly straight at you and fire are predictable and boring within seconds. Role-differentiated AI requires no additional architectural complexity (same state machine, different transition parameters and movement logic per type) but creates dramatically different tactical responses from the crew. Scouts become a harassment threat, Cruisers are aggressive mid-range fighters, Destroyers are a long-range threat that punishes the player for staying in one place.
+
+**Alternatives considered**:
+- Uniform "fly-at-player" AI for all types — rejected: dull within minutes; defeats the purpose of distinct enemy types
+- Full behaviour tree / GOAP — rejected: overkill for Phase 4; the base state machine with type-specific parameters achieves the same result with far less code
+
+---
+
+## 2026-02-18 — Enemy wireframe shapes are drawn in the station module, not renderer.js
+
+**Decision**: Scout (diamond), Cruiser (triangle), and Destroyer (hexagon) wireframe shapes on the tactical radar are drawn entirely in `client/weapons/weapons.js`. They are not added to `client/shared/renderer.js`.
+
+**Reasoning**: This follows and extends the convention established by the Engineering schematic: station-specific canvas drawing belongs in the station module; shared/reusable utilities belong in `renderer.js`. Enemy shapes are only meaningful in the context of the Weapons tactical radar — they carry game-domain concepts (enemy type identity, targeting state) that have no relevance to Helm or any other station. Adding them to `renderer.js` would make a shared library aware of combat-specific domain concepts.
+
+**Alternatives considered**:
+- Add enemy shape helpers to renderer.js — rejected: pollutes shared code with station-specific domain knowledge; violates the established convention
+- Create a separate `client/weapons/radar.js` module — deferred: weapons.js is manageable; split if file grows significantly
+
+---
+
+## 2026-02-18 — world.entities is a full snapshot every tick (no delta-encoding)
+
+**Decision**: Each game loop tick broadcasts the complete `world.entities` payload containing the full list of all enemies and torpedoes with all fields. No delta-encoding, no "only send what changed" optimisation.
+
+**Reasoning**: At LAN bandwidth with 1–3 enemies and ≤10 torpedoes, the payload is tiny (< 2 KB per tick). Full snapshots are simpler to consume on the client: replace the local entity list each tick, no merge logic, no missed-update edge cases. Delta-encoding would add meaningful complexity (tracking previous state per-client, encoding changes) for zero perceptible benefit. This is noted as a potential future optimisation if the entity count grows into the dozens.
+
+**Alternatives considered**:
+- Delta-encoding (send only changed entities) — deferred: appropriate optimisation once entity count grows; not needed for v0.01 scale
+- `world.entity_spawned` / `world.entity_destroyed` individual events — considered for spawn/destroy notifications; these still fire as separate events for visual FX (spawn flash, explosion), but the primary state source is the full snapshot
+
+---
+
+## 2026-02-18 — Shield absorption: proportional formula with depletion
+
+**Decision**: When a hit lands on a shield hemisphere, the shield absorbs up to `shield_hp × SHIELD_ABSORPTION_COEFF` (0.8) of the incoming damage. The shield's HP is reduced by `absorbed / SHIELD_ABSORPTION_COEFF` (i.e., absorbing 8 damage from a 10-HP shield drains 10 HP from the shield). Any remaining damage after absorption passes through to hull.
+
+**Reasoning**: A linear coefficient (absorb 80% while any shield remains) creates a smooth and predictable damage model that is easy to test and reason about. It avoids the "all-or-nothing" feel of a flat damage-reduction model (where half-shield still blocks the same amount as full shield). Shields are meaningful even when depleted — draining the last 10 HP of shield saves 8 HP of hull. At 0 HP shields provide no protection.
+
+**Alternatives considered**:
+- Flat % reduction (e.g., 50% reduction regardless of HP) — rejected: full and half shields feel identical; no urgency to protect shields
+- Ablative (direct 1:1 HP drain, remainder to hull) — considered: simpler math, but provides too little hull protection per shield HP spent; tuning felt wrong
+- Separate `SHIELD_ABSORPTION_COEFF` constant — adopted: makes the formula discoverable and tunable without hunting through code
+
+---
+
+## 2026-02-18 — Torpedo collision radius and max range as class-level constants
+
+**Decision**: Torpedo collision detection uses a fixed radius of 200 world units. Torpedoes that travel beyond 20,000 world units without hitting a target are despawned. Both values are `ClassVar[float]` constants on the `Torpedo` dataclass.
+
+**Reasoning**: Placing constants on the dataclass keeps them co-located with the data they govern, avoids a separate constants file for two values, and makes them accessible from test code as `Torpedo.MAX_RANGE` without importing a separate module. The 200-unit collision radius is approximately 2% of torpedo speed per tick (speed = 500 u/s, tick = 100 ms → 50 u/tick), which prevents tunnelling while avoiding false positives at the typical engagement ranges (4,000–10,000 units).
+
+**Alternatives considered**:
+- Module-level constants in game_loop.py — rejected: combat constants belong near the entity they govern, not in the loop orchestrator
+- Dynamic radius (based on torpedo type) — deferred: only one torpedo type in v0.01; generalise when multiple warhead types are added in Tier 2
+
+---
+
+## 2026-02-18 — Beam weapons use hold-to-fire mechanic (mousedown interval)
+
+**Decision**: The FIRE BEAMS button in the Weapons station sends `weapons.fire_beams {}` immediately on `mousedown`, then continues sending at ~2 Hz (500 ms interval) while the button remains held. The interval is cleared on `mouseup` or `mouseleave` from the button (and on `window.mouseup` to catch releases outside the button).
+
+**Reasoning**: Beams are a sustained weapon — holding the trigger while keeping the enemy in arc is the intended interaction. A single click would feel unrewarding for a powerful weapon. A hold mechanic requires active attention (release to stop firing) and creates a natural interaction cost that makes Engineering's beam power allocation meaningful: higher power makes each burst more damaging, not more automatic. The 2 Hz rate matches the server's maximum processing tempo and avoids flooding the input queue.
+
+**Alternatives considered**:
+- Single click → auto-fire while target in arc (server-side, no hold required) — rejected: removes the intentional action cost; beams become passive
+- Continuous fire at rAF rate — rejected: would flood the server with hundreds of messages per second
+
+---
+
+## 2026-02-18 — _drain_queue world parameter is optional for backward test compatibility
+
+**Decision**: `_drain_queue(ship, world=None)` accepts an optional `world` parameter (default `None`). The `weapons.fire_beams` and `weapons.fire_torpedo` branches are guarded with `if world is not None:`. All existing tests that call `_drain_queue(ship)` continue to work without modification.
+
+**Reasoning**: Changing `_drain_queue` to require `world` would break all Phase 2 and Phase 3 tests that call it with a single argument. Rather than updating every existing test (churn with no benefit), the optional parameter preserves backward compatibility. The guard is explicit and honest — there is no meaningful fallback for fire commands without world access, so they simply skip. Tests that need to exercise fire commands must pass a world object explicitly.
+
+**Alternatives considered**:
+- Update all existing tests to pass a mock World — rejected: churn across ~30 test calls for no gameplay benefit
+- Separate `_drain_weapons_queue(ship, world)` function — considered: cleaner separation, but adds a second function to maintain and call; optional parameter is simpler at this scale
+
+---
+
+## 2026-02-18 — sensor.contacts as a separate role-filtered broadcast (Phase 5)
+
+**Decision**: Phase 5 introduces two distinct entity broadcast channels:
+- `world.entities` → broadcast to `helm` + `engineering` roles (full enemy data: type, hull, shields)
+- `sensor.contacts` → broadcast to `weapons` + `science` roles (range-filtered; type info stripped for unscanned contacts)
+
+Weapons.js switches from listening to `world.entities` to listening to `sensor.contacts`. This is an explicit breaking change — no backward-compatibility shim.
+
+**Reasoning**: This is the first implementation of role-filtered broadcasting for gameplay (information asymmetry) purposes, not merely bandwidth optimisation. Science scans reveal enemy type and weakness; Weapons must not be able to read that data before Science communicates it verbally. Enforcing the filter server-side (not client-side) is the only correct approach — a client-side filter can be bypassed by reading the raw WebSocket data. The server controls what each role receives.
+
+The separation of channels also maps cleanly to the sensor power mechanic: `sensor.contacts` is gated by sensor range (which scales with sensor power), making Engineering's power allocation to the sensors system directly relevant to Science's and Weapons' situational awareness.
+
+**Sensor power effects** (Phase 5 explicit design confirmation):
+- **Scan range**: `effective_range = BASE_SENSOR_RANGE × sensor_efficiency` — contacts outside this range are invisible to Science/Weapons
+- **Scan speed**: `progress_per_sec = 100 / (BASE_SCAN_TIME / sensor_efficiency)` — higher efficiency = faster scan completion
+
+This creates the crew dependency loop: *"Science, scan that cruiser." "I can't — Engineering cut sensor power." "Engineering, give Science more juice." "I can't, it's all in shields."*
+
+**Alternatives considered**:
+- Client-side filtering (send all data to all clients, clients decide what to show) — rejected: undermines information asymmetry; clients can read filtered data from the WebSocket stream
+- Single `world.entities` payload with role-gated field visibility — rejected: complex conditional serialisation logic; cleaner to have two distinct payloads with well-defined audiences
+- Delta-only sensor.contacts (only send when contacts change) — deferred: full snapshot per tick is simpler and sufficient at LAN bandwidth with few contacts
+
+---
+
+## 2026-02-18 — Station pages re-claim their role on WebSocket connect
+
+**Decision**: Each station page (weapons.js, science.js) sends `lobby.claim_role { role, player_name }` immediately when the WebSocket status becomes `connected`. The player name is read from `sessionStorage('player_name')`, which lobby.js writes before redirecting. This ensures the new connection is tagged with the correct role so it receives role-filtered broadcasts (e.g., `sensor.contacts`).
+
+**Reasoning**: When a browser navigates from `/client/lobby/` to `/client/science/`, a new WebSocket connection is created — the old connection (with the role tag from `lobby.claim_role` during role selection) is gone. Without an explicit role claim on the station page, the connection has no role and receives no `broadcast_to_roles` messages. The phase gate for Phase 5 requires that Science receives `sensor.contacts` and Weapons receives the same; both require the connection to be tagged with the correct role.
+
+**Alternatives considered**:
+- Persist role via URL parameter or cookie on redirect — rejected: sessionStorage is simpler and avoids URL clutter; lobby already controls the redirect
+- Send role-filtered messages to all connections regardless of role — rejected: defeats information asymmetry; any client could receive science/weapons data
+- Store connection_id in localStorage and re-use it — not possible: connection IDs are server-generated UUIDs per-connection
+
+---
+
+## 2026-02-18 — Triangulation UX: bearing line on canvas AND numeric readout (Q1)
+
+**Decision**: Science triangulation displays BOTH a bearing line overlaid on the sensor canvas AND a numeric bearing readout in the scan panel. Both representations are shown simultaneously.
+
+**Reasoning**: The bearing line is spatially intuitive — Science can point at a direction and Helm can align course accordingly. The numeric readout is operationally precise — Science can call out "bearing 247" and Helm can dial it in without interpretation. The two together are complementary: visual for spatial reasoning, numeric for crew communication. Neither alone fully satisfies both use cases.
+
+**Consequences**: Science client renders bearing lines on the sensor canvas starting from the ship (canvas centre) at the reported angle. After 2 scans from different positions an intersection diamond marker appears. The scan result panel also shows "Bearing: 247°" in text. The server computes bearing server-side (ship position → signal source) and sends it in the `mission.signal_bearing` message — the client draws; the server computes.
+
+**Alternatives considered**:
+- Bearing line only — rejected: hard to communicate exact angle verbally to Helm
+- Numeric only — rejected: loses spatial intuition; Science can't "see" where to point
+- Interactive protractor tool — deferred: over-engineered for Phase 7
+
+---
+
+## 2026-02-18 — Mission 2 enemy AI targets station exclusively (Q3)
+
+**Decision**: In Mission 2 "Defend the Station", enemies exclusively target the friendly station (Starbase Kepler). Enemies engage the player ship only if the player enters within weapon range while moving to intercept — a side-effect of the attack AI, not a primary target switch.
+
+**Reasoning**: "Station-only" targeting gives the mission its identity: players must actively protect a third party rather than just surviving. If enemies alternated targets, players could kite them away from the station (reducing tactical pressure). The station-only design forces Engineering to maintain shields, Weapons to intercept before enemies reach the station, and Helm to position for interception — all roles engaged. The player ship being engaged as a side-effect (while in weapon range) adds personal jeopardy without making the player the primary target.
+
+**Implementation**: `tick_enemies()` in `server/systems/ai.py` receives an optional `station_targets: list[Station]` parameter. When non-empty, enemies in missions with stations chase the nearest station instead of the ship. The `attack` state fires at the current chase target (station or player). The idle→chase transition uses nearest station as primary target.
+
+**Consequences**: This establishes the pattern for mission-specific AI targeting: game_loop passes contextual targets to tick_enemies based on what the current mission requires. Future missions can override targeting by passing different target lists without changing the AI state machine logic.
+
+**Alternatives considered**:
+- Alternating targets — rejected: reduces tactical pressure on players; kiting becomes dominant strategy
+- Static "attack nearest" — rejected: enemies would attack player when they're far from station, reducing station-protection feel
+- Separate AI variant per mission — rejected: code duplication; parametric targeting via argument is cleaner
+
+---
+
+## 2026-02-18 — Engineering schematic is drawn in station module, not renderer.js
+
+**Decision**: The ship diagnostic schematic (the top-down wireframe canvas with 6 system nodes) is drawn entirely within `client/engineering/engineering.js`. It does not use or extend `client/shared/renderer.js` for its draw calls.
+
+**Reasoning**: `renderer.js` is a library of *shared* utilities (starfield, compass, minimap, ship chevron) that multiple stations can reuse. The Engineering schematic is station-specific — it represents systems, health, repair focus, and damage flashes that have no meaning outside Engineering. Adding it to renderer.js would make renderer.js aware of game domain concepts it doesn't need to know. The convention is corrected in CONVENTIONS.md: station-specific canvas drawing belongs in the station module; shared/reusable utilities belong in renderer.js.
+
+**Alternatives considered**:
+- Put schematic draw functions in renderer.js — rejected: would pollute shared code with Engineering-specific domain knowledge
+- Create a separate `client/engineering/schematic.js` module — deferred: the engineering.js file is manageable at ~750 lines; split if it grows significantly
+
+---
+
+## 2026-02-19 — Split game_loop.py into 4 files (Session 0.1a)
+
+**Decision**: Split the 838-line `server/game_loop.py` into four files:
+- `game_loop.py` (343 lines) — orchestrator with test-anchored symbols
+- `game_loop_physics.py` — TICK_RATE/TICK_DT constants
+- `game_loop_weapons.py` — stateful weapons sub-module
+- `game_loop_mission.py` — stateful mission sub-module
+
+**Reasoning**: game_loop.py had grown to 838 lines across 3 distinct concern domains (orchestration, weapons, mission). The split uses the established stateful module pattern from sensors.py (module-level state + reset()). Sub-modules are imported as `glw` / `glm` aliases at the top of game_loop.py — no circular imports.
+
+**Key constraint**: Functions/constants tested directly via `game_loop.X` references in test files MUST stay in game_loop.py. Identified from test_game_loop.py and test_engineering.py: `_drain_queue`, `_apply_engineering`, `_build_ship_state`, `OVERCLOCK_DAMAGE_HP`, `OVERCLOCK_THRESHOLD`, `POWER_BUDGET`, and the `random` module import (patched via `patch("server.game_loop.random")`).
+
+**Alternatives considered**:
+- Pass all state as function parameters (no module-level state in sub-modules) — rejected: verbose and creates awkward coupling between game_loop.py's start() and sub-module init
+- Move handle_enemy_beam_hits() inline to _loop() — rejected: would keep _loop() too long to reach <350-line target
+
+---
+
+## 2026-02-19 — Split messages.py into namespace package (Session 0.1b)
+
+**Decision**: Split `server/models/messages.py` (255 lines) into `server/models/messages/` package: `base.py` (Message envelope + validate_payload + _PAYLOAD_SCHEMAS), plus one namespace file per station domain (lobby, helm, engineering, weapons, science, captain, game, world). The `__init__.py` re-exports all symbols for backward compatibility.
+
+**Reasoning**: The monolithic messages.py was the single largest models file and mixed concerns across all station domains. The namespace split makes it easy to find where a payload lives, and each file stays under 150 lines. The re-export pattern in __init__.py ensures zero changes to any import site.
+
+**Key constraint**: `base.py` imports FROM the namespace files (to build _PAYLOAD_SCHEMAS). Namespace files do NOT import from base.py. This keeps the import graph acyclic.
+
+**Alternatives considered**:
+- Keep as a single file — rejected: violates the <300-line file convention, increasingly hard to navigate as more message types are added
+- Use `*` re-exports in __init__.py — rejected: hides what's actually exported; explicit re-exports + __all__ are more maintainable
+
+---
+
+## 2026-02-19 — mission.py: schema documentation models
+
+**Decision**: Filled `server/models/mission.py` with Pydantic models (`MissionDefinition`, `ObjectiveDefinition`, `TriggerDefinition`, `EventDefinition`, `SpawnEntry`, `AsteroidEntry`) that document the mission JSON schema. These are NOT used to validate the dicts at runtime — the mission engine continues to use raw dicts for simplicity.
+
+**Reasoning**: The placeholder was useless. The models now serve as canonical schema documentation and can be used to validate mission JSON files during authoring (run `MissionDefinition.model_validate(load_mission(id))` to check a file). Runtime behaviour unchanged.
+
+---
+
+## 2026-02-19 — Session 2a.1: crew_factor as deterministic efficiency multiplier
+
+**Decision**: `ShipSystem._crew_factor` is a float field defaulting to 1.0. `efficiency` becomes `(power/100) * (health/100) * _crew_factor`. Crew casualties are applied deterministically: `int(hull_damage / CREW_CASUALTY_PER_HULL_DAMAGE)` — no extra `rng.random()` call. Deck selection uses `rng.choice()` on the existing rng object.
+
+**Reasoning**: Deterministic casualty count keeps the combat function's rng call pattern unchanged relative to existing tests. Existing tests that mock `rng.choice.return_value = "engines"` still pass because "engines" is not a valid crew deck key — `ship.crew.decks.get("engines")` returns None → `apply_casualties` is a graceful no-op. All 331 existing tests pass unmodified.
+
+**Alternatives considered**:
+- Extra `rng.random()` roll for crew casualties — rejected: changes call count on the mock, would require updating existing tests (violates the zero-test-modification constraint)
+
+---
+
+## 2026-02-19 — Session 2a.1: DECK_SYSTEM_MAP splits weapons/shields on Deck 3
+
+**Decision**: Physical Deck 3 (Combat) has four rooms: weapons_bay and torpedo_room belong to crew deck "weapons" (maps to beams+torpedoes systems); shields_control and combat_info belong to crew deck "shields" (maps to shields system). This gives all 6 crew decks physical rooms even though the ship has only 5 physical decks.
+
+**Reasoning**: The DECK_SYSTEM_MAP from the v0.02 scope defines 6 logical crew decks. The ship interior has 5 physical decks (4 rooms each, 20 rooms total). Splitting Deck 3 between weapons and shields crew decks is the cleanest fit — these are operationally distinct functions that happen to occupy adjacent spaces on the same deck.
+
+---
+
+## 2026-02-19 — Session 2b: Puzzle trigger matching uses mission-author labels, not auto-generated puzzle IDs
+
+**Decision**: The `puzzle_completed` and `puzzle_failed` trigger types in mission JSON reference puzzles by a `puzzle_label` field (e.g. `"args": { "puzzle_label": "sequence_1" }`). The `start_puzzle` on_complete action includes a `"label"` field. The puzzle engine maintains a `_label_to_id` map and reports resolved puzzles by label. The mission engine stores completed/failed labels in sets (`_completed_puzzle_labels`, `_failed_puzzle_labels`). `notify_puzzle_result(label, success)` takes the label string, not the auto-generated puzzle_id.
+
+**Reasoning**: The auto-generated puzzle IDs (`"puzzle_1"`, `"puzzle_2"`) depend on the creation order within a game session. If two `start_puzzle` actions fire before the first resolves, the IDs shift. Mission authors would need to track creation order to write correct triggers — fragile and unintuitive. Labels are stable, mission-authored identifiers that mission writers control. Any future mission that starts a puzzle can declare its label in `start_puzzle` and reference it unambiguously in `puzzle_completed`. This is the same principle as using named entity IDs (`"enemy_1"`, `"station_kepler"`) for scan/destroy triggers rather than referencing by index.
+
+**Consequences**: Every `start_puzzle` action in mission JSON must include a `"label"` field. Every `puzzle_completed` / `puzzle_failed` trigger must use `"puzzle_label"` not `"puzzle_id"` in args. The label→id mapping in PuzzleEngine exists for internal routing but is not exposed in triggers.
+
+**Alternatives considered**:
+- Auto-ID based triggers — rejected: fragile; creation order dependency breaks when multiple puzzles start near simultaneously
+- Persistent UUID per puzzle type — rejected: overkill for mission authoring; human-readable labels are sufficient and easier to reason about in JSON files
+
+---
+
+## 2026-02-19 — Sequential objective model limitation: no compound "all_of" trigger (Session 2b2)
+
+**Decision**: The sequential objective model is retained for v0.02b2. The Engineering Drill mission uses a three-objective chain (timer → freq_completed → circuit_completed) where the second puzzle may finish before the first is checked, causing an instant advance through objective 3.
+
+**Known limitation**: The sequential model does not elegantly handle "complete these N tasks in any order." Missions that need parallel completion (e.g. "both Science AND Engineering solve their puzzles") currently require N sequential objectives, which means whichever puzzle finishes second auto-completes its objective instantly (no additional player interaction required). The UX "flash" is acceptable for the framework test mission but is not suitable for story missions.
+
+**Required future work**: A compound trigger type — `all_of: [condition_A, condition_B]` — on a single objective. This would allow "advance when ALL of these sub-conditions are met, in any order." The trigger evaluator would maintain a set of satisfied sub-conditions and only fire the objective when all are in the set. This is a backward-compatible addition to the trigger system.
+
+**Why not now**: The Engineering Drill is a framework test mission, not a story mission. The flash is acceptable and the added trigger type needs careful design (handling reset, sub-condition state, serialisation) that is out of scope for v0.02b2.
+
+**Alternatives considered**:
+- Redesign the mission engine as a DAG (directed acyclic graph) — deferred: correct long-term but requires rewriting all missions and mission tooling
+- Use a timer-based consolidation objective (wait N seconds after first puzzle resolves, then check second) — rejected: brittle, delay feels arbitrary to players
+
+---
+
+## 2026-02-19 — on_complete supports list of actions (Session 2b2)
+
+**Decision**: The `on_complete` field in mission JSON objective definitions now supports either a single action dict OR a list of action dicts. The mission engine branches on `isinstance(on_complete, list)` to extend vs append to `_pending_actions`. All existing missions with single-dict `on_complete` are unaffected.
+
+**Reasoning**: Starting two puzzles simultaneously (Engineering Drill) requires one timer trigger to fire two `start_puzzle` actions. Introducing list support is the minimal change with zero backward-compatibility cost.
+
+**Alternatives considered**:
+- Wrapper action type `multi_action: [...]` — rejected: extra nesting with no benefit over a bare list
+- Two sequential objectives with the same timer trigger — rejected: only one objective is active at a time; the second timer would never fire until the first objective completed
+
+---
+
+## 2026-02-19 — Cross-station sensor assist uses passive efficiency detection (Session 2b2)
+
+**Decision**: When Science has an active `frequency_matching` puzzle, Engineering assists Science automatically when `ship.sensors.efficiency >= 1.2` (120%). There is no explicit "RELAY ASSIST" button on Engineering. Engineering receives a `puzzle.assist_available` notification panel telling them what to do; the assist fires once as soon as the power threshold is crossed and is not re-applied.
+
+**Reasoning**: The power slider IS the action. Adding a confirmation button would create a two-step interaction (boost power → click relay) with no strategic value — boosting sensors already costs from the power budget, which is the commitment. The notification tells Engineering what the target is; crossing it is sufficient signal of intent. This keeps the interaction feel physical (dial the power up) rather than administrative (click a button).
+
+**Consequences**: The `_check_sensor_assist()` function in `game_loop.py` runs each tick after `_apply_engineering()`. It duck-type-checks for `_tolerance` (a `FrequencyMatchingPuzzle` attribute) to confirm the puzzle type. Applied assists are tracked in `_applied_sensor_assists: set[str]` (cleared on game start). When applied, a `puzzle.assist_sent` message goes to Engineering confirming the relay.
+
+**Alternatives considered**:
+- Explicit RELAY ASSIST button on Engineering — rejected: administrative feel; removes the physical-constraint metaphor
+- Comms station provides the assist (per scope) — deferred to v0.02d; Engineering sensor power is the v0.02b2 assist because it uses existing mechanics
+- Re-apply assist continuously while sensors > 1.2 — rejected: would rapidly stack tolerance to max; one application per puzzle is the right balance
+
+---

@@ -52,7 +52,6 @@ def main() -> None:
         "server.main:app",
         host=host,
         port=port,
-        reload=True,
         log_level="info",
     )
 

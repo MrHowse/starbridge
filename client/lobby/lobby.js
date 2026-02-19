@@ -18,13 +18,14 @@ let myConnectionId = null;
 /** @type {string|null} Role currently held by this client */
 let myRole = null;
 
-const ROLES = ['captain', 'helm', 'weapons', 'engineering', 'science'];
+const ROLES = ['captain', 'helm', 'weapons', 'engineering', 'science', 'medical'];
 const ROLE_LABELS = {
   captain:     'CAPTAIN',
   helm:        'HELM',
   weapons:     'WEAPONS',
   engineering: 'ENGINEERING',
   science:     'SCIENCE',
+  medical:     'MEDICAL',
 };
 
 // ---------------------------------------------------------------------------
@@ -37,8 +38,9 @@ const callsignInput  = document.querySelector('[data-callsign-input]');
 const rolesGridEl    = document.querySelector('[data-roles-grid]');
 const launchPanelEl  = document.querySelector('[data-launch-panel]');
 const launchStatusEl = document.querySelector('[data-launch-status]');
-const launchBtnEl    = document.querySelector('[data-launch-btn]');
-const sessionLabelEl = document.querySelector('[data-session-label]');
+const launchBtnEl       = document.querySelector('[data-launch-btn]');
+const missionSelectEl   = document.querySelector('[data-mission-select]');
+const sessionLabelEl    = document.querySelector('[data-session-label]');
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -58,7 +60,8 @@ function init() {
   on('game.started',  handleGameStarted);
 
   launchBtnEl.addEventListener('click', () => {
-    send('lobby.start_game', { mission_id: 'sandbox' });
+    const mission_id = missionSelectEl ? missionSelectEl.value : 'sandbox';
+    send('lobby.start_game', { mission_id });
   });
 
   connect();
@@ -178,6 +181,9 @@ function handleLobbyError(payload) {
 /** @param {{ mission_id: string, mission_name: string, briefing_text: string }} payload */
 function handleGameStarted(payload) {
   console.log(`[lobby] Game started: ${payload.mission_name}`);
+  // Persist callsign so station pages can re-claim the role on reconnect.
+  const callsign = callsignInput.value.trim();
+  if (callsign) sessionStorage.setItem('player_name', callsign);
   // Freeze all interactive controls before navigating away.
   document.querySelectorAll('.btn').forEach(btn => { btn.disabled = true; });
   launchStatusEl.textContent = `LAUNCHING — ${payload.mission_name.toUpperCase()}`;

@@ -8,11 +8,13 @@
   <link rel="stylesheet" href="weapons.css">
 </head>
 <body>
-  <div class="station-container">
+  <div class="station-container" id="station-container">
 
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
     <header class="station-header panel">
       <div class="panel__header station-header__bar">
         <span class="text-title">WEAPONS</span>
+        <span class="text-label" id="mission-label"></span>
         <div class="station-header__status">
           <span class="status-dot status-dot--disconnected" data-status-dot></span>
           <span class="text-label" data-status-label>CONNECTING</span>
@@ -20,25 +22,135 @@
       </div>
     </header>
 
-    <main class="station-main">
-      <div class="station-standby" data-standby>
+    <!-- ── Standby ─────────────────────────────────────────────────────── -->
+    <main class="station-main" data-standby>
+      <div class="station-standby">
         <p class="text-header">STANDING BY</p>
-        <p class="text-body">This station is not yet operational.</p>
-        <p class="text-label">Phase 4 — Coming soon</p>
+        <p class="text-body">Awaiting game start…</p>
         <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
-      </div>
-      <div class="station-briefing panel" data-briefing style="display:none">
-        <div class="panel__header">
-          <span class="text-header">MISSION BRIEFING</span>
-        </div>
-        <div class="station-briefing__body">
-          <p class="text-data" data-mission-name></p>
-          <p class="text-body" data-briefing-text></p>
-        </div>
       </div>
     </main>
 
-  </div>
+    <!-- ── Main layout (hidden until game starts) ──────────────────────── -->
+    <div class="weapons-main" data-weapons-main style="display:none">
+
+      <!-- Left: Tactical Radar -->
+      <div class="radar-panel panel">
+        <div class="panel__header">
+          <span class="text-label">TACTICAL — <span id="radar-range-label">15km</span></span>
+        </div>
+        <div class="radar-wrap">
+          <canvas id="radar-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Right: Controls -->
+      <div class="controls-panel">
+
+        <!-- Target Info -->
+        <section class="ctrl-section panel" id="target-section">
+          <div class="panel__header">
+            <span class="text-label">TARGET</span>
+            <span class="text-data" id="target-id-label">NONE</span>
+          </div>
+          <div class="target-body" id="target-body">
+            <div class="target-row">
+              <span class="text-label">HULL</span>
+              <div class="gauge target-hull-gauge">
+                <div class="gauge__fill" id="target-hull-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="target-hull-text">—</span>
+            </div>
+            <div class="target-row">
+              <span class="text-label">FWD SHLD</span>
+              <div class="gauge target-shield-gauge">
+                <div class="gauge__fill gauge__fill--shield" id="target-shield-fwd-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="target-shield-fwd-text">—</span>
+            </div>
+            <div class="target-row">
+              <span class="text-label">AFT SHLD</span>
+              <div class="gauge target-shield-gauge">
+                <div class="gauge__fill gauge__fill--shield" id="target-shield-aft-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="target-shield-aft-text">—</span>
+            </div>
+            <div class="target-stats">
+              <div>
+                <span class="text-label">RANGE</span>
+                <span class="text-data" id="target-range">—</span>
+              </div>
+              <div>
+                <span class="text-label">BEARING</span>
+                <span class="text-data" id="target-bearing">—</span>
+              </div>
+              <div>
+                <span class="text-label">TYPE</span>
+                <span class="text-data" id="target-type">—</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Beam Weapons -->
+        <section class="ctrl-section panel">
+          <div class="panel__header">
+            <span class="text-label">BEAM WEAPONS</span>
+          </div>
+          <div class="beam-body">
+            <button class="fire-btn" id="beam-fire-btn" disabled>◈ FIRE BEAMS</button>
+            <p class="text-label beam-status" id="beam-status">NO TARGET</p>
+          </div>
+        </section>
+
+        <!-- Torpedo Tubes -->
+        <section class="ctrl-section panel">
+          <div class="panel__header">
+            <span class="text-label">TORPEDO TUBES</span>
+            <span class="text-data" id="torpedo-ammo-label">AMMO: —</span>
+          </div>
+          <div class="tube-row">
+            <span class="text-label tube-label">TUBE 1</span>
+            <div class="gauge tube-reload-gauge">
+              <div class="gauge__fill" id="tube1-reload-fill" style="width:100%"></div>
+            </div>
+            <span class="text-data tube-status" id="tube1-status">READY</span>
+            <button class="fire-btn fire-btn--small" id="tube1-fire-btn">FIRE</button>
+          </div>
+          <div class="tube-row">
+            <span class="text-label tube-label">TUBE 2</span>
+            <div class="gauge tube-reload-gauge">
+              <div class="gauge__fill" id="tube2-reload-fill" style="width:100%"></div>
+            </div>
+            <span class="text-data tube-status" id="tube2-status">READY</span>
+            <button class="fire-btn fire-btn--small" id="tube2-fire-btn">FIRE</button>
+          </div>
+        </section>
+
+        <!-- Shield Balance -->
+        <section class="ctrl-section panel">
+          <div class="panel__header">
+            <span class="text-label">SHIELD BALANCE</span>
+          </div>
+          <div class="shield-body">
+            <div class="shield-bar-row">
+              <span class="text-label">FWD</span>
+              <input type="range" id="shield-slider" min="0" max="100" step="1" value="50"
+                     aria-label="Shield balance (0=full rear, 100=full forward)">
+              <span class="text-label">AFT</span>
+            </div>
+            <div class="shield-readout">
+              <span class="text-data" id="shield-fwd-pct">50%</span>
+              <span class="text-label">↔</span>
+              <span class="text-data" id="shield-aft-pct">50%</span>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /controls-panel -->
+    </div><!-- /weapons-main -->
+
+  </div><!-- /station-container -->
   <script type="module" src="weapons.js"></script>
 </body>
 </html>

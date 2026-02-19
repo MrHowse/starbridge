@@ -1,49 +1,252 @@
 /*
- * Captain Station — Placeholder layout.
- * Full styles implemented in Phase 6.
+ * Captain Station — Full dashboard layout.
  */
+
+/* =========================================================================
+   Root layout
+   ========================================================================= */
 
 .station-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  position: relative;
 }
 
-.station-header__bar {
+/* =========================================================================
+   Header
+   ========================================================================= */
+
+.captain-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
 }
 
-.station-header__status {
+.captain-header__left {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+}
+
+.captain-header__alert {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.station-main {
+.captain-header__status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* =========================================================================
+   Alert buttons
+   ========================================================================= */
+
+.alert-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--neutral);
+  color: var(--neutral);
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.alert-btn--green.alert-btn--active {
+  border-color: var(--alert-green);
+  color: var(--alert-green);
+  box-shadow: 0 0 6px var(--alert-green-glow);
+}
+
+.alert-btn--yellow.alert-btn--active {
+  border-color: var(--alert-yellow);
+  color: var(--alert-yellow);
+  box-shadow: 0 0 6px var(--alert-yellow-glow);
+}
+
+.alert-btn--red.alert-btn--active {
+  border-color: var(--alert-red);
+  color: var(--alert-red);
+  box-shadow: 0 0 6px var(--alert-red-glow);
+}
+
+/* =========================================================================
+   Stand-by
+   ========================================================================= */
+
+.captain-standby {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+/* =========================================================================
+   Main grid
+   ========================================================================= */
+
+.captain-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+/* =========================================================================
+   Tactical map
+   ========================================================================= */
+
+.captain-map {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.captain-map .panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#captain-canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+/* =========================================================================
+   Sidebar
+   ========================================================================= */
+
+.captain-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.captain-panel {
+  flex-shrink: 0;
+}
+
+.captain-panel__body {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* =========================================================================
+   Gauge bars
+   ========================================================================= */
+
+.status-row {
+  display: grid;
+  grid-template-columns: 3.5ch 1fr 3ch;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-row--power {
+  grid-template-columns: 3.5ch 1fr;
+}
+
+.gauge-bar {
+  height: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.gauge-bar__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.15s linear;
+}
+
+.gauge-bar__fill--hull {
+  background: var(--hull-damage);
+}
+
+/* =========================================================================
+   Science summary
+   ========================================================================= */
+
+.science-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-left: 2px solid var(--primary-dim);
+  padding-left: 0.5rem;
+}
+
+/* =========================================================================
+   Objectives
+   ========================================================================= */
+
+.objective-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  line-height: 1.4;
+}
+
+.obj-icon {
+  flex-shrink: 0;
+  width: 1.2em;
+  text-align: center;
+}
+
+.objective-row.obj-complete .obj-text {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.objective-row.obj-pending .obj-icon {
+  color: var(--text-dim);
+}
+
+.objective-row.obj-complete .obj-icon {
+  color: var(--primary);
+}
+
+/* =========================================================================
+   Game-over overlay
+   ========================================================================= */
+
+.game-over-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 100;
 }
 
-.station-standby {
+.game-over-box {
   text-align: center;
+  padding: 2rem 3rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-}
-
-.station-briefing {
-  width: min(600px, 100%);
-}
-
-.station-briefing__body {
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.5rem;
+  align-items: center;
 }

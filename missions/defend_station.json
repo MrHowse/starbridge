@@ -1,0 +1,54 @@
+{
+  "id": "defend_station",
+  "name": "Defend the Station",
+  "briefing": "Starbase Kepler is under attack. Defend it through three waves of hostiles. Resupply between engagements.",
+  "spawn": [
+    { "type": "station", "x": 50000, "y": 35000, "id": "kepler" }
+  ],
+  "spawn_initial_wave": [
+    { "type": "scout",   "x": 20000, "y": 20000, "id": "w1_1" },
+    { "type": "scout",   "x": 80000, "y": 20000, "id": "w1_2" },
+    { "type": "scout",   "x": 50000, "y": 10000, "id": "w1_3" }
+  ],
+  "objectives": [
+    {
+      "id": "wave_1",
+      "text": "Repel first attack wave",
+      "trigger": "wave_defeated",
+      "args": { "enemy_prefix": "w1_" },
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          { "type": "cruiser", "x": 20000, "y": 50000, "id": "w2_1" },
+          { "type": "cruiser", "x": 80000, "y": 50000, "id": "w2_2" }
+        ]
+      }
+    },
+    {
+      "id": "wave_2",
+      "text": "Repel second attack wave",
+      "trigger": "wave_defeated",
+      "args": { "enemy_prefix": "w2_" },
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          { "type": "destroyer", "x": 50000, "y": 90000, "id": "w3_1" },
+          { "type": "scout",     "x": 30000, "y": 80000, "id": "w3_2" },
+          { "type": "scout",     "x": 70000, "y": 80000, "id": "w3_3" }
+        ]
+      }
+    },
+    {
+      "id": "wave_3",
+      "text": "Repel final assault",
+      "trigger": "wave_defeated",
+      "args": { "enemy_prefix": "w3_" }
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero",
+  "defeat_condition_alt": {
+    "trigger": "station_hull_below",
+    "args": { "station_id": "kepler", "threshold": 0 }
+  }
+}

@@ -1,7 +1,7 @@
 # Code Conventions
 
 > **LIVING DOCUMENT** — Update this file when new patterns are established.
-> Last updated: 2026-02-18 (Session 2b — renderer.js, interpolation, helm station)
+> Last updated: 2026-02-18 (Session 3c — canvas convention clarified, engineering schematic pattern)
 
 ## Python (Server)
 
@@ -31,6 +31,20 @@
 - All game logic runs in the `tick()` function chain
 - No game state modification outside the game loop
 - Client messages are queued and processed at the start of each tick
+
+### messages package re-export pattern (Session 0.1b)
+
+When splitting a module into a package, the `__init__.py` must re-export every public symbol so all existing `from server.models.messages import X` imports work unchanged. Use explicit `from .namespace import X` re-exports (not `*`) and maintain an `__all__` list. The package structure: `base.py` holds the central class and dispatcher; namespace files hold grouped payload models; `base.py` imports FROM the namespace files to build the dispatch table (not the other way around — avoids circular imports).
+
+### game_loop splitting pattern (Session 0.1a)
+
+The game loop is split into 4 files. Each sub-module is **stateful** (module-level state + `reset()`) following the `sensors.py` pattern:
+- `game_loop.py` — orchestrator only; keeps `_drain_queue`, `_apply_engineering`, `_build_ship_state`, engineering constants, `random` import (test-anchored). No inline mission logic.
+- `game_loop_physics.py` — timing constants (`TICK_RATE`, `TICK_DT`)
+- `game_loop_weapons.py` — weapons state (target, ammo, cooldowns, entity counter), fire/tick helpers, `handle_enemy_beam_hits()`
+- `game_loop_mission.py` — mission engine, signal scan, docking, per-tick mission update, broadcast builders (`build_world_entities`, `build_sensor_contacts`)
+- Sub-modules imported as `import server.game_loop_weapons as glw` / `import server.game_loop_mission as glm` — no circular imports.
+- Functions that tests call directly MUST stay in `game_loop.py` (check `tests/test_game_loop.py` and `tests/test_engineering.py` before moving anything).
 
 ### Error Handling
 
@@ -65,7 +79,8 @@
 ### Canvas Rendering
 
 - `requestAnimationFrame` for render loop — render loop runs indefinitely while game is active
-- All canvas drawing goes through `client/shared/renderer.js` — do not inline draw calls in station modules
+- Shared/reusable canvas utilities go in `client/shared/renderer.js` (starfield, compass, minimap, chevron, lerp, worldToScreen). Import these from station modules.
+- Station-specific canvas drawing (e.g. the Engineering ship schematic) lives in the station module itself — do not force station-specific draw calls into renderer.js.
 - Interpolate between server ticks for smooth 60fps movement (see Interpolation Pattern below)
 - All coordinates transformed: world space → screen space via `worldToScreen()`
 - Wireframe only — `strokeStyle`, never `fillStyle` (except background fill and translucent glow effects)

@@ -1,0 +1,205 @@
+/* Medical Station Styles */
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+.medical-main {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+/* ── Supply row in crew panel header ─────────────────────────────────────── */
+
+.supply-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.supply-gauge {
+  width: 80px;
+  height: 10px;
+}
+
+.gauge__fill--supply {
+  background: var(--primary);
+  transition: width 0.4s ease;
+}
+
+.gauge__fill--warn {
+  background: #ffaa00;
+}
+
+.gauge__fill--danger {
+  background: var(--hostile);
+}
+
+/* ── Crew panel ───────────────────────────────────────────────────────────── */
+
+.crew-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.deck-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+/* ── Deck cards ───────────────────────────────────────────────────────────── */
+
+.deck-card {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.deck-card:hover {
+  border-color: var(--primary);
+  background: rgba(0, 255, 140, 0.04);
+}
+
+.deck-card--selected {
+  border-color: var(--primary);
+  background: rgba(0, 255, 140, 0.08);
+}
+
+.deck-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+
+.deck-card__name {
+  color: var(--primary);
+}
+
+.deck-card__counts {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.75rem;
+}
+
+.deck-card__factor-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.deck-card__factor-gauge {
+  flex: 1;
+  height: 6px;
+}
+
+/* ── Treatment badge ──────────────────────────────────────────────────────── */
+
+.treatment-badge {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.treatment-badge--injured {
+  background: rgba(255, 170, 0, 0.2);
+  color: #ffaa00;
+  border: 1px solid #ffaa00;
+}
+
+.treatment-badge--critical {
+  background: rgba(255, 60, 60, 0.2);
+  color: var(--hostile);
+  border: 1px solid var(--hostile);
+}
+
+/* ── Colour helpers ───────────────────────────────────────────────────────── */
+
+.c-active   { color: var(--primary); }
+.c-injured  { color: #ffaa00; }
+.c-critical { color: var(--hostile); }
+
+/* ── Treatment panel ──────────────────────────────────────────────────────── */
+
+.treatment-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.treatment-body {
+  flex: 1;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.treatment-body--empty {
+  align-items: center;
+  justify-content: center;
+}
+
+.treatment-counts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.treatment-count-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.treatment-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.treatment-status--active {
+  color: var(--primary);
+}
+
+.treatment-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fire-btn--hostile {
+  border-color: var(--hostile);
+  color: var(--hostile);
+}
+
+.fire-btn--hostile:hover:not(:disabled) {
+  background: var(--hostile);
+  color: var(--bg-primary);
+}
+
+.treatment-cost-note {
+  text-align: center;
+  opacity: 0.6;
+}
+
+/* ── Panel header override for crew panel ────────────────────────────────── */
+
+.crew-panel .panel__header {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

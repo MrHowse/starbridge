@@ -17,6 +17,7 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
+from server.missions.loader import load_mission
 from server.models.messages import (
     LobbyClaimRolePayload,
     LobbyStartGamePayload,
@@ -59,7 +60,7 @@ class LobbySession:
     roles: dict[str, tuple[str, str] | None] = field(
         default_factory=lambda: {
             r: None
-            for r in ("captain", "helm", "weapons", "engineering", "science")
+            for r in ("captain", "helm", "weapons", "engineering", "science", "medical")
         }
     )
     host_connection_id: str | None = None
@@ -74,6 +75,8 @@ _session: LobbySession = LobbySession()
 _on_game_start: Callable[[str], Awaitable[None]] | None = None
 # Stored once game.started is broadcast; re-sent to any client that joins later.
 _game_payload: dict[str, str] | None = None
+# True from game.started until game.over; controls whether new joins get replay.
+_game_active: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -87,10 +90,11 @@ def init(manager: _ManagerProtocol) -> None:
     Called once from main.py on server startup with the real ConnectionManager.
     Calling again (e.g. in tests) resets the session to a clean state.
     """
-    global _manager, _session, _game_payload
+    global _manager, _session, _game_payload, _game_active
     _manager = manager
     _session = LobbySession()
     _game_payload = None
+    _game_active = False
 
 
 def register_game_start_callback(callback: Callable[[str], Awaitable[None]]) -> None:
@@ -101,6 +105,18 @@ def register_game_start_callback(callback: Callable[[str], Awaitable[None]]) -> 
     """
     global _on_game_start
     _on_game_start = callback
+
+
+async def on_game_end() -> None:
+    """Called by game_loop when the game ends.
+
+    Clears the stored game.started payload so reconnecting clients receive a
+    fresh lobby view rather than being replayed into the finished game.
+    """
+    global _game_payload, _game_active
+    _game_payload = None
+    _game_active = False
+    logger.info("Game ended — lobby reset to pre-game state")
 
 
 # ---------------------------------------------------------------------------
@@ -164,8 +180,8 @@ async def on_connect(connection_id: str) -> None:
         ),
     )
 
-    # If a game is already running, catch up the late-joining client.
-    if _game_payload is not None:
+    # If a game is currently in progress, catch up the late-joining client.
+    if _game_payload is not None and _game_active:
         await _manager.send(connection_id, Message.build("game.started", _game_payload))
         return  # Skip lobby.state — game is in progress, not in lobby.
 
@@ -203,6 +219,12 @@ async def on_disconnect(connection_id: str) -> None:
 async def _claim_role(connection_id: str, payload: LobbyClaimRolePayload) -> None:
     assert _manager is not None
     role = payload.role
+
+    # Observer roles (display-only) are not tracked in session.roles —
+    # just tag the connection so broadcast_to_roles can target them.
+    if role not in _session.roles:
+        _manager.tag(connection_id, role=role)
+        return
 
     occupant = _session.roles[role]
     if occupant is not None and occupant[0] != connection_id:
@@ -251,13 +273,19 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
         )
         return
 
-    # TODO (Phase 6): look up mission_name and briefing_text from the mission loader.
-    global _game_payload
+    global _game_payload, _game_active
+    try:
+        mission_data = load_mission(payload.mission_id)
+    except FileNotFoundError:
+        mission_data = {}
+    sig = mission_data.get("signal_location")
     _game_payload = {
         "mission_id": payload.mission_id,
-        "mission_name": "Awaiting Orders",
-        "briefing_text": "All stations report ready.",
+        "mission_name": mission_data.get("name", "Awaiting Orders"),
+        "briefing_text": mission_data.get("briefing", "All stations report ready."),
+        "signal_location": {"x": sig["x"], "y": sig["y"]} if sig else None,
     }
+    _game_active = True
     await _manager.broadcast(Message.build("game.started", _game_payload))
     logger.info("Game started by host %s, mission: %s", connection_id, payload.mission_id)
 

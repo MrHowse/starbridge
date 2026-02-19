@@ -10,9 +10,11 @@
 <body>
   <div class="station-container">
 
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
     <header class="station-header panel">
       <div class="panel__header station-header__bar">
         <span class="text-title">SCIENCE</span>
+        <span class="text-label" id="mission-label" style="opacity:0.5">—</span>
         <div class="station-header__status">
           <span class="status-dot status-dot--disconnected" data-status-dot></span>
           <span class="text-label" data-status-label>CONNECTING</span>
@@ -20,24 +22,121 @@
       </div>
     </header>
 
-    <main class="station-main">
-      <div class="station-standby" data-standby>
-        <p class="text-header">STANDING BY</p>
-        <p class="text-body">This station is not yet operational.</p>
-        <p class="text-label">Phase 5 — Coming soon</p>
+    <!-- ── Standby ─────────────────────────────────────────────────────── -->
+    <main class="station-main" data-standby>
+      <div class="station-standby">
+        <p class="text-header">SCIENCE STATION</p>
+        <p class="text-body">Awaiting mission orders.</p>
         <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
-      </div>
-      <div class="station-briefing panel" data-briefing style="display:none">
-        <div class="panel__header">
-          <span class="text-header">MISSION BRIEFING</span>
-        </div>
-        <div class="station-briefing__body">
-          <p class="text-data" data-mission-name></p>
-          <p class="text-body" data-briefing-text></p>
-        </div>
       </div>
     </main>
 
+    <!-- ── Active science layout ───────────────────────────────────────── -->
+    <div class="science-main" data-science-main style="display:none">
+
+      <!-- ── Left: Long-range sensor display ──────────────────────────── -->
+      <div class="sensor-panel panel">
+        <div class="panel__header">
+          <span class="text-label">LONG-RANGE SENSORS</span>
+          <span class="text-data" id="sensor-range-label">RANGE: 30km</span>
+        </div>
+        <div class="sensor-wrap">
+          <canvas id="sensor-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- ── Right: Contact list + scan interface + results ──────────── -->
+      <div class="controls-panel">
+
+        <!-- Contact list -->
+        <section class="ctrl-section panel">
+          <div class="panel__header">
+            <span class="text-label">CONTACTS</span>
+            <span class="text-data text-dim" id="contact-count">—</span>
+          </div>
+          <div id="contact-list" class="contact-list">
+            <p class="text-dim contact-list__empty">No contacts detected.</p>
+          </div>
+        </section>
+
+        <!-- Scan controls -->
+        <section class="ctrl-section panel">
+          <div class="panel__header">
+            <span class="text-label">ACTIVE SCAN</span>
+          </div>
+          <div class="scan-body">
+            <p class="text-data text-dim" id="scan-target-label">No target selected</p>
+            <div class="scan-progress-row">
+              <div class="gauge">
+                <div class="gauge__fill gauge__fill--scan" id="scan-progress-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="scan-progress-pct">0%</span>
+            </div>
+            <div class="scan-btn-row">
+              <button class="fire-btn" id="scan-btn" disabled>INITIATE SCAN</button>
+              <button class="fire-btn fire-btn--small" id="cancel-btn" disabled>CANCEL</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Scan results -->
+        <section class="ctrl-section panel" id="results-section" style="display:none">
+          <div class="panel__header">
+            <span class="text-label">SCAN RESULTS</span>
+            <span class="text-data text-dim" id="results-entity-label">—</span>
+          </div>
+          <div class="results-body">
+            <div class="result-row">
+              <span class="text-label">TYPE</span>
+              <span class="text-data text-bright" id="res-type">—</span>
+            </div>
+            <div class="result-row">
+              <span class="text-label">HULL</span>
+              <div class="gauge result-gauge">
+                <div class="gauge__fill" id="res-hull-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="res-hull-pct">—</span>
+            </div>
+            <div class="result-row">
+              <span class="text-label">SHLD FWD</span>
+              <div class="gauge result-gauge">
+                <div class="gauge__fill gauge__fill--shield" id="res-shield-fwd-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="res-shield-fwd-pct">—</span>
+            </div>
+            <div class="result-row">
+              <span class="text-label">SHLD AFT</span>
+              <div class="gauge result-gauge">
+                <div class="gauge__fill gauge__fill--shield" id="res-shield-aft-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="res-shield-aft-pct">—</span>
+            </div>
+            <div class="result-weakness" id="res-weakness-row" style="display:none">
+              <span class="text-label">WEAKNESS</span>
+              <p class="text-body text-hostile" id="res-weakness">—</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Ship state (sensor power ref) -->
+        <section class="ctrl-section panel">
+          <div class="panel__header">
+            <span class="text-label">SENSOR STATUS</span>
+          </div>
+          <div class="sensor-status-body">
+            <div class="result-row">
+              <span class="text-label">POWER</span>
+              <span class="text-data" id="sensor-power">—</span>
+            </div>
+            <div class="result-row">
+              <span class="text-label">EFFICIENCY</span>
+              <span class="text-data" id="sensor-efficiency">—</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
   </div>
   <script type="module" src="science.js"></script>
 </body>

@@ -1,0 +1,36 @@
+{
+  "id": "first_contact",
+  "name": "First Contact",
+  "briefing": "Patrol the sector. Hostile contacts reported. Return to origin.",
+  "spawn": [
+    { "type": "scout",   "x": 70000, "y": 32000, "id": "enemy_1" },
+    { "type": "cruiser", "x": 80000, "y": 70000, "id": "enemy_2" }
+  ],
+  "objectives": [
+    {
+      "id": "obj_patrol",
+      "text": "Patrol to waypoint Alpha",
+      "trigger": "player_in_area",
+      "args": { "x": 30000, "y": 20000, "r": 5000 }
+    },
+    {
+      "id": "obj_scan",
+      "text": "Scan the hostile scout",
+      "trigger": "scan_completed",
+      "args": { "entity_id": "enemy_1" }
+    },
+    {
+      "id": "obj_destroy",
+      "text": "Destroy all hostile contacts",
+      "trigger": "all_enemies_destroyed"
+    },
+    {
+      "id": "obj_return",
+      "text": "Return to sector origin",
+      "trigger": "player_in_area",
+      "args": { "x": 50000, "y": 50000, "r": 8000 }
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero"
+}

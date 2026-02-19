@@ -8,35 +8,132 @@
   <link rel="stylesheet" href="captain.css">
 </head>
 <body>
-  <div class="station-container">
+  <div class="station-container" id="station-container">
 
-    <header class="station-header panel">
-      <div class="panel__header station-header__bar">
+    <!-- ================================================================
+         Header
+         ================================================================ -->
+    <header class="captain-header panel">
+      <div class="captain-header__left">
         <span class="text-title">CAPTAIN</span>
-        <div class="station-header__status">
-          <span class="status-dot status-dot--disconnected" data-status-dot></span>
-          <span class="text-label" data-status-label>CONNECTING</span>
-        </div>
+        <span class="text-label" id="mission-label">STANDING BY</span>
+      </div>
+      <div class="captain-header__alert">
+        <span class="text-label">ALERT:</span>
+        <button class="alert-btn alert-btn--green" data-alert="green">GRN</button>
+        <button class="alert-btn alert-btn--yellow" data-alert="yellow">YEL</button>
+        <button class="alert-btn alert-btn--red" data-alert="red">RED</button>
+      </div>
+      <div class="captain-header__status">
+        <span class="status-dot status-dot--disconnected" data-status-dot></span>
+        <span class="text-label" data-status-label>CONNECTING</span>
       </div>
     </header>
 
-    <main class="station-main">
-      <div class="station-standby" data-standby>
-        <p class="text-header">STANDING BY</p>
-        <p class="text-body">This station is not yet operational.</p>
-        <p class="text-label">Phase 3 — Coming soon</p>
-        <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
-      </div>
-      <div class="station-briefing panel" data-briefing style="display:none">
+    <!-- ================================================================
+         Stand-by panel (pre-game)
+         ================================================================ -->
+    <div class="captain-standby" data-standby>
+      <p class="text-header">STANDING BY</p>
+      <p class="text-body">Awaiting mission launch from host.</p>
+      <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+    </div>
+
+    <!-- ================================================================
+         Main grid (post-game)
+         ================================================================ -->
+    <main class="captain-main" data-captain-main style="display:none">
+
+      <!-- Left: tactical map canvas -->
+      <section class="captain-map panel">
         <div class="panel__header">
-          <span class="text-header">MISSION BRIEFING</span>
+          <span class="text-header">TACTICAL</span>
+          <span class="text-label" id="map-zoom-label">80K WU</span>
         </div>
-        <div class="station-briefing__body">
-          <p class="text-data" data-mission-name></p>
-          <p class="text-body" data-briefing-text></p>
-        </div>
-      </div>
+        <canvas id="captain-canvas"></canvas>
+      </section>
+
+      <!-- Right: status panels stacked -->
+      <aside class="captain-sidebar">
+
+        <!-- Ship status -->
+        <section class="captain-panel panel" id="ship-status-panel">
+          <div class="panel__header">
+            <span class="text-header">SHIP STATUS</span>
+          </div>
+          <div class="captain-panel__body">
+            <div class="status-row">
+              <span class="text-label">HULL</span>
+              <div class="gauge-bar">
+                <div class="gauge-bar__fill gauge-bar__fill--hull" id="hull-fill"></div>
+              </div>
+              <span class="text-data" id="hull-text">100</span>
+            </div>
+            <div class="status-row">
+              <span class="text-label">FWD</span>
+              <div class="gauge-bar">
+                <div class="gauge-bar__fill" id="shield-fwd-fill"></div>
+              </div>
+              <span class="text-data" id="shield-fwd-text">100</span>
+            </div>
+            <div class="status-row">
+              <span class="text-label">AFT</span>
+              <div class="gauge-bar">
+                <div class="gauge-bar__fill" id="shield-aft-fill"></div>
+              </div>
+              <span class="text-data" id="shield-aft-text">100</span>
+            </div>
+            <div class="status-row status-row--power">
+              <span class="text-label">PWR</span>
+              <span class="text-data" id="power-text">—</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Science summary -->
+        <section class="captain-panel panel" id="science-panel">
+          <div class="panel__header">
+            <span class="text-header">SCIENCE</span>
+          </div>
+          <div class="captain-panel__body">
+            <div class="science-row" id="scan-active-row" style="display:none">
+              <span class="text-label">SCANNING</span>
+              <span class="text-data" id="scan-entity-id">—</span>
+              <div class="gauge-bar">
+                <div class="gauge-bar__fill" id="scan-progress-fill"></div>
+              </div>
+            </div>
+            <div class="science-row" id="scan-result-row" style="display:none">
+              <span class="text-label">LAST SCAN</span>
+              <span class="text-data" id="scan-result-entity">—</span>
+              <span class="text-body" id="scan-result-weakness">—</span>
+            </div>
+            <div id="science-idle" class="text-dim">No active scan.</div>
+          </div>
+        </section>
+
+        <!-- Mission objectives -->
+        <section class="captain-panel panel" id="objectives-panel">
+          <div class="panel__header">
+            <span class="text-header">OBJECTIVES</span>
+          </div>
+          <div class="captain-panel__body" id="objectives-list">
+            <div class="text-dim">Awaiting mission data.</div>
+          </div>
+        </section>
+
+      </aside>
+
     </main>
+
+    <!-- Game-over overlay -->
+    <div class="game-over-overlay" id="game-over-overlay" style="display:none">
+      <div class="game-over-box panel">
+        <p class="text-title" id="game-over-title">MISSION COMPLETE</p>
+        <p class="text-body" id="game-over-body"></p>
+        <a class="btn btn--primary" href="/client/lobby/">RETURN TO LOBBY</a>
+      </div>
+    </div>
 
   </div>
   <script type="module" src="captain.js"></script>

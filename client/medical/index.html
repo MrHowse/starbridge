@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — MEDICAL</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="medical.css">
+</head>
+<body>
+  <div class="station-container">
+
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <header class="station-header panel">
+      <div class="panel__header station-header__bar">
+        <span class="text-title">MEDICAL</span>
+        <span class="text-label" id="mission-label" style="opacity:0.5">—</span>
+        <div class="station-header__status">
+          <span class="status-dot status-dot--disconnected" data-status-dot></span>
+          <span class="text-label" data-status-label>CONNECTING</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Standby ─────────────────────────────────────────────────────── -->
+    <main class="station-main" data-standby>
+      <div class="station-standby">
+        <p class="text-header">MEDICAL STATION</p>
+        <p class="text-body">Awaiting mission orders.</p>
+        <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+      </div>
+    </main>
+
+    <!-- ── Active medical layout ───────────────────────────────────────── -->
+    <div class="medical-main" data-medical-main style="display:none">
+
+      <!-- ── Left: Crew status by deck ─────────────────────────────────── -->
+      <div class="crew-panel panel">
+        <div class="panel__header">
+          <span class="text-label">CREW STATUS</span>
+          <div class="supply-row">
+            <span class="text-label">SUPPLIES</span>
+            <div class="supply-gauge gauge">
+              <div class="gauge__fill gauge__fill--supply" id="supply-fill" style="width:100%"></div>
+            </div>
+            <span class="text-data" id="supply-count">20/20</span>
+          </div>
+        </div>
+        <div id="deck-list" class="deck-list">
+          <!-- Deck cards injected by medical.js -->
+        </div>
+      </div>
+
+      <!-- ── Right: Treatment controls ─────────────────────────────────── -->
+      <div class="treatment-panel panel">
+        <div class="panel__header">
+          <span class="text-label">TREATMENT</span>
+          <span class="text-data text-dim" id="treatment-deck-label">No deck selected</span>
+        </div>
+
+        <!-- No deck selected -->
+        <div id="treatment-none" class="treatment-body treatment-body--empty">
+          <p class="text-body text-dim">Select a deck to view treatment options.</p>
+        </div>
+
+        <!-- Deck selected -->
+        <div id="treatment-active" class="treatment-body" style="display:none">
+          <div class="treatment-counts">
+            <div class="treatment-count-row">
+              <span class="text-label">ACTIVE</span>
+              <span class="text-data text-bright" id="tr-active">—</span>
+            </div>
+            <div class="treatment-count-row">
+              <span class="text-label">INJURED</span>
+              <span class="text-data c-injured" id="tr-injured">—</span>
+            </div>
+            <div class="treatment-count-row">
+              <span class="text-label">CRITICAL</span>
+              <span class="text-data c-critical" id="tr-critical">—</span>
+            </div>
+            <div class="treatment-count-row">
+              <span class="text-label">DEAD</span>
+              <span class="text-data text-dim" id="tr-dead">—</span>
+            </div>
+          </div>
+
+          <div class="treatment-status-row">
+            <span class="text-label">STATUS</span>
+            <span class="text-data" id="tr-status">IDLE</span>
+          </div>
+
+          <div class="treatment-buttons">
+            <button class="fire-btn" id="btn-treat-injured">TREAT INJURED</button>
+            <button class="fire-btn fire-btn--hostile" id="btn-treat-critical">TREAT CRITICAL</button>
+            <button class="fire-btn fire-btn--small" id="btn-cancel">CANCEL</button>
+          </div>
+
+          <p class="text-dim text-label treatment-cost-note" id="cost-note">
+            Cost: 2 supplies per session
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <script type="module" src="medical.js"></script>
+</body>
+</html>

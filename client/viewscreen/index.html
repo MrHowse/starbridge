@@ -10,33 +10,67 @@
 <body>
   <div class="station-container">
 
-    <header class="station-header panel">
-      <div class="panel__header station-header__bar">
-        <span class="text-title">VIEWSCREEN</span>
-        <div class="station-header__status">
+    <!-- Full-viewport forward view canvas -->
+    <canvas id="viewscreen-canvas"></canvas>
+
+    <!-- HUD overlay (shown once game.started) -->
+    <div class="vs-hud" data-hud style="display:none">
+      <div class="vs-hud__top">
+        <span class="vs-hud__mission text-label" data-mission-name></span>
+        <div class="vs-hud__status">
           <span class="status-dot status-dot--disconnected" data-status-dot></span>
           <span class="text-label" data-status-label>CONNECTING</span>
         </div>
       </div>
-    </header>
+      <div class="vs-hud__bottom">
+        <div class="vs-hud__gauge-row">
+          <span class="text-label vs-hud__gauge-label">HULL</span>
+          <div class="vs-hud__gauge-bar">
+            <div class="vs-hud__gauge-fill vs-hud__gauge-fill--hull" data-hull-fill></div>
+          </div>
+          <span class="text-data vs-hud__gauge-val" data-hull-text>100</span>
+        </div>
+        <div class="vs-hud__gauge-row">
+          <span class="text-label vs-hud__gauge-label">FWD</span>
+          <div class="vs-hud__gauge-bar">
+            <div class="vs-hud__gauge-fill" data-shield-fwd-fill></div>
+          </div>
+          <span class="text-data vs-hud__gauge-val" data-shield-fwd-text>100</span>
+        </div>
+        <div class="vs-hud__gauge-row">
+          <span class="text-label vs-hud__gauge-label">AFT</span>
+          <div class="vs-hud__gauge-bar">
+            <div class="vs-hud__gauge-fill" data-shield-aft-fill></div>
+          </div>
+          <span class="text-data vs-hud__gauge-val" data-shield-aft-text>100</span>
+        </div>
+        <span class="text-data vs-hud__hdg" data-hdg-text>HDG 000°</span>
+      </div>
+    </div>
 
-    <main class="station-main">
-      <div class="station-standby" data-standby>
-        <p class="text-header">STANDING BY</p>
-        <p class="text-body">This station is not yet operational.</p>
-        <p class="text-label">Phase 7 — Coming soon</p>
-        <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
-      </div>
-      <div class="station-briefing panel" data-briefing style="display:none">
-        <div class="panel__header">
-          <span class="text-header">MISSION BRIEFING</span>
+    <!-- Standby (before game starts) -->
+    <div class="vs-standby" data-standby>
+      <div class="vs-standby__inner">
+        <div class="vs-standby__header">
+          <span class="status-dot status-dot--disconnected" data-status-dot-sb></span>
+          <span class="text-label" data-status-label-sb>CONNECTING</span>
         </div>
-        <div class="station-briefing__body">
-          <p class="text-data" data-mission-name></p>
-          <p class="text-body" data-briefing-text></p>
-        </div>
+        <p class="text-title">STARBRIDGE</p>
+        <p class="text-header">MAIN VIEWSCREEN</p>
+        <p class="text-dim">Awaiting mission launch…</p>
       </div>
-    </main>
+    </div>
+
+    <!-- Game-over overlay -->
+    <div class="vs-game-over" data-game-over style="display:none">
+      <div class="vs-game-over__box panel">
+        <p class="text-title" data-game-over-title>MISSION COMPLETE</p>
+        <p class="text-body" data-game-over-body></p>
+      </div>
+    </div>
+
+    <!-- Screen flash layer (hull hit) -->
+    <div class="vs-flash" data-flash></div>
 
   </div>
   <script type="module" src="viewscreen.js"></script>

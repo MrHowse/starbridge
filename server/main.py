@@ -19,10 +19,10 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from server import engineering, game_loop, helm, lobby
+from server import captain, engineering, game_loop, helm, lobby, medical, science, weapons
 from server.connections import ConnectionManager
 from server.models.messages import Message, VALID_SYSTEMS
-from server.models.world import World
+from server.models.world import World, spawn_enemy
 
 logger = logging.getLogger("starbridge")
 
@@ -46,10 +46,16 @@ world = World()
 lobby.init(manager)
 helm.init(manager, input_queue)
 engineering.init(manager, input_queue)
+weapons.init(manager, input_queue)
+science.init(manager, input_queue)
+medical.init(manager, input_queue)
+captain.init(manager, world.ship)
 game_loop.init(world, manager, input_queue)
 
 # When the host starts a game the lobby calls this to kick off the loop.
 lobby.register_game_start_callback(game_loop.start)
+# When the game ends the loop calls this to reset lobby state.
+game_loop.register_game_end_callback(lobby.on_game_end)
 
 # Serve client files
 CLIENT_DIR = Path(__file__).parent.parent / "client"
@@ -67,6 +73,10 @@ _HANDLERS: dict[str, _MessageHandler] = {
     "lobby": lobby.handle_lobby_message,
     "helm": helm.handle_helm_message,
     "engineering": engineering.handle_engineering_message,
+    "weapons": weapons.handle_weapons_message,
+    "science": science.handle_science_message,
+    "medical": medical.handle_medical_message,
+    "captain": captain.handle_captain_message,
 }
 
 
@@ -126,7 +136,7 @@ async def root() -> dict[str, str]:
         "name": "Starbridge",
         "version": "0.0.1",
         "status": "online",
-        "phase": "3 — Engineering Station + Power System",
+        "phase": "4 — Weapons Station + Combat",
     }
 
 
@@ -167,6 +177,58 @@ async def debug_damage(
     sys_obj.health = max(0.0, sys_obj.health - amount)
     logger.info("[DEBUG] Damaged %s: %.1f → %.1f HP", system, old_health, sys_obj.health)
     return {"system": system, "old_health": old_health, "new_health": sys_obj.health}
+
+
+@app.post("/debug/spawn_enemy")
+async def debug_spawn_enemy(
+    type_: str = Query("scout", alias="type", description="Enemy type: scout, cruiser, destroyer"),
+) -> dict[str, Any]:
+    """[DEBUG] Spawn an enemy near the player ship.
+
+    Example: POST /debug/spawn_enemy?type=cruiser
+    """
+    if not DEBUG:
+        raise HTTPException(status_code=404, detail="Not found")
+    valid_types = {"scout", "cruiser", "destroyer"}
+    if type_ not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Unknown enemy type: {type_!r}")
+    # Place enemy 5000 units north of the player.
+    ship = world.ship
+    x = ship.x
+    y = ship.y - 5_000.0
+    entity_id = f"enemy_{len(world.enemies) + 1}"
+    enemy = spawn_enemy(type_, x, y, entity_id)  # type: ignore[arg-type]
+    world.enemies.append(enemy)
+    logger.info("[DEBUG] Spawned %s %s at (%.0f, %.0f)", type_, entity_id, x, y)
+    return {"entity_id": entity_id, "type": type_, "x": x, "y": y}
+
+
+@app.post("/debug/start_game")
+async def debug_start_game(
+    mission_id: str = Query("debug_mission", description="Mission ID to start"),
+) -> dict[str, Any]:
+    """[DEBUG] Force-start the game without the host check.
+
+    Useful for automated integration testing when a browser connection holds
+    the host role.  Broadcasts game.started to all connected clients and
+    starts the game loop.
+    """
+    if not DEBUG:
+        raise HTTPException(status_code=404, detail="Not found")
+    game_payload = {
+        "mission_id": mission_id,
+        "mission_name": "Debug Mission",
+        "briefing_text": "All stations report ready. (debug start)",
+    }
+    # Bypass lobby host check — update the stored payload directly.
+    import server.lobby as _lobby_module
+    _lobby_module._game_payload = game_payload
+    _lobby_module._game_active = True
+    await game_loop.stop()   # no-op if not running; resets state if it is
+    await manager.broadcast(Message.build("game.started", game_payload))
+    await game_loop.start(mission_id)
+    logger.info("[DEBUG] Force-started game: %s", mission_id)
+    return {"status": "started", "mission_id": mission_id}
 
 
 @app.get("/debug/ship_status")

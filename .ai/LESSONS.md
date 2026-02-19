@@ -55,3 +55,21 @@ Copy this template when adding a new entry:
 **Cause**: `on_connect` sends a welcome to the new client then broadcasts `lobby.state` to ALL connected clients. In a two-client test, the first client gets an extra `lobby.state` when the second client connects.
 **Fix**: Trace the message sequence per-client before writing receive calls. Only consume what a given client actually receives.
 **Prevention**: Add a comment per `receive_json()` call explaining which server event produced it. Leave unread messages on older clients if you're only testing the newer client's responses.
+
+---
+
+## 2026-02-18 — State files must be updated at the end of every session, not deferred
+
+**Issue**: Phase 4 was built in full (244 tests passing) while `.ai/STATE.md` still showed Phase 3 data, `.ai/PHASE_CURRENT.md` still described Phase 4 as a future plan with unchecked task boxes, and `.ai/DECISIONS.md` was missing all Phase 4 architectural decisions.
+**Cause**: Implementation sessions focused on code and tests without circling back to update the project state documents. The state files were treated as documentation to be updated "eventually" rather than as live context required by the next session.
+**Fix**: Updated all state files at the start of the following session before any further work proceeded.
+**Prevention**: State files must be updated at the end of every session, not deferred. If a different model or a new session had picked this up, it would have had stale context and potentially duplicated or conflicted with existing work. The rule is: no session ends without STATE.md, PHASE_CURRENT.md, and DECISIONS.md reflecting the actual state of the codebase.
+
+---
+
+## 2026-02-18 — Budget gauge alarm at comfortable equilibrium
+
+**Issue**: The Engineering power budget gauge immediately turned red on game start because all 6 systems start at 100% each = 600/600 total = exactly at the budget cap. The threshold condition `totalPower >= POWER_BUDGET` was true from the very first server tick.
+**Cause**: When designing threshold-based colour alerts, the default/equilibrium state was not checked against the threshold values. The comfortable starting state (600/600) happened to sit exactly on the "critical" threshold.
+**Fix**: Removed colour thresholds from the budget bar entirely. It always renders in primary green. Per-system overclock indicators (amber slider thumb via `.sys-row--overclocked`, repair focus glow on schematic node) handle the per-system warning role.
+**Prevention**: Before writing any alert threshold, verify what the system's comfortable/default state value is and ensure it falls well below all thresholds. If the comfortable state is at or above a threshold, the threshold is wrong — not the default state. The fix is typically to remove or redesign the indicator, because it is answering the wrong question.

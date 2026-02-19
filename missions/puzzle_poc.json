@@ -1,0 +1,31 @@
+{
+  "id": "puzzle_poc",
+  "name": "Puzzle Framework PoC",
+  "briefing": "Framework demonstration. The puzzle engine will assign a sequence puzzle to Science shortly after launch. Solve it to complete the mission.",
+  "signal_location": null,
+  "defeat_condition": "player_hull_zero",
+  "victory_condition": "all_objectives_complete",
+  "entities": [],
+  "objectives": [
+    {
+      "id": "await_assignment",
+      "text": "Await puzzle assignment",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 3 },
+      "on_complete": {
+        "action": "start_puzzle",
+        "puzzle_type": "sequence_match",
+        "station": "science",
+        "label": "sequence_1",
+        "difficulty": 1,
+        "time_limit": 60.0
+      }
+    },
+    {
+      "id": "solve_puzzle",
+      "text": "Solve the sequence puzzle",
+      "trigger": "puzzle_completed",
+      "args": { "puzzle_label": "sequence_1" }
+    }
+  ]
+}

@@ -16,7 +16,7 @@
  */
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
-import { setStatusDot, setAlertLevel } from '../shared/ui_components.js';
+import { setStatusDot, setAlertLevel, showBriefing, showGameOver } from '../shared/ui_components.js';
 import {
   lerp,
   lerpAngle,
@@ -25,6 +25,8 @@ import {
   drawStarfield,
   drawCompass,
   drawMinimap,
+  drawShipChevron,
+  worldToScreen,
 } from '../shared/renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -35,6 +37,8 @@ const TICK_MS        = 100;    // server tick interval — must match game_loop.
 const HEADING_STEP   = 5;      // degrees per key press
 const THROTTLE_STEP  = 5;      // % per key press
 const STAR_COUNT     = 180;
+const HIT_FLASH_MS   = 400;
+const BEAM_FLASH_MS  = 300;
 
 // ---------------------------------------------------------------------------
 // DOM references
@@ -65,6 +69,11 @@ const telemPosY     = document.getElementById('telem-pos-y');
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
+
+// Enemy contacts from world.entities (for minimap overlay).
+let contacts = [];
+// Beam flash: { targetX, targetY, startTime } — shown on minimap
+let beamFlash = null;
 
 let gameActive = false;
 
@@ -111,9 +120,14 @@ function init() {
     statusLabelEl.textContent = status.toUpperCase();
   });
 
-  on('lobby.welcome', handleWelcome);
-  on('game.started',  handleGameStarted);
-  on('ship.state',    handleShipState);
+  on('lobby.welcome',      handleWelcome);
+  on('game.started',       handleGameStarted);
+  on('ship.state',         handleShipState);
+  on('world.entities',     handleWorldEntities);
+  on('ship.alert_changed', ({ level }) => setAlertLevel(level));
+  on('ship.hull_hit',      handleHullHit);
+  on('weapons.beam_fired', handleBeamFired);
+  on('game.over',          handleGameOver);
 
   setupKeyboard();
 
@@ -148,6 +162,10 @@ function handleGameStarted(payload) {
     requestAnimationFrame(renderLoop);
   });
 
+  if (payload.briefing_text) {
+    showBriefing(payload.mission_name, payload.briefing_text);
+  }
+
   console.log(`[helm] Game started — mission: ${payload.mission_id}`);
 }
 
@@ -156,6 +174,30 @@ function handleShipState(payload) {
   prevState    = currState;
   currState    = payload;
   lastTickTime = performance.now();
+}
+
+function handleWorldEntities(payload) {
+  if (!gameActive) return;
+  contacts = payload.enemies || [];
+}
+
+function handleHullHit() {
+  if (!gameActive) return;
+  const el = document.querySelector('.station-container');
+  if (el) {
+    el.classList.add('hit');
+    setTimeout(() => el.classList.remove('hit'), HIT_FLASH_MS);
+  }
+}
+
+function handleBeamFired(payload) {
+  if (!gameActive) return;
+  beamFlash = { targetX: payload.target_x, targetY: payload.target_y, startTime: performance.now() };
+}
+
+function handleGameOver(payload) {
+  gameActive = false;
+  showGameOver(payload.result, payload.stats || {});
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +264,58 @@ function drawCompassPanel(state) {
 function drawMinimapPanel(state) {
   const size = minimapCanvas.width;
   drawMinimap(mmCtx, size, state.position.x, state.position.y, state.heading);
+  drawMinimapContacts(mmCtx, size, state);
+  drawMinimapBeamFlash(mmCtx, size, state);
+}
+
+function drawMinimapBeamFlash(ctx, size, state) {
+  if (!beamFlash) return;
+  const now = performance.now();
+  const age = now - beamFlash.startTime;
+  if (age >= BEAM_FLASH_MS) { beamFlash = null; return; }
+
+  const PAD     = 6;
+  const SECTOR  = 100_000;
+  const mapW    = size - PAD * 2;
+  const alpha   = (1 - age / BEAM_FLASH_MS) * 0.9;
+
+  // Ship position on minimap.
+  const sx = PAD + (state.position.x / SECTOR) * mapW;
+  const sy = PAD + (state.position.y / SECTOR) * mapW;
+  // Target position on minimap.
+  const tx = PAD + (beamFlash.targetX / SECTOR) * mapW;
+  const ty = PAD + (beamFlash.targetY / SECTOR) * mapW;
+
+  ctx.save();
+  ctx.strokeStyle = `rgba(0, 255, 65, ${alpha})`;
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(tx, ty);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Overlay enemy contacts on the minimap after drawMinimap() has already
+ * drawn the base layer. Enemies are drawn as hostile-colour chevrons.
+ */
+function drawMinimapContacts(ctx, size, state) {
+  if (!contacts.length) return;
+
+  const PAD      = 6;
+  const mapW     = size - PAD * 2;
+  const mapH     = size - PAD * 2;
+  const SECTOR_W = 100_000;
+  const SECTOR_H = 100_000;
+  const C_ENEMY  = '#ff4040';
+
+  for (const contact of contacts) {
+    const sx = PAD + Math.max(0, Math.min(1, contact.x / SECTOR_W)) * mapW;
+    const sy = PAD + Math.max(0, Math.min(1, contact.y / SECTOR_H)) * mapH;
+    const headRad = contact.heading * Math.PI / 180;
+    drawShipChevron(ctx, sx, sy, headRad, 4, C_ENEMY);
+  }
 }
 
 function updateTelemetry(state) {

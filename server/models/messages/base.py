@@ -1,0 +1,98 @@
+"""Message envelope and payload validation dispatcher."""
+from __future__ import annotations
+
+import time
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from server.models.messages.captain import CaptainSetAlertPayload
+from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
+from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
+from server.models.messages.engineering import EngineeringSetPowerPayload, EngineeringSetRepairPayload
+from server.models.messages.helm import HelmSetHeadingPayload, HelmSetThrottlePayload
+from server.models.messages.lobby import LobbyClaimRolePayload, LobbyReleaseRolePayload, LobbyStartGamePayload
+from server.models.messages.science import ScienceCancelScanPayload, ScienceStartScanPayload
+from server.models.messages.weapons import (
+    WeaponsFireBeamsPayload,
+    WeaponsFireTorpedoPayload,
+    WeaponsSelectTargetPayload,
+    WeaponsSetShieldsPayload,
+)
+
+
+class Message(BaseModel):
+    """Standard WebSocket message envelope. All messages use this format.
+
+    tick is None for client→server messages and lobby messages.
+    It is populated by the server for in-game state updates.
+    Serialise outbound messages with to_json() to omit null fields.
+    """
+
+    type: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    tick: int | None = None
+    timestamp: float
+
+    @classmethod
+    def build(
+        cls,
+        type_: str,
+        payload: dict[str, Any] | None = None,
+        tick: int | None = None,
+    ) -> Message:
+        """Construct an outbound message stamped with the current time."""
+        return cls(
+            type=type_,
+            payload=payload or {},
+            tick=tick,
+            timestamp=time.time(),
+        )
+
+    def to_json(self) -> str:
+        """Serialise to JSON, omitting fields whose value is None."""
+        return self.model_dump_json(exclude_none=True)
+
+
+_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
+    # Lobby
+    "lobby.claim_role": LobbyClaimRolePayload,
+    "lobby.release_role": LobbyReleaseRolePayload,
+    "lobby.start_game": LobbyStartGamePayload,
+    # Helm
+    "helm.set_heading": HelmSetHeadingPayload,
+    "helm.set_throttle": HelmSetThrottlePayload,
+    # Engineering
+    "engineering.set_power": EngineeringSetPowerPayload,
+    "engineering.set_repair": EngineeringSetRepairPayload,
+    # Weapons
+    "weapons.select_target": WeaponsSelectTargetPayload,
+    "weapons.fire_beams": WeaponsFireBeamsPayload,
+    "weapons.fire_torpedo": WeaponsFireTorpedoPayload,
+    "weapons.set_shields": WeaponsSetShieldsPayload,
+    # Science
+    "science.start_scan": ScienceStartScanPayload,
+    "science.cancel_scan": ScienceCancelScanPayload,
+    # Captain
+    "captain.set_alert": CaptainSetAlertPayload,
+    # Medical
+    "medical.treat_crew": MedicalTreatCrewPayload,
+    "medical.cancel_treatment": MedicalCancelTreatmentPayload,
+    # Puzzle
+    "puzzle.submit": PuzzleSubmitPayload,
+    "puzzle.request_assist": PuzzleAssistPayload,
+    "puzzle.cancel": PuzzleCancelPayload,
+}
+
+
+def validate_payload(message: Message) -> BaseModel | None:
+    """Validate the payload of an inbound message against its type-specific schema.
+
+    Returns the validated payload model if the type has a registered schema.
+    Returns None if the type is unrecognised (unknown types are logged elsewhere).
+    Raises pydantic.ValidationError if the payload is structurally invalid.
+    """
+    schema = _PAYLOAD_SCHEMAS.get(message.type)
+    if schema is None:
+        return None
+    return schema.model_validate(message.payload)

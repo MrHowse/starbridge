@@ -36,6 +36,9 @@ class MockManager:
     async def broadcast(self, message: Message) -> None:
         self.broadcasts.append(message)
 
+    async def broadcast_to_roles(self, roles: list[str], message: Message) -> None:
+        self.broadcasts.append(message)
+
 
 def fresh() -> tuple[MockManager, World, asyncio.Queue]:  # type: ignore[type-arg]
     """Reset game_loop state with fresh dependencies and return them."""

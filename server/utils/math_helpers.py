@@ -35,3 +35,12 @@ def angle_diff(from_angle: float, to_angle: float) -> float:
     if diff > 180.0:
         diff -= 360.0
     return diff
+
+
+def bearing_to(x1: float, y1: float, x2: float, y2: float) -> float:
+    """Compass bearing from point (x1, y1) to point (x2, y2) in degrees [0, 360).
+
+    Heading convention: 0° = north (–y direction), clockwise.
+    """
+    import math
+    return math.degrees(math.atan2(x2 - x1, y1 - y2)) % 360

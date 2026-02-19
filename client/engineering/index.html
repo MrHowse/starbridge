@@ -10,9 +10,13 @@
 <body>
   <div class="station-container">
 
+    <!-- ─── Header bar ──────────────────────────────────────────────────── -->
     <header class="station-header panel">
       <div class="panel__header station-header__bar">
         <span class="text-title">ENGINEERING</span>
+        <div class="station-header__center">
+          <span class="text-label" id="mission-label">STANDING BY</span>
+        </div>
         <div class="station-header__status">
           <span class="status-dot status-dot--disconnected" data-status-dot></span>
           <span class="text-label" data-status-label>CONNECTING</span>
@@ -20,22 +24,50 @@
       </div>
     </header>
 
-    <main class="station-main">
-      <div class="station-standby" data-standby>
-        <p class="text-header">STANDING BY</p>
-        <p class="text-body">This station is not yet operational.</p>
-        <p class="text-label">Phase 3 — Coming soon</p>
-        <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
-      </div>
-      <div class="station-briefing panel" data-briefing style="display:none">
+    <!-- ─── Standby overlay (visible until game.started) ───────────────── -->
+    <div class="eng-standby" data-standby>
+      <p class="text-header">STANDING BY</p>
+      <p class="text-body">Awaiting mission orders from the Captain.</p>
+      <a class="text-label eng-standby__lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+    </div>
+
+    <!-- ─── Main engineering layout (hidden until game.started) ─────────── -->
+    <main class="eng-main" data-eng-main style="display:none">
+
+      <!-- Left: ship schematic diagnostic display -->
+      <section class="eng-schematic panel" aria-label="Ship systems schematic">
         <div class="panel__header">
-          <span class="text-header">MISSION BRIEFING</span>
+          <span class="text-header">SHIP SYSTEMS — ENGINEERING DIAGNOSTIC</span>
+          <span class="text-label" id="repair-status-label">NO REPAIR ACTIVE</span>
         </div>
-        <div class="station-briefing__body">
-          <p class="text-data" data-mission-name></p>
-          <p class="text-body" data-briefing-text></p>
+        <div class="eng-schematic__canvas-wrap">
+          <canvas id="schematic"></canvas>
         </div>
-      </div>
+      </section>
+
+      <!-- Right: power allocation + system controls -->
+      <aside class="eng-controls panel" aria-label="Power allocation">
+
+        <div class="panel__header">
+          <span class="text-header">POWER ALLOCATION</span>
+        </div>
+
+        <!-- Power budget indicator -->
+        <div class="eng-budget">
+          <div class="eng-budget__row">
+            <span class="text-label">POWER BUDGET</span>
+            <span class="text-data" id="budget-readout">000 / 600</span>
+          </div>
+          <div class="gauge eng-budget__gauge">
+            <div class="gauge__fill" id="budget-gauge-fill" style="width:0%; background:var(--primary)"></div>
+          </div>
+        </div>
+
+        <!-- System rows — populated by engineering.js at game start -->
+        <div class="eng-systems" id="systems-container"></div>
+
+      </aside>
+
     </main>
 
   </div>
