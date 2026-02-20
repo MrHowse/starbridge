@@ -1,12 +1,21 @@
-# Current Phase: v0.03 COMPLETE ✓
+# Current Phase: v0.04a — Mission Graph Engine (IN PROGRESS)
 
-> Updated 2026-02-20 — v0.03 gate verification complete.
+> Updated 2026-02-20 — v0.04a engine + tests complete.
 
 ## Status
 
+**v0.04a IN PROGRESS.** Engine implemented, 118 graph tests pass.
+
+- **1719 tests passing**, 0 regressions from v0.03 baseline (1601 post-gap-close)
+- `server/mission_graph.py` — NEW graph engine alongside existing engine.py
+- `tests/test_mission_graph.py` — 118 tests covering all node/edge/trigger types
+- Next: v0.04b — migration script + convert all 23 missions to graph format
+
+## v0.03 Status (CLOSED)
+
 **v0.03 is CLOSED.** Gate verification completed 2026-02-20.
 
-- **1578 tests passing**, 0 regressions from v0.02 baseline (948 tests)
+- **1578 tests at gate**, 0 regressions from v0.02 baseline (948 tests)
 - **12 player stations**: captain, helm, weapons, engineering, science, medical,
   security, comms, flight_ops, electronic_warfare, tactical + viewscreen (passive)
 - **9 puzzle types** across all stations
