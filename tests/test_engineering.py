@@ -147,8 +147,9 @@ async def test_handle_set_repair_unknown_system_returns_error():
 async def test_drain_queue_applies_set_power():
     _, world, queue = fresh_loop()
     ship = world.ship
-    # Reduce a different system first to create budget headroom for overclock.
-    ship.systems["beams"].power = 50.0  # total: 50+100+100+100+100+100 = 550 → headroom: 150
+    # Reduce a different system to create headroom; 7 systems at 100 = 700 budget.
+    # beams=50, others (incl. flight_deck) at 100 → other_total for engines = 550 → headroom: 150
+    ship.systems["beams"].power = 50.0
     await queue.put(("engineering.set_power", EngineeringSetPowerPayload(system="engines", level=130.0)))
     game_loop._drain_queue(ship)
     assert ship.systems["engines"].power == 130.0
@@ -157,17 +158,18 @@ async def test_drain_queue_applies_set_power():
 async def test_drain_queue_clamps_power_to_budget():
     _, world, queue = fresh_loop()
     ship = world.ship
-    # All systems at 100 = 600 total. No headroom for engines to go above 100.
+    # All 7 systems at 100 = 700 total. No headroom for engines to exceed 100.
     await queue.put(("engineering.set_power", EngineeringSetPowerPayload(system="engines", level=150.0)))
     game_loop._drain_queue(ship)
-    # other_total = 500. available = 600 - 500 = 100. 150 → clamped to 100.
+    # other_total = 600. available = 700 - 600 = 100. 150 → clamped to 100.
     assert ship.systems["engines"].power == 100.0
 
 
 async def test_drain_queue_does_not_clamp_within_budget():
     _, world, queue = fresh_loop()
     ship = world.ship
-    ship.systems["engines"].power = 50.0  # total now 550, headroom = 150 for beams
+    # engines=50, 5 others at 100, flight_deck=100 → other_total for beams = 550 → headroom: 150
+    ship.systems["engines"].power = 50.0
     await queue.put(("engineering.set_power", EngineeringSetPowerPayload(system="beams", level=130.0)))
     game_loop._drain_queue(ship)
     assert ship.systems["beams"].power == 130.0

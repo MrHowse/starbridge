@@ -107,10 +107,15 @@ def tick(world: World, ship: Ship, dt: float) -> list[str]:
     return []
 
 
-def build_sensor_contacts(world: World, ship: Ship) -> list[dict]:
+def build_sensor_contacts(
+    world: World,
+    ship: Ship,
+    extra_bubbles: list[tuple[float, float, float]] | None = None,
+) -> list[dict]:
     """Build the sensor.contacts payload for Weapons / Science clients.
 
-    Only includes enemies within effective sensor range.
+    Only includes enemies within effective sensor range OR within any of the
+    extra_bubbles provided by drones / probes [(x, y, range), ...].
     For unscanned contacts, type and shield/hull details are omitted —
     the client sees a bearing and position but no identity.
     For scanned contacts, full details plus a computed weakness hint are
@@ -121,7 +126,13 @@ def build_sensor_contacts(world: World, ship: Ship) -> list[dict]:
 
     for enemy in world.enemies:
         dist = distance(ship.x, ship.y, enemy.x, enemy.y)
-        if dist > range_:
+        in_range = dist <= range_
+        if not in_range and extra_bubbles:
+            for bx, by, br in extra_bubbles:
+                if distance(bx, by, enemy.x, enemy.y) <= br:
+                    in_range = True
+                    break
+        if not in_range:
             continue
 
         contact: dict = {

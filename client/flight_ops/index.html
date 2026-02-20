@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — FLIGHT OPERATIONS</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="flight_ops.css">
+</head>
+<body>
+  <div class="station-container">
+
+    <!-- ─── Header bar ──────────────────────────────────────────────────── -->
+    <header class="station-header panel">
+      <div class="panel__header station-header__bar">
+        <span class="text-title">FLIGHT OPS</span>
+        <div class="station-header__center">
+          <span class="text-label" id="mission-label">STANDING BY</span>
+        </div>
+        <div class="station-header__status">
+          <span class="status-dot status-dot--disconnected" data-status-dot></span>
+          <span class="text-label" data-status-label>CONNECTING</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── Standby overlay ─────────────────────────────────────────────── -->
+    <div class="fo-standby" data-standby>
+      <p class="text-header">STANDING BY</p>
+      <p class="text-body">Awaiting mission orders from the Captain.</p>
+      <a class="text-label fo-standby__lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+    </div>
+
+    <!-- ─── Main layout ─────────────────────────────────────────────────── -->
+    <main class="fo-main" data-fo-main style="display:none">
+
+      <!-- Left: sector map -->
+      <section class="fo-map-panel panel" id="fo-map-panel" aria-label="Sector map">
+        <div class="panel__header">
+          <span class="text-header">SECTOR MAP</span>
+          <span class="fo-map-label text-dim" id="fo-map-coord"></span>
+        </div>
+
+        <div class="fo-legend">
+          <div class="fo-legend-item">
+            <div class="fo-legend-dot" style="background:var(--primary)"></div>
+            <span>Ship</span>
+          </div>
+          <div class="fo-legend-item">
+            <div class="fo-legend-dot" style="background:#4fc3f7"></div>
+            <span>Drone</span>
+          </div>
+          <div class="fo-legend-item">
+            <div class="fo-legend-dot" style="background:#ffb000"></div>
+            <span>Probe</span>
+          </div>
+        </div>
+
+        <div class="fo-map-canvas-wrap" id="fo-canvas-wrap">
+          <canvas id="fo-map"></canvas>
+          <div class="fo-target-hint" id="fo-target-hint" style="display:none">
+            Click map to set drone target
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: drone cards + probe panel -->
+      <aside class="fo-controls panel" aria-label="Flight operations controls">
+
+        <div class="panel__header">
+          <span class="text-header">DRONES</span>
+        </div>
+
+        <div class="fo-controls-scroll">
+          <!-- Drone cards injected here by JS -->
+          <div id="fo-drone-cards"></div>
+
+          <!-- Probe panel -->
+          <div class="fo-probe-section">
+            <div class="panel__header fo-section-header">
+              <span class="text-label">PROBES</span>
+              <span class="text-data text-dim" id="fo-probe-stock">STOCK: 0</span>
+            </div>
+            <div class="fo-probe-stock-row">
+              <button class="fo-btn" id="fo-deploy-btn">Deploy Probe</button>
+              <span class="text-dim text-label" id="fo-probe-mode-hint" style="display:none">
+                click map →
+              </span>
+            </div>
+            <div class="fo-probe-list" id="fo-probe-list">
+              <p class="text-dim fo-no-probes">No probes deployed.</p>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+    </main>
+  </div>
+  <script type="module" src="flight_ops.js"></script>
+</body>
+</html>

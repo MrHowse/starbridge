@@ -260,10 +260,10 @@ def test_build_ship_state_throttle():
     assert msg.payload["throttle"] == 80.0
 
 
-def test_build_ship_state_has_six_systems():
+def test_build_ship_state_has_seven_systems():
     ship = Ship()
     msg = game_loop._build_ship_state(ship, tick=1)
-    expected = {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring"}
+    expected = {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring", "flight_deck"}
     assert set(msg.payload["systems"].keys()) == expected
 
 

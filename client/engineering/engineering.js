@@ -31,15 +31,15 @@ import { initRoleBar } from '../shared/role_bar.js';
 
 registerHelp([
   { selector: '#schematic',         text: 'Ship schematic — click a system node to set repair focus.', position: 'right' },
-  { selector: '#systems-container', text: 'System sliders — drag to allocate power (0–150%). Budget is 600 total.', position: 'left' },
-  { selector: '#budget-readout',    text: 'Power budget — stay under 600 to avoid overload.', position: 'below' },
+  { selector: '#systems-container', text: 'System sliders — drag to allocate power (0–150%). Budget is 700 total.', position: 'left' },
+  { selector: '#budget-readout',    text: 'Power budget — stay under 700 to avoid overload.', position: 'below' },
 ]);
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const POWER_BUDGET        = 600;    // total budget for all 6 systems combined
+const POWER_BUDGET        = 700;    // total budget for all 7 systems combined
 const OVERCLOCK_THRESHOLD = 100;    // power above this is "overclocked"
 const DAMAGE_FLASH_MS     = 500;    // duration of the red damage flash on a node
 
@@ -59,12 +59,13 @@ const C_OFFLINE  = '#444444';
  * labelDir controls where the text label appears relative to the node circle.
  */
 const SYSTEM_DEFS = [
-  { key: 'sensors',     label: 'SENSORS',   nx:  0.00, ny: -0.36, labelDir: 'below' },
-  { key: 'shields',     label: 'SHIELDS',   nx:  0.00, ny: -0.12, labelDir: 'right' },
-  { key: 'beams',       label: 'BEAMS',     nx: -0.28, ny:  0.04, labelDir: 'left'  },
-  { key: 'torpedoes',   label: 'TORPEDOES', nx:  0.28, ny:  0.04, labelDir: 'right' },
-  { key: 'manoeuvring', label: 'MANOEUV.',  nx:  0.00, ny:  0.20, labelDir: 'left'  },
-  { key: 'engines',     label: 'ENGINES',   nx:  0.00, ny:  0.37, labelDir: 'above' },
+  { key: 'sensors',     label: 'SENSORS',    nx:  0.00, ny: -0.36, labelDir: 'below' },
+  { key: 'shields',     label: 'SHIELDS',    nx:  0.00, ny: -0.12, labelDir: 'right' },
+  { key: 'beams',       label: 'BEAMS',      nx: -0.28, ny:  0.04, labelDir: 'left'  },
+  { key: 'torpedoes',   label: 'TORPEDOES',  nx:  0.28, ny:  0.04, labelDir: 'right' },
+  { key: 'manoeuvring', label: 'MANOEUV.',   nx:  0.00, ny:  0.20, labelDir: 'left'  },
+  { key: 'engines',     label: 'ENGINES',    nx:  0.00, ny:  0.37, labelDir: 'above' },
+  { key: 'flight_deck', label: 'FLT DECK',   nx:  0.28, ny: -0.20, labelDir: 'right' },
 ];
 
 /**

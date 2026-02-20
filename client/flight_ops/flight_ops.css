@@ -1,0 +1,392 @@
+/*
+ * Flight Operations Station Styles
+ *
+ * Layout:
+ *   - Left panel (flex 1): sector map — shows ship, drones, probes
+ *   - Right panel (320px fixed): drone status cards + probe panel
+ */
+
+/* =========================================================================
+   Station container
+   ========================================================================= */
+
+.station-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 0.4rem;
+  gap: 0.4rem;
+  overflow: hidden;
+}
+
+/* =========================================================================
+   Header bar
+   ========================================================================= */
+
+.station-header__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.station-header__center {
+  flex: 1;
+  text-align: center;
+}
+
+.station-header__status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* =========================================================================
+   Standby overlay
+   ========================================================================= */
+
+.fo-standby {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.fo-standby__lobby-link {
+  margin-top: 1rem;
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+/* =========================================================================
+   Main layout
+   ========================================================================= */
+
+.fo-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 0.4rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* =========================================================================
+   Sector map panel (left)
+   ========================================================================= */
+
+.fo-map-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fo-map-panel .panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.fo-map-label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.fo-map-canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  cursor: crosshair;
+}
+
+.fo-map-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Target-select mode highlight on the map panel */
+.fo-map-panel--targeting {
+  outline: 1px solid var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.fo-target-hint {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  color: var(--primary);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+  animation: fo-hint-pulse 1s ease-in-out infinite;
+}
+
+@keyframes fo-hint-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* =========================================================================
+   Controls panel (right)
+   ========================================================================= */
+
+.fo-controls {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fo-controls-scroll {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dim) var(--bg-secondary);
+}
+
+.fo-controls-scroll::-webkit-scrollbar { width: 4px; }
+.fo-controls-scroll::-webkit-scrollbar-track { background: var(--bg-secondary); }
+.fo-controls-scroll::-webkit-scrollbar-thumb { background: var(--primary-dim); }
+
+/* =========================================================================
+   Drone cards
+   ========================================================================= */
+
+.fo-section-header {
+  padding: 0.35rem 1rem;
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.fo-drone-card {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.2s;
+}
+
+.fo-drone-card--targeting {
+  background: rgba(0, 255, 65, 0.05);
+  border-bottom-color: var(--primary-dim);
+}
+
+.fo-drone-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.fo-drone-id {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-normal);
+  flex: 1;
+}
+
+.fo-drone-state-badge {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid currentColor;
+}
+
+.fo-drone-state-badge--hangar    { color: var(--text-dim); }
+.fo-drone-state-badge--transit   { color: #4fc3f7; }
+.fo-drone-state-badge--deployed  { color: var(--primary); }
+.fo-drone-state-badge--returning {
+  color: var(--system-warning);
+  animation: fo-return-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes fo-return-pulse {
+  from { opacity: 0.55; }
+  to   { opacity: 1.0; }
+}
+
+.fo-drone-card__fuel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.fo-fuel-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.fo-fuel-bar-wrap {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fo-fuel-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.3s, background 0.3s;
+}
+
+.fo-fuel-bar-fill--low {
+  background: var(--system-warning);
+}
+
+.fo-fuel-pct {
+  font-size: 0.65rem;
+  color: var(--text-normal);
+  min-width: 32px;
+  text-align: right;
+}
+
+.fo-drone-card__btns {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* =========================================================================
+   Probe panel
+   ========================================================================= */
+
+.fo-probe-section {
+  border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.fo-probe-stock-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.fo-probe-list {
+  max-height: 110px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dim) var(--bg-secondary);
+}
+
+.fo-probe-list::-webkit-scrollbar { width: 4px; }
+.fo-probe-list::-webkit-scrollbar-track { background: var(--bg-secondary); }
+.fo-probe-list::-webkit-scrollbar-thumb { background: var(--primary-dim); }
+
+.fo-probe-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.22rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.fo-probe-id {
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  min-width: 56px;
+}
+
+.fo-probe-coords {
+  color: var(--text-dim);
+}
+
+.fo-no-probes {
+  padding: 0.3rem 1rem;
+  font-size: 0.7rem;
+}
+
+/* =========================================================================
+   Shared button style
+   ========================================================================= */
+
+.fo-btn {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.16rem 0.45rem;
+  border: 1px solid var(--border-primary);
+  color: var(--text-dim);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.fo-btn:hover {
+  border-color: var(--primary);
+  color: var(--text-bright);
+  box-shadow: 0 0 5px var(--primary-glow);
+}
+
+.fo-btn--active {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 5px var(--primary-glow);
+}
+
+.fo-btn--warn:hover {
+  border-color: var(--system-warning);
+  color: var(--system-warning);
+}
+
+.fo-btn:disabled,
+.fo-btn--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =========================================================================
+   Legend
+   ========================================================================= */
+
+.fo-legend {
+  padding: 0.3rem 1rem;
+  display: flex;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.fo-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.62rem;
+  color: var(--text-dim);
+}
+
+.fo-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* =========================================================================
+   Responsive
+   ========================================================================= */
+
+@media (max-width: 768px) {
+  .fo-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}

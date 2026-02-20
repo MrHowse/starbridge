@@ -11,6 +11,11 @@ from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPay
 from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
 from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
+from server.models.messages.flight_ops import (
+    FlightOpsDeployProbePayload,
+    FlightOpsLaunchDronePayload,
+    FlightOpsRecallDronePayload,
+)
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
     EngineeringDispatchDCTPayload,
@@ -101,6 +106,10 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "puzzle.submit": PuzzleSubmitPayload,
     "puzzle.request_assist": PuzzleAssistPayload,
     "puzzle.cancel": PuzzleCancelPayload,
+    # Flight Ops
+    "flight_ops.launch_drone":  FlightOpsLaunchDronePayload,
+    "flight_ops.recall_drone":  FlightOpsRecallDronePayload,
+    "flight_ops.deploy_probe":  FlightOpsDeployProbePayload,
 }
 
 

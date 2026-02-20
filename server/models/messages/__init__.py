@@ -66,6 +66,13 @@ from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPay
 # Puzzle
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
 
+# Flight Ops
+from server.models.messages.flight_ops import (
+    FlightOpsDeployProbePayload,
+    FlightOpsLaunchDronePayload,
+    FlightOpsRecallDronePayload,
+)
+
 # Game lifecycle
 from server.models.messages.game import (
     ErrorPermissionPayload,
@@ -127,6 +134,10 @@ __all__ = [
     "PuzzleSubmitPayload",
     "PuzzleAssistPayload",
     "PuzzleCancelPayload",
+    # flight ops
+    "FlightOpsLaunchDronePayload",
+    "FlightOpsRecallDronePayload",
+    "FlightOpsDeployProbePayload",
     # game
     "ErrorValidationPayload",
     "ErrorPermissionPayload",

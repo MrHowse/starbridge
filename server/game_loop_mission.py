@@ -270,7 +270,11 @@ async def tick_mission(
 # ---------------------------------------------------------------------------
 
 
-def build_sensor_contacts(world: World, ship: object) -> Message:
+def build_sensor_contacts(
+    world: World,
+    ship: object,
+    extra_bubbles: list[tuple[float, float, float]] | None = None,
+) -> Message:
     """Build the sensor.contacts message for Weapons / Science clients."""
     torpedoes = [
         {
@@ -285,7 +289,7 @@ def build_sensor_contacts(world: World, ship: object) -> Message:
     return Message.build(
         "sensor.contacts",
         {
-            "contacts": sensors.build_sensor_contacts(world, ship),  # type: ignore[arg-type]
+            "contacts": sensors.build_sensor_contacts(world, ship, extra_bubbles),  # type: ignore[arg-type]
             "torpedoes": torpedoes,
         },
     )

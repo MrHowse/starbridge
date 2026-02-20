@@ -4,7 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, field_validator
 
 VALID_SYSTEMS: frozenset[str] = frozenset(
-    {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring"}
+    {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring", "flight_deck"}
 )
 
 

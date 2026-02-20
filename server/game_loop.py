@@ -26,6 +26,9 @@ from server.models.messages import (
     CommsHailPayload,
     CommsTuneFrequencyPayload,
     CrewNotifyPayload,
+    FlightOpsDeployProbePayload,
+    FlightOpsLaunchDronePayload,
+    FlightOpsRecallDronePayload,
     GameBriefingLaunchPayload,
     EngineeringCancelDCTPayload,
     EngineeringDispatchDCTPayload,
@@ -67,6 +70,7 @@ import server.game_loop_security as gls
 import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
 import server.game_loop_damage_control as gldc
+import server.game_loop_flight_ops as glfo
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -85,7 +89,7 @@ TICK_RATE: int = 10
 TICK_DT: float = 1.0 / TICK_RATE
 
 # Engineering constants — tunable for gameplay feel
-POWER_BUDGET: float = 600.0
+POWER_BUDGET: float = 700.0
 OVERCLOCK_THRESHOLD: float = 100.0
 OVERCLOCK_DAMAGE_CHANCE: float = 0.10
 OVERCLOCK_DAMAGE_HP: float = 3.0
@@ -165,6 +169,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     glco.reset()
     glcap.reset()
     gldc.reset()
+    glfo.reset()
     _puzzle_engine.reset()
     _applied_sensor_assists.clear()
     _applied_science_medical_assists.clear()
@@ -250,6 +255,7 @@ async def _loop() -> None:
         # 3. Engineering. 3.5 Crew factors + medical + disease. 3.6 Security. 3.7 Comms.
         damaged_systems = _apply_engineering(_world.ship)
         gldc.tick(_world.ship.interior, TICK_DT)
+        glfo.tick(_world.ship, TICK_DT)
         _world.ship.update_crew_factors()
         glmed.tick_treatments(_world.ship, TICK_DT)
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
@@ -465,9 +471,11 @@ async def _loop() -> None:
             ["helm", "engineering", "captain", "viewscreen"],
             glm.build_world_entities(_world),
         )
+        _flight_deck_eff = _world.ship.systems["flight_deck"].efficiency
+        _detection_bubbles = glfo.get_detection_bubbles(_flight_deck_eff)
         await _manager.broadcast_to_roles(
             ["weapons", "science"],
-            glm.build_sensor_contacts(_world, _world.ship),
+            glm.build_sensor_contacts(_world, _world.ship, extra_bubbles=_detection_bubbles),
         )
 
         # 11c. Scan progress.
@@ -529,6 +537,12 @@ async def _loop() -> None:
         await _manager.broadcast_to_roles(
             ["engineering"],
             Message.build("engineering.dc_state", gldc.build_dc_state(_world.ship.interior)),
+        )
+
+        # 11j. Flight ops state → Flight Ops station.
+        await _manager.broadcast_to_roles(
+            ["flight_ops"],
+            Message.build("flight_ops.state", glfo.build_state(_world.ship)),
         )
 
         # 12–15. Damage events, torpedo hits, action events, security events.
@@ -663,6 +677,17 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                     "message":   msg_text,
                     "from_role": payload.from_role.strip()[:20] or "crew",
                 }))
+        elif msg_type == "flight_ops.launch_drone" and isinstance(payload, FlightOpsLaunchDronePayload):
+            glfo.launch_drone(payload.drone_id, payload.target_x, payload.target_y, ship)
+            gl.log_event("flight_ops", "drone_launched", {"drone_id": payload.drone_id})
+        elif msg_type == "flight_ops.recall_drone" and isinstance(payload, FlightOpsRecallDronePayload):
+            glfo.recall_drone(payload.drone_id)
+            gl.log_event("flight_ops", "drone_recalled", {"drone_id": payload.drone_id})
+        elif msg_type == "flight_ops.deploy_probe" and isinstance(payload, FlightOpsDeployProbePayload):
+            glfo.deploy_probe(payload.target_x, payload.target_y)
+            gl.log_event("flight_ops", "probe_deployed", {
+                "target_x": payload.target_x, "target_y": payload.target_y,
+            })
         elif msg_type == "game.briefing_launch" and isinstance(payload, GameBriefingLaunchPayload):
             events.append(("game.all_ready", {}))
         else:

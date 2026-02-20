@@ -66,10 +66,10 @@ class Shields:
 
 
 def _default_systems() -> dict[str, ShipSystem]:
-    """Return the six default ship systems at full power and health."""
+    """Return the seven default ship systems at full power and health."""
     return {
         name: ShipSystem(name)
-        for name in ("engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring")
+        for name in ("engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring", "flight_deck")
     }
 
 
