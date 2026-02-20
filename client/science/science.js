@@ -62,6 +62,31 @@ const C_SELECTED = '#00aaff';   // selected contact glow — blue
 const C_BEARING  = 'rgba(255, 176, 0, 0.55)'; // triangulation bearing lines — amber
 
 // ---------------------------------------------------------------------------
+// Scan mode definitions
+// ---------------------------------------------------------------------------
+
+/**
+ * rangeScale — multiplier applied to the base sensor range in this mode.
+ * GRAV: mass-signature falloff is steeper, 90% effective range.
+ * BIO:  life-signs attenuate through hull plating, 75% effective range.
+ * SUB:  subspace horizon is wider, 125% effective range.
+ *
+ * filterContacts() — which contacts are detectable in this mode.
+ *   EM   — all contacts.
+ *   GRAV — heavy ships only (cruiser/destroyer have enough mass).
+ *   BIO  — only already-scanned contacts (bio-lock needs initial EM contact).
+ *   SUB  — all contacts (same as EM but through interference/cloak).
+ */
+const SCAN_MODES = {
+  em:   { label: 'EM',   fullName: 'ELECTROMAGNETIC', key: '1', rangeScale: 1.00, color: '#00ff41' },
+  grav: { label: 'GRAV', fullName: 'GRAVIMETRIC',     key: '2', rangeScale: 0.90, color: '#00aaff' },
+  bio:  { label: 'BIO',  fullName: 'BIOLOGICAL',      key: '3', rangeScale: 0.75, color: '#ff44ff' },
+  sub:  { label: 'SUB',  fullName: 'SUBSPACE',        key: '4', rangeScale: 1.25, color: '#aa44ff' },
+};
+
+const MODE_SWITCH_MS = 3000;  // recalibration delay (ms)
+
+// ---------------------------------------------------------------------------
 // DOM references
 // ---------------------------------------------------------------------------
 
@@ -99,6 +124,13 @@ const resWeakness        = document.getElementById('res-weakness');
 const sensorPowerEl = document.getElementById('sensor-power');
 const sensorEffEl   = document.getElementById('sensor-efficiency');
 
+const modeBtnEls = {
+  em:   document.getElementById('mode-em'),
+  grav: document.getElementById('mode-grav'),
+  bio:  document.getElementById('mode-bio'),
+  sub:  document.getElementById('mode-sub'),
+};
+
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
@@ -116,6 +148,11 @@ let sensorRange = BASE_SENSOR_RANGE;  // updated from ship.state
 let signalLocation = null;           // {x, y} from game.started payload, or null
 let bearingLines   = [];             // [{bearing, ship_x, ship_y}] from mission.signal_bearing
 let signalScanCount = 0;             // 0, 1, or 2 — how many bearing scans recorded
+
+// Scan mode state
+let scanMode         = 'em';   // active mode: 'em' | 'grav' | 'bio' | 'sub'
+let modeSwitchTarget = null;   // mode we're recalibrating to, or null
+let modeSwitchStart  = 0;      // performance.now() when recalibration began
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -145,6 +182,13 @@ function init() {
 
   initPuzzleRenderer(send);
   setupControls();
+  setupModeButtons();
+  document.addEventListener('keydown', (e) => {
+    if (!gameActive) return;
+    const modeByKey = { '1': 'em', '2': 'grav', '3': 'bio', '4': 'sub' };
+    const m = modeByKey[e.key];
+    if (m) requestModeSwitch(m);
+  });
   SoundBank.init();
   wireButtonSounds(SoundBank);
   initHelpOverlay();
@@ -168,6 +212,11 @@ function handleGameStarted(payload) {
   bearingLines    = [];
   signalScanCount = 0;
 
+  // Reset scan mode.
+  scanMode         = 'em';
+  modeSwitchTarget = null;
+  updateModeSelectorUI();
+
   requestAnimationFrame(() => {
     sensorRenderer = new MapRenderer(sensorCanvas, {
       range:         sensorRange,
@@ -176,10 +225,12 @@ function handleGameStarted(payload) {
       showRangeRings: true,
       interactive:   true,
       drawContact:   (ctx, sx, sy, contact, selected, _now) => {
+        // Callback references module-level scanMode, so mode colour updates live.
+        const modeColor = SCAN_MODES[scanMode].color;
         if (contact.scan_state === 'scanned') {
-          drawScannedContact(ctx, sx, sy, contact.type, selected);
+          drawScannedContact(ctx, sx, sy, contact.type, selected, modeColor);
         } else {
-          drawUnknownContact(ctx, sx, sy, selected);
+          drawUnknownContact(ctx, sx, sy, selected, modeColor);
         }
       },
     });
@@ -210,7 +261,7 @@ function handleShipState(payload) {
   sensorRange     = BASE_SENSOR_RANGE * sensorEff;
 
   if (sensorRenderer) {
-    sensorRenderer._range = sensorRange;
+    sensorRenderer._range = sensorRange * SCAN_MODES[scanMode].rangeScale;
     sensorRenderer.updateShipState(payload);
   }
 
@@ -219,8 +270,7 @@ function handleShipState(payload) {
   sensorPowerEl.textContent = `${Math.round(power)}%`;
   sensorEffEl.textContent   = `${Math.round(sensorEff * 100)}%`;
 
-  // Update range label in panel header.
-  sensorRangeLabel.textContent = `RANGE: ${(sensorRange / 1000).toFixed(0)}km`;
+  updateRangeLabel();
 }
 
 function handleSensorContacts(payload) {
@@ -237,7 +287,7 @@ function handleSensorContacts(payload) {
     resetScanProgress();
   }
 
-  if (sensorRenderer) sensorRenderer.updateContacts(contacts);
+  if (sensorRenderer) sensorRenderer.updateContacts(filterContactsForMode(contacts));
 
   renderContactList();
   updateScanUI();
@@ -361,9 +411,10 @@ function selectContact(id) {
 // ---------------------------------------------------------------------------
 
 function renderContactList() {
-  // Build display list: real contacts + optional signal pseudo-contact.
-  const displayContacts = [...contacts];
-  if (signalLocation && signalScanCount < 2) {
+  // Build display list: mode-filtered real contacts + optional signal pseudo-contact.
+  // Signal is an EM/electromagnetic & subspace phenomenon — not visible in GRAV or BIO.
+  const displayContacts = [...filterContactsForMode(contacts)];
+  if (signalLocation && signalScanCount < 2 && (scanMode === 'em' || scanMode === 'sub')) {
     displayContacts.unshift({
       id: 'signal',
       x: signalLocation.x,
@@ -472,13 +523,32 @@ function resetScanProgress() {
 function renderLoop(now) {
   if (!gameActive) return;
 
+  // Recalibration animation during mode switch.
+  if (modeSwitchTarget !== null) {
+    const progress = Math.min(1, (now - modeSwitchStart) / MODE_SWITCH_MS);
+    drawRecalibrationOverlay(progress);
+    if (progress >= 1) {
+      // Switch complete — snap to new mode.
+      scanMode         = modeSwitchTarget;
+      modeSwitchTarget = null;
+      if (sensorRenderer) {
+        sensorRenderer._range = sensorRange * SCAN_MODES[scanMode].rangeScale;
+        sensorRenderer.updateContacts(filterContactsForMode(contacts));
+      }
+      updateModeSelectorUI();
+    }
+    requestAnimationFrame(renderLoop);
+    return;
+  }
+
   sensorRenderer.render(now);
 
-  // Science-specific overlay: triangulation bearing lines drawn on top.
+  // Science-specific overlays drawn on top.
+  const ctx = sensorCanvas.getContext('2d');
   if (bearingLines.length > 0) {
-    const ctx = sensorCanvas.getContext('2d');
     drawBearingLines(ctx, sensorCanvas.width, sensorCanvas.height);
   }
+  drawModeOverlay(ctx, sensorCanvas.width, sensorCanvas.height);
 
   requestAnimationFrame(renderLoop);
 }
@@ -487,12 +557,12 @@ function renderLoop(now) {
 // Contact drawing (station-specific, NOT in renderer.js)
 // ---------------------------------------------------------------------------
 
-function drawUnknownContact(ctx, sx, sy, selected) {
+function drawUnknownContact(ctx, sx, sy, selected, modeColor = C_UNKNOWN) {
   ctx.save();
   ctx.translate(sx, sy);
 
   // Filled dot.
-  ctx.fillStyle = selected ? C_SELECTED : C_UNKNOWN;
+  ctx.fillStyle = selected ? C_SELECTED : modeColor;
   ctx.beginPath();
   ctx.arc(0, 0, 4, 0, Math.PI * 2);
   ctx.fill();
@@ -500,7 +570,7 @@ function drawUnknownContact(ctx, sx, sy, selected) {
   // Outer ping ring.
   ctx.strokeStyle = selected
     ? 'rgba(0, 170, 255, 0.5)'
-    : 'rgba(255, 255, 0, 0.3)';
+    : modeColor + '4d';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.arc(0, 0, selected ? 12 : 9, 0, Math.PI * 2);
@@ -509,12 +579,12 @@ function drawUnknownContact(ctx, sx, sy, selected) {
   ctx.restore();
 }
 
-function drawScannedContact(ctx, sx, sy, type, selected) {
+function drawScannedContact(ctx, sx, sy, type, selected, modeColor = C_SCANNED) {
   const halfSize = CONTACT_SHAPES[type] ?? CONTACT_SHAPES.cruiser;
 
   ctx.save();
   ctx.translate(sx, sy);
-  ctx.strokeStyle = selected ? C_SELECTED : C_SCANNED;
+  ctx.strokeStyle = selected ? C_SELECTED : modeColor;
   ctx.lineWidth   = selected ? 2 : 1.5;
 
   if (type === 'scout') {
@@ -555,6 +625,129 @@ function drawScannedContact(ctx, sx, sy, type, selected) {
     ctx.stroke();
   }
 
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Scan mode helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Filter the raw contacts list to only those detectable in the current mode.
+ * EM:   all contacts.
+ * GRAV: heavy-mass ships only (cruiser + destroyer — scouts too small).
+ * BIO:  bio-signatures require an initial EM lock → only scanned contacts.
+ * SUB:  wide-aperture detection — all contacts (same as EM, different rendering).
+ */
+function filterContactsForMode(raw) {
+  switch (scanMode) {
+    case 'grav': return raw.filter(c => c.type === 'cruiser' || c.type === 'destroyer');
+    case 'bio':  return raw.filter(c => c.scan_state === 'scanned');
+    default:     return raw;  // em, sub
+  }
+}
+
+/**
+ * Initiate a 3-second recalibration to the given scan mode.
+ * Ignored if already in that mode and not switching.
+ */
+function requestModeSwitch(mode) {
+  if (!gameActive) return;
+  if (mode === scanMode && !modeSwitchTarget) return;
+  if (modeSwitchTarget === mode) return;
+  modeSwitchTarget = mode;
+  modeSwitchStart  = performance.now();
+  // Update button appearance: dim all, pulse the target.
+  for (const btn of Object.values(modeBtnEls)) {
+    if (btn) btn.classList.remove('mode-btn--active', 'mode-btn--switching');
+  }
+  if (modeBtnEls[mode]) modeBtnEls[mode].classList.add('mode-btn--switching');
+}
+
+/** Update mode selector button appearance to reflect the active scanMode. */
+function updateModeSelectorUI() {
+  for (const [m, btn] of Object.entries(modeBtnEls)) {
+    if (!btn) continue;
+    btn.classList.remove('mode-btn--active', 'mode-btn--switching');
+    if (m === scanMode) btn.classList.add('mode-btn--active');
+  }
+  updateRangeLabel();
+  renderContactList();
+  updateScanUI();
+}
+
+/** Update the RANGE label, accounting for current mode's range scale. */
+function updateRangeLabel() {
+  const scale = SCAN_MODES[scanMode].rangeScale;
+  const r     = sensorRange * scale;
+  sensorRangeLabel.textContent = `RANGE: ${(r / 1000).toFixed(0)}km`;
+}
+
+/** Wire click handlers for the 4 mode selector buttons. */
+function setupModeButtons() {
+  for (const [mode, btn] of Object.entries(modeBtnEls)) {
+    if (btn) btn.addEventListener('click', () => requestModeSwitch(mode));
+  }
+}
+
+/**
+ * Draw the recalibration animation that plays during a mode switch.
+ * progress ∈ [0, 1] — how far through the 3-second delay we are.
+ */
+function drawRecalibrationOverlay(progress) {
+  const ctx = sensorCanvas.getContext('2d');
+  const cw  = sensorCanvas.width;
+  const ch  = sensorCanvas.height;
+  const mode = SCAN_MODES[modeSwitchTarget];
+  const col  = mode.color;
+
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.fillStyle = '#050505';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Animated scan sweep.
+  const sweepY = progress * ch;
+  const grad   = ctx.createLinearGradient(0, Math.max(0, sweepY - 60), 0, sweepY);
+  grad.addColorStop(0, 'transparent');
+  grad.addColorStop(1, col + '28');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, Math.max(0, sweepY - 60), cw, 60);
+
+  ctx.strokeStyle = col + 'aa';
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, sweepY);
+  ctx.lineTo(cw, sweepY);
+  ctx.stroke();
+
+  // Progress bar at canvas bottom.
+  ctx.fillStyle = col + '55';
+  ctx.fillRect(0, ch - 3, cw * progress, 3);
+
+  // Status text.
+  ctx.fillStyle    = col;
+  ctx.font         = '11px "Share Tech Mono", monospace';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`RECALIBRATING — ${mode.fullName}`, cw / 2, ch / 2 - 13);
+
+  ctx.fillStyle = col + '88';
+  ctx.font      = '9px "Share Tech Mono", monospace';
+  ctx.fillText(`${Math.round(progress * 100)}%`, cw / 2, ch / 2 + 10);
+}
+
+/**
+ * Draw a small mode indicator in the top-left corner of the sensor canvas.
+ * Called every frame on top of the normal MapRenderer output.
+ */
+function drawModeOverlay(ctx, cw, _ch) {
+  const mode = SCAN_MODES[scanMode];
+  ctx.save();
+  ctx.font         = '9px "Share Tech Mono", monospace';
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle    = mode.color + '88';
+  ctx.fillText(`${mode.label} BAND`, 8, 8);
   ctx.restore();
 }
 

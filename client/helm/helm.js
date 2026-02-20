@@ -162,8 +162,10 @@ function init() {
 // ---------------------------------------------------------------------------
 
 function handleWelcome(payload) {
-  // Nothing helm-specific needed from welcome; status dot handles connection.
   console.log('[helm] Connected as', payload.connection_id);
+  // Re-claim role so this connection receives world.entities broadcasts.
+  const name = sessionStorage.getItem('player_name') || 'HELM';
+  send('lobby.claim_role', { role: 'helm', player_name: name });
 }
 
 function handleGameStarted(payload) {

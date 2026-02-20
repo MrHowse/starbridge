@@ -291,8 +291,8 @@ function init() {
   initRoleBar(send, 'medical');
 
   on('lobby.welcome', () => {
-    const callsign = sessionStorage.getItem('callsign') || 'MEDIC';
-    send('lobby.claim_role', { role: 'medical', player_name: callsign });
+    const name = sessionStorage.getItem('player_name') || 'MEDIC';
+    send('lobby.claim_role', { role: 'medical', player_name: name });
   });
 
   connect();

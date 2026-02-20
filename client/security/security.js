@@ -71,6 +71,37 @@ const C_DIM      = 'rgba(0,255,65,0.25)';
 const C_CONN     = 'rgba(0,255,65,0.18)';
 
 // ---------------------------------------------------------------------------
+// Hull geometry constants
+// ---------------------------------------------------------------------------
+
+const HULL_CX = CANVAS_W / 2;   // 292 — horizontal centre of canvas
+
+/**
+ * Hull polygon vertices (bow = top, stern = bottom, clockwise).
+ * Designed to contain the 4-col × 5-row room grid (x=40..544, y=40..422)
+ * with ~16 px margin on each side.
+ */
+const HULL_VERTICES = [
+  [292,   5],  // bow tip
+  [160,  38],  // left bow shoulder
+  [ 24,  96],  // left upper flank
+  [ 16, 200],  // left amidships (widest)
+  [ 24, 332],  // left lower flank
+  [ 60, 422],  // left stern quarter
+  [148, 448],  // left stern
+  [292, 454],  // stern centre
+  [436, 448],  // right stern
+  [524, 422],  // right stern quarter
+  [560, 332],  // right lower flank
+  [568, 200],  // right amidships
+  [560,  96],  // right upper flank
+  [424,  38],  // right bow shoulder
+];
+
+/** Y positions of deck separator ribs (midpoint between consecutive row gaps). */
+const DECK_BOUNDARIES_Y = [114, 192, 270, 348];
+
+// ---------------------------------------------------------------------------
 // DOM refs
 // ---------------------------------------------------------------------------
 
@@ -139,6 +170,113 @@ function roomAtPoint(px, py) {
 }
 
 // ---------------------------------------------------------------------------
+// Hull rendering — ship-shaped background
+// ---------------------------------------------------------------------------
+
+/** Trace the hull polygon onto the current ctx path (does not stroke/fill). */
+function hullPath() {
+  ctx.beginPath();
+  ctx.moveTo(HULL_VERTICES[0][0], HULL_VERTICES[0][1]);
+  for (let i = 1; i < HULL_VERTICES.length; i++) {
+    ctx.lineTo(HULL_VERTICES[i][0], HULL_VERTICES[i][1]);
+  }
+  ctx.closePath();
+}
+
+/** Draw the ship hull silhouette: dark interior fill + glowing edge. */
+function drawHull() {
+  ctx.save();
+
+  // Dark hull interior
+  hullPath();
+  ctx.fillStyle = '#030d05';
+  ctx.fill();
+
+  // Armour-plate doubling — thick inner stroke (creates a recessed-edge look)
+  ctx.save();
+  hullPath();
+  ctx.clip();
+  hullPath();
+  ctx.strokeStyle = 'rgba(0,255,65,0.09)';
+  ctx.lineWidth   = 10;
+  ctx.stroke();
+  ctx.restore();
+
+  // Outer hull edge with glow
+  hullPath();
+  ctx.shadowBlur   = 22;
+  ctx.shadowColor  = 'rgba(0,255,65,0.5)';
+  ctx.strokeStyle  = 'rgba(0,255,65,0.6)';
+  ctx.lineWidth    = 1.5;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
+/** Draw decorative structural elements: keel spine, deck ribs, orientation labels. */
+function drawStructure() {
+  ctx.save();
+
+  // Clip all structure to the hull interior
+  hullPath();
+  ctx.clip();
+
+  // Keel / spine line (vertical centre)
+  ctx.setLineDash([5, 7]);
+  ctx.strokeStyle = 'rgba(0,255,65,0.18)';
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(HULL_CX, 10);
+  ctx.lineTo(HULL_CX, 450);
+  ctx.stroke();
+
+  // Deck separator ribs (horizontal dashed lines at row boundaries)
+  for (const y of DECK_BOUNDARIES_Y) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(CANVAS_W, y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Orientation labels
+  ctx.font         = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle    = 'rgba(0,255,65,0.28)';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('BOW', HULL_CX, 10);
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('STERN', HULL_CX, 448);
+
+  // PORT / STBD side labels (rotated)
+  ctx.font      = '6px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(0,255,65,0.16)';
+  ctx.textBaseline = 'middle';
+
+  ctx.save();
+  ctx.translate(12, CANVAS_H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('PORT', 0, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(CANVAS_W - 12, CANVAS_H / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.fillText('STBD', 0, 0);
+  ctx.restore();
+
+  // Engine exhaust glow at stern (subtle amber radial gradient)
+  const eng = ctx.createRadialGradient(HULL_CX, 450, 0, HULL_CX, 450, 90);
+  eng.addColorStop(0, 'rgba(255,110,0,0.10)');
+  eng.addColorStop(1, 'rgba(255,110,0,0)');
+  ctx.fillStyle = eng;
+  ctx.fillRect(HULL_CX - 90, 368, 180, 88);
+
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
 // Canvas rendering
 // ---------------------------------------------------------------------------
 
@@ -155,9 +293,13 @@ function roomStrokeColor(state) {
 function draw() {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-  // Background
+  // Void background (space outside hull)
   ctx.fillStyle = C_BG;
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Ship hull silhouette + structural overlays
+  drawHull();
+  drawStructure();
 
   if (Object.keys(layout).length === 0) return;
 
@@ -638,8 +780,8 @@ function init() {
   initHelpOverlay();
 
   on('lobby.welcome', () => {
-    const callsign = sessionStorage.getItem('callsign') || 'SECURITY';
-    send('lobby.claim_role', { role: 'security', player_name: callsign });
+    const name = sessionStorage.getItem('player_name') || 'SECURITY';
+    send('lobby.claim_role', { role: 'security', player_name: name });
   });
 
   connect();
