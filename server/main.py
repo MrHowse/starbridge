@@ -16,10 +16,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from server import captain, comms, damage_control, engineering, ew, flight_ops, game_loop, helm, lobby, medical, science, security, tactical, weapons
+from server.mission_validator import validate_mission as _validate_mission
 from server.connections import ConnectionManager
 from server.models.messages import Message, VALID_SYSTEMS
 from server.models.world import World, spawn_enemy
@@ -66,6 +68,8 @@ game_loop.register_game_end_callback(lobby.on_game_end)
 # Serve client files
 CLIENT_DIR = Path(__file__).parent.parent / "client"
 app.mount("/client", StaticFiles(directory=str(CLIENT_DIR), html=True), name="client")
+
+MISSIONS_DIR = Path(__file__).parent.parent / "missions"
 
 # ---------------------------------------------------------------------------
 # Message routing
@@ -148,7 +152,7 @@ async def root() -> dict[str, str]:
         "name": "Starbridge",
         "version": "0.0.1",
         "status": "online",
-        "phase": "v0.03",
+        "phase": "v0.04",
     }
 
 
@@ -164,6 +168,78 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         manager.disconnect(connection_id)
         await lobby.on_disconnect(connection_id)
+
+
+# ---------------------------------------------------------------------------
+# Mission Editor endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/editor")
+async def editor_page() -> RedirectResponse:
+    """Redirect browser to the mission editor client page."""
+    return RedirectResponse(url="/client/editor/", status_code=302)
+
+
+@app.get("/editor/missions")
+async def list_missions() -> dict:
+    """Return list of all mission JSON files in MISSIONS_DIR."""
+    missions = []
+    if MISSIONS_DIR.exists():
+        for path in sorted(MISSIONS_DIR.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                missions.append({
+                    "id": data.get("id", path.stem),
+                    "name": data.get("name", path.stem),
+                    "file": path.name,
+                })
+            except (json.JSONDecodeError, OSError):
+                missions.append({"id": path.stem, "name": path.stem, "file": path.name})
+    return {"missions": missions}
+
+
+@app.get("/editor/mission/{mission_id}")
+async def get_mission(mission_id: str) -> dict:
+    """Return a mission JSON by ID (file stem).  404 if missing, 422 if invalid JSON."""
+    path = MISSIONS_DIR / f"{mission_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Mission '{mission_id}' not found.")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid JSON: {exc}") from exc
+    return data
+
+
+@app.post("/editor/validate")
+async def validate_mission_endpoint(mission: dict) -> dict:
+    """Validate mission structure.  Returns {valid, errors}."""
+    errors = _validate_mission(mission)
+    return {"valid": len(errors) == 0, "errors": errors}
+
+
+@app.post("/editor/save")
+async def save_mission_endpoint(payload: dict) -> dict:
+    """Save a mission JSON to MISSIONS_DIR/{id}.json.
+
+    Requires 'id' field with only alphanumeric/underscore characters.
+    Saves despite validation errors, returning warnings instead.
+    """
+    mission_id = payload.get("id", "")
+    if not mission_id:
+        raise HTTPException(status_code=400, detail="Mission 'id' field is required.")
+    import re
+    if not re.match(r"^[a-zA-Z0-9_]+$", str(mission_id)):
+        raise HTTPException(
+            status_code=400,
+            detail="Mission 'id' must contain only alphanumeric characters and underscores.",
+        )
+    errors = _validate_mission(payload)
+    MISSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    dest = MISSIONS_DIR / f"{mission_id}.json"
+    dest.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"saved": True, "file": dest.name, "warnings": errors}
 
 
 # ---------------------------------------------------------------------------

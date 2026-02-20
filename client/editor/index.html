@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Starbridge — Mission Editor</title>
+  <link rel="stylesheet" href="editor.css" />
+</head>
+<body>
+  <!-- ── TOOLBAR ──────────────────────────────────────────────────────── -->
+  <div id="toolbar">
+    <div id="toolbar-left">
+      <button id="btn-new" title="New mission">NEW</button>
+      <div class="dropdown-group">
+        <button id="btn-open" title="Open mission">OPEN ▾</button>
+        <div id="open-dropdown" class="dropdown hidden"></div>
+      </div>
+      <button id="btn-save" title="Save to server">SAVE</button>
+      <button id="btn-validate" title="Validate structure">VALIDATE</button>
+      <button id="btn-export" title="Download JSON">EXPORT</button>
+      <button id="btn-test" title="Open in briefing room (test)">TEST</button>
+    </div>
+    <div id="toolbar-meta">
+      <label>ID <input id="meta-id" type="text" placeholder="mission_id" /></label>
+      <label>Name <input id="meta-name" type="text" placeholder="Mission name" /></label>
+      <label>Start <input id="meta-start" type="text" placeholder="start_node_id" /></label>
+      <label>Victory <input id="meta-victory" type="text" placeholder="node_id,node_id" /></label>
+    </div>
+  </div>
+
+  <!-- ── NODE PALETTE ─────────────────────────────────────────────────── -->
+  <div id="palette">
+    <button class="palette-btn" data-type="objective">+ Objective</button>
+    <button class="palette-btn" data-type="parallel">+ Parallel</button>
+    <button class="palette-btn" data-type="branch">+ Branch</button>
+    <button class="palette-btn" data-type="conditional">+ Conditional</button>
+    <button class="palette-btn" data-type="checkpoint">+ Checkpoint</button>
+    <button id="btn-delete" class="palette-btn danger" disabled>DELETE</button>
+    <button id="btn-entity-placer" class="palette-btn">☆ Entities</button>
+  </div>
+
+  <!-- ── MAIN AREA ─────────────────────────────────────────────────────── -->
+  <div id="main-area">
+    <!-- Graph canvas -->
+    <div id="canvas-container">
+      <canvas id="graph-canvas"></canvas>
+      <div id="canvas-hint">Double-click to add objective · Ctrl+drag node to draw edge</div>
+    </div>
+
+    <!-- Right panel -->
+    <div id="right-panel">
+      <div id="panel-placeholder" class="panel-section">
+        <p>Select a node or edge to edit its properties.</p>
+      </div>
+
+      <!-- Node form (hidden until node selected) -->
+      <div id="node-panel" class="hidden"></div>
+
+      <!-- Edge form (hidden until edge selected) -->
+      <div id="edge-panel" class="hidden"></div>
+
+      <!-- Validation results -->
+      <div id="validation-panel" class="panel-section hidden">
+        <h3>Validation</h3>
+        <div id="validation-results"></div>
+      </div>
+
+      <!-- Briefing textarea -->
+      <div id="briefing-panel" class="panel-section">
+        <h3>Briefing Text</h3>
+        <textarea id="meta-briefing" rows="4" placeholder="Mission briefing displayed to crew before launch…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ENTITY PLACER OVERLAY ─────────────────────────────────────────── -->
+  <div id="entity-placer-overlay" class="hidden">
+    <div id="entity-placer-header">
+      <span>Entity Placement (100k × 100k world)</span>
+      <button id="entity-placer-close">✕</button>
+    </div>
+    <canvas id="entity-canvas"></canvas>
+    <div id="entity-toolbar">
+      <select id="entity-type-select">
+        <option value="station">Station</option>
+        <option value="scout">Scout</option>
+        <option value="cruiser">Cruiser</option>
+        <option value="destroyer">Destroyer</option>
+        <option value="hazard_nebula">Hazard: Nebula</option>
+        <option value="hazard_minefield">Hazard: Minefield</option>
+        <option value="hazard_radiation">Hazard: Radiation</option>
+      </select>
+      <input id="entity-id-input" type="text" placeholder="entity_id" />
+      <button id="entity-add-btn">Place</button>
+      <span id="entity-coords">Click canvas to set position</span>
+    </div>
+    <div id="entity-list"></div>
+  </div>
+
+  <!-- ── STATUS BAR ────────────────────────────────────────────────────── -->
+  <div id="status-bar">
+    <span id="status-msg">Ready</span>
+    <span id="node-count"></span>
+  </div>
+
+  <script type="module" src="editor.js"></script>
+</body>
+</html>
