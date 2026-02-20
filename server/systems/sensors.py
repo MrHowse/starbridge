@@ -153,7 +153,7 @@ def build_sensor_contacts(
 
 def build_scan_result(enemy: Enemy) -> dict:
     """Return full scan detail for a scanned enemy (computed from live state)."""
-    return {
+    result = {
         "type": enemy.type,
         "hull": round(enemy.hull, 2),
         "hull_max": ENEMY_TYPE_PARAMS[enemy.type]["hull"],
@@ -161,6 +161,9 @@ def build_scan_result(enemy: Enemy) -> dict:
         "shield_rear": round(enemy.shield_rear, 2),
         "weakness": _compute_weakness(enemy),
     }
+    if enemy.shield_frequency:
+        result["shield_frequency"] = enemy.shield_frequency
+    return result
 
 
 # ---------------------------------------------------------------------------

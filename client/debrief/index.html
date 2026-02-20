@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — MISSION DEBRIEF</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="debrief.css">
+</head>
+<body>
+  <div class="debrief-container">
+
+    <!-- Header -->
+    <header class="debrief-header">
+      <span class="text-title" id="debrief-title">MISSION DEBRIEF</span>
+      <div class="debrief-header__meta">
+        <span class="text-label" id="debrief-result-badge">—</span>
+        <span class="text-label debrief-meta-sep">|</span>
+        <span class="text-label" id="debrief-duration">DURATION: —</span>
+        <span class="text-label debrief-meta-sep">|</span>
+        <span class="text-label" id="debrief-hull">HULL: —</span>
+      </div>
+      <a class="btn btn--secondary debrief-lobby-btn" href="/client/lobby/">RETURN TO LOBBY</a>
+    </header>
+
+    <!-- No-data fallback -->
+    <div class="debrief-no-data panel" id="debrief-no-data" style="display:none">
+      <p class="text-body">No debrief data available. Complete a mission first.</p>
+    </div>
+
+    <!-- Main layout (hidden until data loads) -->
+    <div class="debrief-body" id="debrief-body" style="display:none">
+
+      <!-- Left column: awards + key moments + captain's log -->
+      <aside class="debrief-sidebar">
+
+        <!-- Awards -->
+        <section class="panel debrief-panel" id="awards-panel">
+          <div class="panel__header">
+            <span class="text-header">AWARDS</span>
+          </div>
+          <div class="debrief-panel__body" id="awards-list">
+            <p class="text-label debrief-empty">No awards earned.</p>
+          </div>
+        </section>
+
+        <!-- Key moments -->
+        <section class="panel debrief-panel" id="moments-panel">
+          <div class="panel__header">
+            <span class="text-header">KEY MOMENTS</span>
+          </div>
+          <div class="debrief-panel__body" id="moments-list">
+            <p class="text-label debrief-empty">No events recorded.</p>
+          </div>
+        </section>
+
+        <!-- Captain's log -->
+        <section class="panel debrief-panel" id="captain-log-panel">
+          <div class="panel__header">
+            <span class="text-header">CAPTAIN'S LOG</span>
+          </div>
+          <div class="debrief-panel__body" id="captain-log-list">
+            <p class="text-label debrief-empty">No log entries.</p>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- Right column: per-station stats + replay -->
+      <main class="debrief-main">
+
+        <!-- Per-station stats table -->
+        <section class="panel debrief-panel" id="stats-panel">
+          <div class="panel__header">
+            <span class="text-header">STATION ACTIVITY</span>
+          </div>
+          <div class="debrief-panel__body">
+            <table class="debrief-table" id="stats-table">
+              <thead>
+                <tr>
+                  <th class="text-label">STATION</th>
+                  <th class="text-label">ACTIONS</th>
+                  <th class="text-label">TOP ACTIVITY</th>
+                </tr>
+              </thead>
+              <tbody id="stats-tbody">
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Captain's Replay -->
+        <section class="panel debrief-panel" id="replay-panel">
+          <div class="panel__header">
+            <span class="text-header">CAPTAIN'S REPLAY</span>
+          </div>
+          <div class="debrief-panel__body replay-body">
+            <canvas id="replay-canvas" width="400" height="400"></canvas>
+            <div class="replay-controls">
+              <button class="btn btn--secondary replay-btn" id="replay-play-btn">PLAY</button>
+              <input type="range" id="replay-scrub" min="0" max="100" value="0" class="replay-scrub">
+              <span class="text-label replay-time" id="replay-time">T+0:00</span>
+              <select class="replay-speed" id="replay-speed">
+                <option value="1">1×</option>
+                <option value="2">2×</option>
+                <option value="4" selected>4×</option>
+                <option value="8">8×</option>
+              </select>
+            </div>
+            <div class="replay-legend">
+              <span class="text-label replay-legend-item"><span class="replay-dot replay-dot--ship"></span> Ship path</span>
+              <span class="text-label replay-legend-item"><span class="replay-dot replay-dot--moment"></span> Key event</span>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+  </div>
+  <script type="module" src="debrief.js"></script>
+</body>
+</html>

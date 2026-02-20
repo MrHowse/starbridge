@@ -1,0 +1,229 @@
+/* ─── Electronic Warfare Station ──────────────────────────────────────────── */
+
+.ew-standby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.ew-standby__lobby-link {
+  margin-top: 16px;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.ew-standby__lobby-link:hover {
+  text-decoration: underline;
+}
+
+/* ─── Main layout ─────────────────────────────────────────────────────────── */
+
+.ew-main {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: var(--panel-gap);
+  flex: 1;
+  min-height: 0;
+}
+
+/* ─── Map canvas ──────────────────────────────────────────────────────────── */
+
+.ew-map {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ew-map__canvas-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+#ew-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+/* ─── Controls panel ──────────────────────────────────────────────────────── */
+
+.ew-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ─── Status rows ─────────────────────────────────────────────────────────── */
+
+.ew-ecm-status,
+.ew-cm-section,
+.ew-intrusion-section {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ew-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.ew-status-row .text-label {
+  flex: 0 0 100px;
+}
+
+.ew-status-row .text-data {
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ─── Gauge ───────────────────────────────────────────────────────────────── */
+
+.ew-gauge {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ew-gauge .gauge__fill {
+  height: 100%;
+  width: 0%;
+  background: var(--primary);
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+/* Jam gauge colour coding */
+#jam-gauge.gauge__fill--low    { background: var(--primary); }
+#jam-gauge.gauge__fill--mid    { background: var(--yellow, #f0c040); }
+#jam-gauge.gauge__fill--high   { background: var(--warning); }
+
+/* CM gauge */
+#cm-gauge.gauge__fill { background: var(--accent, #40c0f0); }
+
+/* ─── Enemy list ──────────────────────────────────────────────────────────── */
+
+.ew-enemy-list {
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ew-enemy-card {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.ew-enemy-card:hover {
+  border-color: var(--primary);
+}
+
+.ew-enemy-card.ew-enemy-card--jammed {
+  border-color: var(--warning);
+  background: rgba(255, 80, 80, 0.05);
+}
+
+.ew-enemy-card.ew-enemy-card--selected {
+  border-color: var(--primary);
+  background: rgba(0, 200, 120, 0.08);
+}
+
+.ew-enemy-card__header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  margin-bottom: 3px;
+}
+
+.ew-enemy-card__type {
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.ew-enemy-card__dist {
+  color: var(--text-dim, #888);
+}
+
+.ew-enemy-card__jam-bar {
+  height: 4px;
+  background: var(--bg-panel);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.ew-enemy-card__jam-fill {
+  height: 100%;
+  background: var(--warning, #f06060);
+  transition: width 0.3s ease;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+
+.ew-btn {
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ew-btn:hover {
+  background: var(--primary);
+  color: var(--bg-base);
+}
+
+.ew-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ew-btn--active {
+  background: var(--warning);
+  border-color: var(--warning);
+  color: var(--bg-base);
+}
+
+.ew-btn--active:hover {
+  background: var(--warning);
+}
+
+/* ─── Select ──────────────────────────────────────────────────────────────── */
+
+.ew-select {
+  flex: 1;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 4px 6px;
+}
+
+.ew-select:focus {
+  outline: 1px solid var(--primary);
+}

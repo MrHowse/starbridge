@@ -87,10 +87,21 @@ function dismissBriefing(el) {
  * Reuses an existing [data-shared-game-over] element if present, otherwise
  * creates one. Captain station uses its own HTML-declared overlay instead.
  * @param {string} result  'victory' | 'defeat'
- * @param {{ duration_s?: number, hull_remaining?: number }} stats
+ * @param {{ duration_s?: number, hull_remaining?: number, debrief?: object, captain_log?: Array }} stats
  */
 export function showGameOver(result, stats = {}) {
   const container = document.querySelector('.station-container') || document.body;
+
+  // Save debrief payload to localStorage for the debrief page.
+  try {
+    localStorage.setItem('starbridge_debrief', JSON.stringify({
+      result,
+      duration_s:    stats.duration_s    ?? null,
+      hull_remaining: stats.hull_remaining ?? null,
+      captain_log:   stats.captain_log   ?? [],
+      debrief:       stats.debrief       ?? null,
+    }));
+  } catch (_) { /* storage unavailable */ }
 
   let el = document.querySelector('[data-shared-game-over]');
   if (!el) {
@@ -107,12 +118,14 @@ export function showGameOver(result, stats = {}) {
   const hull   = stats.hull_remaining != null
     ? `${Math.round(stats.hull_remaining)}%`
     : '—';
+  const hasDebrief = stats.debrief != null;
 
   el.innerHTML = `
     <div class="game-over-box panel">
       <p class="text-title go-title">${title}</p>
       <p class="text-label go-stat">DURATION: ${dur}</p>
       <p class="text-label go-stat">HULL REMAINING: ${hull}</p>
+      ${hasDebrief ? '<a class="btn btn--secondary go-btn" href="/client/debrief/" target="_blank">VIEW DEBRIEF</a>' : ''}
       <a class="btn btn--primary go-btn" href="/client/lobby/">RETURN TO LOBBY</a>
     </div>`;
   el.style.display = 'flex';

@@ -128,6 +128,9 @@ let tubeLoading = [0.0, 0.0];
 // Pending nuclear auth: request_id for each tube (or null).
 let pendingAuth = [null, null];
 
+// Beam frequency selection.
+let currentFrequency = 'alpha';
+
 // Beam flash: { targetX, targetY, startTime }
 let beamFlash   = null;
 
@@ -367,10 +370,10 @@ function setupControls() {
 
   function startFiringBeams() {
     if (!gameActive) return;
-    send('weapons.fire_beams', {});
+    send('weapons.fire_beams', { beam_frequency: currentFrequency });
     beamInterval = setInterval(() => {
       if (!gameActive) { stopFiringBeams(); return; }
-      send('weapons.fire_beams', {});
+      send('weapons.fire_beams', { beam_frequency: currentFrequency });
     }, 500);
   }
 
@@ -397,6 +400,15 @@ function setupControls() {
     if (!gameActive) return;
     SoundBank.play('torpedo_launch');
     send('weapons.fire_torpedo', { tube: 2 });
+  });
+
+  // Beam frequency selector buttons.
+  document.querySelectorAll('.freq-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentFrequency = btn.dataset.freq;
+      document.querySelectorAll('.freq-btn').forEach(b => b.classList.remove('freq-btn--active'));
+      btn.classList.add('freq-btn--active');
+    });
   });
 
   // Load type buttons — inject into the torpedo section dynamically.
@@ -476,6 +488,9 @@ function selectTarget(id) {
 function updateTargetPanel() {
   const target = contacts.find(c => c.id === selectedId);
 
+  const shieldFreqRowEl = document.getElementById('target-shield-freq-row');
+  const shieldFreqEl    = document.getElementById('target-shield-freq');
+
   if (!target) {
     targetIdLabel.textContent       = 'NONE';
     targetHullFill.style.width      = '0%';
@@ -489,10 +504,22 @@ function updateTargetPanel() {
     targetTypeEl.textContent        = '—';
     beamStatus.textContent          = 'NO TARGET';
     beamFireBtn.disabled            = true;
+    if (shieldFreqRowEl) shieldFreqRowEl.style.display = 'none';
     return;
   }
 
   targetIdLabel.textContent = target.id.toUpperCase();
+
+  // Shield frequency (revealed by science scan).
+  if (target.shield_frequency && shieldFreqRowEl && shieldFreqEl) {
+    const freq     = target.shield_frequency.toUpperCase();
+    const isMatch  = target.shield_frequency === currentFrequency;
+    shieldFreqRowEl.style.display = '';
+    shieldFreqEl.textContent      = freq;
+    shieldFreqEl.style.color      = isMatch ? 'var(--primary)' : 'var(--warning)';
+  } else if (shieldFreqRowEl) {
+    shieldFreqRowEl.style.display = 'none';
+  }
 
   if (target.scan_state === 'scanned') {
     // Max hull by type (from server ENEMY_TYPE_PARAMS).

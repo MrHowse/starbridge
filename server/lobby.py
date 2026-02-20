@@ -65,7 +65,7 @@ class LobbySession:
     roles: dict[str, tuple[str, str] | None] = field(
         default_factory=lambda: {
             r: None
-            for r in ("captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "flight_ops")
+            for r in ("captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "flight_ops", "electronic_warfare", "tactical", "damage_control")
         }
     )
     host_connection_id: str | None = None
@@ -388,7 +388,10 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
 
     # Build available ship classes list for client display.
     ship_classes = [
-        {"id": sc.id, "name": sc.name, "description": sc.description, "max_hull": sc.max_hull}
+        {
+            "id": sc.id, "name": sc.name, "description": sc.description,
+            "max_hull": sc.max_hull, "min_crew": sc.min_crew, "max_crew": sc.max_crew,
+        }
         for sc in list_ship_classes()
     ]
 

@@ -1,0 +1,41 @@
+{
+  "id": "train_security",
+  "name": "Security Training",
+  "is_training": true,
+  "target_role": "security",
+  "auto_roles": ["helm", "engineering"],
+  "briefing": "Welcome to Security Training. Practice commanding marine squads, controlling ship access points, and responding to a simulated boarding scenario. Intruders move between rooms — cut them off and eliminate them.",
+  "spawn": [],
+  "objectives": [
+    {
+      "id": "sec_01_orient",
+      "text": "Orient yourself — review squad positions on the ship interior map",
+      "hint": "The Security panel shows the ship interior as a grid of rooms. Your marine squads appear as blue icons. Each room shows how many crew and intruders are present. Doors can be sealed to restrict movement.",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 8 }
+    },
+    {
+      "id": "sec_02_move",
+      "text": "Move a squad to an adjacent room",
+      "hint": "Click a squad to select it, then click an adjacent room to move it there. Squads can only move through unsealed doors. Moving into a room with intruders starts combat automatically. Move your squad toward the centre corridor.",
+      "trigger": "training_flag",
+      "args": { "flag": "security_squad_moved" }
+    },
+    {
+      "id": "sec_03_door",
+      "text": "Seal a door to control access",
+      "hint": "Click on a doorway between two rooms and select SEAL. Sealed doors block all movement — including your own squads. Use seals to funnel intruders toward your marines. You can unseal at any time.",
+      "trigger": "training_flag",
+      "args": { "flag": "security_door_toggled" }
+    },
+    {
+      "id": "sec_04_hold",
+      "text": "Maintain ship security for 30 seconds",
+      "hint": "Keep your squads deployed and doors configured. In a real boarding, intruders appear at breach points and move toward vital systems. The Captain may request you lock down specific decks — always confirm before sealing Engineering or Medical.",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 50 }
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero"
+}

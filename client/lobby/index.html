@@ -71,11 +71,13 @@
           </select>
           <label class="text-label" for="ship-class-select">SHIP CLASS</label>
           <select id="ship-class-select" class="lobby-select" data-ship-class-select>
-            <option value="scout">SCOUT — Light hull, fast</option>
-            <option value="corvette">CORVETTE — Light patrol</option>
-            <option value="frigate" selected>FRIGATE — Standard (default)</option>
-            <option value="cruiser">CRUISER — Heavy warship</option>
-            <option value="battleship">BATTLESHIP — Capital ship</option>
+            <option value="scout">SCOUT — Light hull, fast (crew 3–4)</option>
+            <option value="corvette">CORVETTE — Light patrol (crew 4–6)</option>
+            <option value="frigate" selected>FRIGATE — Standard (crew 6–9)</option>
+            <option value="cruiser">CRUISER — Heavy warship (crew 8–11)</option>
+            <option value="battleship">BATTLESHIP — Capital ship (crew 10–12)</option>
+            <option value="medical_ship">HOPE-CLASS — Hospital vessel (crew 5–8)</option>
+            <option value="carrier">ATLAS-CLASS — Drone carrier (crew 7–12)</option>
           </select>
           <button class="btn btn--primary lobby-launch__btn" data-launch-btn disabled>
             LAUNCH

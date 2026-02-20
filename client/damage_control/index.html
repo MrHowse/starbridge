@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — DAMAGE CONTROL</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="damage_control.css">
+</head>
+<body>
+  <div class="station-container">
+
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <header class="station-header panel">
+      <div class="panel__header station-header__bar">
+        <span class="text-title">DAMAGE CONTROL</span>
+        <span class="text-label" id="mission-label" style="opacity:0.5">—</span>
+        <div class="station-header__status">
+          <span class="status-dot status-dot--disconnected" data-status-dot></span>
+          <span class="text-label" data-status-label>CONNECTING</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Standby ─────────────────────────────────────────────────────── -->
+    <main class="station-main" data-standby>
+      <div class="station-standby">
+        <p class="text-header">DAMAGE CONTROL</p>
+        <p class="text-body">Awaiting mission orders.</p>
+        <a class="text-label station-lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+      </div>
+    </main>
+
+    <!-- ── Active layout ───────────────────────────────────────────────── -->
+    <div class="dc-main" data-dc-main style="display:none">
+
+      <!-- Left: ship interior room grid -->
+      <div class="dc-interior panel">
+        <div class="panel__header">
+          <span class="text-label">SHIP INTERIOR</span>
+          <span class="dc-legend">
+            <span class="dc-legend-chip dc-chip--normal">NORMAL</span>
+            <span class="dc-legend-chip dc-chip--damaged">DAMAGED</span>
+            <span class="dc-legend-chip dc-chip--fire">FIRE</span>
+            <span class="dc-legend-chip dc-chip--decompressed">DECOMP</span>
+          </span>
+        </div>
+        <div class="dc-room-grid" id="dc-room-grid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Right: DCT teams panel -->
+      <div class="dc-teams panel">
+        <div class="panel__header">
+          <span class="text-label">REPAIR TEAMS</span>
+          <span class="text-data text-dim" id="dc-team-count">0 ACTIVE</span>
+        </div>
+
+        <div class="dc-teams-scroll">
+          <!-- Selected room info -->
+          <div class="dc-selected-room" id="dc-selected-room">
+            <p class="text-dim">Select a room to dispatch a DCT.</p>
+          </div>
+
+          <!-- Active DCTs list -->
+          <div class="panel__header" style="margin-top:var(--gap)">
+            <span class="text-label">ACTIVE TEAMS</span>
+          </div>
+          <div id="dc-active-dcts">
+            <p class="text-dim">No teams deployed.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <script type="module" src="damage_control.js"></script>
+</body>
+</html>

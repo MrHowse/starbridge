@@ -1,4 +1,5 @@
 {
+  "id": "boarding_action",
   "name": "Boarding Action",
   "briefing": "Enemy boarding party detected inbound. Security: position marine squads to intercept before the hull breach. You have 60 seconds to deploy.",
   "defeat_condition": "player_hull_zero",

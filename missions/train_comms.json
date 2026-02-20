@@ -1,0 +1,43 @@
+{
+  "id": "train_comms",
+  "name": "Comms Training",
+  "is_training": true,
+  "target_role": "comms",
+  "auto_roles": ["helm", "engineering"],
+  "briefing": "Welcome to Comms Training. Practice scanning frequencies, hailing contacts, and interpreting transmissions. Communications intelligence can reveal enemy intentions and unlock diplomatic options.",
+  "spawn": [
+    { "type": "scout", "x": 62000, "y": 42000, "id": "contact_alpha" }
+  ],
+  "objectives": [
+    {
+      "id": "comms_01_orient",
+      "text": "Review your communications panel and active channels",
+      "hint": "The Comms panel shows detected signals, active hailing channels, and decoded transmissions. Your passive receivers scan automatically. Signals appear as frequency readouts on the spectrum display.",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 8 }
+    },
+    {
+      "id": "comms_02_tune",
+      "text": "Tune your receiver to the contact's frequency",
+      "hint": "Click on the detected signal or contact and select TUNE FREQUENCY. The receiver locks onto the signal. You may hear noise first — the signal becomes clearer as you fine-tune. Check the signal strength indicator.",
+      "trigger": "training_flag",
+      "args": { "flag": "comms_frequency_tuned" }
+    },
+    {
+      "id": "comms_03_hail",
+      "text": "Attempt to hail the contact",
+      "hint": "With the frequency locked, press HAIL. This sends a standard identification request. The contact may respond, ignore, or become hostile. In a real mission, hailing before firing can prevent unnecessary conflict.",
+      "trigger": "training_flag",
+      "args": { "flag": "comms_hail_sent" }
+    },
+    {
+      "id": "comms_04_monitor",
+      "text": "Monitor the channel for 20 seconds",
+      "hint": "After hailing, listen for a response. Transmissions appear in the message log. If no response, the contact may be hostile, out of range, or using a different protocol. Report your findings to the Captain.",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 40 }
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero"
+}

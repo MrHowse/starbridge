@@ -239,6 +239,23 @@ function handleGameOver({ result, stats = {} }) {
   gameOverBody.textContent = result === 'victory'
     ? `All objectives achieved. Duration: ${dur}. Hull: ${hull}.`
     : `Hull integrity zero. Duration: ${dur}.`;
+
+  // Save debrief payload for the debrief page.
+  try {
+    localStorage.setItem('starbridge_debrief', JSON.stringify({
+      result,
+      duration_s:     stats.duration_s     ?? null,
+      hull_remaining: stats.hull_remaining  ?? null,
+      captain_log:    stats.captain_log     ?? [],
+      debrief:        stats.debrief         ?? null,
+    }));
+  } catch (_) { /* storage unavailable */ }
+
+  const debriefBtn = document.getElementById('game-over-debrief-btn');
+  if (debriefBtn && stats.debrief != null) {
+    debriefBtn.style.display = '';
+  }
+
   gameOverOverlay.style.display = '';
 }
 

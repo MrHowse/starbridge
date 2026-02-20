@@ -1,0 +1,48 @@
+{
+  "id": "train_helm",
+  "name": "Helm Training",
+  "is_training": true,
+  "target_role": "helm",
+  "auto_roles": ["engineering"],
+  "briefing": "Welcome to Helm Training. Learn to control the ship's heading and speed, read the minimap, and navigate to waypoints. Other systems are managed automatically — focus on the helm controls.",
+  "spawn": [],
+  "objectives": [
+    {
+      "id": "helm_01_heading",
+      "text": "Set your heading to 000° (North)",
+      "hint": "Use the heading dial to set target heading to 000. The ship will turn to face North. Watch the compass rose on the minimap.",
+      "trigger": "training_flag",
+      "args": { "flag": "helm_heading_set" }
+    },
+    {
+      "id": "helm_02_throttle",
+      "text": "Set throttle to 50% and begin moving",
+      "hint": "Drag the throttle slider to 50%. The ship will accelerate. Watch your velocity readout increase. You can also use the AHEAD button.",
+      "trigger": "training_flag",
+      "args": { "flag": "helm_throttle_set" }
+    },
+    {
+      "id": "helm_03_waypoint_alpha",
+      "text": "Navigate to Waypoint Alpha",
+      "hint": "Waypoint Alpha is at the northern sector (bearing 000, range ~20k). Adjust heading to point toward it on your minimap, then increase throttle. The waypoint appears as a green marker.",
+      "trigger": "player_in_area",
+      "args": { "x": 50000, "y": 30000, "r": 6000 }
+    },
+    {
+      "id": "helm_04_waypoint_bravo",
+      "text": "Navigate to Waypoint Bravo",
+      "hint": "Waypoint Bravo is to the east. Set heading to approximately 090° and maintain speed. Good helmsmanship means smooth course changes — avoid sharp reverses.",
+      "trigger": "player_in_area",
+      "args": { "x": 70000, "y": 50000, "r": 6000 }
+    },
+    {
+      "id": "helm_05_return",
+      "text": "Return to sector origin",
+      "hint": "Sector origin is at the centre of the map (50,000 / 50,000). Set heading 270° to turn west, then adjust south as needed. Reduce throttle as you approach to stop cleanly.",
+      "trigger": "player_in_area",
+      "args": { "x": 50000, "y": 50000, "r": 5000 }
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero"
+}

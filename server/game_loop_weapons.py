@@ -15,6 +15,7 @@ v0.02g additions:
 from __future__ import annotations
 
 import math
+import random as _rng
 import uuid
 
 import server.game_logger as gl
@@ -224,8 +225,12 @@ def resolve_nuclear_auth(
 # ---------------------------------------------------------------------------
 
 
-def fire_player_beams(ship: Ship, world: World) -> tuple[str, dict] | None:
-    """Fire player beam weapons at the selected target. Returns broadcast event or None."""
+def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tuple[str, dict] | None:
+    """Fire player beam weapons at the selected target. Returns broadcast event or None.
+
+    *beam_frequency* — the Weapons station's selected frequency (alpha/beta/gamma/delta).
+    Matched frequencies deal 1.5× damage; mismatched deal 0.5×.
+    """
     global _weapons_target
 
     if _weapons_target is None:
@@ -244,7 +249,7 @@ def fire_player_beams(ship: Ship, world: World) -> tuple[str, dict] | None:
         return None
 
     dmg = BEAM_PLAYER_DAMAGE * ship.systems["beams"].efficiency
-    apply_hit_to_enemy(target, dmg, ship.x, ship.y)
+    apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency)
 
     if target.hull <= 0.0:
         world.enemies = [e for e in world.enemies if e.id != target.id]
@@ -259,6 +264,7 @@ def fire_player_beams(ship: Ship, world: World) -> tuple[str, dict] | None:
             "target_x": target.x,
             "target_y": target.y,
             "damage": round(dmg, 2),
+            "beam_frequency": beam_frequency,
         },
     )
 
@@ -325,8 +331,12 @@ def _do_fire(
 # ---------------------------------------------------------------------------
 
 
-def tick_torpedoes(world: World) -> list[dict]:
-    """Move all torpedoes and check for collisions. Returns hit event dicts."""
+def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
+    """Move all torpedoes and check for collisions. Returns hit event dicts.
+
+    *ship* — when provided, the point_defence system may intercept incoming
+    (non-player-owned) torpedoes before they can impact.
+    """
     from server.game_loop_physics import TICK_DT
     from server.systems.sensors import build_scan_result
 
@@ -346,6 +356,21 @@ def tick_torpedoes(world: World) -> list[dict]:
         if torp.distance_travelled >= Torpedo.MAX_RANGE:
             dead_torpedo_ids.append(torp.id)
             continue
+
+        # Point defence: passive intercept of incoming (non-player) torpedoes.
+        if torp.owner != "player" and ship is not None:
+            pd = ship.systems.get("point_defence")
+            if pd is not None and pd.efficiency > 0.0:
+                intercept_chance = pd.efficiency * 0.3  # 30% at full efficiency
+                if _rng.random() < intercept_chance:
+                    dead_torpedo_ids.append(torp.id)
+                    events.append({
+                        "type": "pd_intercept",
+                        "torpedo_id": torp.id,
+                        "x": round(torp.x, 1),
+                        "y": round(torp.y, 1),
+                    })
+                    continue
 
         if torp.owner == "player":
             hit_enemy = None

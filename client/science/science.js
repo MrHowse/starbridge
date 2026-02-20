@@ -120,6 +120,8 @@ const resShieldAftFill   = document.getElementById('res-shield-aft-fill');
 const resShieldAftPct    = document.getElementById('res-shield-aft-pct');
 const resWeaknessRow     = document.getElementById('res-weakness-row');
 const resWeakness        = document.getElementById('res-weakness');
+const resShieldFreqRow   = document.getElementById('res-shield-freq-row');
+const resShieldFreq      = document.getElementById('res-shield-freq');
 
 const sensorPowerEl = document.getElementById('sensor-power');
 const sensorEffEl   = document.getElementById('sensor-efficiency');
@@ -333,6 +335,13 @@ function handleScanComplete(payload) {
     resWeakness.textContent      = r.weakness;
   } else {
     resWeaknessRow.style.display = 'none';
+  }
+
+  if (r.shield_frequency && resShieldFreqRow && resShieldFreq) {
+    resShieldFreqRow.style.display = '';
+    resShieldFreq.textContent      = r.shield_frequency.toUpperCase();
+  } else if (resShieldFreqRow) {
+    resShieldFreqRow.style.display = 'none';
   }
 
   console.log(`[science] Scan complete: ${payload.entity_id}`);

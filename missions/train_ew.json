@@ -1,0 +1,43 @@
+{
+  "id": "train_ew",
+  "name": "Electronic Warfare Training",
+  "is_training": true,
+  "target_role": "electronic_warfare",
+  "auto_roles": ["helm", "engineering"],
+  "briefing": "Welcome to Electronic Warfare Training. Learn to jam enemy sensors, deploy countermeasures, and execute a basic system intrusion. EW is a force multiplier — a jammed enemy is easier to destroy.",
+  "spawn": [
+    { "type": "scout", "x": 58000, "y": 38000, "id": "ew_target_1" }
+  ],
+  "objectives": [
+    {
+      "id": "ew_01_orient",
+      "text": "Review ECM suite status and available countermeasures",
+      "hint": "The EW panel shows ECM power, jam range, and countermeasure charges. Check the tactical map — the red contact is your target. ECM effectiveness scales with power allocation from Engineering.",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 8 }
+    },
+    {
+      "id": "ew_02_jam",
+      "text": "Activate jamming on the nearest contact",
+      "hint": "Click the contact on the ECM map and press JAM TARGET. Jamming reduces the enemy's weapon accuracy. Watch the effectiveness percentage — higher ECM power and shorter range increase effectiveness. You can only jam one target at a time.",
+      "trigger": "training_flag",
+      "args": { "flag": "ew_jam_set" }
+    },
+    {
+      "id": "ew_03_countermeasures",
+      "text": "Activate countermeasures",
+      "hint": "Press DEPLOY COUNTERMEASURES. This reduces incoming weapon accuracy against your ship for the duration. Countermeasure charges are finite — use them when taking fire, not preemptively. Watch the charge counter decrease.",
+      "trigger": "training_flag",
+      "args": { "flag": "ew_countermeasures_set" }
+    },
+    {
+      "id": "ew_04_hold",
+      "text": "Maintain jamming for 30 seconds",
+      "hint": "Keep the jam active while monitoring ECM effectiveness. In a real engagement, you coordinate with Weapons — tell them which targets are jammed so they can focus fire on the most vulnerable. Communication is key.",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 50 }
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero"
+}

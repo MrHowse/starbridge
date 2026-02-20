@@ -85,6 +85,33 @@ Copy this template when adding a new entry:
 
 ---
 
+## 2026-02-20 — Mission JSON files missing required top-level "id" field
+
+**Issue**: `boarding_action.json` and `first_contact_protocol.json` were missing the `"id"` field at the JSON top level. `test_gate_v003.py::test_loads[boarding_action]` failed with `KeyError: 'id'` during gate verification — the first time these missions had been tested with the gate's identity assertion.
+**Cause**: Both files were authored during v0.02c development when the mission file template was copied without double-checking all required top-level keys. The `id` field is not needed by `load_mission()` itself (it returns the raw dict) so the missing field went unnoticed during normal mission engine tests, which access individual objective fields rather than the top-level identity.
+**Fix**: Prepended `"id": "boarding_action"` / `"id": "first_contact_protocol"` to each JSON file.
+**Prevention**: Gate tests should include an `assert mission["id"] == mid` assertion — as `test_gate_v003.py` now does. When authoring any new mission JSON, immediately verify the file round-trips through `load_mission(id)["id"] == id`. Add a lint/validate step to the sub-release checklist that verifies every JSON mission file has the required top-level keys (`id`, `objectives`, `victory_condition`).
+
+---
+
+## 2026-02-20 — Scope drift: point_defence system declared but never implemented
+
+**Issue**: The v0.02 scope document listed `point_defence` as a battleship-exclusive ship system. The v0.03o gate verification confirmed it is absent from `server/models/ship.py`. The default ship has 8 systems; `point_defence` was never implemented.
+**Cause**: The scope document was written speculatively for a multi-phase roadmap. The battleship class was added in v0.03o as a data-model-only entry (hull/ammo/crew values). The gameplay mechanic (point defence turrets against torpedoes) was never scoped into any sprint.
+**Fix**: Not fixed — documented as a known gap at v0.03 close. It is a v0.04 candidate.
+**Prevention**: When a scope document lists a new ship system, create a corresponding failing test or placeholder in `ship.py` immediately. Scope-declared systems that have no code anchor will drift and may not be caught until a gate test explicitly checks for them. Rule: if the scope says "battleship has X", `ship.py` gets a stub entry for X in the same session.
+
+---
+
+## 2026-02-20 — Stale phase string in health endpoint
+
+**Issue**: Server health endpoint (`GET /`) returns `"phase": "4 — Weapons Station + Combat"` even at v0.03 close. The string predates v0.03 by 6+ months of development.
+**Cause**: `server/main.py` has a hardcoded phase string that was set in Phase 4 and never updated. It is not driven by any state file or configuration.
+**Fix**: Not fixed at v0.03 close — not blocking. Reported as a known gap.
+**Prevention**: The health endpoint's `phase` field should either (a) read from a file (e.g. `.ai/PHASE_CURRENT.md` first line), or (b) be removed and replaced with a `version` field that is driven by a single source of truth. Hardcoded descriptive strings in server code will always become stale. Update this at the start of v0.04.
+
+---
+
 ## 2026-02-18 — Budget gauge alarm at comfortable equilibrium
 
 **Issue**: The Engineering power budget gauge immediately turned red on game start because all 6 systems start at 100% each = 600/600 total = exactly at the budget cap. The threshold condition `totalPower >= POWER_BUDGET` was true from the very first server tick.

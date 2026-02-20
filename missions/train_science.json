@@ -1,0 +1,44 @@
+{
+  "id": "train_science",
+  "name": "Science Training",
+  "is_training": true,
+  "target_role": "science",
+  "auto_roles": ["helm", "engineering"],
+  "briefing": "Welcome to Science Training. Learn to use the sensor array to detect, classify, and scan contacts. Science data is shared with other stations — accurate scanning improves crew effectiveness.",
+  "spawn": [
+    { "type": "scout", "x": 65000, "y": 40000, "id": "scan_target_1" },
+    { "type": "cruiser", "x": 35000, "y": 60000, "id": "scan_target_2" }
+  ],
+  "objectives": [
+    {
+      "id": "sci_01_detect",
+      "text": "Observe your sensor contacts — two contacts are visible",
+      "hint": "Your sensor display shows all detected contacts. Red triangles are hostiles. Your passive sensors detect contacts within range automatically. Note each contact's bearing, range, and type.",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 8 }
+    },
+    {
+      "id": "sci_02_scan",
+      "text": "Select and actively scan the scout-class contact",
+      "hint": "Click on the scout contact (smaller triangle) to select it. Then press START SCAN or ACTIVE SCAN. Active scanning reveals detailed data including weapon loadout and shield strength. Scanning takes several seconds.",
+      "trigger": "training_flag",
+      "args": { "flag": "science_scan_started" }
+    },
+    {
+      "id": "sci_03_complete",
+      "text": "Wait for the scan to complete",
+      "hint": "Watch the scan progress bar. When complete, the contact upgrades from a simple icon to a full schematic. This data is shared with Weapons and Tactical. The contact is now 'scanned'.",
+      "trigger": "scan_completed",
+      "args": { "entity_id": "scan_target_1" }
+    },
+    {
+      "id": "sci_04_second",
+      "text": "Scan the cruiser-class contact",
+      "hint": "Now scan the larger contact. Cruisers take longer to fully scan and have more data to reveal. Note the different weapon loadout — this intelligence matters for the weapons officer's targeting decisions.",
+      "trigger": "scan_completed",
+      "args": { "entity_id": "scan_target_2" }
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero"
+}

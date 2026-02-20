@@ -27,17 +27,21 @@ SHIP_CLASS_ORDER: list[str] = [
     "frigate",
     "cruiser",
     "battleship",
+    "medical_ship",
+    "carrier",
 ]
 
 
 class ShipClass(BaseModel):
     """Stat block for a ship class, loaded from ships/<id>.json."""
 
-    id:          str
-    name:        str
-    description: str
-    max_hull:    float = 100.0
-    torpedo_ammo: int  = 12
+    id:           str
+    name:         str
+    description:  str
+    max_hull:     float = 100.0
+    torpedo_ammo: int   = 12
+    min_crew:     int   = 1    # minimum players for a satisfying game
+    max_crew:     int   = 12   # maximum designed crew complement
 
 
 def load_ship_class(ship_class_id: str) -> ShipClass:

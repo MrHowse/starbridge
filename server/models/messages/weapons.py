@@ -13,7 +13,7 @@ class WeaponsSelectTargetPayload(BaseModel):
 
 
 class WeaponsFireBeamsPayload(BaseModel):
-    pass
+    beam_frequency: str = ""   # alpha | beta | gamma | delta | "" (no frequency)
 
 
 class WeaponsFireTorpedoPayload(BaseModel):

@@ -66,10 +66,10 @@ class Shields:
 
 
 def _default_systems() -> dict[str, ShipSystem]:
-    """Return the seven default ship systems at full power and health."""
+    """Return the nine default ship systems at full power and health."""
     return {
         name: ShipSystem(name)
-        for name in ("engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring", "flight_deck")
+        for name in ("engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring", "flight_deck", "ecm_suite", "point_defence")
     }
 
 
@@ -119,6 +119,10 @@ class Ship:
 
     # --- Difficulty (set at game start by game_loop.start()) ---
     difficulty: DifficultySettings = field(default_factory=lambda: get_preset("officer"))
+
+    # --- Electronic Warfare (v0.03k) ---
+    countermeasure_charges: int = 10       # finite charges; each absorbed hit costs 1
+    ew_countermeasure_active: bool = False  # True when EW station has deployed countermeasures
 
     def update_crew_factors(self) -> None:
         """Propagate deck crew_factors into the corresponding ship systems.

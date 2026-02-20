@@ -1,7 +1,9 @@
 {
   "id": "frigate",
-  "name": "Frigate",
-  "description": "Standard multi-role warship. Balanced in all respects. The default choice.",
+  "name": "Resolution-class Frigate",
+  "description": "Standard multi-role warship. Balanced in all respects. The default choice for 7-8 players — supports all core roles without specialist stations.",
   "max_hull": 100,
-  "torpedo_ammo": 12
+  "torpedo_ammo": 12,
+  "min_crew": 6,
+  "max_crew": 9
 }

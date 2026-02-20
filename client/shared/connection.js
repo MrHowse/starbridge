@@ -29,6 +29,38 @@ const statusHandlers = [];
 // ---------------------------------------------------------------------------
 
 /**
+ * Convenience wrapper that creates a connection with role claiming and a
+ * catch-all message dispatcher. Used by stations that centralise message
+ * handling in a single handleMessage function.
+ *
+ * @param {{
+ *   role: string,
+ *   onStatusChange: function(boolean): void,
+ *   onMessage: function({type:string, payload:object}): void,
+ * }} config
+ * @returns {{ send: function(string, object?): void }}
+ */
+export function initConnection({ role, onStatusChange: onStatusCb, onMessage }) {
+  onStatusChange((status) => {
+    onStatusCb(status === 'connected');
+  });
+
+  // Claim role on connect.
+  on('lobby.welcome', () => {
+    const name = sessionStorage.getItem('player_name') || role.toUpperCase();
+    send('lobby.claim_role', { role, player_name: name });
+  });
+
+  // Route all messages to the caller's handler via a wildcard.
+  on('*', (_payload, msg) => {
+    if (onMessage) onMessage(msg);
+  });
+
+  connect();
+  return { send };
+}
+
+/**
  * Register a handler for a specific message type.
  * Multiple handlers per type are supported.
  * @param {string} type
@@ -99,6 +131,11 @@ function _onMessage(event) {
   const callbacks = handlers.get(msg.type);
   if (callbacks) {
     callbacks.forEach(cb => cb(msg.payload, msg));
+  }
+  // Wildcard handlers receive every message.
+  const wildcards = handlers.get('*');
+  if (wildcards) {
+    wildcards.forEach(cb => cb(msg.payload, msg));
   }
 }
 

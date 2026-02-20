@@ -1,34 +1,59 @@
-# Current Phase: v0.02 COMPLETE — v0.03 Scope in Development
+# Current Phase: v0.03 COMPLETE ✓
 
-> Replace this file's contents when the v0.03 scope is finalised and approved.
+> Updated 2026-02-20 — v0.03 gate verification complete.
 
 ## Status
 
-**v0.02 is CLOSED.** Gate verification completed 2026-02-19.
+**v0.03 is CLOSED.** Gate verification completed 2026-02-20.
 
-- 948 tests passing, 0 regressions
-- 8 stations (captain, helm, weapons, engineering, science, medical, security, comms)
-- 8 puzzle types across all stations
-- 11 JSON missions + sandbox (synthetic)
-- Game event logger (JSONL, logs/, STARBRIDGE_LOGGING)
-- Commit: fe339fc
+- **1578 tests passing**, 0 regressions from v0.02 baseline (948 tests)
+- **12 player stations**: captain, helm, weapons, engineering, science, medical,
+  security, comms, flight_ops, electronic_warfare, tactical + viewscreen (passive)
+- **9 puzzle types** across all stations
+- **23 JSON missions** + sandbox (synthetic): 11 story + 12 training (train_*)
+- **7 ship classes**: scout, corvette, frigate, cruiser, battleship, medical_ship, carrier
+  — all with min_crew/max_crew crew ranges
+- **4 difficulty presets**: cadet, officer, commander, admiral
+- Game event logger + Debrief Dashboard + Captain's Replay
+- Training missions for all 12 player roles
+- Multi-role play supported (role_bar.js, combined roles)
+- Mission briefing room (client/briefing/)
+- Cross-station notification system (crew.notify → crew.notification)
+- v0.03 gate tests in tests/test_gate_v003.py
 
-## What Comes Next (v0.03 — not yet scoped)
+## v0.03 Sub-releases Completed
 
-No formal scope document exists for v0.03 yet. Candidate areas:
+| Sub-release | Tests at close | Feature |
+|-------------|---------------|---------|
+| v0.03a–g    | ~999          | Audio placeholder, QoL fixes, MapRenderer, notifications, ship framework, multi-role, briefing room |
+| v0.03h      | 999           | Science scan modes (EM/GRAV/BIO/SUB) |
+| v0.03i      | 1033          | Damage Control station |
+| v0.03j      | 1085          | Flight Operations Officer |
+| v0.03k      | 1162          | Electronic Warfare Officer |
+| v0.03l      | 1223          | Tactical Officer |
+| v0.03m      | 1289          | Training Missions (12 missions, all roles) |
+| v0.03n      | 1324          | Debrief Dashboard + Captain's Replay |
+| v0.03o      | 1578          | Ship Balancing + Final Integration + Gate |
 
-- **Audio** — `client/shared/audio.js` is a placeholder; no sound effects or music
-- **Tablet layout verification** — styles written mobile-first at 768px min, untested on hardware
-- **End-to-end test suite** — Playwright or similar; mission flow integration
-- **Multi-crew reconnect** — mid-game role reclaim on disconnect/reconnect
-- **Captain waypoints** — objective positions rendered on tactical map
-- **Science bearing line reset** — bearing lines accumulate indefinitely
-- **Sandbox improvements** — difficulty scaling, wave progression, high-score tracking
-- **Performance profiling** — 10Hz loop; headroom not yet measured with 8 clients
+## Known Gaps at v0.03 Close (not blocking)
 
-## Known Gaps at v0.02 Close
+- No audio — `client/shared/audio.js` is a placeholder; `SoundBank` is wired in JS but silent
+- No tablet layout verification on physical hardware
+- No automated end-to-end tests (Playwright/Selenium)
+- Science bearing lines accumulate indefinitely (session-lifetime storage)
+- Sandbox has no game.over — infinite play only
+- Lobby does not enforce min_crew (host can launch with fewer players than min_crew)
+- medical_ship and carrier have no differentiated gameplay mechanics from standard frigate
+  (hull/ammo values differ; specialist mechanics are v0.04 scope)
 
-- No `missions/sandbox.json` — sandbox is correctly synthetic in loader.py; old file manifest entry was wrong (corrected in STATE.md)
-- Science bearing lines never clear (session-lifetime storage in science.js bearingLines[])
-- Tablet layout untested on physical hardware
-- No automated end-to-end tests
+## What Comes Next (v0.04 — not yet scoped)
+
+Candidate areas for v0.04:
+- **Networked play beyond LAN** — WebRTC relay or hosted server
+- **Persistent player profiles** — stats across sessions, achievements
+- **Mission editor UI** — drag-and-drop mission authoring
+- **Community mission sharing** — upload/download from a repository
+- **Differentiated ship gameplay** — medical_ship medbay expansion, carrier fighter mechanics
+- **Audio system** — procedural audio, SoundBank implementation
+- **Tablet layout** — physical hardware verification + mobile-first CSS pass
+- **Automated E2E tests** — Playwright suite for full mission flow

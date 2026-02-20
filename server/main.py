@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from server import captain, comms, engineering, flight_ops, game_loop, helm, lobby, medical, science, security, weapons
+from server import captain, comms, damage_control, engineering, ew, flight_ops, game_loop, helm, lobby, medical, science, security, tactical, weapons
 from server.connections import ConnectionManager
 from server.models.messages import Message, VALID_SYSTEMS
 from server.models.world import World, spawn_enemy
@@ -53,6 +53,9 @@ security.init(manager, input_queue)
 comms.init(manager, input_queue)
 captain.init(manager, world.ship)
 flight_ops.init(manager, input_queue)
+ew.init(manager, input_queue)
+tactical.init(manager, input_queue)
+damage_control.init(manager, input_queue)
 game_loop.init(world, manager, input_queue)
 
 # When the host starts a game the lobby calls this to kick off the loop.
@@ -83,6 +86,9 @@ _HANDLERS: dict[str, _MessageHandler] = {
     "comms": comms.handle_comms_message,
     "captain": captain.handle_captain_message,
     "flight_ops": flight_ops.handle_flight_ops_message,
+    "ew": ew.handle_ew_message,
+    "tactical": tactical.handle_tactical_message,
+    "damage_control": damage_control.handle_damage_control_message,
 }
 
 
@@ -142,7 +148,7 @@ async def root() -> dict[str, str]:
         "name": "Starbridge",
         "version": "0.0.1",
         "status": "online",
-        "phase": "4 — Weapons Station + Combat",
+        "phase": "v0.03",
     }
 
 

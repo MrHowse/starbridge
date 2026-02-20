@@ -95,16 +95,23 @@ def tick_enemies(
         if enemy.stun_ticks > 0:
             enemy.stun_ticks -= 1
 
-        # ── Beam fire (blocked when EMP-stunned) ──────────────────────────
-        if enemy.ai_state == "attack" and enemy.beam_cooldown <= 0.0 and enemy.stun_ticks == 0:
+        # ── EW intrusion stun decay ───────────────────────────────────────
+        if enemy.intrusion_stun_ticks > 0:
+            enemy.intrusion_stun_ticks -= 1
+
+        # ── Beam fire (blocked when stunned or intruded) ──────────────────
+        stunned = enemy.stun_ticks > 0 or enemy.intrusion_stun_ticks > 0
+        if enemy.ai_state == "attack" and enemy.beam_cooldown <= 0.0 and not stunned:
             brg = bearing_to(enemy.x, enemy.y, target_x, target_y)
             if beam_in_arc(enemy.heading, brg, params["arc_deg"]):
+                # Jamming reduces beam damage (jam_factor=0 → full damage).
+                effective_dmg = params["beam_dmg"] * max(0.0, 1.0 - enemy.jam_factor)
                 events.append(
                     BeamHitEvent(
                         attacker_id=enemy.id,
                         attacker_x=enemy.x,
                         attacker_y=enemy.y,
-                        damage=params["beam_dmg"],
+                        damage=effective_dmg,
                         target=target_id,
                     )
                 )

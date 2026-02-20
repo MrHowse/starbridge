@@ -1,0 +1,9 @@
+{
+  "id": "medical_ship",
+  "name": "Hope-class Medical Frigate",
+  "description": "Lightly armed hospital vessel with an expanded medbay and surgical theatre. Medical station is the primary operational focus. Tough hull for a support ship — designed to survive long enough to do its job.",
+  "max_hull": 80,
+  "torpedo_ammo": 6,
+  "min_crew": 5,
+  "max_crew": 8
+}

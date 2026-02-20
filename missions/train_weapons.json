@@ -1,0 +1,43 @@
+{
+  "id": "train_weapons",
+  "name": "Weapons Training",
+  "is_training": true,
+  "target_role": "weapons",
+  "auto_roles": ["helm", "engineering"],
+  "briefing": "Welcome to Weapons Training. Practice targeting, beam fire, torpedo management, and shield balance against training drones. The helm will manoeuvre automatically.",
+  "spawn": [
+    { "type": "scout", "x": 55000, "y": 35000, "id": "drone_1" },
+    { "type": "scout", "x": 60000, "y": 55000, "id": "drone_2" }
+  ],
+  "objectives": [
+    {
+      "id": "wpn_01_target",
+      "text": "Select a target — click on a contact on your radar",
+      "hint": "Your radar shows enemy contacts as red triangles. Click one to lock onto it. The selected target appears highlighted and its distance/bearing shows in the status panel.",
+      "trigger": "training_flag",
+      "args": { "flag": "weapons_target_selected" }
+    },
+    {
+      "id": "wpn_02_beams",
+      "text": "Fire your beam weapon at the target",
+      "hint": "Press the FIRE BEAMS button (or keyboard shortcut). Beams have a firing arc — the target must be within your arc. Watch the beam cooldown bar before firing again.",
+      "trigger": "training_flag",
+      "args": { "flag": "weapons_beams_fired" }
+    },
+    {
+      "id": "wpn_03_shields",
+      "text": "Adjust shield balance — boost forward shields to 80%",
+      "hint": "Use the shield balance sliders. Set FRONT to 80 and REAR to 20. Forward shields protect you when charging; rear shields protect during retreat. The ship's shields will regenerate over time.",
+      "trigger": "training_flag",
+      "args": { "flag": "weapons_shields_set" }
+    },
+    {
+      "id": "wpn_04_destroy",
+      "text": "Destroy all training drones",
+      "hint": "Keep firing beams at the drones. Beams drain shields before hitting hull. When shields are down, hull damage accumulates. Prioritise the closer drone first. Remember to lead moving targets slightly.",
+      "trigger": "all_enemies_destroyed"
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero"
+}

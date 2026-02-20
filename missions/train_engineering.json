@@ -1,0 +1,41 @@
+{
+  "id": "train_engineering",
+  "name": "Engineering Training",
+  "is_training": true,
+  "target_role": "engineering",
+  "auto_roles": ["helm"],
+  "briefing": "Welcome to Engineering Training. Learn to manage power distribution across ship systems, use overclock safely, and focus repair teams on damaged systems.",
+  "spawn": [],
+  "objectives": [
+    {
+      "id": "eng_01_power",
+      "text": "Adjust power levels — boost ENGINES to 120",
+      "hint": "The power panel shows all systems and their current power level. The total budget is shared — raising one system may require lowering another. Set ENGINES to 120 using the slider or input field.",
+      "trigger": "training_flag",
+      "args": { "flag": "engineering_power_set" }
+    },
+    {
+      "id": "eng_02_balance",
+      "text": "Re-balance power — reduce ENGINES and boost SHIELDS",
+      "hint": "Now redistribute: lower ENGINES back to 100 and raise SHIELDS to 120. The budget bar at the top shows total usage. Stay under the red line to avoid overload risk.",
+      "trigger": "training_flag",
+      "args": { "flag": "engineering_power_set" }
+    },
+    {
+      "id": "eng_03_repair",
+      "text": "Set a system to repair focus",
+      "hint": "Click the wrench icon (or REPAIR button) next to any system to focus the repair crew there. The system's health will slowly increase. Choose the system with the lowest health percentage.",
+      "trigger": "training_flag",
+      "args": { "flag": "engineering_repair_set" }
+    },
+    {
+      "id": "eng_04_hold",
+      "text": "Hold current power configuration for 30 seconds",
+      "hint": "Well done — now maintain this configuration. Watch the efficiency readouts. Overclocked systems (above 100) risk random damage. Keep key systems near 100 for sustained operations.",
+      "trigger": "timer_elapsed",
+      "args": { "seconds": 60 }
+    }
+  ],
+  "victory_condition": "all_objectives_complete",
+  "defeat_condition": "player_hull_zero"
+}

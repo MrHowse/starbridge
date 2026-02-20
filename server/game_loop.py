@@ -26,6 +26,15 @@ from server.models.messages import (
     CommsHailPayload,
     CommsTuneFrequencyPayload,
     CrewNotifyPayload,
+    EWBeginIntrusionPayload,
+    EWSetJamTargetPayload,
+    EWToggleCountermeasuresPayload,
+    TacticalSetEngagementPriorityPayload,
+    TacticalSetInterceptTargetPayload,
+    TacticalAddAnnotationPayload,
+    TacticalRemoveAnnotationPayload,
+    TacticalCreateStrikePlanPayload,
+    TacticalExecuteStrikePlanPayload,
     FlightOpsDeployProbePayload,
     FlightOpsLaunchDronePayload,
     FlightOpsRecallDronePayload,
@@ -63,6 +72,7 @@ from server.systems.ai import tick_enemies
 from server.systems.combat import regenerate_shields
 from server.systems import hazards as hazard_system
 import server.game_logger as gl
+import server.game_debrief as gdb
 import server.game_loop_weapons as glw
 import server.game_loop_mission as glm
 import server.game_loop_medical as glmed
@@ -71,6 +81,9 @@ import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
 import server.game_loop_damage_control as gldc
 import server.game_loop_flight_ops as glfo
+import server.game_loop_ew as glew
+import server.game_loop_tactical as gltac
+import server.game_loop_training as gltr
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -80,6 +93,7 @@ import server.puzzles.transmission_decoding   # noqa: F401 — registers transmi
 import server.puzzles.triage                  # noqa: F401 — registers triage type
 import server.puzzles.route_calculation        # noqa: F401 — registers route_calculation type
 import server.puzzles.firing_solution           # noqa: F401 — registers firing_solution type
+import server.puzzles.network_intrusion        # noqa: F401 — registers network_intrusion type
 
 logger = logging.getLogger("starbridge.game_loop")
 
@@ -89,7 +103,7 @@ TICK_RATE: int = 10
 TICK_DT: float = 1.0 / TICK_RATE
 
 # Engineering constants — tunable for gameplay feel
-POWER_BUDGET: float = 700.0
+POWER_BUDGET: float = 900.0
 OVERCLOCK_THRESHOLD: float = 100.0
 OVERCLOCK_DAMAGE_CHANCE: float = 0.10
 OVERCLOCK_DAMAGE_HP: float = 3.0
@@ -109,6 +123,9 @@ _task: asyncio.Task[None] | None = None
 _tick_count: int = 0
 _game_start_time: float = 0.0
 _on_game_end: Callable[[], Awaitable[None]] | None = None
+
+# Training: track the last objective index for which a hint was broadcast.
+_training_last_hint_idx: int = -1
 
 # Sensor-assist tracking: puzzle IDs that have already received the
 # Engineering sensor-boost assist (one application per puzzle lifetime).
@@ -152,9 +169,10 @@ def register_game_end_callback(cb: Callable[[], Awaitable[None]]) -> None:
 
 async def start(mission_id: str, difficulty: str = "officer", ship_class: str = "frigate") -> None:
     """Begin the game loop. Called when the host launches a game."""
-    global _task, _tick_count, _game_start_time
+    global _task, _tick_count, _game_start_time, _training_last_hint_idx
     _tick_count = 0
     _game_start_time = _time.monotonic()
+    _training_last_hint_idx = -1
 
     # Apply ship class stats before subsystem resets (so ammo uses class defaults).
     try:
@@ -170,6 +188,9 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     glcap.reset()
     gldc.reset()
     glfo.reset()
+    glew.reset()
+    gltac.reset()
+    gltr.reset()
     _puzzle_engine.reset()
     _applied_sensor_assists.clear()
     _applied_science_medical_assists.clear()
@@ -198,6 +219,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     )
 
     glm.init_mission(mission_id, _world)
+    gltr.init_training(glm.get_mission_dict())
 
     _task = asyncio.create_task(_loop(), name="game_loop")
     logger.info("Game loop started (mission: %s, %d Hz)", mission_id, TICK_RATE)
@@ -249,13 +271,20 @@ async def _loop() -> None:
                 },
                 "ammo": glw.get_ammo(),
                 "enemy_count": len(_world.enemies),
+                "x": round(_world.ship.x, 0),
+                "y": round(_world.ship.y, 0),
             })
         glm.apply_asteroid_collisions(_world)
 
         # 3. Engineering. 3.5 Crew factors + medical + disease. 3.6 Security. 3.7 Comms.
         damaged_systems = _apply_engineering(_world.ship)
+        # 3.1 Training auto-simulation (only active during training missions).
+        gltr.auto_helm_tick(_world.ship, TICK_DT)
+        gltr.auto_engineering_tick(_world.ship, TICK_DT)
         gldc.tick(_world.ship.interior, TICK_DT)
         glfo.tick(_world.ship, TICK_DT)
+        glew.tick(_world, _world.ship, TICK_DT)
+        gltac.tick(_world, _world.ship, TICK_DT)
         _world.ship.update_crew_factors()
         glmed.tick_treatments(_world.ship, TICK_DT)
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
@@ -281,7 +310,7 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(["science"], science_weapons_msg)
         # Tube loading advancement.
         glw.tick_tube_loading(TICK_DT)
-        torpedo_events = glw.tick_torpedoes(_world)
+        torpedo_events = glw.tick_torpedoes(_world, _world.ship)
         stations = _world.stations if _world.stations else None
         beam_hit_events = tick_enemies(_world.enemies, _world.ship, TICK_DT, stations)
 
@@ -296,9 +325,34 @@ async def _loop() -> None:
 
         # 8.5 Mission tick.
         over, result = await glm.tick_mission(_world, _world.ship, _manager, TICK_DT)
+
+        # 8.51 Training hint broadcast — sent once per objective advance.
+        if gltr.is_training_active():
+            _me = glm.get_mission_engine()
+            if _me is not None:
+                _new_obj_idx = _me.get_active_objective_index()
+                if _new_obj_idx != _training_last_hint_idx:
+                    _training_last_hint_idx = _new_obj_idx
+                    _hint_text = gltr.get_hint_for_idx(_new_obj_idx)
+                    if _hint_text:
+                        await _manager.broadcast_to_roles(
+                            [gltr.get_target_role()],
+                            Message.build(
+                                "training.hint",
+                                {"text": _hint_text, "objective_index": _new_obj_idx},
+                            ),
+                        )
+
         if over:
             stats = _build_game_stats()
+            _log_path = gl.get_log_path()
             gl.stop_logging(result or "unknown", stats)
+            # Compute debrief from completed log.
+            if _log_path is not None:
+                try:
+                    stats["debrief"] = gdb.compute_from_log(_log_path)
+                except Exception as _exc:
+                    logger.warning("Debrief computation failed: %s", _exc)
             await _manager.broadcast(
                 Message.build("game.over", {"result": result, "stats": stats})
             )
@@ -316,8 +370,16 @@ async def _loop() -> None:
         if me := glm.get_mission_engine():
             for _pid, label, success in _puzzle_engine.pop_resolved():
                 me.notify_puzzle_result(label, success)
+                # EW intrusion: apply beam stun on successful network intrusion.
+                if label.startswith("intrusion_") and success and _world is not None:
+                    target_id = label[len("intrusion_"):]
+                    glew.apply_intrusion_success(target_id, _world)
         else:
-            _puzzle_engine.pop_resolved()  # discard if no mission engine
+            for _pid, label, success in _puzzle_engine.pop_resolved():
+                # Apply EW intrusion effect even without a mission engine.
+                if label.startswith("intrusion_") and success and _world is not None:
+                    target_id = label[len("intrusion_"):]
+                    glew.apply_intrusion_success(target_id, _world)
         for pstart in glm.pop_pending_puzzle_starts():
             # Build extra kwargs for puzzle types that need runtime references.
             extra_kwargs: dict = {}
@@ -533,10 +595,15 @@ async def _loop() -> None:
                 Message.build("ship.hull_hit", {"cause": hev["hazard_type"], "damage": hev["damage"]})
             )
 
-        # 11i. Engineering damage-control state → Engineering station.
+        # 11i. Engineering damage-control state → Engineering + Damage Control stations.
+        _dc_state_msg = gldc.build_dc_state(_world.ship.interior)
         await _manager.broadcast_to_roles(
             ["engineering"],
-            Message.build("engineering.dc_state", gldc.build_dc_state(_world.ship.interior)),
+            Message.build("engineering.dc_state", _dc_state_msg),
+        )
+        await _manager.broadcast_to_roles(
+            ["damage_control"],
+            Message.build("damage_control.state", _dc_state_msg),
         )
 
         # 11j. Flight ops state → Flight Ops station.
@@ -544,6 +611,32 @@ async def _loop() -> None:
             ["flight_ops"],
             Message.build("flight_ops.state", glfo.build_state(_world.ship)),
         )
+
+        # 11k. EW state → Electronic Warfare station.
+        await _manager.broadcast_to_roles(
+            ["electronic_warfare"],
+            Message.build("ew.state", glew.build_state(_world, _world.ship)),
+        )
+
+        # 11l. Tactical state → Tactical station + cross-station broadcasts.
+        await _manager.broadcast_to_roles(
+            ["tactical"],
+            Message.build("tactical.state", gltac.build_state(_world, _world.ship)),
+        )
+        await _manager.broadcast_to_roles(
+            ["weapons"],
+            Message.build("tactical.designations", gltac.get_designations()),
+        )
+        _intercept = gltac.calc_intercept(_world, _world.ship)
+        await _manager.broadcast_to_roles(
+            ["helm"],
+            Message.build("tactical.intercept", _intercept or {}),
+        )
+        for _roles, _cdata in gltac.pop_pending_broadcasts():
+            await _manager.broadcast_to_roles(
+                _roles,
+                Message.build("tactical.strike_countdown", _cdata),
+            )
 
         # 12–15. Damage events, torpedo hits, action events, security events.
         for s, h in damaged_systems:
@@ -555,6 +648,13 @@ async def _loop() -> None:
                 "ship.system_damaged", {"system": s, "new_health": h, "cause": "combat"}))
             gl.log_event("combat", "system_damaged", {"system": s, "new_health": round(h, 1)})
         for evt in torpedo_events:
+            if evt.get("type") == "pd_intercept":
+                await _manager.broadcast(Message.build("weapons.pd_intercept", {
+                    "torpedo_id": evt["torpedo_id"],
+                    "x": evt["x"],
+                    "y": evt["y"],
+                }))
+                continue
             await _manager.broadcast(Message.build("weapons.torpedo_hit", evt))
             gl.log_event("weapons", "torpedo_hit", {
                 "target_id": evt["target_id"],
@@ -592,34 +692,41 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             if payload.heading != ship.target_heading:
                 gl.log_event("helm", "heading_changed", {"from": round(ship.target_heading, 1), "to": payload.heading})
             ship.target_heading = payload.heading
+            _set_training_flag(glm, "helm_heading_set")
         elif msg_type == "helm.set_throttle" and isinstance(payload, HelmSetThrottlePayload):
             if payload.throttle != ship.throttle:
                 gl.log_event("helm", "throttle_changed", {"from": ship.throttle, "to": payload.throttle})
             ship.throttle = payload.throttle
+            _set_training_flag(glm, "helm_throttle_set")
         elif msg_type == "engineering.set_power" and isinstance(payload, EngineeringSetPowerPayload):
             _prev_power = ship.systems[payload.system].power
             _apply_power(ship, payload.system, payload.level)
             _new_power = ship.systems[payload.system].power
             if _new_power != _prev_power:
                 gl.log_event("engineering", "power_changed", {"system": payload.system, "from": _prev_power, "to": _new_power})
+            _set_training_flag(glm, "engineering_power_set")
         elif msg_type == "engineering.set_repair" and isinstance(payload, EngineeringSetRepairPayload):
             ship.repair_focus = payload.system
             gl.log_event("engineering", "repair_started", {"system": payload.system})
-        elif msg_type == "engineering.dispatch_dct" and isinstance(payload, EngineeringDispatchDCTPayload):
+            _set_training_flag(glm, "engineering_repair_set")
+        elif msg_type in ("engineering.dispatch_dct", "damage_control.dispatch_dct") and isinstance(payload, EngineeringDispatchDCTPayload):
             gldc.dispatch_dct(payload.room_id, ship.interior)
             gl.log_event("engineering", "dct_dispatched", {"room_id": payload.room_id})
-        elif msg_type == "engineering.cancel_dct" and isinstance(payload, EngineeringCancelDCTPayload):
+            _set_training_flag(glm, "dc_team_dispatched")
+        elif msg_type in ("engineering.cancel_dct", "damage_control.cancel_dct") and isinstance(payload, EngineeringCancelDCTPayload):
             gldc.cancel_dct(payload.room_id)
             gl.log_event("engineering", "dct_cancelled", {"room_id": payload.room_id})
         elif msg_type == "weapons.select_target" and isinstance(payload, WeaponsSelectTargetPayload):
             glw.set_target(payload.entity_id)
             gl.log_event("weapons", "target_selected", {"target_id": payload.entity_id})
+            _set_training_flag(glm, "weapons_target_selected")
         elif msg_type == "weapons.fire_beams" and isinstance(payload, WeaponsFireBeamsPayload):
             if world is not None:
-                evt = glw.fire_player_beams(ship, world)
+                evt = glw.fire_player_beams(ship, world, beam_frequency=payload.beam_frequency)
                 if evt:
                     events.append(evt)
                     gl.log_event("weapons", "beam_fired", evt[1])
+            _set_training_flag(glm, "weapons_beams_fired")
         elif msg_type == "weapons.fire_torpedo" and isinstance(payload, WeaponsFireTorpedoPayload):
             if world is not None:
                 for evt in glw.fire_torpedo(ship, world, payload.tube):
@@ -634,36 +741,46 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             ship.shields.front = payload.front
             ship.shields.rear = payload.rear
             gl.log_event("weapons", "shield_changed", {"front": payload.front, "rear": payload.rear})
+            _set_training_flag(glm, "weapons_shields_set")
         elif msg_type == "science.start_scan" and isinstance(payload, ScienceStartScanPayload):
             if glm.is_signal_scan(payload.entity_id):
                 events.append(("signal.scan_result", {"ship_x": ship.x, "ship_y": ship.y}))
             else:
                 sensors.start_scan(payload.entity_id)
                 gl.log_event("science", "scan_started", {"entity_id": payload.entity_id})
+            _set_training_flag(glm, "science_scan_started")
         elif msg_type == "science.cancel_scan" and isinstance(payload, ScienceCancelScanPayload):
             sensors.cancel_scan()
         elif msg_type == "medical.treat_crew" and isinstance(payload, MedicalTreatCrewPayload):
             glmed.start_treatment(payload.deck, payload.injury_type, ship)
             gl.log_event("medical", "treatment_started", {"deck": payload.deck, "injury_type": payload.injury_type})
+            _set_training_flag(glm, "medical_treatment_started")
         elif msg_type == "medical.cancel_treatment" and isinstance(payload, MedicalCancelTreatmentPayload):
             glmed.cancel_treatment(payload.deck)
+            _set_training_flag(glm, "medical_treatment_cancelled")
         elif msg_type == "security.move_squad" and isinstance(payload, SecurityMoveSquadPayload):
             gls.move_squad(ship.interior, payload.squad_id, payload.room_id)
             gl.log_event("security", "squad_moved", {"squad_id": payload.squad_id, "room_id": payload.room_id})
+            _set_training_flag(glm, "security_squad_moved")
         elif msg_type == "security.toggle_door" and isinstance(payload, SecurityToggleDoorPayload):
             gls.toggle_door(ship.interior, payload.room_id, payload.squad_id)
             gl.log_event("security", "door_toggled", {"room_id": payload.room_id, "squad_id": payload.squad_id})
+            _set_training_flag(glm, "security_door_toggled")
         elif msg_type == "captain.authorize" and isinstance(payload, CaptainAuthorizePayload):
             if world is not None:
                 for evt in glw.resolve_nuclear_auth(payload.request_id, payload.approved, ship, world):
                     events.append(evt)
+            _set_training_flag(glm, "captain_authorized")
         elif msg_type == "captain.add_log" and isinstance(payload, CaptainAddLogPayload):
             entry = glcap.add_log_entry(payload.text)
             events.append(("captain.log_entry", {"text": entry["text"], "timestamp": entry["timestamp"]}))
+            _set_training_flag(glm, "captain_log_added")
         elif msg_type == "comms.tune_frequency" and isinstance(payload, CommsTuneFrequencyPayload):
             glco.tune(payload.frequency)
+            _set_training_flag(glm, "comms_frequency_tuned")
         elif msg_type == "comms.hail" and isinstance(payload, CommsHailPayload):
             glco.hail(payload.contact_id, payload.message_type)
+            _set_training_flag(glm, "comms_hail_sent")
         elif msg_type == "puzzle.submit" and isinstance(payload, PuzzleSubmitPayload):
             _puzzle_engine.submit(payload.puzzle_id, payload.submission)
         elif msg_type == "puzzle.request_assist" and isinstance(payload, PuzzleAssistPayload):
@@ -680,20 +797,86 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "flight_ops.launch_drone" and isinstance(payload, FlightOpsLaunchDronePayload):
             glfo.launch_drone(payload.drone_id, payload.target_x, payload.target_y, ship)
             gl.log_event("flight_ops", "drone_launched", {"drone_id": payload.drone_id})
+            _set_training_flag(glm, "flightops_drone_launched")
         elif msg_type == "flight_ops.recall_drone" and isinstance(payload, FlightOpsRecallDronePayload):
             glfo.recall_drone(payload.drone_id)
             gl.log_event("flight_ops", "drone_recalled", {"drone_id": payload.drone_id})
+            _set_training_flag(glm, "flightops_drone_recalled")
         elif msg_type == "flight_ops.deploy_probe" and isinstance(payload, FlightOpsDeployProbePayload):
             glfo.deploy_probe(payload.target_x, payload.target_y)
             gl.log_event("flight_ops", "probe_deployed", {
                 "target_x": payload.target_x, "target_y": payload.target_y,
             })
+            _set_training_flag(glm, "flightops_probe_deployed")
+        elif msg_type == "ew.set_jam_target" and isinstance(payload, EWSetJamTargetPayload):
+            glew.set_jam_target(payload.entity_id)
+            gl.log_event("ew", "jam_target_set", {"entity_id": payload.entity_id})
+            _set_training_flag(glm, "ew_jam_set")
+        elif msg_type == "ew.toggle_countermeasures" and isinstance(payload, EWToggleCountermeasuresPayload):
+            if ship is not None:
+                glew.toggle_countermeasures(payload.active, ship)
+            gl.log_event("ew", "countermeasures_toggled", {"active": payload.active})
+            _set_training_flag(glm, "ew_countermeasures_set")
+        elif msg_type == "ew.begin_intrusion" and isinstance(payload, EWBeginIntrusionPayload):
+            if world is not None:
+                target_enemy = next((e for e in world.enemies if e.id == payload.entity_id), None)
+                if target_enemy is not None:
+                    glew.set_intrusion_target(payload.entity_id, payload.target_system)
+                    label = f"intrusion_{payload.entity_id}"
+                    _puzzle_engine.create_puzzle(
+                        puzzle_type="network_intrusion",
+                        station="electronic_warfare",
+                        label=label,
+                        difficulty=1,
+                        time_limit=30.0,
+                        target_id=payload.entity_id,
+                        target_system=payload.target_system,
+                    )
+                    gl.log_event("ew", "intrusion_started", {
+                        "target_id": payload.entity_id,
+                        "target_system": payload.target_system,
+                    })
+        elif msg_type == "tactical.set_engagement_priority" and isinstance(payload, TacticalSetEngagementPriorityPayload):
+            gltac.set_engagement_priority(payload.entity_id, payload.priority)
+            gl.log_event("tactical", "engagement_priority_set", {
+                "entity_id": payload.entity_id, "priority": payload.priority,
+            })
+            _set_training_flag(glm, "tactical_priority_set")
+        elif msg_type == "tactical.set_intercept_target" and isinstance(payload, TacticalSetInterceptTargetPayload):
+            gltac.set_intercept_target(payload.entity_id)
+            gl.log_event("tactical", "intercept_target_set", {"entity_id": payload.entity_id})
+            _set_training_flag(glm, "tactical_intercept_set")
+        elif msg_type == "tactical.add_annotation" and isinstance(payload, TacticalAddAnnotationPayload):
+            ann_id = gltac.add_annotation(
+                payload.annotation_type, payload.x, payload.y, payload.label, payload.text,
+            )
+            gl.log_event("tactical", "annotation_added", {"id": ann_id, "type": payload.annotation_type})
+        elif msg_type == "tactical.remove_annotation" and isinstance(payload, TacticalRemoveAnnotationPayload):
+            gltac.remove_annotation(payload.annotation_id)
+            gl.log_event("tactical", "annotation_removed", {"id": payload.annotation_id})
+        elif msg_type == "tactical.create_strike_plan" and isinstance(payload, TacticalCreateStrikePlanPayload):
+            plan_id = gltac.create_strike_plan([s.model_dump() for s in payload.steps])
+            gl.log_event("tactical", "strike_plan_created", {"plan_id": plan_id, "step_count": len(payload.steps)})
+            if len(payload.steps) >= 2:
+                _set_training_flag(glm, "tactical_plan_created")
+        elif msg_type == "tactical.execute_strike_plan" and isinstance(payload, TacticalExecuteStrikePlanPayload):
+            ok = gltac.execute_strike_plan(payload.plan_id)
+            gl.log_event("tactical", "strike_plan_executed", {"plan_id": payload.plan_id, "found": ok})
         elif msg_type == "game.briefing_launch" and isinstance(payload, GameBriefingLaunchPayload):
             events.append(("game.all_ready", {}))
         else:
             logger.warning("Unrecognised queued input type: %s", msg_type)
 
     return events
+
+
+def _set_training_flag(glm_module: object, flag: str) -> None:
+    """Set a training flag on the active mission engine (no-op if not training)."""
+    if not gltr.is_training_active():
+        return
+    me = glm_module.get_mission_engine()  # type: ignore[union-attr]
+    if me is not None:
+        me.set_training_flag(flag)
 
 
 def _apply_power(ship: Ship, system_name: str, requested: float) -> None:
@@ -764,6 +947,8 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             },
             "medical_supplies": ship.medical_supplies,
             "active_treatments": glmed.get_active_treatments(),
+            "countermeasure_charges": ship.countermeasure_charges,
+            "ew_countermeasure_active": ship.ew_countermeasure_active,
         },
         tick=tick,
     )

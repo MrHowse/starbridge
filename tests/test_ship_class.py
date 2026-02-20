@@ -63,9 +63,10 @@ def test_load_unknown_class_raises_file_not_found():
 # ---------------------------------------------------------------------------
 
 
-def test_list_returns_all_five_classes():
+def test_list_returns_all_classes():
+    # Now 7 classes (5 combat + 2 specialised: medical_ship, carrier).
     classes = list_ship_classes()
-    assert len(classes) == 5
+    assert len(classes) == 7
 
 
 def test_list_order_is_canonical():
@@ -74,11 +75,11 @@ def test_list_order_is_canonical():
     assert ids == SHIP_CLASS_ORDER
 
 
-def test_list_hull_increases_through_order():
-    classes = list_ship_classes()
-    hulls = [sc.max_hull for sc in classes]
-    # Each class should have equal or greater hull than the previous.
-    assert hulls == sorted(hulls), f"Hull values not monotonically increasing: {hulls}"
+def test_combat_hull_increases_through_order():
+    # Core combat ship line is strictly increasing in hull.
+    combat_ids = ["scout", "corvette", "frigate", "cruiser", "battleship"]
+    hulls = [load_ship_class(cid).max_hull for cid in combat_ids]
+    assert hulls == sorted(hulls), f"Combat hull values not monotonically increasing: {hulls}"
 
 
 # ---------------------------------------------------------------------------

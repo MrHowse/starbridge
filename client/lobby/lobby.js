@@ -18,14 +18,37 @@ let myConnectionId = null;
 /** @type {string|null} Role currently held by this client */
 let myRole = null;
 
-const ROLES = ['captain', 'helm', 'weapons', 'engineering', 'science', 'medical'];
+/** @type {Object} Latest roles dict from lobby.state, for launch-time crew count */
+let _latestRoles = {};
+
+const ROLES = [
+  'captain', 'helm', 'weapons', 'engineering', 'science', 'medical',
+  'security', 'comms', 'flight_ops', 'electronic_warfare', 'tactical', 'damage_control',
+];
 const ROLE_LABELS = {
-  captain:     'CAPTAIN',
-  helm:        'HELM',
-  weapons:     'WEAPONS',
-  engineering: 'ENGINEERING',
-  science:     'SCIENCE',
-  medical:     'MEDICAL',
+  captain:            'CAPTAIN',
+  helm:               'HELM',
+  weapons:            'WEAPONS',
+  engineering:        'ENGINEERING',
+  science:            'SCIENCE',
+  medical:            'MEDICAL',
+  security:           'SECURITY',
+  comms:              'COMMS',
+  flight_ops:         'FLIGHT OPS',
+  electronic_warfare: 'ELEC WARFARE',
+  tactical:           'TACTICAL',
+  damage_control:     'DAMAGE CTRL',
+};
+
+/** Minimum crew per ship class (matches ships/*.json min_crew field). */
+const MIN_CREW = {
+  scout:        3,
+  corvette:     4,
+  frigate:      6,
+  cruiser:      8,
+  battleship:  10,
+  medical_ship: 5,
+  carrier:      7,
 };
 
 // ---------------------------------------------------------------------------
@@ -65,6 +88,26 @@ function init() {
     const difficulty   = difficultyEl ? difficultyEl.value : 'officer';
     const shipClassEl  = document.querySelector('[data-ship-class-select]');
     const ship_class   = shipClassEl ? shipClassEl.value : 'frigate';
+
+    // Soft min-crew warning — warn but do not block launch.
+    const minCrew     = MIN_CREW[ship_class] || 1;
+    const claimedCount = Object.values(_latestRoles)
+      .filter(v => v !== null && !String(v).startsWith('DISCONNECTED:')).length;
+    if (claimedCount < minCrew) {
+      launchStatusEl.textContent =
+        `⚠ WARNING: ${ship_class.toUpperCase()} requires ${minCrew} crew (${claimedCount} ready). Launch anyway?`;
+      launchStatusEl.style.color = 'var(--warning, #ffaa00)';
+      // Allow a second click to actually launch.
+      launchBtnEl.dataset.warned = '1';
+      if (!launchBtnEl.dataset.confirmed) {
+        launchBtnEl.dataset.confirmed = '1';
+        return;
+      }
+    }
+    // Clear warning state.
+    launchBtnEl.dataset.confirmed = '';
+    launchStatusEl.style.color = '';
+
     send('lobby.start_game', { mission_id, difficulty, ship_class });
   });
 
@@ -133,6 +176,7 @@ function handleWelcome(payload) {
 /** @param {{ roles: Object, host: string, session_id: string }} payload */
 function handleLobbyState(payload) {
   const { roles, host, session_id } = payload;
+  _latestRoles = roles;
 
   sessionLabelEl.textContent = `SESSION ${session_id.slice(0, 8).toUpperCase()}`;
 

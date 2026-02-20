@@ -86,9 +86,9 @@ def test_ship_default_hull_full():
     assert ship.hull == pytest.approx(100.0)
 
 
-def test_ship_has_seven_systems():
+def test_ship_has_nine_systems():
     ship = Ship()
-    expected = {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring", "flight_deck"}
+    expected = {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring", "flight_deck", "ecm_suite", "point_defence"}
     assert set(ship.systems.keys()) == expected
 
 

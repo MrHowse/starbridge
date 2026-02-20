@@ -147,9 +147,10 @@ async def test_handle_set_repair_unknown_system_returns_error():
 async def test_drain_queue_applies_set_power():
     _, world, queue = fresh_loop()
     ship = world.ship
-    # Reduce a different system to create headroom; 7 systems at 100 = 700 budget.
-    # beams=50, others (incl. flight_deck) at 100 → other_total for engines = 550 → headroom: 150
+    # Reduce two systems to create headroom; 9 systems × 100 = 900 budget.
+    # beams=50, point_defence=50, 7 others at 100 → other_total for engines = 750 → headroom: 150
     ship.systems["beams"].power = 50.0
+    ship.systems["point_defence"].power = 50.0
     await queue.put(("engineering.set_power", EngineeringSetPowerPayload(system="engines", level=130.0)))
     game_loop._drain_queue(ship)
     assert ship.systems["engines"].power == 130.0
@@ -158,18 +159,19 @@ async def test_drain_queue_applies_set_power():
 async def test_drain_queue_clamps_power_to_budget():
     _, world, queue = fresh_loop()
     ship = world.ship
-    # All 7 systems at 100 = 700 total. No headroom for engines to exceed 100.
+    # All 9 systems at 100 = 900 total. No headroom for engines to exceed 100.
     await queue.put(("engineering.set_power", EngineeringSetPowerPayload(system="engines", level=150.0)))
     game_loop._drain_queue(ship)
-    # other_total = 600. available = 700 - 600 = 100. 150 → clamped to 100.
+    # other_total = 800. available = 900 - 800 = 100. 150 → clamped to 100.
     assert ship.systems["engines"].power == 100.0
 
 
 async def test_drain_queue_does_not_clamp_within_budget():
     _, world, queue = fresh_loop()
     ship = world.ship
-    # engines=50, 5 others at 100, flight_deck=100 → other_total for beams = 550 → headroom: 150
+    # engines=50, point_defence=50, 7 others at 100 → other_total for beams = 750 → headroom: 150
     ship.systems["engines"].power = 50.0
+    ship.systems["point_defence"].power = 50.0
     await queue.put(("engineering.set_power", EngineeringSetPowerPayload(system="beams", level=130.0)))
     game_loop._drain_queue(ship)
     assert ship.systems["beams"].power == 130.0

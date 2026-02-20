@@ -89,6 +89,10 @@
                 <span class="text-data" id="target-type">—</span>
               </div>
             </div>
+            <div class="target-row" id="target-shield-freq-row" style="display:none">
+              <span class="text-label">SHIELD FREQ</span>
+              <span class="text-data" id="target-shield-freq">—</span>
+            </div>
           </div>
         </section>
 
@@ -100,6 +104,13 @@
           <div class="beam-body">
             <button class="fire-btn" id="beam-fire-btn" disabled>◈ FIRE BEAMS</button>
             <p class="text-label beam-status" id="beam-status">NO TARGET</p>
+            <div class="freq-selector" id="freq-selector">
+              <span class="text-label freq-label">BEAM FREQ:</span>
+              <button class="freq-btn freq-btn--alpha freq-btn--active" data-freq="alpha">ALPHA</button>
+              <button class="freq-btn freq-btn--beta"  data-freq="beta">BETA</button>
+              <button class="freq-btn freq-btn--gamma" data-freq="gamma">GAMMA</button>
+              <button class="freq-btn freq-btn--delta" data-freq="delta">DELTA</button>
+            </div>
           </div>
         </section>
 

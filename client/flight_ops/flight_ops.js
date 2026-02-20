@@ -12,6 +12,10 @@
  */
 
 import { initSharedUI, on, send } from '../shared/station_base.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_ambient.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -58,6 +62,9 @@ let targetMode = null;
 // Shared UI init
 // ---------------------------------------------------------------------------
 
+SoundBank.init();
+wireButtonSounds(SoundBank);
+
 initSharedUI({
   role: 'flight_ops',
   onConnect() {},
@@ -67,13 +74,17 @@ initSharedUI({
     mainEl.style.display    = 'grid';
     if (payload.mission_name) missionLabel.textContent = payload.mission_name;
     resizeCanvas();
+    SoundBank.setAmbient('life_support', { active: true });
   },
-  onGameOver() {
+  onGameOver(payload) {
     standbyEl.style.display = '';
     mainEl.style.display    = 'none';
     missionLabel.textContent = 'MISSION ENDED';
     foState = null;
     shipState = null;
+    SoundBank.play((payload && payload.result === 'victory') ? 'victory' : 'defeat');
+    SoundBank.stopAmbient('life_support');
+    SoundBank.stopAmbient('alert_level');
   },
 });
 
@@ -84,6 +95,14 @@ initSharedUI({
 on('ship.state', payload => {
   shipState = payload;
   renderMap();
+});
+
+on('ship.alert_changed', ({ level }) => {
+  SoundBank.setAmbient('alert_level', { level });
+});
+
+on('ship.hull_hit', () => {
+  SoundBank.play('hull_hit');
 });
 
 on('flight_ops.state', payload => {
@@ -317,11 +336,13 @@ canvasWrap.addEventListener('click', e => {
       target_x: Math.round(wx),
       target_y: Math.round(wy),
     });
+    SoundBank.play('scan_complete');
   } else if (targetMode.type === 'probe') {
     send('flight_ops.deploy_probe', {
       target_x: Math.round(wx),
       target_y: Math.round(wy),
     });
+    SoundBank.play('torpedo_launch');
   }
 
   exitTargetMode();

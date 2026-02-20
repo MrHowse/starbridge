@@ -10,8 +10,11 @@ north (toward y=0), clockwise.
 """
 from __future__ import annotations
 
+import random as _rng_module
 from dataclasses import dataclass, field
 from typing import ClassVar, Literal, Optional
+
+_SHIELD_FREQUENCIES = ("alpha", "beta", "gamma", "delta")
 
 from server.models.ship import Ship
 
@@ -139,6 +142,11 @@ class Enemy:
     scan_state: Literal["unknown", "scanned"] = "unknown"
     # v0.02g — EMP stun (ticks remaining; 0 = not stunned)
     stun_ticks: int = 0
+    # v0.03k — Electronic Warfare
+    jam_factor: float = 0.0          # 0.0 = not jammed; jam reduces beam damage fraction
+    intrusion_stun_ticks: int = 0    # EW network intrusion: blocks beam fire when > 0
+    # Gap closure — beam frequency vulnerability
+    shield_frequency: str = ""       # alpha | beta | gamma | delta — matched by Weapons
 
 
 # ---------------------------------------------------------------------------
@@ -202,4 +210,5 @@ def spawn_enemy(type_: Literal["scout", "cruiser", "destroyer"], x: float, y: fl
         shield_front=100.0,
         shield_rear=100.0,
         ai_state="idle",
+        shield_frequency=_rng_module.choice(_SHIELD_FREQUENCIES),
     )

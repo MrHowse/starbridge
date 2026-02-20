@@ -16,6 +16,19 @@ from server.models.messages.flight_ops import (
     FlightOpsLaunchDronePayload,
     FlightOpsRecallDronePayload,
 )
+from server.models.messages.ew import (
+    EWSetJamTargetPayload,
+    EWToggleCountermeasuresPayload,
+    EWBeginIntrusionPayload,
+)
+from server.models.messages.tactical import (
+    TacticalSetEngagementPriorityPayload,
+    TacticalSetInterceptTargetPayload,
+    TacticalAddAnnotationPayload,
+    TacticalRemoveAnnotationPayload,
+    TacticalCreateStrikePlanPayload,
+    TacticalExecuteStrikePlanPayload,
+)
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
     EngineeringDispatchDCTPayload,
@@ -110,6 +123,20 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "flight_ops.launch_drone":  FlightOpsLaunchDronePayload,
     "flight_ops.recall_drone":  FlightOpsRecallDronePayload,
     "flight_ops.deploy_probe":  FlightOpsDeployProbePayload,
+    # Electronic Warfare
+    "ew.set_jam_target":         EWSetJamTargetPayload,
+    "ew.toggle_countermeasures": EWToggleCountermeasuresPayload,
+    "ew.begin_intrusion":        EWBeginIntrusionPayload,
+    # Tactical Officer
+    "tactical.set_engagement_priority": TacticalSetEngagementPriorityPayload,
+    "tactical.set_intercept_target":    TacticalSetInterceptTargetPayload,
+    "tactical.add_annotation":          TacticalAddAnnotationPayload,
+    "tactical.remove_annotation":       TacticalRemoveAnnotationPayload,
+    "tactical.create_strike_plan":      TacticalCreateStrikePlanPayload,
+    "tactical.execute_strike_plan":     TacticalExecuteStrikePlanPayload,
+    # Damage Control (aliases engineering DCT payloads)
+    "damage_control.dispatch_dct": EngineeringDispatchDCTPayload,
+    "damage_control.cancel_dct":   EngineeringCancelDCTPayload,
 }
 
 

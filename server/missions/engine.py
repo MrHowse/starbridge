@@ -78,6 +78,9 @@ class MissionEngine:
         self._completed_puzzle_labels: set[str] = set()
         self._failed_puzzle_labels: set[str] = set()
 
+        # Training flag tracking (training_flag trigger)
+        self._training_flags: set[str] = set()
+
     def tick(self, world: World, ship: Ship, dt: float = 0.1) -> list[str]:
         """Check triggers. Returns IDs of newly-completed objectives this tick.
 
@@ -165,6 +168,14 @@ class MissionEngine:
         else:
             self._failed_puzzle_labels.add(label)
 
+    def set_training_flag(self, flag: str) -> None:
+        """Record a player action flag for training_flag triggers."""
+        self._training_flags.add(flag)
+
+    def get_active_objective_index(self) -> int:
+        """Return the index of the currently active objective."""
+        return self._active_index
+
     def get_objectives(self) -> list[Objective]:
         """Return a copy of the current objective list."""
         return list(self._objectives)
@@ -249,5 +260,8 @@ class MissionEngine:
                 label in self._completed_puzzle_labels
                 or label in self._failed_puzzle_labels
             )
+
+        if trigger == "training_flag":
+            return args["flag"] in self._training_flags
 
         return False

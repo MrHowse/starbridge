@@ -73,6 +73,23 @@ from server.models.messages.flight_ops import (
     FlightOpsRecallDronePayload,
 )
 
+# Electronic Warfare
+from server.models.messages.ew import (
+    EWBeginIntrusionPayload,
+    EWSetJamTargetPayload,
+    EWToggleCountermeasuresPayload,
+)
+
+# Tactical Officer
+from server.models.messages.tactical import (
+    TacticalSetEngagementPriorityPayload,
+    TacticalSetInterceptTargetPayload,
+    TacticalAddAnnotationPayload,
+    TacticalRemoveAnnotationPayload,
+    TacticalCreateStrikePlanPayload,
+    TacticalExecuteStrikePlanPayload,
+)
+
 # Game lifecycle
 from server.models.messages.game import (
     ErrorPermissionPayload,
@@ -138,6 +155,17 @@ __all__ = [
     "FlightOpsLaunchDronePayload",
     "FlightOpsRecallDronePayload",
     "FlightOpsDeployProbePayload",
+    # electronic warfare
+    "EWSetJamTargetPayload",
+    "EWToggleCountermeasuresPayload",
+    "EWBeginIntrusionPayload",
+    # tactical officer
+    "TacticalSetEngagementPriorityPayload",
+    "TacticalSetInterceptTargetPayload",
+    "TacticalAddAnnotationPayload",
+    "TacticalRemoveAnnotationPayload",
+    "TacticalCreateStrikePlanPayload",
+    "TacticalExecuteStrikePlanPayload",
     # game
     "ErrorValidationPayload",
     "ErrorPermissionPayload",

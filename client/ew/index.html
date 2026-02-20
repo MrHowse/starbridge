@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — ELECTRONIC WARFARE</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="ew.css">
+</head>
+<body>
+  <div class="station-container">
+
+    <!-- ─── Header bar ──────────────────────────────────────────────────── -->
+    <header class="station-header panel">
+      <div class="panel__header station-header__bar">
+        <span class="text-title">ELECTRONIC WARFARE</span>
+        <div class="station-header__center">
+          <span class="text-label" id="mission-label">STANDING BY</span>
+        </div>
+        <div class="station-header__status">
+          <span class="status-dot status-dot--disconnected" data-status-dot></span>
+          <span class="text-label" data-status-label>CONNECTING</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── Standby overlay ─────────────────────────────────────────────── -->
+    <div class="ew-standby" data-standby>
+      <p class="text-header">STANDING BY</p>
+      <p class="text-body">Awaiting mission orders from the Captain.</p>
+      <a class="text-label ew-standby__lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+    </div>
+
+    <!-- ─── Main EW layout (hidden until game.started) ──────────────────── -->
+    <main class="ew-main" data-ew-main style="display:none">
+
+      <!-- Left: ECM tactical map -->
+      <section class="ew-map panel" aria-label="ECM tactical map">
+        <div class="panel__header">
+          <span class="text-header">ECM TACTICAL MAP</span>
+          <span class="text-label text-dim" id="ecm-range-label">JAM RANGE: —</span>
+        </div>
+        <div class="ew-map__canvas-wrap">
+          <canvas id="ew-canvas"></canvas>
+        </div>
+      </section>
+
+      <!-- Right: ECM controls -->
+      <aside class="ew-controls panel" aria-label="ECM controls">
+
+        <!-- ECM system status -->
+        <div class="panel__header">
+          <span class="text-header">ECM SUITE STATUS</span>
+        </div>
+        <div class="ew-ecm-status">
+          <div class="ew-status-row">
+            <span class="text-label">EFFICIENCY</span>
+            <span class="text-data" id="ecm-efficiency">100%</span>
+          </div>
+          <div class="ew-status-row">
+            <span class="text-label">JAM TARGET</span>
+            <span class="text-data" id="jam-target-label">NONE</span>
+          </div>
+          <div class="ew-status-row">
+            <span class="text-label">JAM STRENGTH</span>
+            <div class="gauge ew-gauge">
+              <div class="gauge__fill" id="jam-gauge"></div>
+            </div>
+            <span class="text-data" id="jam-pct">0%</span>
+          </div>
+        </div>
+
+        <!-- Countermeasures -->
+        <div class="panel__header" style="margin-top:8px">
+          <span class="text-label">COUNTERMEASURES</span>
+          <span class="text-data" id="cm-active-label">INACTIVE</span>
+        </div>
+        <div class="ew-cm-section">
+          <div class="ew-status-row">
+            <span class="text-label">CHARGES</span>
+            <div class="gauge ew-gauge">
+              <div class="gauge__fill" id="cm-gauge"></div>
+            </div>
+            <span class="text-data" id="cm-charges">10</span>
+          </div>
+          <button class="ew-btn" id="btn-cm-toggle">ENABLE COUNTERMEASURES</button>
+        </div>
+
+        <!-- Enemy list -->
+        <div class="panel__header" style="margin-top:8px">
+          <span class="text-label">CONTACTS</span>
+        </div>
+        <div class="ew-enemy-list" id="enemy-list">
+          <p class="text-dim">No contacts detected.</p>
+        </div>
+
+        <!-- Intrusion controls -->
+        <div class="panel__header" style="margin-top:8px">
+          <span class="text-label">SYSTEM INTRUSION</span>
+          <span class="text-data text-dim" id="intrusion-target-label">NO TARGET</span>
+        </div>
+        <div class="ew-intrusion-section">
+          <div class="ew-status-row">
+            <span class="text-label">SYSTEM</span>
+            <select class="ew-select" id="intrusion-system">
+              <option value="weapons">WEAPONS</option>
+              <option value="shields">SHIELDS</option>
+              <option value="engines">ENGINES</option>
+            </select>
+          </div>
+          <button class="ew-btn" id="btn-intrusion">BEGIN INTRUSION</button>
+        </div>
+
+      </aside>
+    </main>
+
+  </div>
+  <script type="module" src="ew.js"></script>
+</body>
+</html>

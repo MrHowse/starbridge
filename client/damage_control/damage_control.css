@@ -1,0 +1,207 @@
+/* ── Damage Control Station ──────────────────────────────────────────────── */
+
+.dc-main {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  grid-template-rows: 1fr;
+  gap: var(--gap);
+  padding: var(--gap);
+  height: calc(100vh - 56px);  /* subtract header height */
+  overflow: hidden;
+}
+
+/* ── Interior grid ───────────────────────────────────────────────────────── */
+
+.dc-interior {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dc-room-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--gap);
+  overflow-y: auto;
+}
+
+.dc-deck-label {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 6px 2px 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.dc-room-card {
+  background: var(--bg-panel-deep);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+}
+
+.dc-room-card:hover {
+  border-color: var(--primary);
+}
+
+.dc-room-card--selected {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--bg-panel-deep));
+}
+
+.dc-room-card--normal    { border-left: 3px solid #2a9d2a; }
+.dc-room-card--damaged   { border-left: 3px solid var(--warning); }
+.dc-room-card--fire      { border-left: 3px solid var(--danger); }
+.dc-room-card--decompressed { border-left: 3px solid #555; }
+
+.dc-room-name {
+  flex: 1;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.dc-room-status {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dc-status--normal      { background: #1a3a1a; color: #2a9d2a; }
+.dc-status--damaged     { background: #3a2a00; color: var(--warning); }
+.dc-status--fire        { background: #3a0a00; color: var(--danger); }
+.dc-status--decompressed { background: #1a1a2a; color: #5070c0; }
+.dc-status--dct         { background: #00264a; color: var(--primary); }
+
+/* ── Legend ──────────────────────────────────────────────────────────────── */
+
+.dc-legend {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dc-legend-chip {
+  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  padding: 2px 5px;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+}
+
+.dc-chip--normal      { background: #1a3a1a; color: #2a9d2a; }
+.dc-chip--damaged     { background: #3a2a00; color: var(--warning); }
+.dc-chip--fire        { background: #3a0a00; color: var(--danger); }
+.dc-chip--decompressed { background: #1a1a2a; color: #5070c0; }
+
+/* ── Teams panel ─────────────────────────────────────────────────────────── */
+
+.dc-teams {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dc-teams-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap);
+}
+
+.dc-selected-room {
+  background: var(--bg-panel-deep);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: var(--gap);
+  min-height: 80px;
+}
+
+.dc-selected-room h3 {
+  margin: 0 0 6px 0;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+.dc-room-detail {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin: 2px 0;
+}
+
+.dc-dispatch-btn,
+.dc-cancel-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  border-radius: 3px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: opacity 0.15s;
+}
+
+.dc-dispatch-btn {
+  background: var(--primary);
+  color: #000;
+}
+
+.dc-dispatch-btn:disabled,
+.dc-cancel-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dc-cancel-btn {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* DCT active list entries */
+.dc-dct-entry {
+  background: var(--bg-panel-deep);
+  border: 1px solid var(--primary);
+  border-radius: 3px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.dc-dct-entry__room {
+  color: var(--primary);
+  font-weight: bold;
+}
+
+.dc-dct-progress {
+  height: 3px;
+  background: var(--bg-alt);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.dc-dct-progress__fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.5s linear;
+}

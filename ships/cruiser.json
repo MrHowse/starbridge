@@ -1,7 +1,9 @@
 {
   "id": "cruiser",
-  "name": "Cruiser",
-  "description": "Heavy warship with strong hull and generous armament. Sacrifices speed.",
+  "name": "Endeavour-class Cruiser",
+  "description": "Heavy warship with strong hull and generous armament. Specialist stations (EW, Tactical) come into their own at this scale. Best with 9-10 players.",
   "max_hull": 140,
-  "torpedo_ammo": 16
+  "torpedo_ammo": 16,
+  "min_crew": 8,
+  "max_crew": 11
 }

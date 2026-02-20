@@ -28,6 +28,10 @@ HULL_SYSTEM_DAMAGE_CHANCE: float = 0.25
 SYSTEM_DAMAGE_MIN: float = 10.0
 SYSTEM_DAMAGE_MAX: float = 25.0
 SHIELD_REGEN_PER_TICK: float = 0.5     # HP/tick at full shield efficiency
+COUNTERMEASURE_REDUCTION: float = 0.30  # fraction of hull damage absorbed per charge
+# Beam frequency matching
+FREQ_MATCH_MULT: float = 1.5     # matched frequency → 50% bonus damage
+FREQ_MISMATCH_MULT: float = 0.5  # mismatched frequency → 50% penalty
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +77,13 @@ def apply_hit_to_player(
     # Apply difficulty enemy damage multiplier.
     hull_damage = (damage - absorbed) * ship.difficulty.enemy_damage_mult
 
+    # Apply Electronic Warfare countermeasure reduction.
+    if hull_damage > 0.0 and ship.ew_countermeasure_active and ship.countermeasure_charges > 0:
+        hull_damage *= (1.0 - COUNTERMEASURE_REDUCTION)
+        ship.countermeasure_charges = max(0, ship.countermeasure_charges - 1)
+        if ship.countermeasure_charges == 0:
+            ship.ew_countermeasure_active = False
+
     # 3. Hull damage + optional system damage roll + crew casualties.
     damaged_systems: list[tuple[str, float]] = []
     if hull_damage > 0:
@@ -102,8 +113,21 @@ def apply_hit_to_enemy(
     damage: float,
     attacker_x: float,
     attacker_y: float,
+    beam_frequency: str = "",
 ) -> None:
-    """Apply damage to an enemy ship (shields + hull; no system damage roll)."""
+    """Apply damage to an enemy ship (shields + hull; no system damage roll).
+
+    If *beam_frequency* matches the enemy's shield_frequency the damage is
+    multiplied by FREQ_MATCH_MULT (1.5×); a mismatch applies FREQ_MISMATCH_MULT
+    (0.5×). No effect when either side has no frequency set.
+    """
+    # Apply beam frequency modifier before shield absorption.
+    if beam_frequency and enemy.shield_frequency:
+        if beam_frequency == enemy.shield_frequency:
+            damage *= FREQ_MATCH_MULT
+        else:
+            damage *= FREQ_MISMATCH_MULT
+
     brg = bearing_to(enemy.x, enemy.y, attacker_x, attacker_y)
     diff = angle_diff(enemy.heading, brg)
     is_front = abs(diff) < 90.0

@@ -25,6 +25,7 @@ class GameLogger:
 
     def __init__(self) -> None:
         self._log_file: Path | None = None
+        self._last_log_file: Path | None = None  # preserved after stop()
         self._fh: TextIO | None = None
         self._active: bool = False
         self._tick: int = 0
@@ -93,10 +94,15 @@ class GameLogger:
         self._fh = None
         if self._log_file is not None:
             print(f"[game_logger] Session log written: {self._log_file.resolve()}", file=sys.stderr)
+            self._last_log_file = self._log_file
         self._log_file = None
 
     def is_active(self) -> bool:
         return self._active
+
+    def get_log_path(self) -> "Path | None":
+        """Return the active log path (or last completed path after stop)."""
+        return self._log_file or self._last_log_file
 
     # ------------------------------------------------------------------
     # Internal
@@ -139,3 +145,8 @@ def stop_logging(result: str, stats: dict | None = None) -> None:
 def is_logging() -> bool:
     """Return True if an active log session is open."""
     return _logger.is_active()
+
+
+def get_log_path() -> "Path | None":
+    """Return the active or most recently completed log file path."""
+    return _logger.get_log_path()

@@ -39,14 +39,16 @@ _pending_puzzle_starts: list[dict] = []
 _pending_boardings: list[dict] = []
 _pending_deployments: list[dict] = []
 _pending_outbreaks: list[dict] = []
+_mission_dict: dict = {}
 
 
 def reset() -> None:
     """Reset mission state. Called automatically by init_mission."""
-    global _mission_engine, _signal_location, _dock_timer
+    global _mission_engine, _signal_location, _dock_timer, _mission_dict
     _mission_engine = None
     _signal_location = None
     _dock_timer = 0.0
+    _mission_dict = {}
     _pending_puzzle_starts.clear()
     _pending_boardings.clear()
     _pending_deployments.clear()
@@ -85,6 +87,11 @@ def get_mission_engine() -> MissionEngine | None:
     return _mission_engine
 
 
+def get_mission_dict() -> dict:
+    """Return the currently loaded mission dict (empty if no mission loaded)."""
+    return dict(_mission_dict)
+
+
 # ---------------------------------------------------------------------------
 # Initialisation
 # ---------------------------------------------------------------------------
@@ -94,10 +101,11 @@ def init_mission(mission_id: str, world: World) -> None:
     """Load and initialise the mission, spawn all entities."""
     import server.game_loop_weapons as glw
 
-    global _mission_engine, _signal_location, _dock_timer
+    global _mission_engine, _signal_location, _dock_timer, _mission_dict
     _dock_timer = 0.0
 
     mission = load_mission(mission_id)
+    _mission_dict = mission
 
     if mission_id == "sandbox":
         _spawn_sandbox_enemies(world)

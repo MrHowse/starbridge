@@ -1,4 +1,5 @@
 {
+  "id": "first_contact_protocol",
   "name": "First Contact Protocol",
   "briefing": "An unknown vessel has entered sensor range on an unusual frequency. Science: begin long-range analysis. Comms: monitor all channels and prepare to decode any transmissions. The nature of this contact is unknown.",
   "defeat_condition": "player_hull_zero",
