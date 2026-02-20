@@ -1,0 +1,195 @@
+{
+  "id": "pandemic",
+  "name": "Pandemic",
+  "briefing": "Station Aether-7 reports a catastrophic disease outbreak. Casualties are mounting and the pathogen is unknown. Your ship has been diverted to respond. Navigate to the station and assess the situation — initial reports suggest the outbreak may not be accidental.",
+  "spawn": [
+    {"type": "station", "id": "station_aether7", "x": 30000, "y": 70000}
+  ],
+  "nodes": [
+    {
+      "id": "receive_distress",
+      "type": "objective",
+      "text": "Receive and acknowledge the distress call from Station Aether-7",
+      "trigger": {"type": "timer_elapsed", "seconds": 0}
+    },
+    {
+      "id": "navigate_to_station",
+      "type": "objective",
+      "text": "Navigate to Station Aether-7",
+      "trigger": {"type": "player_in_area", "x": 30000, "y": 70000, "r": 8000}
+    },
+    {
+      "id": "pathogen_branch",
+      "type": "branch",
+      "text": "Identify the pathogen — your stations' findings will determine the response"
+    },
+    {
+      "id": "alien_pathogen",
+      "type": "parallel",
+      "text": "Respond to the alien pathogen — requires Science and Medical coordination",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "frequency_analysis",
+          "type": "objective",
+          "text": "Science: Analyse the pathogen's biological frequency signature",
+          "trigger": {"type": "puzzle_completed", "label": "pathogen_frequency"}
+        },
+        {
+          "id": "alien_triage",
+          "type": "objective",
+          "text": "Medical: Develop and apply the novel treatment protocol",
+          "trigger": {"type": "puzzle_resolved", "label": "alien_triage"}
+        }
+      ]
+    },
+    {
+      "id": "weaponised_pathogen",
+      "type": "parallel",
+      "text": "Investigate the weaponised pathogen — requires Security and Medical coordination",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "security_trace",
+          "type": "objective",
+          "text": "Security: Locate the bioweapon dispersal device aboard the station",
+          "trigger": {"type": "puzzle_resolved", "label": "security_sweep"}
+        },
+        {
+          "id": "medical_containment",
+          "type": "objective",
+          "text": "Medical: Administer emergency treatment to survivors",
+          "trigger": {"type": "puzzle_resolved", "label": "emergency_triage"}
+        }
+      ]
+    },
+    {
+      "id": "standard_protocol",
+      "type": "objective",
+      "text": "Medical: Administer standard triage protocol — time is running out",
+      "trigger": {"type": "puzzle_resolved", "label": "standard_triage"}
+    },
+    {
+      "id": "depart_station",
+      "type": "objective",
+      "text": "Depart Station Aether-7 and report your findings to command",
+      "trigger": {"type": "player_in_area", "x": 85000, "y": 50000, "r": 6000}
+    },
+    {
+      "id": "hull_emergency",
+      "type": "conditional",
+      "text": "EMERGENCY: Hull integrity critical — effect immediate repairs",
+      "condition": {"type": "ship_hull_below", "value": 30},
+      "deactivate_when": {"type": "ship_hull_above", "value": 50},
+      "on_activate": {
+        "action": "start_puzzle",
+        "puzzle_type": "circuit_routing",
+        "station": "engineering",
+        "label": "pandemic_hull_repair",
+        "difficulty": 2,
+        "time_limit": 90.0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "receive_distress",
+      "to": "navigate_to_station",
+      "type": "sequence"
+    },
+    {
+      "from": "navigate_to_station",
+      "to": "pathogen_branch",
+      "type": "sequence",
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "frequency_matching",
+          "station": "science",
+          "label": "bio_scan",
+          "difficulty": 3,
+          "time_limit": 120.0
+        },
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "transmission_decoding",
+          "station": "comms",
+          "label": "intercept_comm",
+          "difficulty": 2,
+          "time_limit": 120.0
+        }
+      ]
+    },
+    {
+      "from": "pathogen_branch",
+      "to": "alien_pathogen",
+      "type": "branch_trigger",
+      "trigger": {"type": "puzzle_completed", "label": "bio_scan"},
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "frequency_matching",
+          "station": "science",
+          "label": "pathogen_frequency",
+          "difficulty": 4,
+          "time_limit": 120.0
+        },
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "triage",
+          "station": "medical",
+          "label": "alien_triage",
+          "difficulty": 3,
+          "time_limit": 120.0
+        }
+      ]
+    },
+    {
+      "from": "pathogen_branch",
+      "to": "weaponised_pathogen",
+      "type": "branch_trigger",
+      "trigger": {"type": "puzzle_completed", "label": "intercept_comm"},
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "tactical_positioning",
+          "station": "security",
+          "label": "security_sweep",
+          "difficulty": 2,
+          "time_limit": 90.0,
+          "intruder_specs": [
+            {"id": "saboteur_1", "room_id": "engine_room", "objective_id": "conn"}
+          ]
+        },
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "triage",
+          "station": "medical",
+          "label": "emergency_triage",
+          "difficulty": 3,
+          "time_limit": 120.0
+        }
+      ]
+    },
+    {
+      "from": "pathogen_branch",
+      "to": "standard_protocol",
+      "type": "branch_trigger",
+      "trigger": {"type": "timer_elapsed", "seconds": 120},
+      "on_complete": {
+        "action": "start_puzzle",
+        "puzzle_type": "triage",
+        "station": "medical",
+        "label": "standard_triage",
+        "difficulty": 2,
+        "time_limit": 90.0
+      }
+    },
+    {"from": "alien_pathogen",       "to": "depart_station", "type": "sequence"},
+    {"from": "weaponised_pathogen",  "to": "depart_station", "type": "sequence"},
+    {"from": "standard_protocol",    "to": "depart_station", "type": "sequence"}
+  ],
+  "start_node": "receive_distress",
+  "victory_nodes": ["depart_station"],
+  "defeat_condition": {"type": "player_hull_zero"}
+}

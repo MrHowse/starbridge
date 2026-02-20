@@ -1,0 +1,113 @@
+{
+  "id": "the_convoy",
+  "name": "The Convoy",
+  "briefing": "Three civilian transports carrying critical medical supplies must reach Outpost Sigma. Enemy raiders have been detected in the approach corridor. Rendezvous with the convoy and escort them through — but be aware that multiple attack groups will strike simultaneously. You may not be able to protect all three.",
+  "spawn": [
+    {"type": "station", "id": "transport_alpha", "x": 20000, "y": 50000},
+    {"type": "station", "id": "transport_beta",  "x": 22000, "y": 52000},
+    {"type": "station", "id": "transport_gamma", "x": 18000, "y": 48000}
+  ],
+  "nodes": [
+    {
+      "id": "rendezvous",
+      "type": "objective",
+      "text": "Rendezvous with the convoy at waypoint Alpha",
+      "trigger": {"type": "player_in_area", "x": 20000, "y": 50000, "r": 6000}
+    },
+    {
+      "id": "escort_gauntlet",
+      "type": "parallel",
+      "text": "Protect the convoy — neutralise at least 2 of 3 attack groups",
+      "complete_when": {"count": 2},
+      "children": [
+        {
+          "id": "fend_off_alpha",
+          "type": "objective",
+          "text": "Weapons: Defeat the raider wing attacking Transport Alpha",
+          "trigger": {"type": "wave_defeated", "prefix": "alpha_"}
+        },
+        {
+          "id": "fend_off_beta",
+          "type": "objective",
+          "text": "Weapons: Destroy the cruiser threatening Transport Beta",
+          "trigger": {"type": "entity_destroyed", "target": "beta_cruiser"}
+        },
+        {
+          "id": "fend_off_gamma",
+          "type": "objective",
+          "text": "Weapons: Repel the destroyers targeting Transport Gamma",
+          "trigger": {"type": "wave_defeated", "prefix": "gamma_"}
+        }
+      ]
+    },
+    {
+      "id": "deliver_convoy",
+      "type": "objective",
+      "text": "Escort the surviving transports to Outpost Sigma",
+      "trigger": {"type": "player_in_area", "x": 80000, "y": 50000, "r": 6000}
+    },
+    {
+      "id": "hull_emergency",
+      "type": "conditional",
+      "text": "EMERGENCY: Hull integrity critical — effect immediate repairs",
+      "condition": {"type": "ship_hull_below", "value": 30},
+      "deactivate_when": {"type": "ship_hull_above", "value": 50},
+      "on_activate": {
+        "action": "start_puzzle",
+        "puzzle_type": "circuit_routing",
+        "station": "engineering",
+        "label": "convoy_hull_repair",
+        "difficulty": 3,
+        "time_limit": 90.0
+      }
+    },
+    {
+      "id": "transport_danger",
+      "type": "conditional",
+      "text": "ALERT: Transport Beta is taking heavy fire — prioritise its defence",
+      "condition": {
+        "type": "station_hull_below",
+        "station_id": "transport_beta",
+        "threshold": 50
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "rendezvous",
+      "to": "escort_gauntlet",
+      "type": "sequence",
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "scout",    "id": "alpha_1",     "x": 10000, "y": 45000},
+          {"type": "scout",    "id": "alpha_2",     "x":  8000, "y": 55000},
+          {"type": "cruiser",  "id": "beta_cruiser","x": 15000, "y": 40000},
+          {"type": "destroyer","id": "gamma_1",     "x": 25000, "y": 35000},
+          {"type": "scout",    "id": "gamma_2",     "x": 28000, "y": 30000}
+        ]
+      }
+    },
+    {
+      "from": "escort_gauntlet",
+      "to": "deliver_convoy",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "rendezvous",
+  "victory_nodes": ["deliver_convoy"],
+  "defeat_condition": {
+    "type": "any_of",
+    "triggers": [
+      {"type": "player_hull_zero"},
+      {
+        "type": "all_of",
+        "triggers": [
+          {"type": "station_hull_below", "station_id": "transport_alpha", "threshold": 0},
+          {"type": "station_hull_below", "station_id": "transport_beta",  "threshold": 0},
+          {"type": "station_hull_below", "station_id": "transport_gamma", "threshold": 0}
+        ]
+      }
+    ]
+  }
+}

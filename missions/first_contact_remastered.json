@@ -1,0 +1,130 @@
+{
+  "id": "first_contact_remastered",
+  "name": "First Contact Remastered",
+  "briefing": "An unidentified vessel has been detected on long-range sensors in Sector 7. Proceed to investigate. The nature of this contact is unknown — how your crew responds in the first moments will determine whether this becomes a historic alliance, a deadly engagement, or a tactical withdrawal.",
+  "spawn": [],
+  "nodes": [
+    {
+      "id": "patrol_sector",
+      "type": "objective",
+      "text": "Proceed to Sector 7 patrol coordinates",
+      "trigger": {"type": "player_in_area", "x": 30000, "y": 70000, "r": 6000}
+    },
+    {
+      "id": "detect_contact",
+      "type": "objective",
+      "text": "Unidentified contact on sensors — all stations, assess the situation",
+      "trigger": {"type": "timer_elapsed", "seconds": 20}
+    },
+    {
+      "id": "response_branch",
+      "type": "branch",
+      "text": "Your crew's first action determines the path forward"
+    },
+    {
+      "id": "diplomatic_path",
+      "type": "parallel",
+      "text": "Establish communication with the unknown vessel",
+      "complete_when": "any",
+      "children": [
+        {
+          "id": "science_analysis",
+          "type": "objective",
+          "text": "Science: Analyse the vessel's transmission signature",
+          "trigger": {"type": "puzzle_completed", "label": "sensor_sweep"}
+        },
+        {
+          "id": "comms_negotiation",
+          "type": "objective",
+          "text": "Comms: Decode and respond to the alien transmission",
+          "trigger": {"type": "puzzle_completed", "label": "hail_alien"}
+        }
+      ]
+    },
+    {
+      "id": "combat_outcome",
+      "type": "objective",
+      "text": "The vessel responded with hostility — destroy all contacts",
+      "trigger": {"type": "all_enemies_destroyed"}
+    },
+    {
+      "id": "avoidance_path",
+      "type": "objective",
+      "text": "Vessel has disengaged — hold at safe distance and log the contact",
+      "trigger": {"type": "timer_elapsed", "seconds": 150}
+    },
+    {
+      "id": "return_to_command",
+      "type": "objective",
+      "text": "Return to command and file your report",
+      "trigger": {"type": "player_in_area", "x": 85000, "y": 50000, "r": 6000}
+    },
+    {
+      "id": "boarding_alert",
+      "type": "conditional",
+      "text": "ALERT: Intruders detected aboard — repel boarders immediately",
+      "condition": {"type": "boarding_active"},
+      "deactivate_when": {"type": "no_intruders"}
+    }
+  ],
+  "edges": [
+    {
+      "from": "patrol_sector",
+      "to": "detect_contact",
+      "type": "sequence",
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "cruiser", "id": "alien_vessel", "x": 40000, "y": 60000}
+        ]
+      }
+    },
+    {
+      "from": "detect_contact",
+      "to": "response_branch",
+      "type": "sequence"
+    },
+    {
+      "from": "response_branch",
+      "to": "diplomatic_path",
+      "type": "branch_trigger",
+      "trigger": {"type": "scan_completed", "target": "alien_vessel"},
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "frequency_matching",
+          "station": "science",
+          "label": "sensor_sweep",
+          "difficulty": 2,
+          "time_limit": 90.0
+        },
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "transmission_decoding",
+          "station": "comms",
+          "label": "hail_alien",
+          "difficulty": 2,
+          "time_limit": 90.0
+        }
+      ]
+    },
+    {
+      "from": "response_branch",
+      "to": "combat_outcome",
+      "type": "branch_trigger",
+      "trigger": {"type": "entity_destroyed", "target": "alien_vessel"}
+    },
+    {
+      "from": "response_branch",
+      "to": "avoidance_path",
+      "type": "branch_trigger",
+      "trigger": {"type": "player_in_area", "x": 80000, "y": 20000, "r": 10000}
+    },
+    {"from": "diplomatic_path", "to": "return_to_command", "type": "sequence"},
+    {"from": "combat_outcome", "to": "return_to_command", "type": "sequence"},
+    {"from": "avoidance_path", "to": "return_to_command", "type": "sequence"}
+  ],
+  "start_node": "patrol_sector",
+  "victory_nodes": ["return_to_command"],
+  "defeat_condition": {"type": "player_hull_zero"}
+}

@@ -1,8 +1,24 @@
-# Current Phase: v0.04b — Mission Graph Migration (COMPLETE ✓)
+# Current Phase: v0.04c — New Graph-Native Missions (COMPLETE ✓)
 
-> Updated 2026-02-20 — v0.04b migration complete.
+> Updated 2026-02-20 — v0.04c complete.
 
 ## Status
+
+**v0.04c COMPLETE.** 4 new graph-native missions created, showcasing branch/parallel/conditional depth.
+
+- **1781 tests passing**, 0 regressions from v0.04b baseline (1721 tests)
+- **Bug fix**: `MissionGraph.tick()` now returns parent parallel node IDs when they complete via
+  child completion (previously only child IDs were returned). Fixed by tracking completions in
+  `_do_complete_node` via `_tick_completions` list, reset each tick.
+- 4 new mission JSON files in `missions/`:
+  - `salvage_run.json` — 3-way branch: science vs comms vs timer ambush; rescue parallel
+  - `first_contact_remastered.json` — 3-way branch: scan (diplomatic), destroy (combat), flee
+  - `the_convoy.json` — parallel count=2/3 attack groups; compound defeat condition
+  - `pandemic.json` — 3-way pathogen branch; two nested parallel "all" outcome paths
+- `tests/test_graph_missions.py` — 60 tests covering all 4 missions (load + branch simulation)
+- Next: v0.04d — (see SCOPE_v004.md)
+
+## v0.04b Status (CLOSED)
 
 **v0.04b COMPLETE.** All 23 missions converted to graph format, game_loop switched to MissionGraph.
 
@@ -14,7 +30,6 @@
 - `server/missions/loader.py` — sandbox dict updated to graph format
 - All 7 test files updated to use new mission format keys
 - `tests/test_diplomatic_summit.py` — fully rewritten for graph format + MissionGraph
-- Next: v0.04c — (TBD, see SCOPE_v004.md)
 
 ## v0.03 Status (CLOSED)
 
@@ -59,15 +74,3 @@
 - Lobby does not enforce min_crew (host can launch with fewer players than min_crew)
 - medical_ship and carrier have no differentiated gameplay mechanics from standard frigate
   (hull/ammo values differ; specialist mechanics are v0.04 scope)
-
-## What Comes Next (v0.04 — not yet scoped)
-
-Candidate areas for v0.04:
-- **Networked play beyond LAN** — WebRTC relay or hosted server
-- **Persistent player profiles** — stats across sessions, achievements
-- **Mission editor UI** — drag-and-drop mission authoring
-- **Community mission sharing** — upload/download from a repository
-- **Differentiated ship gameplay** — medical_ship medbay expansion, carrier fighter mechanics
-- **Audio system** — procedural audio, SoundBank implementation
-- **Tablet layout** — physical hardware verification + mobile-first CSS pass
-- **Automated E2E tests** — Playwright suite for full mission flow

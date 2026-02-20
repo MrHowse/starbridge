@@ -1,0 +1,149 @@
+{
+  "id": "salvage_run",
+  "name": "Salvage Run",
+  "briefing": "A derelict vessel drifts in the Kepler Debris Field, broadcasting a fragmented distress signal. Investigate the site — but be cautious. False distress beacons are a known piracy tactic. You have limited time to assess the situation before the sector becomes unsafe.",
+  "spawn": [],
+  "nodes": [
+    {
+      "id": "navigate_to_site",
+      "type": "objective",
+      "text": "Navigate to the salvage coordinates in the Kepler Debris Field",
+      "trigger": {"type": "player_in_area", "x": 25000, "y": 30000, "r": 8000}
+    },
+    {
+      "id": "survey_branch",
+      "type": "branch",
+      "text": "Assess the situation at the salvage site"
+    },
+    {
+      "id": "trap_discovered",
+      "type": "objective",
+      "text": "Science detected a power spike — hostiles emerging. Destroy all enemies",
+      "trigger": {"type": "all_enemies_destroyed"}
+    },
+    {
+      "id": "survivors_found",
+      "type": "parallel",
+      "text": "Rescue the survivors from the derelict vessel",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "dock_with_derelict",
+          "type": "objective",
+          "text": "Helm: Hold position alongside the derelict vessel",
+          "trigger": {
+            "type": "proximity_with_shields",
+            "x": 25000, "y": 30000, "r": 3000,
+            "min_shield": 0, "duration": 10
+          }
+        },
+        {
+          "id": "triage_survivors_obj",
+          "type": "objective",
+          "text": "Medical: Stabilise the survivors",
+          "trigger": {"type": "puzzle_resolved", "label": "triage_survivors"}
+        }
+      ]
+    },
+    {
+      "id": "ambush_sprung",
+      "type": "objective",
+      "text": "Ambush detected — break contact and reach the safe corridor",
+      "trigger": {"type": "player_in_area", "x": 70000, "y": 65000, "r": 8000}
+    },
+    {
+      "id": "return_to_base",
+      "type": "objective",
+      "text": "Return to Starbase Kepler",
+      "trigger": {"type": "player_in_area", "x": 85000, "y": 50000, "r": 6000}
+    },
+    {
+      "id": "hull_emergency",
+      "type": "conditional",
+      "text": "EMERGENCY: Hull integrity critical — effect immediate repairs",
+      "condition": {"type": "ship_hull_below", "value": 30},
+      "deactivate_when": {"type": "ship_hull_above", "value": 50},
+      "on_activate": {
+        "action": "start_puzzle",
+        "puzzle_type": "circuit_routing",
+        "station": "engineering",
+        "label": "emergency_repair",
+        "difficulty": 3,
+        "time_limit": 90.0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "navigate_to_site",
+      "to": "survey_branch",
+      "type": "sequence",
+      "on_complete": [
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "frequency_matching",
+          "station": "science",
+          "label": "sensor_analysis",
+          "difficulty": 2,
+          "time_limit": 120.0
+        },
+        {
+          "action": "start_puzzle",
+          "puzzle_type": "transmission_decoding",
+          "station": "comms",
+          "label": "decode_distress",
+          "difficulty": 2,
+          "time_limit": 120.0
+        }
+      ]
+    },
+    {
+      "from": "survey_branch",
+      "to": "trap_discovered",
+      "type": "branch_trigger",
+      "trigger": {"type": "puzzle_resolved", "label": "sensor_analysis"},
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "scout", "id": "trap_1", "x": 30000, "y": 20000},
+          {"type": "scout", "id": "trap_2", "x": 18000, "y": 35000},
+          {"type": "cruiser", "id": "trap_cmd", "x": 35000, "y": 15000}
+        ]
+      }
+    },
+    {
+      "from": "survey_branch",
+      "to": "survivors_found",
+      "type": "branch_trigger",
+      "trigger": {"type": "puzzle_resolved", "label": "decode_distress"},
+      "on_complete": {
+        "action": "start_puzzle",
+        "puzzle_type": "triage",
+        "station": "medical",
+        "label": "triage_survivors",
+        "difficulty": 2,
+        "time_limit": 90.0
+      }
+    },
+    {
+      "from": "survey_branch",
+      "to": "ambush_sprung",
+      "type": "branch_trigger",
+      "trigger": {"type": "timer_elapsed", "seconds": 90},
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "destroyer", "id": "ambush_1", "x": 15000, "y": 20000},
+          {"type": "scout", "id": "ambush_2", "x": 10000, "y": 35000},
+          {"type": "scout", "id": "ambush_3", "x": 20000, "y": 10000}
+        ]
+      }
+    },
+    {"from": "trap_discovered", "to": "return_to_base", "type": "sequence"},
+    {"from": "survivors_found", "to": "return_to_base", "type": "sequence"},
+    {"from": "ambush_sprung", "to": "return_to_base", "type": "sequence"}
+  ],
+  "start_node": "navigate_to_site",
+  "victory_nodes": ["return_to_base"],
+  "defeat_condition": {"type": "player_hull_zero"}
+}

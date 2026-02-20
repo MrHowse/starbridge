@@ -3,13 +3,14 @@
 > **LIVING DOCUMENT** — Update after every AI engineering session.
 > This is the single source of truth for what exists in the project.
 
-**Last updated**: 2026-02-20 (v0.04b COMPLETE — mission graph migration)
-**Current phase**: v0.04b COMPLETE ✓
-**Overall status**: 1721 tests passing. 11 active player roles + viewscreen (passive) = 12 stations.
-23 JSON missions (11 story + 12 training) + sandbox (synthetic) — all in graph format. 9 puzzle types.
+**Last updated**: 2026-02-20 (v0.04c COMPLETE — new graph-native missions)
+**Current phase**: v0.04c COMPLETE ✓
+**Overall status**: 1781 tests passing. 11 active player roles + viewscreen (passive) = 12 stations.
+27 JSON missions (15 story + 12 training) + sandbox (synthetic) — all in graph format. 9 puzzle types.
 7 ship classes (5 combat + 2 specialised). 4 difficulty presets.
 Game event logger (JSONL) + Debrief Dashboard + Captain's Replay.
 MissionGraph engine (parallel/branch/conditional nodes) — all missions use graph format.
+Bug fix: MissionGraph.tick() now returns parallel parent IDs when they complete.
 
 ---
 
@@ -91,7 +92,7 @@ MissionGraph engine (parallel/branch/conditional nodes) — all missions use gra
 #### Mission System (`server/missions/`)
 - `server/missions/loader.py` — `load_mission(id)`: reads `missions/<id>.json`; sandbox returns synthetic graph-format dict. **[v0.04b]** Sandbox dict uses graph format: `{nodes:[], edges:[], start_node:None, victory_nodes:[], defeat_condition:None}`.
 - `server/missions/engine.py` — `MissionEngine` class. Sequential objectives. **Still used in tests with inline dicts (do not remove).** Trigger types: all standard triggers + `training_flag`.
-- `server/mission_graph.py` — **[v0.04a]** `MissionGraph` class. Drop-in replacement for `MissionEngine` with parallel/branch/conditional/checkpoint nodes. Same public interface: `tick(world, ship, dt)`, `pop_pending_actions()`, `notify_puzzle_result(label, success)`, `set_training_flag(flag)`, `record_signal_scan()`, `is_over()`, `get_objectives()`, `get_active_node_ids()`. Mission format: `nodes` (with nested `children` for parallel), `edges`, `start_node`, `victory_nodes`, `defeat_condition` dict. Trigger format: `{"type": "name", ...args}` (flat merge).
+- `server/mission_graph.py` — **[v0.04a]** `MissionGraph` class. Drop-in replacement for `MissionEngine` with parallel/branch/conditional/checkpoint nodes. Same public interface: `tick(world, ship, dt)`, `pop_pending_actions()`, `notify_puzzle_result(label, success)`, `set_training_flag(flag)`, `record_signal_scan()`, `is_over()`, `get_objectives()`, `get_active_node_ids()`. Mission format: `nodes` (with nested `children` for parallel), `edges`, `start_node`, `victory_nodes`, `defeat_condition` dict. Trigger format: `{"type": "name", ...args}` (flat merge). **[v0.04c]** Bug fix: `_tick_completions` accumulator in `_do_complete_node` ensures parallel parent IDs appear in `tick()` return list when they complete via child completion.
 - `tools/migrate_missions.py` — **[v0.04b]** Migration script: converts missions from old sequential format (objectives array + string triggers) to graph format. Handles `defeat_condition_alt` via `any_of`. Skips already-migrated files.
 
 ### Ships
@@ -107,7 +108,7 @@ MissionGraph engine (parallel/branch/conditional nodes) — all missions use gra
 
 ### Missions
 
-#### Standard Missions (11 JSON files + sandbox)
+#### Standard Missions (15 JSON files + sandbox)
 - **Sandbox** — synthetic dict in `loader.py`; free play, no objectives, continuous enemy spawns
 - `missions/first_contact.json` — 4 sequential: patrol → scan scout → destroy all → return
 - `missions/defend_station.json` — 3 waves + station defence
@@ -120,6 +121,10 @@ MissionGraph engine (parallel/branch/conditional nodes) — all missions use gra
 - `missions/nebula_crossing.json` — route_calculation puzzle for Helm; weapon_stagger assist chain
 - `missions/deep_strike.json` — firing_solution puzzle for Weapons; nuclear authorisation flow
 - `missions/diplomatic_summit.json` — 9-objective flagship mission; all 8+ puzzle types simultaneously
+- **[v0.04c]** `missions/salvage_run.json` — 3-way branch: science vs comms vs timer ambush; parallel rescue (dock + triage)
+- **[v0.04c]** `missions/first_contact_remastered.json` — 3-way branch: scan (diplomatic any-of), destroy (combat), flee
+- **[v0.04c]** `missions/the_convoy.json` — parallel count=2/3 attack groups; compound defeat condition; 3 station spawns
+- **[v0.04c]** `missions/pandemic.json` — 3-way pathogen branch; two nested parallel "all" outcome paths
 
 #### Training Missions (12 JSON files — one per role)
 All training missions carry `"is_training": true` and `"target_role"`. Objectives use `training_flag` triggers. All have hints. All have `≥3` objectives.
@@ -270,8 +275,9 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 | `test_ship_classes.py` | 71 | v0.03o |
 | `test_gate_v003.py` | 183 | v0.03o |
 | `test_mission_graph.py` | 118 | v0.04a |
+| `test_graph_missions.py` | 60 | v0.04c |
 
-**Total: 1721 tests** ✓ (verified by pytest run 2026-02-20, post-v0.04b)
+**Total: 1781 tests** ✓ (verified by pytest run 2026-02-20, post-v0.04c)
 
 ---
 
@@ -583,7 +589,11 @@ starbridge/
 │   ├── train_flight_ops.json [v0.03m]
 │   ├── train_ew.json         [v0.03m]
 │   ├── train_tactical.json   [v0.03m]
-│   └── train_captain.json    [v0.03m]
+│   ├── train_captain.json    [v0.03m]
+│   ├── salvage_run.json      [v0.04c]
+│   ├── first_contact_remastered.json [v0.04c]
+│   ├── the_convoy.json       [v0.04c]
+│   └── pandemic.json         [v0.04c]
 ├── docs/
 │   ├── MESSAGE_PROTOCOL.md
 │   ├── MISSION_FORMAT.md
@@ -636,7 +646,9 @@ starbridge/
 │   ├── test_debrief.py            — 35 [v0.03n]
 │   ├── test_ship_class.py         — 13 [v0.03o updated]
 │   ├── test_ship_classes.py       — 71 [v0.03o]
-│   └── test_gate_v003.py          — 183 [v0.03o]
+│   ├── test_gate_v003.py          — 183 [v0.03o]
+│   ├── test_mission_graph.py      — 118 [v0.04a]
+│   └── test_graph_missions.py     —  60 [v0.04c]
 ├── logs/                          (runtime — .gitignore)
 ├── pytest.ini
 ├── requirements.txt

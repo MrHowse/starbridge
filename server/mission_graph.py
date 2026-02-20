@@ -116,6 +116,9 @@ class MissionGraph:
         self._over: bool = False
         self._result: str | None = None
 
+        # Per-tick completion accumulator (reset at start of each tick)
+        self._tick_completions: list[str] = []
+
         # Register all nodes from the mission dict
         for node_def in mission.get("nodes", []):
             self._register_node(node_def)
@@ -208,6 +211,7 @@ class MissionGraph:
         gobj.status = "complete"
         self._active_set.discard(node_id)
         self._complete_set.add(node_id)
+        self._tick_completions.append(node_id)
 
         # If this node is a child of a parallel, notify the parent.
         parent_id = self._child_parent.get(node_id)
@@ -293,7 +297,7 @@ class MissionGraph:
 
         self._elapsed += dt
         self._last_dt = dt
-        newly_completed: list[str] = []
+        self._tick_completions = []  # reset for this tick
 
         # ── 1. Check defeat condition ───────────────────────────────────
         if self._defeat_condition:
@@ -335,8 +339,6 @@ class MissionGraph:
                 trigger_def = self._all_nodes[node_id].get("trigger", {})
                 if trigger_def and self._eval_trigger(trigger_def, world, ship, node_id):
                     self._do_complete_node(node_id)
-                    if self._graph_nodes[node_id].status == "complete":
-                        newly_completed.append(node_id)
 
             elif ntype == "branch":
                 # Check outgoing branch_trigger edges — first to fire wins
@@ -351,8 +353,6 @@ class MissionGraph:
                         self._activate_node(edge["to"])
                         # Complete the branch node itself (no sequence edges to follow)
                         self._do_complete_node(node_id)
-                        if self._graph_nodes[node_id].status == "complete":
-                            newly_completed.append(node_id)
                         break  # Only one branch can fire per tick
 
             elif ntype == "parallel":
@@ -381,7 +381,7 @@ class MissionGraph:
             self._over = True
             self._result = "victory"
 
-        return newly_completed
+        return list(self._tick_completions)
 
     # ------------------------------------------------------------------
     # Trigger evaluation
