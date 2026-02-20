@@ -181,6 +181,7 @@ function init() {
   on('game.over',              handleGameOver);
   on('puzzle.assist_available', handleAssistAvailable);
   on('puzzle.assist_sent',      handleAssistSent);
+  on('engineering.dc_state',   handleDCState);
 
   initPuzzleRenderer(send);
   setupSchematicClick();
@@ -850,6 +851,95 @@ function hexToRgb(hex) {
     parseInt(hex.slice(3, 5), 16),
     parseInt(hex.slice(5, 7), 16),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Damage Control panel
+// ---------------------------------------------------------------------------
+
+const dcRoomListEl = document.getElementById('dc-room-list');
+const dcStatusEl   = document.getElementById('dc-status');
+
+/**
+ * Handle an engineering.dc_state broadcast from the server.
+ * Payload: { rooms: {room_id: {name, state, deck}}, active_dcts: {room_id: 0..1} }
+ */
+function handleDCState(payload) {
+  if (!gameActive) return;
+  renderDCPanel(payload.rooms || {}, payload.active_dcts || {});
+}
+
+/**
+ * Rebuild the damage-control room list.
+ *
+ * Each non-normal room gets a row with: name | state badge | [progress bar] | DISPATCH/CANCEL
+ * Decompressed rooms are shown without a button (cannot be repaired by DCT).
+ */
+function renderDCPanel(rooms, activeDcts) {
+  if (!dcRoomListEl || !dcStatusEl) return;
+
+  const roomIds = Object.keys(rooms);
+  const alertCount = roomIds.length;
+
+  if (alertCount === 0) {
+    dcStatusEl.textContent = 'ALL CLEAR';
+    dcStatusEl.style.color = '';
+    dcRoomListEl.innerHTML = '<p class="text-dim dc-all-clear">All compartments nominal.</p>';
+    return;
+  }
+
+  dcStatusEl.textContent = `${alertCount} ALERT${alertCount > 1 ? 'S' : ''}`;
+  dcStatusEl.style.color = alertCount > 0 ? '#ff5500' : '';
+
+  dcRoomListEl.innerHTML = '';
+  for (const [roomId, info] of Object.entries(rooms)) {
+    const isActive = roomId in activeDcts;
+    const progress = isActive ? activeDcts[roomId] : 0;
+    const canRepair = info.state !== 'decompressed';
+
+    const row = document.createElement('div');
+    row.className = 'dc-room-row';
+
+    // Room name
+    const nameEl = document.createElement('span');
+    nameEl.className = 'dc-room-name';
+    nameEl.textContent = info.name;
+    row.appendChild(nameEl);
+
+    // State badge
+    const badge = document.createElement('span');
+    badge.className = `dc-state-badge dc-state-badge--${info.state}`;
+    badge.textContent = info.state.toUpperCase();
+    row.appendChild(badge);
+
+    // Progress bar (only when DCT is active)
+    if (isActive) {
+      const wrap = document.createElement('div');
+      wrap.className = 'dc-progress-wrap';
+      const fill = document.createElement('div');
+      fill.className = 'dc-progress-fill';
+      fill.style.width = `${Math.round(progress * 100)}%`;
+      wrap.appendChild(fill);
+      row.appendChild(wrap);
+    }
+
+    // DISPATCH / CANCEL button (not for decompressed rooms)
+    if (canRepair) {
+      const btn = document.createElement('button');
+      btn.className = `dc-btn${isActive ? ' dc-btn--active' : ''}`;
+      btn.textContent = isActive ? 'CANCEL' : 'DISPATCH';
+      btn.addEventListener('click', () => {
+        if (isActive) {
+          send('engineering.cancel_dct', { room_id: roomId });
+        } else {
+          send('engineering.dispatch_dct', { room_id: roomId });
+        }
+      });
+      row.appendChild(btn);
+    }
+
+    dcRoomListEl.appendChild(row);
+  }
 }
 
 // ---------------------------------------------------------------------------

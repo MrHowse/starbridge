@@ -66,6 +66,17 @@
         <!-- System rows — populated by engineering.js at game start -->
         <div class="eng-systems" id="systems-container"></div>
 
+        <!-- Damage Control panel — populated by engineering.dc_state broadcasts -->
+        <div class="eng-dc-section">
+          <div class="panel__header">
+            <span class="text-label">DAMAGE CONTROL</span>
+            <span class="text-data text-dim" id="dc-status">ALL CLEAR</span>
+          </div>
+          <div id="dc-room-list" class="dc-room-list">
+            <p class="text-dim dc-all-clear">All compartments nominal.</p>
+          </div>
+        </div>
+
       </aside>
 
     </main>

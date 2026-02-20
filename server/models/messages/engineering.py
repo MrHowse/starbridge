@@ -29,3 +29,11 @@ class EngineeringSetRepairPayload(BaseModel):
         if v not in VALID_SYSTEMS:
             raise ValueError(f"Unknown system: {v!r}")
         return v
+
+
+class EngineeringDispatchDCTPayload(BaseModel):
+    room_id: str
+
+
+class EngineeringCancelDCTPayload(BaseModel):
+    room_id: str

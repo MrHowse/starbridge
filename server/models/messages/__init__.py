@@ -30,6 +30,8 @@ from server.models.messages.helm import HelmSetHeadingPayload, HelmSetThrottlePa
 # Engineering
 from server.models.messages.engineering import (
     VALID_SYSTEMS,
+    EngineeringCancelDCTPayload,
+    EngineeringDispatchDCTPayload,
     EngineeringSetPowerPayload,
     EngineeringSetRepairPayload,
 )

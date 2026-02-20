@@ -11,7 +11,12 @@ from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPay
 from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
 from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
-from server.models.messages.engineering import EngineeringSetPowerPayload, EngineeringSetRepairPayload
+from server.models.messages.engineering import (
+    EngineeringCancelDCTPayload,
+    EngineeringDispatchDCTPayload,
+    EngineeringSetPowerPayload,
+    EngineeringSetRepairPayload,
+)
 from server.models.messages.helm import HelmSetHeadingPayload, HelmSetThrottlePayload
 from server.models.messages.lobby import LobbyClaimRolePayload, LobbyReleaseRolePayload, LobbyStartGamePayload
 from server.models.messages.science import ScienceCancelScanPayload, ScienceStartScanPayload
@@ -66,8 +71,10 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "helm.set_heading": HelmSetHeadingPayload,
     "helm.set_throttle": HelmSetThrottlePayload,
     # Engineering
-    "engineering.set_power": EngineeringSetPowerPayload,
-    "engineering.set_repair": EngineeringSetRepairPayload,
+    "engineering.set_power":    EngineeringSetPowerPayload,
+    "engineering.set_repair":   EngineeringSetRepairPayload,
+    "engineering.dispatch_dct": EngineeringDispatchDCTPayload,
+    "engineering.cancel_dct":   EngineeringCancelDCTPayload,
     # Weapons
     "weapons.select_target": WeaponsSelectTargetPayload,
     "weapons.fire_beams": WeaponsFireBeamsPayload,

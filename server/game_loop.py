@@ -27,6 +27,8 @@ from server.models.messages import (
     CommsTuneFrequencyPayload,
     CrewNotifyPayload,
     GameBriefingLaunchPayload,
+    EngineeringCancelDCTPayload,
+    EngineeringDispatchDCTPayload,
     EngineeringSetPowerPayload,
     EngineeringSetRepairPayload,
     HelmSetHeadingPayload,
@@ -64,6 +66,7 @@ import server.game_loop_medical as glmed
 import server.game_loop_security as gls
 import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
+import server.game_loop_damage_control as gldc
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -161,6 +164,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     gls.reset()
     glco.reset()
     glcap.reset()
+    gldc.reset()
     _puzzle_engine.reset()
     _applied_sensor_assists.clear()
     _applied_science_medical_assists.clear()
@@ -245,6 +249,7 @@ async def _loop() -> None:
 
         # 3. Engineering. 3.5 Crew factors + medical + disease. 3.6 Security. 3.7 Comms.
         damaged_systems = _apply_engineering(_world.ship)
+        gldc.tick(_world.ship.interior, TICK_DT)
         _world.ship.update_crew_factors()
         glmed.tick_treatments(_world.ship, TICK_DT)
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
@@ -275,7 +280,9 @@ async def _loop() -> None:
         beam_hit_events = tick_enemies(_world.enemies, _world.ship, TICK_DT, stations)
 
         # 6. Enemy beam hits. 7. Shields. 7.5 Scan. 7.6 Docking. 8. Cooldowns.
+        _hull_before_combat = _world.ship.hull
         combat_damage_events = await glw.handle_enemy_beam_hits(beam_hit_events, _world, _manager)
+        gldc.apply_hull_damage(_hull_before_combat - _world.ship.hull, _world.ship.interior)
         regenerate_shields(_world.ship)
         scan_completed = sensors.tick(_world, _world.ship, TICK_DT)
         await glm.tick_docking(_world, _manager, TICK_DT)
@@ -518,6 +525,12 @@ async def _loop() -> None:
                 Message.build("ship.hull_hit", {"cause": hev["hazard_type"], "damage": hev["damage"]})
             )
 
+        # 11i. Engineering damage-control state → Engineering station.
+        await _manager.broadcast_to_roles(
+            ["engineering"],
+            Message.build("engineering.dc_state", gldc.build_dc_state(_world.ship.interior)),
+        )
+
         # 12–15. Damage events, torpedo hits, action events, security events.
         for s, h in damaged_systems:
             await _manager.broadcast(Message.build(
@@ -578,6 +591,12 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "engineering.set_repair" and isinstance(payload, EngineeringSetRepairPayload):
             ship.repair_focus = payload.system
             gl.log_event("engineering", "repair_started", {"system": payload.system})
+        elif msg_type == "engineering.dispatch_dct" and isinstance(payload, EngineeringDispatchDCTPayload):
+            gldc.dispatch_dct(payload.room_id, ship.interior)
+            gl.log_event("engineering", "dct_dispatched", {"room_id": payload.room_id})
+        elif msg_type == "engineering.cancel_dct" and isinstance(payload, EngineeringCancelDCTPayload):
+            gldc.cancel_dct(payload.room_id)
+            gl.log_event("engineering", "dct_cancelled", {"room_id": payload.room_id})
         elif msg_type == "weapons.select_target" and isinstance(payload, WeaponsSelectTargetPayload):
             glw.set_target(payload.entity_id)
             gl.log_event("weapons", "target_selected", {"target_id": payload.entity_id})

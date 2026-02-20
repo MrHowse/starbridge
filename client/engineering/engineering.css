@@ -423,6 +423,117 @@
 }
 
 /* =========================================================================
+   Damage Control panel
+   Compact list of non-normal rooms with DISPATCH / CANCEL DCT buttons.
+   ========================================================================= */
+
+.eng-dc-section {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-primary);
+}
+
+.dc-room-list {
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dim) var(--bg-secondary);
+}
+
+.dc-room-list::-webkit-scrollbar { width: 4px; }
+.dc-room-list::-webkit-scrollbar-track { background: var(--bg-secondary); }
+.dc-room-list::-webkit-scrollbar-thumb { background: var(--primary-dim); }
+
+.dc-all-clear {
+  padding: 0.4rem 1rem;
+  font-size: 0.75rem;
+}
+
+.dc-room-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.dc-room-name {
+  flex: 1;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dc-state-badge {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid currentColor;
+  flex-shrink: 0;
+}
+
+.dc-state-badge--damaged      { color: #ffaa00; border-color: rgba(255, 170, 0, 0.4); }
+.dc-state-badge--decompressed { color: var(--text-dim); border-color: rgba(128, 128, 128, 0.35); }
+.dc-state-badge--fire {
+  color: #ff5500;
+  border-color: rgba(255, 85, 0, 0.45);
+  animation: dc-fire-pulse 0.65s ease-in-out infinite alternate;
+}
+
+@keyframes dc-fire-pulse {
+  from { opacity: 0.55; }
+  to   { opacity: 1.0; }
+}
+
+/* Thin progress bar beside the badge when a DCT is active */
+.dc-progress-wrap {
+  width: 28px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.dc-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.25s linear;
+}
+
+/* DISPATCH / CANCEL button */
+.dc-btn {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 0.14rem 0.38rem;
+  border: 1px solid var(--border-primary);
+  color: var(--text-dim);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.dc-btn:hover {
+  border-color: var(--primary);
+  color: var(--text-bright);
+}
+
+.dc-btn--active {
+  border-color: #ffaa00;
+  color: #ffaa00;
+}
+
+.dc-btn--active:hover {
+  border-color: var(--hostile, #ff3333);
+  color: var(--hostile, #ff3333);
+}
+
+/* =========================================================================
    Responsive — tablet portrait (768 px and below, stack vertically)
    ========================================================================= */
 
