@@ -17,3 +17,8 @@ class CaptainAuthorizePayload(BaseModel):
 
 class CaptainAddLogPayload(BaseModel):
     text: str = Field(min_length=1, max_length=500)
+
+
+class CaptainSystemOverridePayload(BaseModel):
+    system: str
+    online: bool  # True = bring online, False = take offline

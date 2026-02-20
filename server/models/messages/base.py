@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainSetAlertPayload
+from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
 from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPayload
 from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
@@ -106,6 +106,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "captain.set_alert": CaptainSetAlertPayload,
     "captain.authorize": CaptainAuthorizePayload,
     "captain.add_log": CaptainAddLogPayload,
+    "captain.system_override": CaptainSystemOverridePayload,
     # Medical
     "medical.treat_crew": MedicalTreatCrewPayload,
     "medical.cancel_treatment": MedicalCancelTreatmentPayload,

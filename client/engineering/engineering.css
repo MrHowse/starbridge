@@ -196,6 +196,21 @@
   opacity: 0.55;
 }
 
+/* Captain override — system taken offline by Captain */
+.sys-row--override {
+  background: rgba(255, 32, 32, 0.06);
+  border-left: 2px solid var(--alert-red);
+}
+
+.sys-row__override-badge {
+  font-size: 0.65rem;
+  color: var(--alert-red);
+  letter-spacing: 0.06em;
+  margin-left: auto;
+  padding-left: 0.5rem;
+  flex-shrink: 0;
+}
+
 /* Header: system name + repair button */
 .sys-row__header {
   display: flex;

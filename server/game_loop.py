@@ -949,6 +949,10 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "active_treatments": glmed.get_active_treatments(),
             "countermeasure_charges": ship.countermeasure_charges,
             "ew_countermeasure_active": ship.ew_countermeasure_active,
+            "system_overrides": {
+                name: not s._captain_offline
+                for name, s in ship.systems.items()
+            },
         },
         tick=tick,
     )

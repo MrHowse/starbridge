@@ -13,7 +13,7 @@
     <!-- ================================================================
          Header
          ================================================================ -->
-    <header class="captain-header panel">
+    <header class="captain-header">
       <div class="captain-header__left">
         <span class="text-title">CAPTAIN</span>
         <span class="text-label" id="mission-label">STANDING BY</span>
@@ -40,93 +40,122 @@
     </div>
 
     <!-- ================================================================
-         Main grid (post-game)
+         Main grid (post-game) — 3 columns × 3 rows
          ================================================================ -->
     <main class="captain-main" data-captain-main style="display:none">
 
-      <!-- Left: tactical map canvas -->
-      <section class="captain-map panel">
-        <div class="panel__header">
-          <span class="text-header">TACTICAL</span>
-          <span class="text-label" id="map-zoom-label">80K WU</span>
+      <!-- Row 1+2 left: 2×2 wireframe viewports -->
+      <div class="viewport-grid">
+        <div class="viewport-cell">
+          <canvas id="vp-forward" class="viewport-canvas"></canvas>
+        </div>
+        <div class="viewport-cell">
+          <canvas id="vp-aft" class="viewport-canvas"></canvas>
+        </div>
+        <div class="viewport-cell">
+          <canvas id="vp-port" class="viewport-canvas"></canvas>
+        </div>
+        <div class="viewport-cell">
+          <canvas id="vp-starboard" class="viewport-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Right column: ship status + system controls (spans all rows) -->
+      <aside class="captain-right">
+
+        <!-- Ship silhouette: Systems / Crew view -->
+        <div class="captain-panel" id="silhouette-panel">
+          <div class="panel-header">
+            <span>SHIP STATUS</span>
+            <button id="view-toggle-btn" class="view-toggle-btn">CREW VIEW</button>
+          </div>
+          <div class="silhouette-wrap">
+            <canvas id="ship-silhouette"></canvas>
+          </div>
+        </div>
+
+        <!-- System override controls -->
+        <div class="captain-panel captain-panel--scroll" id="system-controls-panel">
+          <div class="panel-header"><span>SYSTEM CONTROLS</span></div>
+          <div id="system-controls-list"></div>
+        </div>
+
+        <!-- Hull / shields quick-status -->
+        <div class="captain-panel" id="quick-status-panel">
+          <div class="panel-header"><span>HULL / SHIELDS</span></div>
+          <div class="quick-status">
+            <div class="quick-row">
+              <span class="qs-label">HULL</span>
+              <div class="qs-bar"><div id="hull-fill" class="qs-fill qs-fill--hull"></div></div>
+              <span class="qs-val" id="hull-text">100</span>
+            </div>
+            <div class="quick-row">
+              <span class="qs-label">FWD</span>
+              <div class="qs-bar"><div id="shield-fwd-fill" class="qs-fill"></div></div>
+              <span class="qs-val" id="shield-fwd-text">100</span>
+            </div>
+            <div class="quick-row">
+              <span class="qs-label">AFT</span>
+              <div class="qs-bar"><div id="shield-aft-fill" class="qs-fill"></div></div>
+              <span class="qs-val" id="shield-aft-text">100</span>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- Bottom-left: tactical map -->
+      <section class="captain-tactical">
+        <div class="panel-header">
+          <span>TACTICAL</span>
+          <span id="map-zoom-label" class="text-muted">80K WU</span>
         </div>
         <canvas id="captain-canvas"></canvas>
       </section>
 
-      <!-- Right: status panels stacked -->
-      <aside class="captain-sidebar">
+      <!-- Bottom-right: objectives + auth + log -->
+      <section class="captain-objectives">
+        <div class="panel-header"><span>OBJECTIVES</span></div>
+        <div id="objectives-list" class="objectives-list">
+          <div class="text-dim">Awaiting mission data.</div>
+        </div>
 
-        <!-- Ship status -->
-        <section class="captain-panel panel" id="ship-status-panel">
-          <div class="panel__header">
-            <span class="text-header">SHIP STATUS</span>
-          </div>
-          <div class="captain-panel__body">
-            <div class="status-row">
-              <span class="text-label">HULL</span>
-              <div class="gauge-bar">
-                <div class="gauge-bar__fill gauge-bar__fill--hull" id="hull-fill"></div>
-              </div>
-              <span class="text-data" id="hull-text">100</span>
-            </div>
-            <div class="status-row">
-              <span class="text-label">FWD</span>
-              <div class="gauge-bar">
-                <div class="gauge-bar__fill" id="shield-fwd-fill"></div>
-              </div>
-              <span class="text-data" id="shield-fwd-text">100</span>
-            </div>
-            <div class="status-row">
-              <span class="text-label">AFT</span>
-              <div class="gauge-bar">
-                <div class="gauge-bar__fill" id="shield-aft-fill"></div>
-              </div>
-              <span class="text-data" id="shield-aft-text">100</span>
-            </div>
-            <div class="status-row status-row--power">
-              <span class="text-label">PWR</span>
-              <span class="text-data" id="power-text">—</span>
-            </div>
-          </div>
-        </section>
+        <!-- Auth requests (shown when active) -->
+        <div id="auth-panel" style="display:none" class="auth-panel">
+          <div class="panel-header"><span>AUTHORIZATION REQUIRED</span></div>
+          <div id="auth-content"></div>
+        </div>
+
+        <!-- Captain's log -->
+        <div class="panel-header log-header"><span>CAPTAIN'S LOG</span></div>
+        <div id="log-list" class="log-list"></div>
+        <div class="log-input-row">
+          <input id="log-input" type="text" placeholder="Add log entry…" maxlength="200" />
+          <button id="log-submit">LOG</button>
+        </div>
 
         <!-- Science summary -->
-        <section class="captain-panel panel" id="science-panel">
-          <div class="panel__header">
-            <span class="text-header">SCIENCE</span>
+        <div class="panel-header"><span>SCIENCE</span></div>
+        <div id="science-panel" class="science-panel">
+          <div id="scan-active-row" style="display:none" class="scan-row">
+            <span>SCANNING</span>
+            <span id="scan-entity-id">—</span>
+            <div class="qs-bar"><div id="scan-progress-fill" class="qs-fill"></div></div>
           </div>
-          <div class="captain-panel__body">
-            <div class="science-row" id="scan-active-row" style="display:none">
-              <span class="text-label">SCANNING</span>
-              <span class="text-data" id="scan-entity-id">—</span>
-              <div class="gauge-bar">
-                <div class="gauge-bar__fill" id="scan-progress-fill"></div>
-              </div>
-            </div>
-            <div class="science-row" id="scan-result-row" style="display:none">
-              <span class="text-label">LAST SCAN</span>
-              <span class="text-data" id="scan-result-entity">—</span>
-              <span class="text-body" id="scan-result-weakness">—</span>
-            </div>
-            <div id="science-idle" class="text-dim">No active scan.</div>
+          <div id="scan-result-row" style="display:none" class="scan-row">
+            <span>LAST SCAN</span>
+            <span id="scan-result-entity">—</span>
+            <span id="scan-result-weakness">—</span>
           </div>
-        </section>
-
-        <!-- Mission objectives -->
-        <section class="captain-panel panel" id="objectives-panel">
-          <div class="panel__header">
-            <span class="text-header">OBJECTIVES</span>
-          </div>
-          <div class="captain-panel__body" id="objectives-list">
-            <div class="text-dim">Awaiting mission data.</div>
-          </div>
-        </section>
-
-      </aside>
+          <div id="science-idle" class="text-dim">No active scan.</div>
+        </div>
+      </section>
 
     </main>
 
-    <!-- Game-over overlay -->
+    <!-- ================================================================
+         Game-over overlay
+         ================================================================ -->
     <div class="game-over-overlay" id="game-over-overlay" style="display:none">
       <div class="game-over-box panel">
         <p class="text-title" id="game-over-title">MISSION COMPLETE</p>

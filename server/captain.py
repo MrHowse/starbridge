@@ -16,7 +16,7 @@ from typing import Protocol
 from pydantic import ValidationError
 
 from server.game_logger import log_event as _log
-from server.models.messages import CaptainSetAlertPayload, Message, validate_payload
+from server.models.messages import CaptainSetAlertPayload, CaptainSystemOverridePayload, Message, VALID_SYSTEMS, validate_payload
 from server.models.ship import Ship
 
 logger = logging.getLogger("starbridge.captain")
@@ -82,3 +82,18 @@ async def handle_captain_message(connection_id: str, message: Message) -> None:
             Message.build("ship.alert_changed", {"level": payload.level})
         )
         logger.info("Alert level set to '%s' by %s", payload.level, connection_id)
+
+    elif message.type == "captain.system_override" and isinstance(payload, CaptainSystemOverridePayload):
+        system = payload.system
+        if system not in _ship.systems:
+            await _manager.send(
+                connection_id,
+                Message.build("error.validation", {"message": f"Unknown system: {system!r}", "original_type": message.type}),
+            )
+            return
+        _ship.systems[system]._captain_offline = not payload.online
+        _log("captain", "system_override", {"system": system, "online": payload.online})
+        await _manager.broadcast(
+            Message.build("captain.override_changed", {"system": system, "online": payload.online})
+        )
+        logger.info("Captain set system '%s' online=%s from %s", system, payload.online, connection_id)

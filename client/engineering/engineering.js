@@ -183,6 +183,7 @@ function init() {
   on('puzzle.assist_available', handleAssistAvailable);
   on('puzzle.assist_sent',      handleAssistSent);
   on('engineering.dc_state',   handleDCState);
+  on('captain.override_changed', handleCaptainOverride);
 
   initPuzzleRenderer(send);
   setupSchematicClick();
@@ -868,6 +869,32 @@ const dcStatusEl   = document.getElementById('dc-status');
 function handleDCState(payload) {
   if (!gameActive) return;
   renderDCPanel(payload.rooms || {}, payload.active_dcts || {});
+}
+
+/**
+ * Captain system override — highlight the affected system row with a lock
+ * badge so the engineering officer knows the Captain has taken it offline.
+ */
+function handleCaptainOverride({ system, online }) {
+  const els = sysEls[system];
+  if (!els) return;
+
+  els.row.classList.toggle('sys-row--override', !online);
+
+  // Add or remove the lock badge
+  let badge = els.row.querySelector('.sys-row__override-badge');
+  if (!online) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className   = 'sys-row__override-badge';
+      badge.textContent = '🔒 OFFLINE';
+      els.row.appendChild(badge);
+    }
+    if (els.slider) els.slider.disabled = true;
+  } else {
+    if (badge) badge.remove();
+    if (els.slider) els.slider.disabled = false;
+  }
 }
 
 /**
