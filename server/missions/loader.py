@@ -22,9 +22,11 @@ _SANDBOX_MISSION: dict = {
     "name": "Sandbox",
     "briefing": "Free play mode. No objectives.",
     "spawn": [],
-    "objectives": [],
-    "victory_condition": None,
-    "defeat_condition": "player_hull_zero",
+    "nodes": [],
+    "edges": [],
+    "start_node": None,
+    "victory_nodes": [],
+    "defeat_condition": None,
 }
 
 

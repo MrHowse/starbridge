@@ -1,41 +1,77 @@
 {
   "id": "train_engineering",
   "name": "Engineering Training",
-  "is_training": true,
-  "target_role": "engineering",
-  "auto_roles": ["helm"],
   "briefing": "Welcome to Engineering Training. Learn to manage power distribution across ship systems, use overclock safely, and focus repair teams on damaged systems.",
   "spawn": [],
-  "objectives": [
+  "is_training": true,
+  "target_role": "engineering",
+  "auto_roles": [
+    "helm"
+  ],
+  "nodes": [
     {
       "id": "eng_01_power",
-      "text": "Adjust power levels — boost ENGINES to 120",
-      "hint": "The power panel shows all systems and their current power level. The total budget is shared — raising one system may require lowering another. Set ENGINES to 120 using the slider or input field.",
-      "trigger": "training_flag",
-      "args": { "flag": "engineering_power_set" }
+      "type": "objective",
+      "text": "Adjust power levels \u2014 boost ENGINES to 120",
+      "trigger": {
+        "type": "training_flag",
+        "flag": "engineering_power_set"
+      },
+      "hint": "The power panel shows all systems and their current power level. The total budget is shared \u2014 raising one system may require lowering another. Set ENGINES to 120 using the slider or input field."
     },
     {
       "id": "eng_02_balance",
-      "text": "Re-balance power — reduce ENGINES and boost SHIELDS",
-      "hint": "Now redistribute: lower ENGINES back to 100 and raise SHIELDS to 120. The budget bar at the top shows total usage. Stay under the red line to avoid overload risk.",
-      "trigger": "training_flag",
-      "args": { "flag": "engineering_power_set" }
+      "type": "objective",
+      "text": "Re-balance power \u2014 reduce ENGINES and boost SHIELDS",
+      "trigger": {
+        "type": "training_flag",
+        "flag": "engineering_power_set"
+      },
+      "hint": "Now redistribute: lower ENGINES back to 100 and raise SHIELDS to 120. The budget bar at the top shows total usage. Stay under the red line to avoid overload risk."
     },
     {
       "id": "eng_03_repair",
+      "type": "objective",
       "text": "Set a system to repair focus",
-      "hint": "Click the wrench icon (or REPAIR button) next to any system to focus the repair crew there. The system's health will slowly increase. Choose the system with the lowest health percentage.",
-      "trigger": "training_flag",
-      "args": { "flag": "engineering_repair_set" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "engineering_repair_set"
+      },
+      "hint": "Click the wrench icon (or REPAIR button) next to any system to focus the repair crew there. The system's health will slowly increase. Choose the system with the lowest health percentage."
     },
     {
       "id": "eng_04_hold",
+      "type": "objective",
       "text": "Hold current power configuration for 30 seconds",
-      "hint": "Well done — now maintain this configuration. Watch the efficiency readouts. Overclocked systems (above 100) risk random damage. Keep key systems near 100 for sustained operations.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 60 }
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 60
+      },
+      "hint": "Well done \u2014 now maintain this configuration. Watch the efficiency readouts. Overclocked systems (above 100) risk random damage. Keep key systems near 100 for sustained operations."
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "eng_01_power",
+      "to": "eng_02_balance",
+      "type": "sequence"
+    },
+    {
+      "from": "eng_02_balance",
+      "to": "eng_03_repair",
+      "type": "sequence"
+    },
+    {
+      "from": "eng_03_repair",
+      "to": "eng_04_hold",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "eng_01_power",
+  "victory_nodes": [
+    "eng_04_hold"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

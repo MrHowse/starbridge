@@ -3,52 +3,129 @@
   "name": "Defend the Station",
   "briefing": "Starbase Kepler is under attack. Defend it through three waves of hostiles. Resupply between engagements.",
   "spawn": [
-    { "type": "station", "x": 50000, "y": 35000, "id": "kepler" }
+    {
+      "type": "station",
+      "x": 50000,
+      "y": 35000,
+      "id": "kepler"
+    }
   ],
   "spawn_initial_wave": [
-    { "type": "scout",   "x": 20000, "y": 20000, "id": "w1_1" },
-    { "type": "scout",   "x": 80000, "y": 20000, "id": "w1_2" },
-    { "type": "scout",   "x": 50000, "y": 10000, "id": "w1_3" }
+    {
+      "type": "scout",
+      "x": 20000,
+      "y": 20000,
+      "id": "w1_1"
+    },
+    {
+      "type": "scout",
+      "x": 80000,
+      "y": 20000,
+      "id": "w1_2"
+    },
+    {
+      "type": "scout",
+      "x": 50000,
+      "y": 10000,
+      "id": "w1_3"
+    }
   ],
-  "objectives": [
+  "nodes": [
     {
       "id": "wave_1",
+      "type": "objective",
       "text": "Repel first attack wave",
-      "trigger": "wave_defeated",
-      "args": { "enemy_prefix": "w1_" },
-      "on_complete": {
-        "action": "spawn_wave",
-        "enemies": [
-          { "type": "cruiser", "x": 20000, "y": 50000, "id": "w2_1" },
-          { "type": "cruiser", "x": 80000, "y": 50000, "id": "w2_2" }
-        ]
+      "trigger": {
+        "type": "wave_defeated",
+        "enemy_prefix": "w1_"
       }
     },
     {
       "id": "wave_2",
+      "type": "objective",
       "text": "Repel second attack wave",
-      "trigger": "wave_defeated",
-      "args": { "enemy_prefix": "w2_" },
-      "on_complete": {
-        "action": "spawn_wave",
-        "enemies": [
-          { "type": "destroyer", "x": 50000, "y": 90000, "id": "w3_1" },
-          { "type": "scout",     "x": 30000, "y": 80000, "id": "w3_2" },
-          { "type": "scout",     "x": 70000, "y": 80000, "id": "w3_3" }
-        ]
+      "trigger": {
+        "type": "wave_defeated",
+        "enemy_prefix": "w2_"
       }
     },
     {
       "id": "wave_3",
+      "type": "objective",
       "text": "Repel final assault",
-      "trigger": "wave_defeated",
-      "args": { "enemy_prefix": "w3_" }
+      "trigger": {
+        "type": "wave_defeated",
+        "enemy_prefix": "w3_"
+      }
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero",
-  "defeat_condition_alt": {
-    "trigger": "station_hull_below",
-    "args": { "station_id": "kepler", "threshold": 0 }
+  "edges": [
+    {
+      "from": "wave_1",
+      "to": "wave_2",
+      "type": "sequence",
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          {
+            "type": "cruiser",
+            "x": 20000,
+            "y": 50000,
+            "id": "w2_1"
+          },
+          {
+            "type": "cruiser",
+            "x": 80000,
+            "y": 50000,
+            "id": "w2_2"
+          }
+        ]
+      }
+    },
+    {
+      "from": "wave_2",
+      "to": "wave_3",
+      "type": "sequence",
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          {
+            "type": "destroyer",
+            "x": 50000,
+            "y": 90000,
+            "id": "w3_1"
+          },
+          {
+            "type": "scout",
+            "x": 30000,
+            "y": 80000,
+            "id": "w3_2"
+          },
+          {
+            "type": "scout",
+            "x": 70000,
+            "y": 80000,
+            "id": "w3_3"
+          }
+        ]
+      }
+    }
+  ],
+  "start_node": "wave_1",
+  "victory_nodes": [
+    "wave_3"
+  ],
+  "defeat_condition": {
+    "type": "any_of",
+    "triggers": [
+      {
+        "type": "player_hull_zero"
+      },
+      {
+        "type": "station_hull_below",
+        "station_id": "kepler",
+        "threshold": 0
+      }
+    ]
   }
 }

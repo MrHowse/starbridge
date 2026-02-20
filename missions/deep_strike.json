@@ -1,10 +1,11 @@
 {
   "id": "deep_strike",
   "name": "Deep Strike",
-  "briefing": "ENEMY DESTROYER DETECTED ON INTERCEPT COURSE. STANDARD TORPEDO SOLUTIONS WON'T WORK — THE TARGET IS MANOEUVRING. WEAPONS MUST CALCULATE A PRECISE FIRING SOLUTION WHILE SCIENCE TRACKS TARGET VELOCITY. NUCLEAR OPTION IS AUTHORISED AT CAPTAIN'S DISCRETION.",
-  "signal_location": { "x": 65000, "y": 30000 },
-  "defeat_condition": "player_hull_zero",
-  "victory_condition": "all_objectives_complete",
+  "briefing": "ENEMY DESTROYER DETECTED ON INTERCEPT COURSE. STANDARD TORPEDO SOLUTIONS WON'T WORK \u2014 THE TARGET IS MANOEUVRING. WEAPONS MUST CALCULATE A PRECISE FIRING SOLUTION WHILE SCIENCE TRACKS TARGET VELOCITY. NUCLEAR OPTION IS AUTHORISED AT CAPTAIN'S DISCRETION.",
+  "signal_location": {
+    "x": 65000,
+    "y": 30000
+  },
   "spawn": [
     {
       "type": "destroyer",
@@ -13,12 +14,40 @@
       "id": "destroyer_alpha"
     }
   ],
-  "objectives": [
+  "nodes": [
     {
       "id": "arm_weapons",
+      "type": "objective",
       "text": "Arm advanced torpedo payload",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 5 },
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 5
+      }
+    },
+    {
+      "id": "firing_solution",
+      "type": "objective",
+      "text": "Calculate intercept firing solution for the destroyer",
+      "trigger": {
+        "type": "puzzle_completed",
+        "puzzle_label": "ds_firing_solution"
+      }
+    },
+    {
+      "id": "destroy_or_survive",
+      "type": "objective",
+      "text": "Survive the engagement (60 seconds)",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 60
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "arm_weapons",
+      "to": "firing_solution",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "start_puzzle",
@@ -31,16 +60,16 @@
       ]
     },
     {
-      "id": "firing_solution",
-      "text": "Calculate intercept firing solution for the destroyer",
-      "trigger": "puzzle_completed",
-      "args": { "puzzle_label": "ds_firing_solution" }
-    },
-    {
-      "id": "destroy_or_survive",
-      "text": "Survive the engagement (60 seconds)",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 60 }
+      "from": "firing_solution",
+      "to": "destroy_or_survive",
+      "type": "sequence"
     }
-  ]
+  ],
+  "start_node": "arm_weapons",
+  "victory_nodes": [
+    "destroy_or_survive"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

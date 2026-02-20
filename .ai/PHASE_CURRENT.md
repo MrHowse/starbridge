@@ -1,15 +1,20 @@
-# Current Phase: v0.04a — Mission Graph Engine (IN PROGRESS)
+# Current Phase: v0.04b — Mission Graph Migration (COMPLETE ✓)
 
-> Updated 2026-02-20 — v0.04a engine + tests complete.
+> Updated 2026-02-20 — v0.04b migration complete.
 
 ## Status
 
-**v0.04a IN PROGRESS.** Engine implemented, 118 graph tests pass.
+**v0.04b COMPLETE.** All 23 missions converted to graph format, game_loop switched to MissionGraph.
 
-- **1719 tests passing**, 0 regressions from v0.03 baseline (1601 post-gap-close)
-- `server/mission_graph.py` — NEW graph engine alongside existing engine.py
-- `tests/test_mission_graph.py` — 118 tests covering all node/edge/trigger types
-- Next: v0.04b — migration script + convert all 23 missions to graph format
+- **1721 tests passing**, 0 regressions from v0.04a baseline (1719 tests)
+- `tools/migrate_missions.py` — migration script (converts old sequential format → graph format)
+- All 23 JSON missions converted: nodes/edges/start_node/victory_nodes/defeat_condition
+- 3 missions enhanced with parallel nodes (engineering_drill, first_contact_protocol, diplomatic_summit)
+- `server/game_loop_mission.py` — now uses `MissionGraph` instead of `MissionEngine`
+- `server/missions/loader.py` — sandbox dict updated to graph format
+- All 7 test files updated to use new mission format keys
+- `tests/test_diplomatic_summit.py` — fully rewritten for graph format + MissionGraph
+- Next: v0.04c — (TBD, see SCOPE_v004.md)
 
 ## v0.03 Status (CLOSED)
 

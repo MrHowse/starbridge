@@ -13,7 +13,7 @@ import math
 import server.game_logger as gl
 from server.models.messages import Message
 from server.models.world import World, spawn_enemy
-from server.missions.engine import MissionEngine
+from server.mission_graph import MissionGraph
 from server.missions.loader import load_mission, spawn_from_mission, spawn_wave
 from server.systems import sensors
 from server.utils.math_helpers import distance
@@ -32,7 +32,7 @@ RESUPPLY_AMMO_MAX: int = 10
 # Module-level state
 # ---------------------------------------------------------------------------
 
-_mission_engine: MissionEngine | None = None
+_mission_engine: MissionGraph | None = None
 _signal_location: tuple[float, float] | None = None
 _dock_timer: float = 0.0
 _pending_puzzle_starts: list[dict] = []
@@ -83,7 +83,7 @@ def pop_pending_outbreaks() -> list[dict]:
     return actions
 
 
-def get_mission_engine() -> MissionEngine | None:
+def get_mission_engine() -> MissionGraph | None:
     return _mission_engine
 
 
@@ -112,7 +112,7 @@ def init_mission(mission_id: str, world: World) -> None:
     else:
         spawn_from_mission(mission, world, 0)
 
-    _mission_engine = MissionEngine(mission)
+    _mission_engine = MissionGraph(mission)
 
     sig = mission.get("signal_location")
     _signal_location = (float(sig["x"]), float(sig["y"])) if sig else None

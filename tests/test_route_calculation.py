@@ -478,8 +478,12 @@ class TestNebulaCrossingMission:
     def test_mission_has_route_calculation_puzzle(self):
         mission = load_mission("nebula_crossing")
         actions = []
-        for obj in mission.get("objectives", []):
-            actions.extend(obj.get("on_complete", []))
+        for edge in mission.get("edges", []):
+            oc = edge.get("on_complete", [])
+            if isinstance(oc, list):
+                actions.extend(oc)
+            elif isinstance(oc, dict):
+                actions.append(oc)
         puzzle_actions = [a for a in actions if a.get("action") == "start_puzzle"]
         assert any(a.get("puzzle_type") == "route_calculation" for a in puzzle_actions)
 
@@ -498,8 +502,12 @@ class TestNebulaCrossingMission:
         nebulas = [h for h in world.hazards if h.hazard_type == "nebula"]
         assert len(nebulas) >= 1
 
-    def test_mission_objectives_use_flat_trigger(self):
+    def test_mission_nodes_use_dict_trigger(self):
         mission = load_mission("nebula_crossing")
-        for obj in mission.get("objectives", []):
-            assert isinstance(obj.get("trigger"), str), \
-                f"Objective {obj['id']} trigger must be a string"
+        for obj in mission.get("nodes", []):
+            if obj.get("type", "objective") != "objective":
+                continue
+            assert isinstance(obj.get("trigger"), dict), \
+                f"Node {obj['id']} trigger must be a dict in graph format"
+            assert "type" in obj["trigger"], \
+                f"Node {obj['id']} trigger must have a 'type' key"

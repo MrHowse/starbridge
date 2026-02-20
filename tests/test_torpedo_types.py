@@ -375,8 +375,12 @@ class TestDeepStrikeMission:
         from server.missions.loader import load_mission
         m = load_mission("deep_strike")
         actions = []
-        for obj in m["objectives"]:
-            actions.extend(obj.get("on_complete", []))
+        for edge in m.get("edges", []):
+            oc = edge.get("on_complete", [])
+            if isinstance(oc, list):
+                actions.extend(oc)
+            elif isinstance(oc, dict):
+                actions.append(oc)
         puzzle_actions = [a for a in actions if a.get("action") == "start_puzzle"]
         types = [a["puzzle_type"] for a in puzzle_actions]
         assert "firing_solution" in types

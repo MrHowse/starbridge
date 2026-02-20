@@ -1,17 +1,51 @@
 {
   "id": "engineering_drill",
   "name": "Engineering Drill",
-  "briefing": "Systems diagnostic underway. Science — calibrate the sensor frequency signature. Engineering — repair the circuit routing damage. Engineering: boost SENSORS above 120% to assist Science's frequency calibration. Both tasks must be completed to clear the drill.",
+  "briefing": "Systems diagnostic underway. Science \u2014 calibrate the sensor frequency signature. Engineering \u2014 repair the circuit routing damage. Engineering: boost SENSORS above 120% to assist Science's frequency calibration. Both tasks must be completed to clear the drill.",
   "signal_location": null,
-  "defeat_condition": "player_hull_zero",
-  "victory_condition": "all_objectives_complete",
   "entities": [],
-  "objectives": [
+  "nodes": [
     {
       "id": "await_drill_start",
+      "type": "objective",
       "text": "Awaiting drill sequence activation",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 5 },
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 5
+      }
+    },
+    {
+      "id": "parallel_drills",
+      "type": "parallel",
+      "text": "Complete both drill tasks",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "freq_calibration_complete",
+          "type": "objective",
+          "text": "Science: complete frequency calibration",
+          "trigger": {
+            "type": "puzzle_completed",
+            "puzzle_label": "freq_calibration"
+          }
+        },
+        {
+          "id": "circuit_repair_complete",
+          "type": "objective",
+          "text": "Engineering: complete circuit routing repair",
+          "trigger": {
+            "type": "puzzle_completed",
+            "puzzle_label": "circuit_repair"
+          }
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "await_drill_start",
+      "to": "parallel_drills",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "start_puzzle",
@@ -30,18 +64,13 @@
           "time_limit": 90.0
         }
       ]
-    },
-    {
-      "id": "freq_calibration_complete",
-      "text": "Science: complete frequency calibration",
-      "trigger": "puzzle_completed",
-      "args": { "puzzle_label": "freq_calibration" }
-    },
-    {
-      "id": "circuit_repair_complete",
-      "text": "Engineering: complete circuit routing repair",
-      "trigger": "puzzle_completed",
-      "args": { "puzzle_label": "circuit_repair" }
     }
-  ]
+  ],
+  "start_node": "await_drill_start",
+  "victory_nodes": [
+    "parallel_drills"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

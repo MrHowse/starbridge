@@ -119,25 +119,27 @@ class TestTrainingMissionsGate:
 
     @pytest.mark.parametrize("mid", TRAINING_MISSION_IDS)
     def test_at_least_three_objectives(self, mid):
-        assert len(load_mission(mid)["objectives"]) >= 3
+        assert len(load_mission(mid)["nodes"]) >= 3
 
     @pytest.mark.parametrize("mid", TRAINING_MISSION_IDS)
     def test_valid_triggers(self, mid):
         mission = load_mission(mid)
-        for obj in mission["objectives"]:
-            assert obj.get("trigger") in VALID_TRIGGERS, (
+        for obj in mission["nodes"]:
+            if obj.get("type", "objective") != "objective":
+                continue
+            assert obj.get("trigger", {}).get("type") in VALID_TRIGGERS, (
                 f"{mid}/{obj['id']} has invalid trigger {obj.get('trigger')!r}"
             )
 
     @pytest.mark.parametrize("mid", TRAINING_MISSION_IDS)
     def test_has_at_least_one_hint(self, mid):
         mission = load_mission(mid)
-        hints = [obj.get("hint", "") for obj in mission["objectives"]]
+        hints = [obj.get("hint", "") for obj in mission["nodes"]]
         assert any(h for h in hints), f"{mid} has no hints"
 
     @pytest.mark.parametrize("mid", TRAINING_MISSION_IDS)
     def test_victory_condition_present(self, mid):
-        assert "victory_condition" in load_mission(mid)
+        assert "victory_nodes" in load_mission(mid)
 
 
 # ---------------------------------------------------------------------------
@@ -156,13 +158,15 @@ class TestStandardMissionsGate:
     @pytest.mark.parametrize("mid", STANDARD_MISSION_IDS)
     def test_has_objectives(self, mid):
         mission = load_mission(mid)
-        assert len(mission["objectives"]) >= 1
+        assert len(mission["nodes"]) >= 1
 
     @pytest.mark.parametrize("mid", STANDARD_MISSION_IDS)
     def test_valid_triggers(self, mid):
         mission = load_mission(mid)
-        for obj in mission["objectives"]:
-            assert obj.get("trigger") in VALID_TRIGGERS, (
+        for obj in mission["nodes"]:
+            if obj.get("type", "objective") != "objective":
+                continue
+            assert obj.get("trigger", {}).get("type") in VALID_TRIGGERS, (
                 f"{mid}/{obj['id']} has invalid trigger {obj.get('trigger')!r}"
             )
 

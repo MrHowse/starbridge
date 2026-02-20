@@ -1,44 +1,91 @@
 {
   "id": "train_tactical",
   "name": "Tactical Officer Training",
-  "is_training": true,
-  "target_role": "tactical",
-  "auto_roles": ["helm", "engineering"],
   "briefing": "Welcome to Tactical Training. Learn to assess threats, assign engagement priorities, set intercept targets for Helm, and create strike plans. The Tactical Officer coordinates the crew's combat effectiveness.",
   "spawn": [
-    { "type": "scout",   "x": 58000, "y": 36000, "id": "tac_target_1" },
-    { "type": "cruiser", "x": 40000, "y": 60000, "id": "tac_target_2" }
+    {
+      "type": "scout",
+      "x": 58000,
+      "y": 36000,
+      "id": "tac_target_1"
+    },
+    {
+      "type": "cruiser",
+      "x": 40000,
+      "y": 60000,
+      "id": "tac_target_2"
+    }
   ],
-  "objectives": [
+  "is_training": true,
+  "target_role": "tactical",
+  "auto_roles": [
+    "helm",
+    "engineering"
+  ],
+  "nodes": [
     {
       "id": "tac_01_orient",
-      "text": "Review the tactical plot — observe threat levels for both contacts",
-      "hint": "Your tactical plot auto-rates contacts by threat level (CRITICAL / HIGH / MEDIUM / LOW) based on their type, distance, and behaviour. The cruiser-class contact is more dangerous than the scout. Review the Threat Board on the right.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 8 }
+      "type": "objective",
+      "text": "Review the tactical plot \u2014 observe threat levels for both contacts",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 8
+      },
+      "hint": "Your tactical plot auto-rates contacts by threat level (CRITICAL / HIGH / MEDIUM / LOW) based on their type, distance, and behaviour. The cruiser-class contact is more dangerous than the scout. Review the Threat Board on the right."
     },
     {
       "id": "tac_02_priority",
+      "type": "objective",
       "text": "Designate the cruiser as PRIMARY target",
-      "hint": "In the Threat Board, click on the cruiser contact. Press PRIMARY to mark it as the primary engagement target. Weapons will see this designation on their radar. Secondary targets should be engaged after the primary is neutralised.",
-      "trigger": "training_flag",
-      "args": { "flag": "tactical_priority_set" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "tactical_priority_set"
+      },
+      "hint": "In the Threat Board, click on the cruiser contact. Press PRIMARY to mark it as the primary engagement target. Weapons will see this designation on their radar. Secondary targets should be engaged after the primary is neutralised."
     },
     {
       "id": "tac_03_intercept",
+      "type": "objective",
       "text": "Set an intercept target for Helm",
-      "hint": "Click on a contact on the tactical map or Threat Board, then press INTERCEPT. This sends a bearing and ETA to the Helm station. The Helm officer sees the suggested heading and can choose to follow it. Coordinate by voice.",
-      "trigger": "training_flag",
-      "args": { "flag": "tactical_intercept_set" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "tactical_intercept_set"
+      },
+      "hint": "Click on a contact on the tactical map or Threat Board, then press INTERCEPT. This sends a bearing and ETA to the Helm station. The Helm officer sees the suggested heading and can choose to follow it. Coordinate by voice."
     },
     {
       "id": "tac_04_plan",
+      "type": "objective",
       "text": "Create a strike plan with at least two steps",
-      "hint": "In the Strike Plans section, add steps using the Role / Action / T+ fields. Example: 'helm / turn to 270 / T-5' and 'weapons / fire torpedoes / T+0'. Press CREATE PLAN when done. Execute the plan to broadcast countdown cards to each station.",
-      "trigger": "training_flag",
-      "args": { "flag": "tactical_plan_created" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "tactical_plan_created"
+      },
+      "hint": "In the Strike Plans section, add steps using the Role / Action / T+ fields. Example: 'helm / turn to 270 / T-5' and 'weapons / fire torpedoes / T+0'. Press CREATE PLAN when done. Execute the plan to broadcast countdown cards to each station."
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "tac_01_orient",
+      "to": "tac_02_priority",
+      "type": "sequence"
+    },
+    {
+      "from": "tac_02_priority",
+      "to": "tac_03_intercept",
+      "type": "sequence"
+    },
+    {
+      "from": "tac_03_intercept",
+      "to": "tac_04_plan",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "tac_01_orient",
+  "victory_nodes": [
+    "tac_04_plan"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

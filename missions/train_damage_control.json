@@ -1,41 +1,77 @@
 {
   "id": "train_damage_control",
   "name": "Damage Control Training",
-  "is_training": true,
-  "target_role": "engineering",
-  "auto_roles": ["helm"],
   "briefing": "Welcome to Damage Control Training. Practice dispatching repair teams to damaged ship sections, monitoring repair progress, and cancelling dispatch orders. Fast damage control keeps the ship operational.",
   "spawn": [],
-  "objectives": [
+  "is_training": true,
+  "target_role": "engineering",
+  "auto_roles": [
+    "helm"
+  ],
+  "nodes": [
     {
       "id": "dc_01_orient",
-      "text": "Review interior damage status — identify areas needing repair",
-      "hint": "The Damage Control panel shows the ship interior with room-level status. Damaged sections are highlighted. Repair teams (DCTs) are shown as icons. Scroll the panel to see all decks.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 8 }
+      "type": "objective",
+      "text": "Review interior damage status \u2014 identify areas needing repair",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 8
+      },
+      "hint": "The Damage Control panel shows the ship interior with room-level status. Damaged sections are highlighted. Repair teams (DCTs) are shown as icons. Scroll the panel to see all decks."
     },
     {
       "id": "dc_02_dispatch",
+      "type": "objective",
       "text": "Dispatch a repair team to a damaged section",
-      "hint": "Click on a room in the interior map, then select DISPATCH DCT. A repair team will move to that room and begin work. Each dispatch takes one DCT — you have a limited number, so prioritise critical areas.",
-      "trigger": "training_flag",
-      "args": { "flag": "dc_team_dispatched" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "dc_team_dispatched"
+      },
+      "hint": "Click on a room in the interior map, then select DISPATCH DCT. A repair team will move to that room and begin work. Each dispatch takes one DCT \u2014 you have a limited number, so prioritise critical areas."
     },
     {
       "id": "dc_03_monitor",
+      "type": "objective",
       "text": "Monitor the repair team's progress for 20 seconds",
-      "hint": "Watch the room status update as repair progresses. Structural integrity rises while the DCT works. In combat, additional damage may arrive while teams are working — you may need to redirect teams.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 40 }
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 40
+      },
+      "hint": "Watch the room status update as repair progresses. Structural integrity rises while the DCT works. In combat, additional damage may arrive while teams are working \u2014 you may need to redirect teams."
     },
     {
       "id": "dc_04_second",
+      "type": "objective",
       "text": "Dispatch a second repair team and hold for 30 seconds",
-      "hint": "Dispatch another team to a different room. Multiple teams working simultaneously speeds recovery. Keep teams away from areas where Security is operating — marine combat and repair work don't mix.",
-      "trigger": "training_flag",
-      "args": { "flag": "dc_team_dispatched" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "dc_team_dispatched"
+      },
+      "hint": "Dispatch another team to a different room. Multiple teams working simultaneously speeds recovery. Keep teams away from areas where Security is operating \u2014 marine combat and repair work don't mix."
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "dc_01_orient",
+      "to": "dc_02_dispatch",
+      "type": "sequence"
+    },
+    {
+      "from": "dc_02_dispatch",
+      "to": "dc_03_monitor",
+      "type": "sequence"
+    },
+    {
+      "from": "dc_03_monitor",
+      "to": "dc_04_second",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "dc_01_orient",
+  "victory_nodes": [
+    "dc_04_second"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

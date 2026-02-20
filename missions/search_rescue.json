@@ -2,44 +2,129 @@
   "id": "search_rescue",
   "name": "Search and Rescue",
   "briefing": "A distress beacon has been detected. Triangulate the signal, navigate through the asteroid field, extend shields around the damaged vessel, and escort them to sector base.",
-  "signal_location": { "x": 72000, "y": 68000 },
+  "signal_location": {
+    "x": 72000,
+    "y": 68000
+  },
   "spawn": [
-    { "type": "station", "x": 50000, "y": 50000, "id": "base" },
-    { "type": "station", "x": 72000, "y": 68000, "id": "rescue_target" }
+    {
+      "type": "station",
+      "x": 50000,
+      "y": 50000,
+      "id": "base"
+    },
+    {
+      "type": "station",
+      "x": 72000,
+      "y": 68000,
+      "id": "rescue_target"
+    }
   ],
   "asteroids": [
-    { "id": "a1", "x": 60000, "y": 57000, "radius": 1800 },
-    { "id": "a2", "x": 65000, "y": 62000, "radius": 1200 },
-    { "id": "a3", "x": 68000, "y": 56000, "radius": 1500 },
-    { "id": "a4", "x": 63000, "y": 66000, "radius": 900 },
-    { "id": "a5", "x": 57000, "y": 63000, "radius": 1300 },
-    { "id": "a6", "x": 71000, "y": 60000, "radius": 1000 }
+    {
+      "id": "a1",
+      "x": 60000,
+      "y": 57000,
+      "radius": 1800
+    },
+    {
+      "id": "a2",
+      "x": 65000,
+      "y": 62000,
+      "radius": 1200
+    },
+    {
+      "id": "a3",
+      "x": 68000,
+      "y": 56000,
+      "radius": 1500
+    },
+    {
+      "id": "a4",
+      "x": 63000,
+      "y": 66000,
+      "radius": 900
+    },
+    {
+      "id": "a5",
+      "x": 57000,
+      "y": 63000,
+      "radius": 1300
+    },
+    {
+      "id": "a6",
+      "x": 71000,
+      "y": 60000,
+      "radius": 1000
+    }
   ],
-  "objectives": [
+  "nodes": [
     {
       "id": "triangulate",
+      "type": "objective",
       "text": "Triangulate the distress signal (scan from 2 positions)",
-      "trigger": "signal_located"
+      "trigger": {
+        "type": "signal_located"
+      }
     },
     {
       "id": "navigate",
+      "type": "objective",
       "text": "Navigate to the rescue target",
-      "trigger": "player_in_area",
-      "args": { "x": 72000, "y": 68000, "r": 3000 }
+      "trigger": {
+        "type": "player_in_area",
+        "x": 72000,
+        "y": 68000,
+        "r": 3000
+      }
     },
     {
       "id": "extend_shields",
-      "text": "Extend shields around the damaged vessel (shields ≥80%, hold 10s)",
-      "trigger": "proximity_with_shields",
-      "args": { "x": 72000, "y": 68000, "radius": 2000, "min_shield": 80, "duration": 10 }
+      "type": "objective",
+      "text": "Extend shields around the damaged vessel (shields \u226580%, hold 10s)",
+      "trigger": {
+        "type": "proximity_with_shields",
+        "x": 72000,
+        "y": 68000,
+        "radius": 2000,
+        "min_shield": 80,
+        "duration": 10
+      }
     },
     {
       "id": "escort",
+      "type": "objective",
       "text": "Return to sector base",
-      "trigger": "player_in_area",
-      "args": { "x": 50000, "y": 50000, "r": 5000 }
+      "trigger": {
+        "type": "player_in_area",
+        "x": 50000,
+        "y": 50000,
+        "r": 5000
+      }
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "triangulate",
+      "to": "navigate",
+      "type": "sequence"
+    },
+    {
+      "from": "navigate",
+      "to": "extend_shields",
+      "type": "sequence"
+    },
+    {
+      "from": "extend_shields",
+      "to": "escort",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "triangulate",
+  "victory_nodes": [
+    "escort"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

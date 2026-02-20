@@ -1,17 +1,46 @@
 {
   "id": "plague_ship",
   "name": "Plague Ship",
-  "briefing": "DISTRESS SIGNAL RECEIVED — derelict freighter MSV Korinthia, last known position Sector 7. Survivors aboard. Pathogen unknown. Board with extreme caution and prepare the medical bay. Science, run a pathogen sweep the moment we're in range. Medical, stand by for triage.",
-  "signal_location": {"x": 62000, "y": 44000},
-  "defeat_condition": "player_hull_zero",
-  "victory_condition": "all_objectives_complete",
+  "briefing": "DISTRESS SIGNAL RECEIVED \u2014 derelict freighter MSV Korinthia, last known position Sector 7. Survivors aboard. Pathogen unknown. Board with extreme caution and prepare the medical bay. Science, run a pathogen sweep the moment we're in range. Medical, stand by for triage.",
+  "signal_location": {
+    "x": 62000,
+    "y": 44000
+  },
   "entities": [],
-  "objectives": [
+  "nodes": [
     {
       "id": "receive_distress",
+      "type": "objective",
       "text": "Receive and process the distress signal",
-      "trigger": "timer_elapsed",
-      "args": {"seconds": 5},
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 5
+      }
+    },
+    {
+      "id": "triage_survivors",
+      "type": "objective",
+      "text": "Diagnose and treat the infected survivors",
+      "trigger": {
+        "type": "puzzle_resolved",
+        "puzzle_label": "plague_triage"
+      }
+    },
+    {
+      "id": "contain_outbreak",
+      "type": "objective",
+      "text": "Hold position while the outbreak is contained (60 seconds)",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 60
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "receive_distress",
+      "to": "triage_survivors",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "start_outbreak",
@@ -29,16 +58,16 @@
       ]
     },
     {
-      "id": "triage_survivors",
-      "text": "Diagnose and treat the infected survivors",
-      "trigger": "puzzle_resolved",
-      "args": {"puzzle_label": "plague_triage"}
-    },
-    {
-      "id": "contain_outbreak",
-      "text": "Hold position while the outbreak is contained (60 seconds)",
-      "trigger": "timer_elapsed",
-      "args": {"seconds": 60}
+      "from": "triage_survivors",
+      "to": "contain_outbreak",
+      "type": "sequence"
     }
-  ]
+  ],
+  "start_node": "receive_distress",
+  "victory_nodes": [
+    "contain_outbreak"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

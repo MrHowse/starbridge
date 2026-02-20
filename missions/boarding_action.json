@@ -2,20 +2,52 @@
   "id": "boarding_action",
   "name": "Boarding Action",
   "briefing": "Enemy boarding party detected inbound. Security: position marine squads to intercept before the hull breach. You have 60 seconds to deploy.",
-  "defeat_condition": "player_hull_zero",
-  "victory_condition": "all_objectives_complete",
-  "objectives": [
+  "nodes": [
     {
       "id": "obj_position",
+      "type": "objective",
       "text": "Position marine squads to intercept boarders",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 0 },
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 0
+      }
+    },
+    {
+      "id": "obj_repel",
+      "type": "objective",
+      "text": "Repel all boarders",
+      "trigger": {
+        "type": "puzzle_resolved",
+        "puzzle_label": "position_squads"
+      }
+    },
+    {
+      "id": "obj_victory",
+      "type": "objective",
+      "text": "All boarders neutralised",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 240
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "obj_position",
+      "to": "obj_repel",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "deploy_squads",
           "squads": [
-            { "id": "squad_1", "room_id": "conn" },
-            { "id": "squad_2", "room_id": "torpedo_room" }
+            {
+              "id": "squad_1",
+              "room_id": "conn"
+            },
+            {
+              "id": "squad_2",
+              "room_id": "torpedo_room"
+            }
           ]
         },
         {
@@ -26,34 +58,49 @@
           "difficulty": 2,
           "time_limit": 60.0,
           "intruder_specs": [
-            { "id": "intruder_1", "room_id": "engine_room", "objective_id": "conn" },
-            { "id": "intruder_2", "room_id": "engine_room", "objective_id": "torpedo_room" }
+            {
+              "id": "intruder_1",
+              "room_id": "engine_room",
+              "objective_id": "conn"
+            },
+            {
+              "id": "intruder_2",
+              "room_id": "engine_room",
+              "objective_id": "torpedo_room"
+            }
           ]
         }
       ]
     },
     {
-      "id": "obj_repel",
-      "text": "Repel all boarders",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "position_squads" },
+      "from": "obj_repel",
+      "to": "obj_victory",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "start_boarding",
           "squads": [],
           "intruders": [
-            { "id": "intruder_1", "room_id": "engine_room", "objective_id": "conn" },
-            { "id": "intruder_2", "room_id": "engine_room", "objective_id": "torpedo_room" }
+            {
+              "id": "intruder_1",
+              "room_id": "engine_room",
+              "objective_id": "conn"
+            },
+            {
+              "id": "intruder_2",
+              "room_id": "engine_room",
+              "objective_id": "torpedo_room"
+            }
           ]
         }
       ]
-    },
-    {
-      "id": "obj_victory",
-      "text": "All boarders neutralised",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 240 },
-      "on_complete": []
     }
-  ]
+  ],
+  "start_node": "obj_position",
+  "victory_nodes": [
+    "obj_victory"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

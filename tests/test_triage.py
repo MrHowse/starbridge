@@ -462,15 +462,15 @@ def test_plague_ship_mission_loadable():
     from server.missions.loader import load_mission
     mission = load_mission("plague_ship")
     assert mission["name"] == "Plague Ship"
-    assert len(mission["objectives"]) == 3
+    assert len(mission["nodes"]) == 3
 
 
 def test_plague_ship_mission_has_start_outbreak_action():
     from server.missions.loader import load_mission
     mission = load_mission("plague_ship")
-    first_obj = mission["objectives"][0]
-    on_complete = first_obj["on_complete"]
-    # on_complete is a list
+    # on_complete is now on the first edge (receive_distress → triage_survivors)
+    first_edge = mission["edges"][0]
+    on_complete = first_edge.get("on_complete", [])
     actions = on_complete if isinstance(on_complete, list) else [on_complete]
     outbreak_actions = [a for a in actions if a.get("action") == "start_outbreak"]
     assert len(outbreak_actions) == 1
@@ -480,8 +480,9 @@ def test_plague_ship_mission_has_start_outbreak_action():
 def test_plague_ship_mission_has_triage_puzzle():
     from server.missions.loader import load_mission
     mission = load_mission("plague_ship")
-    first_obj = mission["objectives"][0]
-    on_complete = first_obj["on_complete"]
+    # on_complete is now on the first edge (receive_distress → triage_survivors)
+    first_edge = mission["edges"][0]
+    on_complete = first_edge.get("on_complete", [])
     actions = on_complete if isinstance(on_complete, list) else [on_complete]
     puzzle_actions = [a for a in actions if a.get("action") == "start_puzzle"]
     assert len(puzzle_actions) == 1

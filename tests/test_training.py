@@ -374,7 +374,7 @@ class TestTrainingMissionsLoad:
         mission = load_mission(mission_id)
         assert mission["is_training"] is True
         assert "target_role" in mission
-        assert len(mission["objectives"]) >= 3
+        assert len(mission["nodes"]) >= 3
 
     @pytest.mark.parametrize("mission_id", [
         "train_helm",
@@ -393,7 +393,7 @@ class TestTrainingMissionsLoad:
     def test_mission_has_hints(self, mission_id):
         from server.missions.loader import load_mission
         mission = load_mission(mission_id)
-        hints = [obj.get("hint", "") for obj in mission["objectives"]]
+        hints = [obj.get("hint", "") for obj in mission["nodes"]]
         # Each training mission should have at least one hint.
         assert any(h for h in hints), f"{mission_id} has no hints"
 
@@ -421,8 +421,10 @@ class TestTrainingMissionsLoad:
             "puzzle_resolved", "training_flag",
         }
         mission = load_mission(mission_id)
-        for obj in mission["objectives"]:
-            assert obj.get("trigger") in valid_triggers, (
+        for obj in mission["nodes"]:
+            if obj.get("type", "objective") != "objective":
+                continue
+            assert obj.get("trigger", {}).get("type") in valid_triggers, (
                 f"{mission_id}/{obj['id']} has unknown trigger {obj.get('trigger')!r}"
             )
 

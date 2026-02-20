@@ -1,11 +1,11 @@
 """Tests for the Diplomatic Summit mission (c.9 / v0.02h).
 
 Covers:
-  - Mission JSON structure and loading
+  - Mission JSON structure and loading (graph format)
   - Spawn (two faction stations)
-  - Objective chain integrity
+  - Node / edge structure (parallel groups)
   - All 7 active puzzle types represented
-  - Runtime engine tick-through (objectives complete in sequence)
+  - Runtime engine tick-through via MissionGraph
   - Balance checks (difficulty params within expected ranges)
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from server.missions.loader import load_mission, spawn_from_mission
-from server.missions.engine import MissionEngine
+from server.mission_graph import MissionGraph
 from server.models.world import World
 from server.models.ship import Ship
 
@@ -35,13 +35,30 @@ def load_summit() -> dict:
     return load_mission("diplomatic_summit")
 
 
+def _all_nodes_flat(mission: dict) -> list[dict]:
+    """Return all nodes (including children of parallel nodes) as a flat list."""
+    result: list[dict] = []
+
+    def _collect(nodes: list[dict]) -> None:
+        for n in nodes:
+            result.append(n)
+            _collect(n.get("children", []))
+
+    _collect(mission.get("nodes", []))
+    return result
+
+
 def _all_puzzle_actions(mission: dict) -> list[dict]:
-    """Collect every start_puzzle action across all objectives."""
+    """Collect every start_puzzle action from all edges' on_complete."""
     actions: list[dict] = []
-    for obj in mission.get("objectives", []):
-        for a in obj.get("on_complete", []):
-            if a.get("action") == "start_puzzle":
-                actions.append(a)
+    for edge in mission.get("edges", []):
+        on_complete = edge.get("on_complete", [])
+        if isinstance(on_complete, list):
+            for a in on_complete:
+                if a.get("action") == "start_puzzle":
+                    actions.append(a)
+        elif isinstance(on_complete, dict) and on_complete.get("action") == "start_puzzle":
+            actions.append(on_complete)
     return actions
 
 
@@ -69,13 +86,13 @@ class TestDiplomaticSummitLoad:
         assert sig is not None
         assert "x" in sig and "y" in sig
 
-    def test_victory_condition(self):
+    def test_victory_nodes_present(self):
         m = load_summit()
-        assert m["victory_condition"] == "all_objectives_complete"
+        assert "obj_summit" in m["victory_nodes"]
 
     def test_defeat_condition(self):
         m = load_summit()
-        assert m["defeat_condition"] == "player_hull_zero"
+        assert m["defeat_condition"]["type"] == "player_hull_zero"
 
     def test_has_two_spawn_stations(self):
         m = load_summit()
@@ -89,9 +106,11 @@ class TestDiplomaticSummitLoad:
         assert "meridian_ship" in ids
         assert "talon_ship" in ids
 
-    def test_has_nine_objectives(self):
+    def test_has_nine_objective_type_nodes(self):
         m = load_summit()
-        assert len(m["objectives"]) == 9
+        all_nodes = _all_nodes_flat(m)
+        objective_nodes = [n for n in all_nodes if n.get("type", "objective") == "objective"]
+        assert len(objective_nodes) == 9
 
     def test_spawn_creates_two_world_stations(self):
         world = fresh_world()
@@ -109,29 +128,33 @@ class TestDiplomaticSummitLoad:
 
 
 # ---------------------------------------------------------------------------
-# TestDiplomaticSummitObjectives — objective chain structure
+# TestDiplomaticSummitObjectives — node / edge structure checks
 # ---------------------------------------------------------------------------
 
 
 class TestDiplomaticSummitObjectives:
     def setup_method(self):
         self.m = load_summit()
-        self.objs = self.m["objectives"]
+        self.all_nodes = _all_nodes_flat(self.m)
 
-    def test_first_objective_is_timer(self):
-        assert self.objs[0]["trigger"] == "timer_elapsed"
-        assert self.objs[0]["args"]["seconds"] == 5
+    def test_first_node_is_arrival_timer(self):
+        first = self.m["nodes"][0]
+        assert first["id"] == "obj_arrival"
+        assert first["trigger"]["type"] == "timer_elapsed"
+        assert first["trigger"]["seconds"] == 5
 
-    def test_first_objective_starts_five_puzzles(self):
+    def test_arrival_edge_starts_five_puzzles(self):
+        arrival_edge = next(e for e in self.m["edges"] if e["from"] == "obj_arrival")
         puzzle_actions = [
-            a for a in self.objs[0]["on_complete"]
+            a for a in arrival_edge.get("on_complete", [])
             if a.get("action") == "start_puzzle"
         ]
         assert len(puzzle_actions) == 5
 
-    def test_first_objective_includes_deploy_squads(self):
+    def test_arrival_edge_includes_deploy_squads(self):
+        arrival_edge = next(e for e in self.m["edges"] if e["from"] == "obj_arrival")
         deploy_actions = [
-            a for a in self.objs[0]["on_complete"]
+            a for a in arrival_edge.get("on_complete", [])
             if a.get("action") == "deploy_squads"
         ]
         assert len(deploy_actions) == 1
@@ -163,34 +186,34 @@ class TestDiplomaticSummitObjectives:
         assert len(tp["intruder_specs"]) >= 2
 
     def test_science_objective_trigger(self):
-        obj = next(o for o in self.objs if o["id"] == "obj_science")
-        assert obj["trigger"] == "puzzle_resolved"
-        assert obj["args"]["puzzle_label"] == "faction_signatures"
+        obj = next(o for o in self.all_nodes if o["id"] == "obj_science")
+        assert obj["trigger"]["type"] == "puzzle_resolved"
+        assert obj["trigger"]["puzzle_label"] == "faction_signatures"
 
     def test_comms_objective_trigger(self):
-        obj = next(o for o in self.objs if o["id"] == "obj_comms")
-        assert obj["trigger"] == "puzzle_resolved"
-        assert obj["args"]["puzzle_label"] == "summit_channel"
+        obj = next(o for o in self.all_nodes if o["id"] == "obj_comms")
+        assert obj["trigger"]["type"] == "puzzle_resolved"
+        assert obj["trigger"]["puzzle_label"] == "summit_channel"
 
     def test_engineering_objective_trigger(self):
-        obj = next(o for o in self.objs if o["id"] == "obj_engineering")
-        assert obj["trigger"] == "puzzle_resolved"
-        assert obj["args"]["puzzle_label"] == "summit_power"
+        obj = next(o for o in self.all_nodes if o["id"] == "obj_engineering")
+        assert obj["trigger"]["type"] == "puzzle_resolved"
+        assert obj["trigger"]["puzzle_label"] == "summit_power"
 
     def test_medical_objective_trigger(self):
-        obj = next(o for o in self.objs if o["id"] == "obj_medical")
-        assert obj["trigger"] == "puzzle_resolved"
-        assert obj["args"]["puzzle_label"] == "crew_prep"
+        obj = next(o for o in self.all_nodes if o["id"] == "obj_medical")
+        assert obj["trigger"]["type"] == "puzzle_resolved"
+        assert obj["trigger"]["puzzle_label"] == "crew_prep"
 
     def test_security_objective_trigger(self):
-        obj = next(o for o in self.objs if o["id"] == "obj_security")
-        assert obj["trigger"] == "puzzle_resolved"
-        assert obj["args"]["puzzle_label"] == "security_sweep"
+        obj = next(o for o in self.all_nodes if o["id"] == "obj_security")
+        assert obj["trigger"]["type"] == "puzzle_resolved"
+        assert obj["trigger"]["puzzle_label"] == "security_sweep"
 
-    def test_security_starts_helm_and_weapons_puzzles(self):
-        obj = next(o for o in self.objs if o["id"] == "obj_security")
+    def test_security_edge_starts_helm_and_weapons_puzzles(self):
+        security_edge = next(e for e in self.m["edges"] if e["from"] == "obj_security")
         puzzle_actions = [
-            a for a in obj.get("on_complete", [])
+            a for a in security_edge.get("on_complete", [])
             if a.get("action") == "start_puzzle"
         ]
         types = {a["puzzle_type"] for a in puzzle_actions}
@@ -198,19 +221,19 @@ class TestDiplomaticSummitObjectives:
         assert "firing_solution" in types
 
     def test_helm_objective_trigger(self):
-        obj = next(o for o in self.objs if o["id"] == "obj_helm")
-        assert obj["trigger"] == "puzzle_resolved"
-        assert obj["args"]["puzzle_label"] == "exit_route"
+        obj = next(o for o in self.all_nodes if o["id"] == "obj_helm")
+        assert obj["trigger"]["type"] == "puzzle_resolved"
+        assert obj["trigger"]["puzzle_label"] == "exit_route"
 
     def test_weapons_objective_trigger(self):
-        obj = next(o for o in self.objs if o["id"] == "obj_weapons")
-        assert obj["trigger"] == "puzzle_resolved"
-        assert obj["args"]["puzzle_label"] == "summit_defense"
+        obj = next(o for o in self.all_nodes if o["id"] == "obj_weapons")
+        assert obj["trigger"]["type"] == "puzzle_resolved"
+        assert obj["trigger"]["puzzle_label"] == "summit_defense"
 
     def test_final_objective_timer_at_least_200s(self):
-        final = next(o for o in self.objs if o["id"] == "obj_summit")
-        assert final["trigger"] == "timer_elapsed"
-        assert final["args"]["seconds"] >= 200
+        final = next(o for o in self.all_nodes if o["id"] == "obj_summit")
+        assert final["trigger"]["type"] == "timer_elapsed"
+        assert final["trigger"]["seconds"] >= 200
 
     def test_all_time_limits_reasonable(self):
         """Every puzzle should have a time_limit >= 60s."""
@@ -224,9 +247,21 @@ class TestDiplomaticSummitObjectives:
         for a in puzzle_actions:
             assert 1 <= a["difficulty"] <= 5, f"Puzzle {a['label']} difficulty out of range"
 
+    def test_parallel_station_prep_has_four_children(self):
+        """The parallel_station_prep node should contain 4 children."""
+        prep = next(n for n in self.m["nodes"] if n["id"] == "parallel_station_prep")
+        assert prep["type"] == "parallel"
+        assert len(prep["children"]) == 4
+
+    def test_parallel_final_tasks_has_two_children(self):
+        """The parallel_final_tasks node should contain helm and weapons."""
+        final = next(n for n in self.m["nodes"] if n["id"] == "parallel_final_tasks")
+        assert final["type"] == "parallel"
+        assert len(final["children"]) == 2
+
 
 # ---------------------------------------------------------------------------
-# TestDiplomaticSummitEngine — runtime tick-through
+# TestDiplomaticSummitEngine — runtime tick-through (using MissionGraph)
 # ---------------------------------------------------------------------------
 
 
@@ -234,12 +269,11 @@ class TestDiplomaticSummitEngine:
     def setup_method(self):
         self.world = fresh_world()
         spawn_from_mission(load_summit(), self.world, entity_counter=0)
-        self.engine = MissionEngine(load_summit())
+        self.engine = MissionGraph(load_summit())
 
     def _tick(self, seconds: float, dt: float = 0.1) -> list[str]:
         """Tick the engine for `seconds` of game time. Uses ceiling to avoid
-        floating-point accumulation landing just short of the target (e.g.
-        50 × 0.1 = 4.999... rather than 5.0)."""
+        floating-point accumulation landing just short of the target."""
         completed: list[str] = []
         ticks = round(seconds / dt) + 1  # +1 guarantees we exceed the target
         for _ in range(ticks):
@@ -280,26 +314,27 @@ class TestDiplomaticSummitEngine:
         assert "faction_signatures" in labels
 
     def test_obj_science_completes_on_notify(self):
-        """After arrival fires, notifying the science puzzle resolved advances obj_science."""
+        """After arrival fires, notifying the science puzzle resolved completes obj_science."""
         self._tick(5.0)
         self.engine.pop_pending_actions()
         self.engine.notify_puzzle_result("faction_signatures", True)
         completed = self.engine.tick(self.world, self.world.ship)
         assert "obj_science" in completed
 
-    def test_obj_comms_completes_after_science(self):
+    def test_obj_comms_completes_after_notify(self):
+        """obj_comms is active in parallel — completes as soon as summit_channel resolves."""
         self._tick(5.0)
         self.engine.pop_pending_actions()
-        # Science resolves first.
+        # Science resolves — comms still waiting.
         self.engine.notify_puzzle_result("faction_signatures", True)
-        self.engine.tick(self.world, self.world.ship)  # obj_science completes
-        # Comms already resolved.
+        self.engine.tick(self.world, self.world.ship)
+        # Now notify comms.
         self.engine.notify_puzzle_result("summit_channel", True)
         completed = self.engine.tick(self.world, self.world.ship)
         assert "obj_comms" in completed
 
-    def test_puzzle_block_resolves_sequentially(self):
-        """All 5 block-1 puzzles resolved before security → objectives 2–6 complete."""
+    def test_all_five_station_objectives_complete(self):
+        """All 5 block-1 puzzles resolved → objectives 2–6 all complete."""
         self._tick(5.0)
         self.engine.pop_pending_actions()
 
@@ -310,7 +345,6 @@ class TestDiplomaticSummitEngine:
         for _ in range(10):
             completed.extend(self.engine.tick(self.world, self.world.ship))
 
-        obj_ids = {o.id for o in self.engine.get_objectives()}
         completed_set = set(completed)
         for oid in ["obj_science", "obj_comms", "obj_engineering", "obj_medical", "obj_security"]:
             assert oid in completed_set, f"{oid} should have completed"
@@ -343,7 +377,7 @@ class TestDiplomaticSummitEngine:
         for label in all_labels:
             self.engine.notify_puzzle_result(label, True)
 
-        # Advance enough for objectives 2–8 to clear but less than 240s total.
+        # Advance enough for all objectives to clear but less than 240s total.
         for _ in range(20):
             self.engine.tick(self.world, self.world.ship)
 
@@ -362,7 +396,7 @@ class TestDiplomaticSummitEngine:
         for label in all_labels:
             self.engine.notify_puzzle_result(label, True)
 
-        # Tick objectives 2–8 through.
+        # Tick objectives through.
         for _ in range(20):
             self.engine.tick(self.world, self.world.ship)
 

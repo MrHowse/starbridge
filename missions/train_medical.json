@@ -1,41 +1,78 @@
 {
   "id": "train_medical",
   "name": "Medical Training",
-  "is_training": true,
-  "target_role": "medical",
-  "auto_roles": ["helm", "engineering"],
   "briefing": "Welcome to Medical Training. The ship has sustained crew injuries from a simulated combat drill. Learn to read crew status, prioritise treatment, manage medical supplies, and respond to outbreaks.",
   "spawn": [],
-  "objectives": [
+  "is_training": true,
+  "target_role": "medical",
+  "auto_roles": [
+    "helm",
+    "engineering"
+  ],
+  "nodes": [
     {
       "id": "med_01_assess",
-      "text": "Review crew status — identify the most injured deck",
-      "hint": "The Medical panel shows each deck's crew count: Active (green), Injured (yellow), Critical (red). Look for the deck with the most injuries or critical crew. Medical supplies are shown in the top-right counter.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 8 }
+      "type": "objective",
+      "text": "Review crew status \u2014 identify the most injured deck",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 8
+      },
+      "hint": "The Medical panel shows each deck's crew count: Active (green), Injured (yellow), Critical (red). Look for the deck with the most injuries or critical crew. Medical supplies are shown in the top-right counter."
     },
     {
       "id": "med_02_treat",
+      "type": "objective",
       "text": "Begin treatment on the most injured deck",
-      "hint": "Click the TREAT button next to the deck with the most critical crew. Select injury type if prompted. Treatment costs 2 medical supplies and heals 1 crew member every 2 seconds. Critical crew are prioritised automatically.",
-      "trigger": "training_flag",
-      "args": { "flag": "medical_treatment_started" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "medical_treatment_started"
+      },
+      "hint": "Click the TREAT button next to the deck with the most critical crew. Select injury type if prompted. Treatment costs 2 medical supplies and heals 1 crew member every 2 seconds. Critical crew are prioritised automatically."
     },
     {
       "id": "med_03_monitor",
-      "text": "Monitor treatment — observe healing progress for 20 seconds",
-      "hint": "Watch the crew counters update as treatment progresses. The ACTIVE count rises as injured crew recover. If medical supplies run low, you may need to prioritise which deck to treat. Supplies replenish when docked.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 40 }
+      "type": "objective",
+      "text": "Monitor treatment \u2014 observe healing progress for 20 seconds",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 40
+      },
+      "hint": "Watch the crew counters update as treatment progresses. The ACTIVE count rises as injured crew recover. If medical supplies run low, you may need to prioritise which deck to treat. Supplies replenish when docked."
     },
     {
       "id": "med_04_cancel",
+      "type": "objective",
       "text": "Cancel treatment when the deck is stable",
-      "hint": "Once a deck has no more critical crew, press CANCEL TREATMENT to stop and conserve supplies. Injured crew continue to slowly recover without treatment. Allocate remaining supplies to the next worst deck.",
-      "trigger": "training_flag",
-      "args": { "flag": "medical_treatment_cancelled" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "medical_treatment_cancelled"
+      },
+      "hint": "Once a deck has no more critical crew, press CANCEL TREATMENT to stop and conserve supplies. Injured crew continue to slowly recover without treatment. Allocate remaining supplies to the next worst deck."
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "med_01_assess",
+      "to": "med_02_treat",
+      "type": "sequence"
+    },
+    {
+      "from": "med_02_treat",
+      "to": "med_03_monitor",
+      "type": "sequence"
+    },
+    {
+      "from": "med_03_monitor",
+      "to": "med_04_cancel",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "med_01_assess",
+  "victory_nodes": [
+    "med_04_cancel"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

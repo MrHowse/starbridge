@@ -1,10 +1,12 @@
 {
   "id": "nebula_crossing",
   "name": "Nebula Crossing",
-  "briefing": "LONG-RANGE SENSORS DETECT A DISTRESS BEACON DEEP IN THE VELORIAN NEBULA. THE NEBULA'S DENSE PARTICLE CLOUDS MAKE SAFE NAVIGATION TREACHEROUS — PLOT A COURSE BEFORE ENGAGING THRUSTERS. SCIENCE SENSORS CAN HELP REVEAL HIDDEN HAZARDS.",
-  "signal_location": { "x": 70000, "y": 30000 },
-  "defeat_condition": "player_hull_zero",
-  "victory_condition": "all_objectives_complete",
+  "briefing": "LONG-RANGE SENSORS DETECT A DISTRESS BEACON DEEP IN THE VELORIAN NEBULA. THE NEBULA'S DENSE PARTICLE CLOUDS MAKE SAFE NAVIGATION TREACHEROUS \u2014 PLOT A COURSE BEFORE ENGAGING THRUSTERS. SCIENCE SENSORS CAN HELP REVEAL HIDDEN HAZARDS.",
+  "signal_location": {
+    "x": 70000,
+    "y": 30000
+  },
+  "spawn": [],
   "hazards": [
     {
       "id": "nebula_core",
@@ -23,13 +25,40 @@
       "label": "Radiation Debris"
     }
   ],
-  "spawn": [],
-  "objectives": [
+  "nodes": [
     {
       "id": "plot_course",
+      "type": "objective",
       "text": "Plot a safe route through the Velorian Nebula",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 3 },
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 3
+      }
+    },
+    {
+      "id": "navigate_nebula",
+      "type": "objective",
+      "text": "Successfully navigate through the nebula",
+      "trigger": {
+        "type": "puzzle_completed",
+        "puzzle_label": "nebula_route"
+      }
+    },
+    {
+      "id": "reach_beacon",
+      "type": "objective",
+      "text": "Reach the distress beacon coordinates",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 45
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "plot_course",
+      "to": "navigate_nebula",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "start_puzzle",
@@ -42,16 +71,16 @@
       ]
     },
     {
-      "id": "navigate_nebula",
-      "text": "Successfully navigate through the nebula",
-      "trigger": "puzzle_completed",
-      "args": { "puzzle_label": "nebula_route" }
-    },
-    {
-      "id": "reach_beacon",
-      "text": "Reach the distress beacon coordinates",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 45 }
+      "from": "navigate_nebula",
+      "to": "reach_beacon",
+      "type": "sequence"
     }
-  ]
+  ],
+  "start_node": "plot_course",
+  "victory_nodes": [
+    "reach_beacon"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

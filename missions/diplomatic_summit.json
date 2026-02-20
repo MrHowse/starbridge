@@ -1,20 +1,129 @@
 {
   "id": "diplomatic_summit",
   "name": "Diplomatic Summit",
-  "briefing": "TWO RIVAL FACTIONS — THE MERIDIAN COALITION AND THE TALON ALLIANCE — HAVE CONVENED ABOARD STARBRIDGE FOR HIGH-STAKES PEACE NEGOTIATIONS. ALL STATIONS MUST BE FULLY OPERATIONAL. SCIENCE: IDENTIFY FACTION FREQUENCIES. COMMS: ESTABLISH DIPLOMATIC CHANNELS. ENGINEERING: ROUTE POWER TO CONFERENCE SYSTEMS. MEDICAL: PREPARE THE CREW. SECURITY: CLEAR THE CONFERENCE DECKS. HELM AND WEAPONS: STAND BY FOR ANY CONTINGENCY.",
-  "signal_location": { "x": 55000, "y": 45000 },
-  "defeat_condition": "player_hull_zero",
-  "victory_condition": "all_objectives_complete",
+  "briefing": "TWO RIVAL FACTIONS \u2014 THE MERIDIAN COALITION AND THE TALON ALLIANCE \u2014 HAVE CONVENED ABOARD STARBRIDGE FOR HIGH-STAKES PEACE NEGOTIATIONS. ALL STATIONS MUST BE FULLY OPERATIONAL. SCIENCE: IDENTIFY FACTION FREQUENCIES. COMMS: ESTABLISH DIPLOMATIC CHANNELS. ENGINEERING: ROUTE POWER TO CONFERENCE SYSTEMS. MEDICAL: PREPARE THE CREW. SECURITY: CLEAR THE CONFERENCE DECKS. HELM AND WEAPONS: STAND BY FOR ANY CONTINGENCY.",
+  "signal_location": {
+    "x": 55000,
+    "y": 45000
+  },
   "spawn": [
-    { "type": "station", "id": "meridian_ship", "x": 58000, "y": 52000 },
-    { "type": "station", "id": "talon_ship",    "x": 42000, "y": 48000 }
+    {
+      "type": "station",
+      "id": "meridian_ship",
+      "x": 58000,
+      "y": 52000
+    },
+    {
+      "type": "station",
+      "id": "talon_ship",
+      "x": 42000,
+      "y": 48000
+    }
   ],
-  "objectives": [
+  "nodes": [
     {
       "id": "obj_arrival",
-      "text": "Station all departments — faction ships approaching",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 5 },
+      "type": "objective",
+      "text": "Station all departments \u2014 faction ships approaching",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 5
+      }
+    },
+    {
+      "id": "parallel_station_prep",
+      "type": "parallel",
+      "text": "All stations complete preparations",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "obj_science",
+          "type": "objective",
+          "text": "Identify faction ship frequencies",
+          "trigger": {
+            "type": "puzzle_resolved",
+            "puzzle_label": "faction_signatures"
+          }
+        },
+        {
+          "id": "obj_comms",
+          "type": "objective",
+          "text": "Establish diplomatic communications channel",
+          "trigger": {
+            "type": "puzzle_resolved",
+            "puzzle_label": "summit_channel"
+          }
+        },
+        {
+          "id": "obj_engineering",
+          "type": "objective",
+          "text": "Route power to summit conference systems",
+          "trigger": {
+            "type": "puzzle_resolved",
+            "puzzle_label": "summit_power"
+          }
+        },
+        {
+          "id": "obj_medical",
+          "type": "objective",
+          "text": "Prepare crew for diplomatic engagement",
+          "trigger": {
+            "type": "puzzle_resolved",
+            "puzzle_label": "crew_prep"
+          }
+        }
+      ]
+    },
+    {
+      "id": "obj_security",
+      "type": "objective",
+      "text": "Conference areas cleared \u2014 stand by for contingency orders",
+      "trigger": {
+        "type": "puzzle_resolved",
+        "puzzle_label": "security_sweep"
+      }
+    },
+    {
+      "id": "parallel_final_tasks",
+      "type": "parallel",
+      "text": "Final preparations complete",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "obj_helm",
+          "type": "objective",
+          "text": "Emergency extraction route plotted",
+          "trigger": {
+            "type": "puzzle_resolved",
+            "puzzle_label": "exit_route"
+          }
+        },
+        {
+          "id": "obj_weapons",
+          "type": "objective",
+          "text": "Defensive firing solution confirmed",
+          "trigger": {
+            "type": "puzzle_resolved",
+            "puzzle_label": "summit_defense"
+          }
+        }
+      ]
+    },
+    {
+      "id": "obj_summit",
+      "type": "objective",
+      "text": "Summit concluded \u2014 all stations stand down",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 240
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "obj_arrival",
+      "to": "parallel_station_prep",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "start_puzzle",
@@ -51,8 +160,14 @@
         {
           "action": "deploy_squads",
           "squads": [
-            { "id": "squad_1", "room_id": "conn" },
-            { "id": "squad_2", "room_id": "torpedo_room" }
+            {
+              "id": "squad_1",
+              "room_id": "conn"
+            },
+            {
+              "id": "squad_2",
+              "room_id": "torpedo_room"
+            }
           ]
         },
         {
@@ -63,45 +178,29 @@
           "difficulty": 1,
           "time_limit": 90.0,
           "intruder_specs": [
-            { "id": "summit_intruder_1", "room_id": "engine_room", "objective_id": "conn" },
-            { "id": "summit_intruder_2", "room_id": "surgery",     "objective_id": "science_lab" }
+            {
+              "id": "summit_intruder_1",
+              "room_id": "engine_room",
+              "objective_id": "conn"
+            },
+            {
+              "id": "summit_intruder_2",
+              "room_id": "surgery",
+              "objective_id": "science_lab"
+            }
           ]
         }
       ]
     },
     {
-      "id": "obj_science",
-      "text": "Identify faction ship frequencies",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "faction_signatures" },
-      "on_complete": []
+      "from": "parallel_station_prep",
+      "to": "obj_security",
+      "type": "sequence"
     },
     {
-      "id": "obj_comms",
-      "text": "Establish diplomatic communications channel",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "summit_channel" },
-      "on_complete": []
-    },
-    {
-      "id": "obj_engineering",
-      "text": "Route power to summit conference systems",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "summit_power" },
-      "on_complete": []
-    },
-    {
-      "id": "obj_medical",
-      "text": "Prepare crew for diplomatic engagement",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "crew_prep" },
-      "on_complete": []
-    },
-    {
-      "id": "obj_security",
-      "text": "Conference areas cleared — stand by for contingency orders",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "security_sweep" },
+      "from": "obj_security",
+      "to": "parallel_final_tasks",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "start_puzzle",
@@ -122,24 +221,16 @@
       ]
     },
     {
-      "id": "obj_helm",
-      "text": "Emergency extraction route plotted",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "exit_route" },
-      "on_complete": []
-    },
-    {
-      "id": "obj_weapons",
-      "text": "Defensive firing solution confirmed",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "summit_defense" },
-      "on_complete": []
-    },
-    {
-      "id": "obj_summit",
-      "text": "Summit concluded — all stations stand down",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 240 }
+      "from": "parallel_final_tasks",
+      "to": "obj_summit",
+      "type": "sequence"
     }
-  ]
+  ],
+  "start_node": "obj_arrival",
+  "victory_nodes": [
+    "obj_summit"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

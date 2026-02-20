@@ -1,41 +1,78 @@
 {
   "id": "train_security",
   "name": "Security Training",
+  "briefing": "Welcome to Security Training. Practice commanding marine squads, controlling ship access points, and responding to a simulated boarding scenario. Intruders move between rooms \u2014 cut them off and eliminate them.",
+  "spawn": [],
   "is_training": true,
   "target_role": "security",
-  "auto_roles": ["helm", "engineering"],
-  "briefing": "Welcome to Security Training. Practice commanding marine squads, controlling ship access points, and responding to a simulated boarding scenario. Intruders move between rooms — cut them off and eliminate them.",
-  "spawn": [],
-  "objectives": [
+  "auto_roles": [
+    "helm",
+    "engineering"
+  ],
+  "nodes": [
     {
       "id": "sec_01_orient",
-      "text": "Orient yourself — review squad positions on the ship interior map",
-      "hint": "The Security panel shows the ship interior as a grid of rooms. Your marine squads appear as blue icons. Each room shows how many crew and intruders are present. Doors can be sealed to restrict movement.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 8 }
+      "type": "objective",
+      "text": "Orient yourself \u2014 review squad positions on the ship interior map",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 8
+      },
+      "hint": "The Security panel shows the ship interior as a grid of rooms. Your marine squads appear as blue icons. Each room shows how many crew and intruders are present. Doors can be sealed to restrict movement."
     },
     {
       "id": "sec_02_move",
+      "type": "objective",
       "text": "Move a squad to an adjacent room",
-      "hint": "Click a squad to select it, then click an adjacent room to move it there. Squads can only move through unsealed doors. Moving into a room with intruders starts combat automatically. Move your squad toward the centre corridor.",
-      "trigger": "training_flag",
-      "args": { "flag": "security_squad_moved" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "security_squad_moved"
+      },
+      "hint": "Click a squad to select it, then click an adjacent room to move it there. Squads can only move through unsealed doors. Moving into a room with intruders starts combat automatically. Move your squad toward the centre corridor."
     },
     {
       "id": "sec_03_door",
+      "type": "objective",
       "text": "Seal a door to control access",
-      "hint": "Click on a doorway between two rooms and select SEAL. Sealed doors block all movement — including your own squads. Use seals to funnel intruders toward your marines. You can unseal at any time.",
-      "trigger": "training_flag",
-      "args": { "flag": "security_door_toggled" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "security_door_toggled"
+      },
+      "hint": "Click on a doorway between two rooms and select SEAL. Sealed doors block all movement \u2014 including your own squads. Use seals to funnel intruders toward your marines. You can unseal at any time."
     },
     {
       "id": "sec_04_hold",
+      "type": "objective",
       "text": "Maintain ship security for 30 seconds",
-      "hint": "Keep your squads deployed and doors configured. In a real boarding, intruders appear at breach points and move toward vital systems. The Captain may request you lock down specific decks — always confirm before sealing Engineering or Medical.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 50 }
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 50
+      },
+      "hint": "Keep your squads deployed and doors configured. In a real boarding, intruders appear at breach points and move toward vital systems. The Captain may request you lock down specific decks \u2014 always confirm before sealing Engineering or Medical."
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "sec_01_orient",
+      "to": "sec_02_move",
+      "type": "sequence"
+    },
+    {
+      "from": "sec_02_move",
+      "to": "sec_03_door",
+      "type": "sequence"
+    },
+    {
+      "from": "sec_03_door",
+      "to": "sec_04_hold",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "sec_01_orient",
+  "victory_nodes": [
+    "sec_04_hold"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

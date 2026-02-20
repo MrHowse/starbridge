@@ -3,12 +3,13 @@
 > **LIVING DOCUMENT** — Update after every AI engineering session.
 > This is the single source of truth for what exists in the project.
 
-**Last updated**: 2026-02-20 (v0.03 CLOSED — gate verification complete)
-**Current phase**: v0.03 COMPLETE ✓
-**Overall status**: 1578 tests passing. 11 active player roles + viewscreen (passive) = 12 stations.
-23 JSON missions (11 story + 12 training) + sandbox (synthetic). 9 puzzle types.
+**Last updated**: 2026-02-20 (v0.04b COMPLETE — mission graph migration)
+**Current phase**: v0.04b COMPLETE ✓
+**Overall status**: 1721 tests passing. 11 active player roles + viewscreen (passive) = 12 stations.
+23 JSON missions (11 story + 12 training) + sandbox (synthetic) — all in graph format. 9 puzzle types.
 7 ship classes (5 combat + 2 specialised). 4 difficulty presets.
 Game event logger (JSONL) + Debrief Dashboard + Captain's Replay.
+MissionGraph engine (parallel/branch/conditional nodes) — all missions use graph format.
 
 ---
 
@@ -88,8 +89,10 @@ Game event logger (JSONL) + Debrief Dashboard + Captain's Replay.
 - `server/game_loop_training.py` — **[v0.03m]** training state: `is_training_active()`, `set_training_flag(flag)`, `reset()`. Station handlers call `set_training_flag()` when training-relevant actions occur (e.g. `helm_heading_set`, `weapons_beam_fired`).
 
 #### Mission System (`server/missions/`)
-- `server/missions/loader.py` — `load_mission(id)`: reads `missions/<id>.json`; sandbox returns synthetic dict
-- `server/missions/engine.py` — `MissionEngine` class. Sequential objectives. Trigger types: `player_in_area`, `scan_completed`, `entity_destroyed`, `all_enemies_destroyed`, `player_hull_zero`, `timer_elapsed`, `wave_complete`, `signal_located`, `proximity_with_shields`, `puzzle_completed`, `puzzle_failed`, `puzzle_resolved`, **`training_flag` [v0.03m]**. `set_training_flag(name)` for training missions. `get_active_objective_index()`. `tick(world, ship, dt)` → list of newly-completed objective IDs.
+- `server/missions/loader.py` — `load_mission(id)`: reads `missions/<id>.json`; sandbox returns synthetic graph-format dict. **[v0.04b]** Sandbox dict uses graph format: `{nodes:[], edges:[], start_node:None, victory_nodes:[], defeat_condition:None}`.
+- `server/missions/engine.py` — `MissionEngine` class. Sequential objectives. **Still used in tests with inline dicts (do not remove).** Trigger types: all standard triggers + `training_flag`.
+- `server/mission_graph.py` — **[v0.04a]** `MissionGraph` class. Drop-in replacement for `MissionEngine` with parallel/branch/conditional/checkpoint nodes. Same public interface: `tick(world, ship, dt)`, `pop_pending_actions()`, `notify_puzzle_result(label, success)`, `set_training_flag(flag)`, `record_signal_scan()`, `is_over()`, `get_objectives()`, `get_active_node_ids()`. Mission format: `nodes` (with nested `children` for parallel), `edges`, `start_node`, `victory_nodes`, `defeat_condition` dict. Trigger format: `{"type": "name", ...args}` (flat merge).
+- `tools/migrate_missions.py` — **[v0.04b]** Migration script: converts missions from old sequential format (objectives array + string triggers) to graph format. Handles `defeat_condition_alt` via `any_of`. Skips already-migrated files.
 
 ### Ships
 
@@ -266,8 +269,9 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 | `test_ship_class.py` | 13 | v0.03o (updated) |
 | `test_ship_classes.py` | 71 | v0.03o |
 | `test_gate_v003.py` | 183 | v0.03o |
+| `test_mission_graph.py` | 118 | v0.04a |
 
-**Total: 1578 tests** ✓ (verified by pytest run 2026-02-20)
+**Total: 1721 tests** ✓ (verified by pytest run 2026-02-20, post-v0.04b)
 
 ---
 

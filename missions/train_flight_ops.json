@@ -1,41 +1,78 @@
 {
   "id": "train_flight_ops",
   "name": "Flight Operations Training",
-  "is_training": true,
-  "target_role": "flight_ops",
-  "auto_roles": ["helm", "engineering"],
   "briefing": "Welcome to Flight Operations Training. Practice managing reconnaissance drones and sensor probes. Auxiliary craft extend your sensor reach and can gather intelligence ahead of the main ship.",
   "spawn": [],
-  "objectives": [
+  "is_training": true,
+  "target_role": "flight_ops",
+  "auto_roles": [
+    "helm",
+    "engineering"
+  ],
+  "nodes": [
     {
       "id": "fo_01_orient",
-      "text": "Review Flight Deck status — check drone and probe inventory",
-      "hint": "The Flight Ops panel shows all craft in the hangar and those currently deployed. Check drone fuel capacity and current power allocation to the flight deck. Insufficient power reduces launch speed.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 8 }
+      "type": "objective",
+      "text": "Review Flight Deck status \u2014 check drone and probe inventory",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 8
+      },
+      "hint": "The Flight Ops panel shows all craft in the hangar and those currently deployed. Check drone fuel capacity and current power allocation to the flight deck. Insufficient power reduces launch speed."
     },
     {
       "id": "fo_02_launch",
+      "type": "objective",
       "text": "Launch Drone 1 toward bearing 045",
-      "hint": "Select Drone 1 from the craft list, then click a location on the sector map toward bearing 045 (northeast). Press LAUNCH. The drone will fly to that position and begin passive sensor coverage. Watch its fuel level decrease.",
-      "trigger": "training_flag",
-      "args": { "flag": "flightops_drone_launched" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "flightops_drone_launched"
+      },
+      "hint": "Select Drone 1 from the craft list, then click a location on the sector map toward bearing 045 (northeast). Press LAUNCH. The drone will fly to that position and begin passive sensor coverage. Watch its fuel level decrease."
     },
     {
       "id": "fo_03_probe",
+      "type": "objective",
       "text": "Deploy a sensor probe at a forward position",
-      "hint": "Select DEPLOY PROBE from the panel. Click a location further out on the map — perhaps a chokepoint or suspected approach route. Probes are stationary but provide persistent coverage. They are expendable.",
-      "trigger": "training_flag",
-      "args": { "flag": "flightops_probe_deployed" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "flightops_probe_deployed"
+      },
+      "hint": "Select DEPLOY PROBE from the panel. Click a location further out on the map \u2014 perhaps a chokepoint or suspected approach route. Probes are stationary but provide persistent coverage. They are expendable."
     },
     {
       "id": "fo_04_recall",
+      "type": "objective",
       "text": "Recall Drone 1 before fuel expires",
-      "hint": "Monitor the drone's fuel gauge. When it drops below 30%, press RECALL to bring it home. A drone that runs out of fuel is lost permanently. Recovery takes time — issue the recall order early.",
-      "trigger": "training_flag",
-      "args": { "flag": "flightops_drone_recalled" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "flightops_drone_recalled"
+      },
+      "hint": "Monitor the drone's fuel gauge. When it drops below 30%, press RECALL to bring it home. A drone that runs out of fuel is lost permanently. Recovery takes time \u2014 issue the recall order early."
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "fo_01_orient",
+      "to": "fo_02_launch",
+      "type": "sequence"
+    },
+    {
+      "from": "fo_02_launch",
+      "to": "fo_03_probe",
+      "type": "sequence"
+    },
+    {
+      "from": "fo_03_probe",
+      "to": "fo_04_recall",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "fo_01_orient",
+  "victory_nodes": [
+    "fo_04_recall"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

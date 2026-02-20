@@ -2,14 +2,57 @@
   "id": "first_contact_protocol",
   "name": "First Contact Protocol",
   "briefing": "An unknown vessel has entered sensor range on an unusual frequency. Science: begin long-range analysis. Comms: monitor all channels and prepare to decode any transmissions. The nature of this contact is unknown.",
-  "defeat_condition": "player_hull_zero",
-  "victory_condition": "all_objectives_complete",
-  "objectives": [
+  "nodes": [
     {
       "id": "obj_signal",
+      "type": "objective",
       "text": "Intercept alien transmissions",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 5 },
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 5
+      }
+    },
+    {
+      "id": "parallel_comms",
+      "type": "parallel",
+      "text": "Complete science and comms analysis",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "obj_freq",
+          "type": "objective",
+          "text": "Lock on to the alien frequency",
+          "trigger": {
+            "type": "puzzle_resolved",
+            "puzzle_label": "alien_freq"
+          }
+        },
+        {
+          "id": "obj_decode",
+          "type": "objective",
+          "text": "Decode the alien transmission",
+          "trigger": {
+            "type": "puzzle_resolved",
+            "puzzle_label": "alien_transmission"
+          }
+        }
+      ]
+    },
+    {
+      "id": "obj_contact",
+      "type": "objective",
+      "text": "Maintain contact for 30 seconds",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 120
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "obj_signal",
+      "to": "parallel_comms",
+      "type": "sequence",
       "on_complete": [
         {
           "action": "start_puzzle",
@@ -30,25 +73,16 @@
       ]
     },
     {
-      "id": "obj_freq",
-      "text": "Lock on to the alien frequency",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "alien_freq" },
-      "on_complete": []
-    },
-    {
-      "id": "obj_decode",
-      "text": "Decode the alien transmission",
-      "trigger": "puzzle_resolved",
-      "args": { "puzzle_label": "alien_transmission" },
-      "on_complete": []
-    },
-    {
-      "id": "obj_contact",
-      "text": "Maintain contact for 30 seconds",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 120 },
-      "on_complete": []
+      "from": "parallel_comms",
+      "to": "obj_contact",
+      "type": "sequence"
     }
-  ]
+  ],
+  "start_node": "obj_signal",
+  "victory_nodes": [
+    "obj_contact"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

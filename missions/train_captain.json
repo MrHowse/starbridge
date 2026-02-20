@@ -1,43 +1,85 @@
 {
   "id": "train_captain",
   "name": "Captain Training",
+  "briefing": "Welcome to Captain Training. Practice using the command dashboard \u2014 reviewing crew and mission status, managing alert levels, and writing log entries. The Captain coordinates all stations and makes final decisions.",
+  "spawn": [
+    {
+      "type": "scout",
+      "x": 65000,
+      "y": 40000,
+      "id": "capt_contact_1"
+    }
+  ],
   "is_training": true,
   "target_role": "captain",
-  "auto_roles": ["helm", "engineering"],
-  "briefing": "Welcome to Captain Training. Practice using the command dashboard — reviewing crew and mission status, managing alert levels, and writing log entries. The Captain coordinates all stations and makes final decisions.",
-  "spawn": [
-    { "type": "scout", "x": 65000, "y": 40000, "id": "capt_contact_1" }
+  "auto_roles": [
+    "helm",
+    "engineering"
   ],
-  "objectives": [
+  "nodes": [
     {
       "id": "capt_01_orient",
-      "text": "Review ship status — check hull, shields, and all system efficiencies",
-      "hint": "The Captain's dashboard shows a summary of every ship system. Look for any systems below 80% efficiency — these need Engineering attention. The tactical map shows contact positions. Brief your crew — what do you see?",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 10 }
+      "type": "objective",
+      "text": "Review ship status \u2014 check hull, shields, and all system efficiencies",
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 10
+      },
+      "hint": "The Captain's dashboard shows a summary of every ship system. Look for any systems below 80% efficiency \u2014 these need Engineering attention. The tactical map shows contact positions. Brief your crew \u2014 what do you see?"
     },
     {
       "id": "capt_02_log",
+      "type": "objective",
       "text": "Add a log entry about the current situation",
-      "hint": "Use the LOG ENTRY field at the bottom of the panel. Write a brief status update (e.g. 'Contact bearing 045, distance 15k — raising alert level'). Log entries are timestamped and saved for the debrief. Press ADD or press Enter.",
-      "trigger": "training_flag",
-      "args": { "flag": "captain_log_added" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "captain_log_added"
+      },
+      "hint": "Use the LOG ENTRY field at the bottom of the panel. Write a brief status update (e.g. 'Contact bearing 045, distance 15k \u2014 raising alert level'). Log entries are timestamped and saved for the debrief. Press ADD or press Enter."
     },
     {
       "id": "capt_03_hold",
+      "type": "objective",
       "text": "Monitor the situation for 30 seconds",
-      "hint": "As Captain, your primary job is coordination. Observe your tactical map and crew status displays. In a real mission, you would be directing: 'Helm, set heading 045. Weapons, standby to fire. Science, scan that contact.' Practise giving clear, station-specific orders.",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 45 }
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 45
+      },
+      "hint": "As Captain, your primary job is coordination. Observe your tactical map and crew status displays. In a real mission, you would be directing: 'Helm, set heading 045. Weapons, standby to fire. Science, scan that contact.' Practise giving clear, station-specific orders."
     },
     {
       "id": "capt_04_second_log",
+      "type": "objective",
       "text": "Add a final log entry to conclude the training drill",
-      "hint": "Write a closing log entry (e.g. 'Drill complete — all stations performed well. Returning to standard alert.'). In a real game, your log entries help the crew review the mission in the debrief. Press ADD to complete.",
-      "trigger": "training_flag",
-      "args": { "flag": "captain_log_added" }
+      "trigger": {
+        "type": "training_flag",
+        "flag": "captain_log_added"
+      },
+      "hint": "Write a closing log entry (e.g. 'Drill complete \u2014 all stations performed well. Returning to standard alert.'). In a real game, your log entries help the crew review the mission in the debrief. Press ADD to complete."
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "capt_01_orient",
+      "to": "capt_02_log",
+      "type": "sequence"
+    },
+    {
+      "from": "capt_02_log",
+      "to": "capt_03_hold",
+      "type": "sequence"
+    },
+    {
+      "from": "capt_03_hold",
+      "to": "capt_04_second_log",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "capt_01_orient",
+  "victory_nodes": [
+    "capt_04_second_log"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

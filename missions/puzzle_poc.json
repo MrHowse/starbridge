@@ -3,15 +3,32 @@
   "name": "Puzzle Framework PoC",
   "briefing": "Framework demonstration. The puzzle engine will assign a sequence puzzle to Science shortly after launch. Solve it to complete the mission.",
   "signal_location": null,
-  "defeat_condition": "player_hull_zero",
-  "victory_condition": "all_objectives_complete",
   "entities": [],
-  "objectives": [
+  "nodes": [
     {
       "id": "await_assignment",
+      "type": "objective",
       "text": "Await puzzle assignment",
-      "trigger": "timer_elapsed",
-      "args": { "seconds": 3 },
+      "trigger": {
+        "type": "timer_elapsed",
+        "seconds": 3
+      }
+    },
+    {
+      "id": "solve_puzzle",
+      "type": "objective",
+      "text": "Solve the sequence puzzle",
+      "trigger": {
+        "type": "puzzle_completed",
+        "puzzle_label": "sequence_1"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "await_assignment",
+      "to": "solve_puzzle",
+      "type": "sequence",
       "on_complete": {
         "action": "start_puzzle",
         "puzzle_type": "sequence_match",
@@ -20,12 +37,13 @@
         "difficulty": 1,
         "time_limit": 60.0
       }
-    },
-    {
-      "id": "solve_puzzle",
-      "text": "Solve the sequence puzzle",
-      "trigger": "puzzle_completed",
-      "args": { "puzzle_label": "sequence_1" }
     }
-  ]
+  ],
+  "start_node": "await_assignment",
+  "victory_nodes": [
+    "solve_puzzle"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }

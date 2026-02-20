@@ -307,7 +307,7 @@ def test_tick_no_op_after_game_over():
 def test_load_mission_first_contact_parses():
     mission = load_mission("first_contact")
     assert mission["id"] == "first_contact"
-    assert len(mission["objectives"]) == 4
+    assert len(mission["nodes"]) == 4
     assert len(mission["spawn"]) == 2
 
 
@@ -315,7 +315,7 @@ def test_load_mission_sandbox_returns_dict():
     mission = load_mission("sandbox")
     assert mission["id"] == "sandbox"
     assert mission["spawn"] == []
-    assert mission["objectives"] == []
+    assert mission["nodes"] == []
 
 
 def test_load_mission_missing_raises():
@@ -520,8 +520,8 @@ def test_on_complete_action_queued_on_objective_complete():
 def test_load_mission_defend_station_parses():
     mission = load_mission("defend_station")
     assert mission["id"] == "defend_station"
-    assert len(mission["objectives"]) == 3
-    assert mission["objectives"][0]["trigger"] == "wave_defeated"
+    assert len(mission["nodes"]) == 3
+    assert mission["nodes"][0]["trigger"]["type"] == "wave_defeated"
 
 
 def test_spawn_from_mission_defend_station_creates_station_and_enemies():
@@ -735,9 +735,9 @@ def test_proximity_timer_resets_on_low_shield():
 def test_load_mission_search_rescue_parses():
     mission = load_mission("search_rescue")
     assert mission["id"] == "search_rescue"
-    assert len(mission["objectives"]) == 4
-    assert mission["objectives"][0]["trigger"] == "signal_located"
-    assert mission["objectives"][2]["trigger"] == "proximity_with_shields"
+    assert len(mission["nodes"]) == 4
+    assert mission["nodes"][0]["trigger"]["type"] == "signal_located"
+    assert mission["nodes"][2]["trigger"]["type"] == "proximity_with_shields"
 
 
 def test_spawn_from_mission_search_rescue_creates_stations_and_asteroids():

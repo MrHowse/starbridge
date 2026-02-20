@@ -3,34 +3,82 @@
   "name": "First Contact",
   "briefing": "Patrol the sector. Hostile contacts reported. Return to origin.",
   "spawn": [
-    { "type": "scout",   "x": 70000, "y": 32000, "id": "enemy_1" },
-    { "type": "cruiser", "x": 80000, "y": 70000, "id": "enemy_2" }
+    {
+      "type": "scout",
+      "x": 70000,
+      "y": 32000,
+      "id": "enemy_1"
+    },
+    {
+      "type": "cruiser",
+      "x": 80000,
+      "y": 70000,
+      "id": "enemy_2"
+    }
   ],
-  "objectives": [
+  "nodes": [
     {
       "id": "obj_patrol",
+      "type": "objective",
       "text": "Patrol to waypoint Alpha",
-      "trigger": "player_in_area",
-      "args": { "x": 30000, "y": 20000, "r": 5000 }
+      "trigger": {
+        "type": "player_in_area",
+        "x": 30000,
+        "y": 20000,
+        "r": 5000
+      }
     },
     {
       "id": "obj_scan",
+      "type": "objective",
       "text": "Scan the hostile scout",
-      "trigger": "scan_completed",
-      "args": { "entity_id": "enemy_1" }
+      "trigger": {
+        "type": "scan_completed",
+        "entity_id": "enemy_1"
+      }
     },
     {
       "id": "obj_destroy",
+      "type": "objective",
       "text": "Destroy all hostile contacts",
-      "trigger": "all_enemies_destroyed"
+      "trigger": {
+        "type": "all_enemies_destroyed"
+      }
     },
     {
       "id": "obj_return",
+      "type": "objective",
       "text": "Return to sector origin",
-      "trigger": "player_in_area",
-      "args": { "x": 50000, "y": 50000, "r": 8000 }
+      "trigger": {
+        "type": "player_in_area",
+        "x": 50000,
+        "y": 50000,
+        "r": 8000
+      }
     }
   ],
-  "victory_condition": "all_objectives_complete",
-  "defeat_condition": "player_hull_zero"
+  "edges": [
+    {
+      "from": "obj_patrol",
+      "to": "obj_scan",
+      "type": "sequence"
+    },
+    {
+      "from": "obj_scan",
+      "to": "obj_destroy",
+      "type": "sequence"
+    },
+    {
+      "from": "obj_destroy",
+      "to": "obj_return",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "obj_patrol",
+  "victory_nodes": [
+    "obj_return"
+  ],
+  "defeat_condition": {
+    "type": "player_hull_zero"
+  }
 }
