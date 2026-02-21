@@ -64,6 +64,24 @@ def reset() -> None:
     _pending_hull_damage = 0.0
 
 
+
+
+def serialise() -> dict:
+    return {
+        "active_dcts": dict(_active_dcts),
+        "fire_spread_timer": _fire_spread_timer,
+        "pending_hull_damage": _pending_hull_damage,
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _fire_spread_timer, _pending_hull_damage
+    _active_dcts.clear()
+    _active_dcts.update(data.get("active_dcts", {}))
+    _fire_spread_timer    = data.get("fire_spread_timer", 0.0)
+    _pending_hull_damage  = data.get("pending_hull_damage", 0.0)
+
+
 def apply_hull_damage(amount: float, interior: ShipInterior) -> None:
     """Accumulate hull damage and trigger room events when threshold is reached.
 

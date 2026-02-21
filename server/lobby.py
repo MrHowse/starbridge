@@ -131,6 +131,19 @@ async def on_game_end() -> None:
     logger.info("Game ended — lobby reset to pre-game state")
 
 
+def activate_game(payload: dict) -> None:
+    """Activate a resumed game session without calling _on_game_start.
+
+    Called by main.py's /saves/resume endpoint after save_system.restore_game()
+    and game_loop.resume() have been invoked.  Ensures that late-joining clients
+    receive the stored game.started payload when they connect.
+    """
+    global _game_payload, _game_active
+    _game_payload = payload
+    _game_active = True
+    logger.info("Game activated via save/resume")
+
+
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------

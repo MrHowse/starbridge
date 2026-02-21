@@ -153,3 +153,26 @@ def auto_engineering_tick(ship: Ship, dt: float) -> None:  # noqa: ARG001
     for _name, sys_obj in ship.systems.items():
         if sys_obj.power < _AUTO_ENG_MIN_POWER:
             sys_obj.power = _AUTO_ENG_BASELINE
+
+
+def serialise() -> dict:
+    return {
+        "training_active": _training_active,
+        "target_role": _target_role,
+        "obj_hints": dict(_obj_hints),
+        "last_hint_idx": _last_hint_idx,
+        "auto_helm_enabled": _auto_helm_enabled,
+        "auto_engineering_enabled": _auto_engineering_enabled,
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _training_active, _target_role, _last_hint_idx
+    global _auto_helm_enabled, _auto_engineering_enabled
+    _training_active          = data.get("training_active", False)
+    _target_role              = data.get("target_role", "")
+    _last_hint_idx            = data.get("last_hint_idx", -1)
+    _auto_helm_enabled        = data.get("auto_helm_enabled", False)
+    _auto_engineering_enabled = data.get("auto_engineering_enabled", False)
+    _obj_hints.clear()
+    _obj_hints.update({int(k): v for k, v in data.get("obj_hints", {}).items()})

@@ -274,3 +274,31 @@ def build_state(world: World, ship: Ship) -> dict:
             for p in _strike_plans
         ],
     }
+
+
+def serialise() -> dict:
+    return {
+        "engagement_priorities": dict(_engagement_priorities),
+        "threat_overrides": dict(_threat_overrides),
+        "intercept_target_id": _intercept_target_id,
+        "annotations": list(_annotations),
+        "annotation_counter": _annotation_counter,
+        "strike_plans": list(_strike_plans),
+        "plan_counter": _plan_counter,
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _intercept_target_id, _annotation_counter, _plan_counter
+    _engagement_priorities.clear()
+    _engagement_priorities.update(data.get("engagement_priorities", {}))
+    _threat_overrides.clear()
+    _threat_overrides.update(data.get("threat_overrides", {}))
+    _intercept_target_id = data.get("intercept_target_id")
+    _annotations.clear()
+    _annotations.extend(data.get("annotations", []))
+    _annotation_counter = data.get("annotation_counter", 0)
+    _strike_plans.clear()
+    _strike_plans.extend(data.get("strike_plans", []))
+    _plan_counter = data.get("plan_counter", 0)
+    _pending_broadcasts.clear()

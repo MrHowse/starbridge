@@ -89,6 +89,34 @@ def reset(initial_ammo: int = 10) -> None:
     _entity_counter = 0
 
 
+
+
+def serialise() -> dict:
+    return {
+        "weapons_target": _weapons_target,
+        "torpedo_ammo": _torpedo_ammo,
+        "tube_cooldowns": list(_tube_cooldowns),
+        "tube_types": list(_tube_types),
+        "tube_loading": list(_tube_loading),
+        "tube_type_loading": list(_tube_type_loading),
+        "entity_counter": _entity_counter,
+        # pending nuclear auths not serialised — authorization requests don't survive save/resume
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _weapons_target, _torpedo_ammo, _tube_cooldowns, _tube_types
+    global _tube_loading, _tube_type_loading, _entity_counter
+    _weapons_target       = data.get("weapons_target")
+    _torpedo_ammo         = data.get("torpedo_ammo", 10)
+    _tube_cooldowns[:]    = data.get("tube_cooldowns", [0.0, 0.0])
+    _tube_types[:]        = data.get("tube_types", ["standard", "standard"])
+    _tube_loading[:]      = data.get("tube_loading", [0.0, 0.0])
+    _tube_type_loading[:] = data.get("tube_type_loading", ["standard", "standard"])
+    _entity_counter       = data.get("entity_counter", 0)
+    _pending_nuclear_auths.clear()
+
+
 # ---------------------------------------------------------------------------
 # State accessors
 # ---------------------------------------------------------------------------

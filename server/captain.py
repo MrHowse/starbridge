@@ -16,7 +16,7 @@ from typing import Protocol
 from pydantic import ValidationError
 
 from server.game_logger import log_event as _log
-from server.models.messages import CaptainSetAlertPayload, CaptainSystemOverridePayload, Message, VALID_SYSTEMS, validate_payload
+from server.models.messages import CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload, Message, VALID_SYSTEMS, validate_payload
 from server.models.ship import Ship
 
 logger = logging.getLogger("starbridge.captain")
@@ -97,3 +97,32 @@ async def handle_captain_message(connection_id: str, message: Message) -> None:
             Message.build("captain.override_changed", {"system": system, "online": payload.online})
         )
         logger.info("Captain set system '%s' online=%s from %s", system, payload.online, connection_id)
+
+    elif message.type == "captain.save_game" and isinstance(payload, CaptainSaveGamePayload):
+        import server.game_loop as _gl
+        import server.save_system as _ss
+        world = _gl.get_world()
+        if world is None or not _gl.is_running():
+            await _manager.send(
+                connection_id,
+                Message.build("error.state", {"message": "No active game to save.", "original_type": message.type}),
+            )
+            return
+        try:
+            save_id = _ss.save_game(
+                world=world,
+                mission_id=_gl.get_mission_id(),
+                difficulty_preset=_gl.get_difficulty_preset(),
+                ship_class=_gl.get_ship_class_id(),
+                tick_count=_gl.get_tick_count(),
+                game_state=_gl.get_game_state(),
+            )
+            _log("captain", "game_saved", {"save_id": save_id})
+            await _manager.broadcast(Message.build("game.saved", {"save_id": save_id}))
+            logger.info("Game saved as '%s' by %s", save_id, connection_id)
+        except Exception as exc:
+            logger.error("Save failed: %s", exc)
+            await _manager.send(
+                connection_id,
+                Message.build("error.state", {"message": f"Save failed: {exc}", "original_type": message.type}),
+            )

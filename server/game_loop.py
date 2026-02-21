@@ -124,6 +124,11 @@ _tick_count: int = 0
 _game_start_time: float = 0.0
 _on_game_end: Callable[[], Awaitable[None]] | None = None
 
+# Save/resume metadata — set by start() and resume().
+_mission_id: str = ""
+_difficulty_preset: str = "officer"
+_ship_class_id: str = "frigate"
+
 # Training: track the last objective index for which a hint was broadcast.
 _training_last_hint_idx: int = -1
 
@@ -167,12 +172,78 @@ def register_game_end_callback(cb: Callable[[], Awaitable[None]]) -> None:
     _on_game_end = cb
 
 
+# ---------------------------------------------------------------------------
+# Save/resume accessors (used by captain.py → save_system)
+# ---------------------------------------------------------------------------
+
+
+def get_world() -> World | None:
+    """Return the active World, or None if game is not running."""
+    return _world
+
+
+def get_tick_count() -> int:
+    """Return the current tick count."""
+    return _tick_count
+
+
+def get_mission_id() -> str:
+    """Return the mission ID of the current or last game."""
+    return _mission_id
+
+
+def get_difficulty_preset() -> str:
+    """Return the difficulty preset name of the current or last game."""
+    return _difficulty_preset
+
+
+def get_ship_class_id() -> str:
+    """Return the ship class ID of the current or last game."""
+    return _ship_class_id
+
+
+def is_running() -> bool:
+    """Return True if the game loop task is active."""
+    return _task is not None and not _task.done()
+
+
+def get_game_state() -> dict:
+    """Return game_loop-level state for save/resume."""
+    return {
+        "tick_count": _tick_count,
+        "training_last_hint_idx": _training_last_hint_idx,
+        "applied_sensor_assists": list(_applied_sensor_assists),
+        "applied_science_medical_assists": list(_applied_science_medical_assists),
+        "applied_science_helm_assists": list(_applied_science_helm_assists),
+        "applied_science_weapons_assists": list(_applied_science_weapons_assists),
+    }
+
+
+def _restore_game_state(data: dict) -> None:
+    """Restore game_loop-level state from save data."""
+    global _tick_count, _training_last_hint_idx
+    _tick_count = int(data.get("tick_count", 0))
+    _training_last_hint_idx = int(data.get("training_last_hint_idx", -1))
+    _applied_sensor_assists.clear()
+    _applied_sensor_assists.update(data.get("applied_sensor_assists", []))
+    _applied_science_medical_assists.clear()
+    _applied_science_medical_assists.update(data.get("applied_science_medical_assists", []))
+    _applied_science_helm_assists.clear()
+    _applied_science_helm_assists.update(data.get("applied_science_helm_assists", []))
+    _applied_science_weapons_assists.clear()
+    _applied_science_weapons_assists.update(data.get("applied_science_weapons_assists", []))
+
+
 async def start(mission_id: str, difficulty: str = "officer", ship_class: str = "frigate") -> None:
     """Begin the game loop. Called when the host launches a game."""
     global _task, _tick_count, _game_start_time, _training_last_hint_idx
+    global _mission_id, _difficulty_preset, _ship_class_id
     _tick_count = 0
     _game_start_time = _time.monotonic()
     _training_last_hint_idx = -1
+    _mission_id = mission_id
+    _difficulty_preset = difficulty
+    _ship_class_id = ship_class
 
     # Apply ship class stats before subsystem resets (so ammo uses class defaults).
     try:
@@ -240,6 +311,43 @@ async def stop() -> None:
     logger.info("Game loop stopped")
     if _on_game_end is not None:
         await _on_game_end()
+
+
+async def resume(
+    mission_id: str,
+    difficulty_preset: str,
+    ship_class: str,
+    tick_count: int,
+    game_state: dict | None = None,
+) -> None:
+    """Resume a saved game. State is already restored by save_system.restore_game().
+
+    Does NOT reset modules or re-initialise the mission — all state has been
+    loaded before this call. Sets metadata globals and starts the game loop.
+    """
+    global _task, _tick_count, _game_start_time
+    global _mission_id, _difficulty_preset, _ship_class_id
+
+    if _task is not None and not _task.done():
+        logger.warning("Game loop already running — stopping before resume")
+        await stop()
+
+    _game_start_time = _time.monotonic()
+    _mission_id = mission_id
+    _difficulty_preset = difficulty_preset
+    _ship_class_id = ship_class
+
+    # Restore game_loop-level state (tick count, assist-tracking sets).
+    if game_state:
+        _restore_game_state(game_state)
+    else:
+        _tick_count = tick_count
+
+    # Re-init training from the restored mission dict (reads already-restored gltr state).
+    gltr.init_training(glm.get_mission_dict())
+
+    _task = asyncio.create_task(_loop(), name="game_loop")
+    logger.info("Game loop resumed (mission: %s, tick: %d)", mission_id, _tick_count)
 
 
 # ---------------------------------------------------------------------------

@@ -149,3 +149,18 @@ def build_state(world: World, ship: Ship) -> dict:
         "intrusion_target_id": _intrusion_target_id,
         "intrusion_target_system": _intrusion_target_system,
     }
+
+
+def serialise() -> dict:
+    return {
+        "jam_target_id": _jam_target_id,
+        "intrusion_target_id": _intrusion_target_id,
+        "intrusion_target_system": _intrusion_target_system,
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _jam_target_id, _intrusion_target_id, _intrusion_target_system
+    _jam_target_id           = data.get("jam_target_id")
+    _intrusion_target_id     = data.get("intrusion_target_id")
+    _intrusion_target_system = data.get("intrusion_target_system")

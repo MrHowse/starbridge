@@ -31,3 +31,14 @@ def add_log_entry(text: str) -> dict:
 def get_log() -> list[dict]:
     """Return a copy of all log entries."""
     return list(_captain_log)
+
+
+def serialise() -> dict:
+    return {
+        "captain_log": list(_captain_log),
+    }
+
+
+def deserialise(data: dict) -> None:
+    _captain_log.clear()
+    _captain_log.extend(data.get("captain_log", []))

@@ -59,6 +59,45 @@ def reset(
     _probe_stock = probe_stock
 
 
+
+
+def serialise() -> dict:
+    return {
+        "probe_stock": _probe_stock,
+        "drones": [
+            {
+                "id": d.id,
+                "state": d.state,
+                "x": d.x,
+                "y": d.y,
+                "target_x": d.target_x,
+                "target_y": d.target_y,
+                "fuel": d.fuel,
+            }
+            for d in _drones
+        ],
+        "probes": [
+            {"id": p.id, "x": p.x, "y": p.y}
+            for p in _probes
+        ],
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _probe_stock
+    from server.models.flight_ops import Drone, Probe
+    _probe_stock = data.get("probe_stock", 4)
+    _drones.clear()
+    for d in data.get("drones", []):
+        drone = Drone(id=d["id"], x=d["x"], y=d["y"], target_x=d["target_x"], target_y=d["target_y"])
+        drone.state = d.get("state", "hangar")
+        drone.fuel  = d.get("fuel", 100.0)
+        _drones.append(drone)
+    _probes.clear()
+    for p in data.get("probes", []):
+        _probes.append(Probe(id=p["id"], x=p["x"], y=p["y"]))
+
+
 def get_drones() -> list[Drone]:
     """Return current drone list (read-only intent)."""
     return _drones

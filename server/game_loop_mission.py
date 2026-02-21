@@ -92,6 +92,45 @@ def get_mission_dict() -> dict:
     return dict(_mission_dict)
 
 
+def serialise_mission() -> dict:
+    """Capture mission module state for save/resume."""
+    return {
+        "signal_location": list(_signal_location) if _signal_location else None,
+        "dock_timer": _dock_timer,
+        "graph_state": _mission_engine.serialise_state() if _mission_engine else None,
+    }
+
+
+def deserialise_mission(data: dict, mission_id: str) -> None:
+    """Restore mission module state from save data.
+
+    Reloads the mission JSON, creates a fresh MissionGraph, then overlays
+    the saved runtime state so the graph resumes exactly where it left off.
+    """
+    global _mission_engine, _signal_location, _dock_timer, _mission_dict
+
+    # Clear all transient pending queues — they don't survive a save/load.
+    _pending_puzzle_starts.clear()
+    _pending_boardings.clear()
+    _pending_deployments.clear()
+    _pending_outbreaks.clear()
+
+    _dock_timer = float(data.get("dock_timer", 0.0))
+
+    sig = data.get("signal_location")
+    _signal_location = (float(sig[0]), float(sig[1])) if sig else None
+
+    # Reload mission dict from file and create a fresh engine.
+    mission = load_mission(mission_id)
+    _mission_dict = mission
+    _mission_engine = MissionGraph(mission)
+
+    # Overlay the saved runtime state on top of the freshly constructed graph.
+    graph_state = data.get("graph_state")
+    if graph_state is not None:
+        _mission_engine.deserialise_state(graph_state)
+
+
 # ---------------------------------------------------------------------------
 # Initialisation
 # ---------------------------------------------------------------------------

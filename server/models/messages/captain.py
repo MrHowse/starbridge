@@ -22,3 +22,8 @@ class CaptainAddLogPayload(BaseModel):
 class CaptainSystemOverridePayload(BaseModel):
     system: str
     online: bool  # True = bring online, False = take offline
+
+
+class CaptainSaveGamePayload(BaseModel):
+    """Sent by Captain station to trigger save-and-return-to-lobby."""
+    model_config = {"extra": "allow"}  # accepts empty payload {}

@@ -49,7 +49,7 @@ from server.models.messages.weapons import (
 from server.models.messages.science import ScienceCancelScanPayload, ScienceStartScanPayload
 
 # Captain
-from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
+from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
 
 # Medical
 from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
@@ -137,6 +137,7 @@ __all__ = [
     "CaptainAuthorizePayload",
     "CaptainAddLogPayload",
     "CaptainSystemOverridePayload",
+    "CaptainSaveGamePayload",
     # medical
     "MedicalTreatCrewPayload",
     "MedicalCancelTreatmentPayload",

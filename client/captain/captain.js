@@ -96,6 +96,10 @@ const logList   = document.getElementById('log-list');
 const logInput  = document.getElementById('log-input');
 const logSubmit = document.getElementById('log-submit');
 
+// Save
+const saveBtn    = document.getElementById('save-game-btn');
+const saveStatus = document.getElementById('save-status');
+
 // Game over
 const gameOverOverlay = document.getElementById('game-over-overlay');
 const gameOverTitle   = document.getElementById('game-over-title');
@@ -142,6 +146,13 @@ function init() {
   if (logInput) {
     logInput.addEventListener('keydown', e => { if (e.key === 'Enter') _submitLog(); });
   }
+
+  // Save button
+  if (saveBtn) {
+    saveBtn.addEventListener('click', _saveGame);
+  }
+
+  on('game.saved', handleGameSaved);
 
   // Server messages
   on('game.started',                  handleGameStarted);
@@ -211,6 +222,8 @@ function handleGameStarted(payload) {
 
   _resizeTactical();
   requestAnimationFrame(_tacticalLoop);
+
+  if (saveBtn) saveBtn.style.display = '';
 
   if (payload.briefing_text) {
     showBriefing(payload.mission_name, payload.briefing_text);
@@ -422,6 +435,25 @@ function _renderLog() {
     return `<div class="log-entry"><span class="log-ts">${hh}:${mm}</span><span>${e.text}</span></div>`;
   }).join('');
   logList.scrollTop = logList.scrollHeight;
+}
+
+// ---------------------------------------------------------------------------
+// Save & resume
+// ---------------------------------------------------------------------------
+
+function _saveGame() {
+  if (!gameActive || !saveBtn) return;
+  saveBtn.disabled = true;
+  if (saveStatus) saveStatus.textContent = 'Saving…';
+  send('captain.save_game', {});
+}
+
+function handleGameSaved({ save_id }) {
+  if (saveStatus) saveStatus.textContent = `Saved: ${save_id}`;
+  // Brief pause so the captain can see the confirmation, then return to lobby.
+  setTimeout(() => {
+    window.location.href = '/client/lobby/';
+  }, 1500);
 }
 
 // ---------------------------------------------------------------------------

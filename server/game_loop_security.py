@@ -51,6 +51,22 @@ def reset() -> None:
     _eliminated_reported.clear()
 
 
+
+
+def serialise() -> dict:
+    return {
+        "boarding_active": _boarding_active,
+        "eliminated_reported": list(_eliminated_reported),
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _boarding_active
+    _boarding_active = data.get("boarding_active", False)
+    _eliminated_reported.clear()
+    _eliminated_reported.update(data.get("eliminated_reported", []))
+
+
 # ---------------------------------------------------------------------------
 # Boarding initialisation
 # ---------------------------------------------------------------------------

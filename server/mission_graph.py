@@ -577,3 +577,62 @@ class MissionGraph:
             if self._graph_nodes[nid].status == "active":
                 return i
         return -1
+
+    # ------------------------------------------------------------------
+    # Save / resume
+    # ------------------------------------------------------------------
+
+    def serialise_state(self) -> dict:
+        """Capture runtime state for save/resume. Excludes the static graph structure."""
+        return {
+            "graph_nodes": {nid: gobj.status for nid, gobj in self._graph_nodes.items()},
+            "proximity_timers": dict(self._proximity_timers),
+            "parallel_complete_count": dict(self._parallel_complete_count),
+            "parallel_start_elapsed": dict(self._parallel_start_elapsed),
+            "elapsed": self._elapsed,
+            "last_dt": self._last_dt,
+            "completed_puzzle_labels": list(self._completed_puzzle_labels),
+            "failed_puzzle_labels": list(self._failed_puzzle_labels),
+            "training_flags": list(self._training_flags),
+            "triangulation_count": self._triangulation_count,
+            "triangulation_positions": [list(p) for p in self._triangulation_positions],
+            "over": self._over,
+            "result": self._result,
+        }
+
+    def deserialise_state(self, state: dict) -> None:
+        """Restore runtime state from save data (call after __init__)."""
+        # Restore per-node statuses first.
+        for nid, status in state.get("graph_nodes", {}).items():
+            if nid in self._graph_nodes:
+                self._graph_nodes[nid].status = status
+        # Derive active/complete sets from restored statuses.
+        self._active_set = {
+            nid for nid, gobj in self._graph_nodes.items() if gobj.status == "active"
+        }
+        self._complete_set = {
+            nid for nid, gobj in self._graph_nodes.items() if gobj.status == "complete"
+        }
+        # Restore timers and counters.
+        self._proximity_timers = dict(state.get("proximity_timers", {}))
+        self._parallel_complete_count = {
+            k: int(v) for k, v in state.get("parallel_complete_count", {}).items()
+        }
+        self._parallel_start_elapsed = dict(state.get("parallel_start_elapsed", {}))
+        self._elapsed = float(state.get("elapsed", 0.0))
+        self._last_dt = float(state.get("last_dt", 0.1))
+        # Restore puzzle and training tracking.
+        self._completed_puzzle_labels = set(state.get("completed_puzzle_labels", []))
+        self._failed_puzzle_labels = set(state.get("failed_puzzle_labels", []))
+        self._training_flags = set(state.get("training_flags", []))
+        # Restore triangulation.
+        self._triangulation_count = int(state.get("triangulation_count", 0))
+        self._triangulation_positions = [
+            tuple(p) for p in state.get("triangulation_positions", [])  # type: ignore[misc]
+        ]
+        # Restore mission end state.
+        self._over = bool(state.get("over", False))
+        self._result = state.get("result")
+        # Clear transient per-tick state — no stale actions survive a load.
+        self._pending_actions.clear()
+        self._tick_completions.clear()

@@ -222,3 +222,22 @@ def build_comms_state() -> dict:
         "transmissions": list(_transmissions),
         "pending_hails": len(_pending_hails),
     }
+
+
+def serialise() -> dict:
+    return {
+        "active_frequency": _active_frequency,
+        "pending_hails": list(_pending_hails),
+        "transmissions": list(_transmissions),
+        "interception_timer": _interception_timer,
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _active_frequency, _interception_timer
+    _active_frequency    = data.get("active_frequency", 0.0)
+    _interception_timer  = data.get("interception_timer", 0.0)
+    _pending_hails.clear()
+    _pending_hails.extend(data.get("pending_hails", []))
+    _transmissions.clear()
+    _transmissions.extend(data.get("transmissions", []))

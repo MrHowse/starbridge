@@ -264,6 +264,76 @@ function handleGameStarted(payload) {
 function updateLaunchPanel(isHost) {
   launchPanelEl.style.display = isHost ? '' : 'none';
   launchStatusEl.textContent  = isHost ? 'YOU ARE HOST — SELECT MISSION AND LAUNCH' : '';
+  if (isHost) _loadSaves();
+}
+
+// ---------------------------------------------------------------------------
+// Save / Resume
+// ---------------------------------------------------------------------------
+
+async function _loadSaves() {
+  const resumeSection = document.getElementById('resume-section');
+  const saveSelect    = document.getElementById('save-select');
+  const resumeBtn     = document.getElementById('resume-btn');
+  if (!resumeSection || !saveSelect || !resumeBtn) return;
+
+  try {
+    const r    = await fetch('/saves');
+    const data = await r.json();
+    const saves = data.saves || [];
+
+    if (saves.length === 0) {
+      resumeSection.style.display = 'none';
+      return;
+    }
+
+    // Populate select, keeping the placeholder first option.
+    saveSelect.innerHTML = '<option value="">SELECT SAVE…</option>';
+    for (const s of saves) {
+      const opt = document.createElement('option');
+      opt.value = s.save_id;
+      const ts = s.saved_at ? s.saved_at.replace('T', ' ') : '?';
+      opt.textContent = `${s.mission_id} — ${s.ship_class} — ${ts}`;
+      saveSelect.appendChild(opt);
+    }
+
+    resumeSection.style.display = '';
+
+    saveSelect.addEventListener('change', () => {
+      resumeBtn.disabled = !saveSelect.value;
+    });
+
+    resumeBtn.addEventListener('click', async () => {
+      const saveId = saveSelect.value;
+      if (!saveId) return;
+      await _resumeGame(saveId);
+    });
+  } catch (_err) {
+    // /saves unavailable — hide resume section.
+    if (resumeSection) resumeSection.style.display = 'none';
+  }
+}
+
+async function _resumeGame(saveId) {
+  const resumeBtn    = document.getElementById('resume-btn');
+  const resumeStatus = document.getElementById('resume-status');
+  if (resumeBtn) resumeBtn.disabled = true;
+  if (resumeStatus) resumeStatus.textContent = 'Resuming…';
+
+  try {
+    const r = await fetch(`/saves/resume/${encodeURIComponent(saveId)}`, { method: 'POST' });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: r.statusText }));
+      if (resumeStatus) resumeStatus.textContent = `Error: ${err.detail || r.statusText}`;
+      if (resumeBtn) resumeBtn.disabled = false;
+      return;
+    }
+    // game.started will be broadcast by the server; handleGameStarted() navigates.
+    if (resumeStatus) resumeStatus.textContent = 'Restored — launching…';
+  } catch (err) {
+    if (resumeStatus) resumeStatus.textContent = `Network error: ${err.message}`;
+    if (resumeBtn) resumeBtn.disabled = false;
+  }
 }
 
 // ---------------------------------------------------------------------------

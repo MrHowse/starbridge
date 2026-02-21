@@ -25,6 +25,10 @@ from server.mission_validator import validate_mission as _validate_mission
 from server.connections import ConnectionManager
 from server.models.messages import Message, VALID_SYSTEMS
 from server.models.world import World, spawn_enemy
+import server.save_system as _ss
+from server.missions.loader import load_mission as _load_mission
+from server.models.interior import make_default_interior as _make_default_interior
+from server.models.ship_class import list_ship_classes as _list_ship_classes
 
 logger = logging.getLogger("starbridge")
 
@@ -240,6 +244,102 @@ async def save_mission_endpoint(payload: dict) -> dict:
     dest = MISSIONS_DIR / f"{mission_id}.json"
     dest.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"saved": True, "file": dest.name, "warnings": errors}
+
+
+# ---------------------------------------------------------------------------
+# Save / Resume endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/saves")
+async def list_saves() -> dict:
+    """Return list of available save files, newest first."""
+    return {"saves": _ss.list_saves()}
+
+
+@app.get("/saves/{save_id}")
+async def get_save(save_id: str) -> dict:
+    """Return metadata for a specific save. 404 if not found."""
+    try:
+        data = _ss.load_save(save_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Save '{save_id}' not found.")
+    return {
+        "save_id": data.get("save_id", save_id),
+        "saved_at": data.get("saved_at", ""),
+        "mission_id": data.get("mission_id", ""),
+        "ship_class": data.get("ship_class", ""),
+        "difficulty_preset": data.get("difficulty_preset", ""),
+        "tick_count": data.get("tick_count", 0),
+    }
+
+
+@app.post("/saves/resume/{save_id}")
+async def resume_game(save_id: str) -> dict:
+    """Restore a saved game and restart the game loop from the saved state."""
+    if game_loop.is_running():
+        raise HTTPException(status_code=409, detail="A game is already in progress.")
+    try:
+        restored = _ss.restore_game(save_id, world)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Save '{save_id}' not found.")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Restore failed: {exc}") from exc
+
+    mission_id       = restored["mission_id"]
+    difficulty_preset = restored["difficulty_preset"]
+    ship_class       = restored["ship_class"]
+    tick_count       = restored["tick_count"]
+    game_state       = restored.get("game_state", {})
+
+    # Build game.started payload (mirrors _start_game in lobby.py).
+    try:
+        mission_data = _load_mission(mission_id)
+    except FileNotFoundError:
+        mission_data = {}
+    sig = mission_data.get("signal_location")
+    default_interior = _make_default_interior()
+    interior_layout = {
+        room_id: {
+            "name": room.name,
+            "deck": room.deck,
+            "col": room.position[0],
+            "row": room.position[1],
+            "connections": list(room.connections),
+        }
+        for room_id, room in default_interior.rooms.items()
+    }
+    ship_classes = [
+        {
+            "id": sc.id, "name": sc.name, "description": sc.description,
+            "max_hull": sc.max_hull, "min_crew": sc.min_crew, "max_crew": sc.max_crew,
+        }
+        for sc in _list_ship_classes()
+    ]
+    game_payload = {
+        "mission_id": mission_id,
+        "mission_name": mission_data.get("name", "Saved Mission"),
+        "briefing_text": mission_data.get("briefing", "Resuming saved mission."),
+        "signal_location": {"x": sig["x"], "y": sig["y"]} if sig else None,
+        "interior_layout": interior_layout,
+        "difficulty": difficulty_preset,
+        "ship_class": ship_class,
+        "ship_classes": ship_classes,
+        "players": {},
+        "resumed": True,
+    }
+
+    lobby.activate_game(game_payload)
+    await game_loop.resume(
+        mission_id=mission_id,
+        difficulty_preset=difficulty_preset,
+        ship_class=ship_class,
+        tick_count=tick_count,
+        game_state=game_state,
+    )
+    await manager.broadcast(Message.build("game.started", game_payload))
+    logger.info("Game resumed from save '%s' (mission=%s)", save_id, mission_id)
+    return {"status": "resumed", "mission_id": mission_id, "save_id": save_id}
 
 
 # ---------------------------------------------------------------------------

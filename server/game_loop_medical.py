@@ -47,6 +47,28 @@ def reset() -> None:
     _spread_timer = 0.0
 
 
+
+
+def serialise() -> dict:
+    return {
+        "active_treatments": dict(_active_treatments),
+        "heal_timers": dict(_heal_timers),
+        "active_outbreak": dict(_active_outbreak),
+        "spread_timer": _spread_timer,
+    }
+
+
+def deserialise(data: dict) -> None:
+    global _spread_timer
+    _active_treatments.clear()
+    _active_treatments.update(data.get("active_treatments", {}))
+    _heal_timers.clear()
+    _heal_timers.update(data.get("heal_timers", {}))
+    _active_outbreak.clear()
+    _active_outbreak.update(data.get("active_outbreak", {}))
+    _spread_timer = data.get("spread_timer", 0.0)
+
+
 # ---------------------------------------------------------------------------
 # Treatment management
 # ---------------------------------------------------------------------------
