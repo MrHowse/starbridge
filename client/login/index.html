@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Starbridge — Enter Bridge</title>
+  <link rel="stylesheet" href="/client/shared/theme.css" />
+  <link rel="stylesheet" href="login.css" />
+</head>
+<body class="login-body">
+  <div class="login-container">
+    <div class="login-logo">
+      <span class="login-logo__line">★ STARBRIDGE ★</span>
+    </div>
+
+    <div class="panel login-card">
+      <div class="panel__header">
+        <span class="text-header">CREW IDENTIFICATION</span>
+      </div>
+      <div class="login-card__body">
+        <label class="text-label" for="callsign-input">CALLSIGN</label>
+        <input
+          id="callsign-input"
+          class="lobby-input"
+          type="text"
+          maxlength="30"
+          placeholder="Enter your callsign…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="enter-btn" class="btn btn--primary login-card__enter-btn">
+          ENTER BRIDGE
+        </button>
+        <div id="login-status" class="login-card__status text-dim"></div>
+      </div>
+    </div>
+
+    <div id="profile-card" class="panel login-profile" style="display:none">
+      <div class="panel__header">
+        <span class="text-header" id="profile-name">—</span>
+      </div>
+      <div class="login-profile__stats">
+        <div class="login-stat">
+          <span class="text-label">GAMES</span>
+          <span class="text-data" id="stat-played">0</span>
+        </div>
+        <div class="login-stat">
+          <span class="text-label">VICTORIES</span>
+          <span class="text-data" id="stat-won">0</span>
+        </div>
+        <div class="login-stat">
+          <span class="text-label">ACHIEVEMENTS</span>
+          <span class="text-data" id="stat-ach">0</span>
+        </div>
+      </div>
+      <div id="achievement-list" class="login-achievements"></div>
+    </div>
+
+    <div class="login-links">
+      <a class="text-dim login-link" href="/client/lobby/">SKIP LOGIN →</a>
+      <button id="leaderboard-btn" class="btn btn--secondary login-link-btn">LEADERBOARD</button>
+    </div>
+  </div>
+
+  <!-- Leaderboard modal -->
+  <div id="leaderboard-modal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="lb-title">
+    <div class="modal-box panel">
+      <div class="panel__header">
+        <span class="text-header" id="lb-title">LEADERBOARD</span>
+        <button id="lb-close" class="btn btn--ghost" aria-label="Close leaderboard">✕</button>
+      </div>
+      <div id="lb-content" class="modal-body">
+        <span class="text-dim">Loading…</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="login.js"></script>
+</body>
+</html>

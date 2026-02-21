@@ -192,7 +192,87 @@
 .lobby-footer {
   border-top: 1px solid var(--border-primary);
   padding-top: 0.5rem;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lobby-footer__profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-profile-name {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+
+.footer-profile-wins {
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+.footer-profile-lb-btn {
+  font-size: 0.65rem;
+  padding: 3px 10px;
+}
+
+/* ---- Leaderboard modal ---- */
+.lobby-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.lobby-modal-box {
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  margin: 20px;
+}
+
+.lobby-modal-box .panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lobby-modal-body {
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.lb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+}
+
+.lb-table th {
+  text-align: left;
+  padding: 4px 8px;
+  color: var(--text-dim, rgba(0,255,65,.5));
+  border-bottom: 1px solid var(--border, rgba(0,255,65,.2));
+  font-weight: normal;
+  letter-spacing: 0.08em;
+}
+
+.lb-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(0,255,65,.08);
+}
+
+.lb-rank {
+  color: var(--text-dim, rgba(0,255,65,.5));
+  width: 2em;
 }
 
 /* =========================================================================

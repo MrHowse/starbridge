@@ -337,7 +337,77 @@ async function _resumeGame(saveId) {
 }
 
 // ---------------------------------------------------------------------------
+// Player profile card + leaderboard (v0.04g)
+// ---------------------------------------------------------------------------
+
+function initProfileCard() {
+  try {
+    const raw = sessionStorage.getItem('player_profile');
+    if (!raw) return;
+    const profile = JSON.parse(raw);
+    const footerProfile = document.getElementById('footer-profile');
+    const footerName    = document.getElementById('footer-profile-name');
+    const footerWins    = document.getElementById('footer-profile-wins');
+    if (footerProfile && footerName && footerWins) {
+      footerName.textContent = profile.name || '';
+      footerWins.textContent = `${profile.games_won || 0}W / ${profile.games_played || 0}G`;
+      footerProfile.style.display = '';
+    }
+  } catch (_) { /* ignore */ }
+}
+
+function initLeaderboard() {
+  const lbBtn   = document.getElementById('leaderboard-btn');
+  const lbModal = document.getElementById('leaderboard-modal');
+  const lbClose = document.getElementById('lb-close');
+  const lbContent = document.getElementById('lb-content');
+  if (!lbBtn || !lbModal) return;
+
+  lbBtn.addEventListener('click', async () => {
+    lbModal.style.display = 'flex';
+    lbContent.innerHTML = '<span class="text-dim">Loading…</span>';
+    try {
+      const r = await fetch('/profiles/leaderboard');
+      const { profiles } = await r.json();
+      if (!profiles || profiles.length === 0) {
+        lbContent.innerHTML = '<span class="text-dim">No profiles yet.</span>';
+        return;
+      }
+      const table = document.createElement('table');
+      table.className = 'lb-table';
+      table.innerHTML = `<thead><tr>
+        <th class="lb-rank">#</th>
+        <th>CALLSIGN</th><th>WINS</th><th>PLAYED</th><th>ACHIEVEMENTS</th>
+      </tr></thead>`;
+      const tbody = document.createElement('tbody');
+      profiles.forEach((p, i) => {
+        const tr = document.createElement('tr');
+        const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        tr.innerHTML = `<td class="lb-rank">${i+1}</td><td>${esc(p.name)}</td>
+          <td>${p.games_won}</td><td>${p.games_played}</td>
+          <td>${(p.achievements||[]).length}</td>`;
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      lbContent.innerHTML = '';
+      lbContent.appendChild(table);
+    } catch (err) {
+      lbContent.innerHTML = `<span class="text-dim">Error loading leaderboard.</span>`;
+    }
+  });
+
+  lbClose.addEventListener('click', () => { lbModal.style.display = 'none'; });
+  lbModal.addEventListener('click', (e) => {
+    if (e.target === lbModal) lbModal.style.display = 'none';
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  initProfileCard();
+  initLeaderboard();
+});

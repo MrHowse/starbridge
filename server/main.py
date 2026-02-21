@@ -26,6 +26,7 @@ from server.connections import ConnectionManager
 from server.models.messages import Message, VALID_SYSTEMS
 from server.models.world import World, spawn_enemy
 import server.save_system as _ss
+import server.profiles as _prof
 from server.missions.loader import load_mission as _load_mission
 from server.models.interior import make_default_interior as _make_default_interior
 from server.models.ship_class import list_ship_classes as _list_ship_classes
@@ -64,8 +65,18 @@ tactical.init(manager, input_queue)
 damage_control.init(manager, input_queue)
 game_loop.init(world, manager, input_queue)
 
-# When the host starts a game the lobby calls this to kick off the loop.
-lobby.register_game_start_callback(game_loop.start)
+# When the host starts a game the lobby calls this wrapper, which captures the
+# player roster for profile updates before delegating to game_loop.start.
+async def _on_game_start(mission_id: str, difficulty: str = "officer", ship_class: str = "frigate") -> None:
+    players = {
+        role: occ[1]
+        for role, occ in lobby._session.roles.items()
+        if occ is not None
+    }
+    game_loop.set_session_players(players)
+    await game_loop.start(mission_id, difficulty, ship_class)
+
+lobby.register_game_start_callback(_on_game_start)
 # When the game ends the loop calls this to reset lobby state.
 game_loop.register_game_end_callback(lobby.on_game_end)
 
@@ -244,6 +255,61 @@ async def save_mission_endpoint(payload: dict) -> dict:
     dest = MISSIONS_DIR / f"{mission_id}.json"
     dest.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"saved": True, "file": dest.name, "warnings": errors}
+
+
+# ---------------------------------------------------------------------------
+# Profile endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post("/profiles/login")
+async def profiles_login(payload: dict) -> dict:
+    """Create or retrieve a player profile by name.  Returns a profile summary."""
+    name = str(payload.get("name", "")).strip()
+    if not name or len(name) > 30:
+        raise HTTPException(status_code=400, detail="name must be 1–30 characters.")
+    profile = _prof.get_or_create_profile(name)
+    return {
+        "name":         profile["name"],
+        "games_played": profile.get("games_played", 0),
+        "games_won":    profile.get("games_won", 0),
+        "games_lost":   profile.get("games_lost", 0),
+        "achievements": profile.get("achievements", []),
+        "last_played_at": profile.get("last_played_at"),
+    }
+
+
+@app.get("/profiles/leaderboard")
+async def profiles_leaderboard() -> dict:
+    """Return the top profiles sorted by games won."""
+    return {"profiles": _prof.list_profiles()[:20]}
+
+
+@app.get("/profiles/export")
+async def profiles_export() -> Any:
+    """Download all profiles as a CSV file."""
+    from fastapi.responses import Response
+    csv_data = _prof.export_csv()
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=profiles.csv"},
+    )
+
+
+@app.get("/profiles")
+async def list_profiles_endpoint() -> dict:
+    """Return summary dicts for all profiles, sorted by games won."""
+    return {"profiles": _prof.list_profiles()}
+
+
+@app.get("/profiles/{name}")
+async def get_profile_endpoint(name: str) -> dict:
+    """Return the full profile for a player.  404 if not found."""
+    profile = _prof.get_profile(name)
+    if profile is None:
+        raise HTTPException(status_code=404, detail=f"Profile '{name}' not found.")
+    return profile
 
 
 # ---------------------------------------------------------------------------

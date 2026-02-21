@@ -148,6 +148,11 @@ _applied_science_weapons_assists: set[str] = set()
 # Sensor efficiency threshold that triggers the cross-station assist.
 SENSOR_ASSIST_THRESHOLD: float = 1.2
 
+# Session player mapping: role → player_name.  Set by set_session_players()
+# (called from main.py just before game_loop.start()), used to update profiles
+# at game end.
+_session_players: dict[str, str] = {}
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -200,6 +205,16 @@ def get_difficulty_preset() -> str:
 def get_ship_class_id() -> str:
     """Return the ship class ID of the current or last game."""
     return _ship_class_id
+
+
+def set_session_players(players: dict[str, str]) -> None:
+    """Register a role → player_name mapping used for profile updates at game end.
+
+    Called from main.py immediately before game_loop.start() so that when the
+    game ends the loop knows which player names to credit for each role.
+    """
+    global _session_players
+    _session_players = dict(players)
 
 
 def is_running() -> bool:
@@ -461,6 +476,8 @@ async def _loop() -> None:
                     stats["debrief"] = gdb.compute_from_log(_log_path)
                 except Exception as _exc:
                     logger.warning("Debrief computation failed: %s", _exc)
+            # Update player profiles.
+            _update_profiles(result or "defeat", stats)
             await _manager.broadcast(
                 Message.build("game.over", {"result": result, "stats": stats})
             )
@@ -629,6 +646,7 @@ async def _loop() -> None:
         if glm.get_mission_engine() is None and _world.ship.hull <= 0.0:
             stats = _build_game_stats()
             gl.stop_logging("defeat", stats)
+            _update_profiles("defeat", stats)
             await _manager.broadcast(
                 Message.build("game.over", {"result": "defeat", "stats": stats})
             )
@@ -1199,3 +1217,28 @@ def _build_game_stats() -> dict:
         "hull_remaining": hull,
         "captain_log": glcap.get_log(),
     }
+
+
+def _update_profiles(result: str, stats: dict) -> None:
+    """Update player profiles after a game ends.  Errors are logged, not raised."""
+    if not _session_players:
+        return
+    try:
+        import server.profiles as _prof  # lazy import avoids circular deps
+        per_station = stats.get("debrief", {}).get("per_station_stats", {})
+        duration_s  = stats.get("duration_s", 0.0)
+        for role, player_name in _session_players.items():
+            newly = _prof.update_game_result(
+                name=player_name,
+                role=role,
+                result=result,
+                mission_id=_mission_id,
+                duration_s=duration_s,
+                station_stats=per_station,
+            )
+            if newly:
+                logger.info(
+                    "Player %r unlocked achievements: %s", player_name, newly
+                )
+    except Exception as exc:
+        logger.warning("Profile update failed: %s", exc)
