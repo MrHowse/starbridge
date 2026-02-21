@@ -1,0 +1,165 @@
+/* ============================================================
+   Starbridge — Accessibility styles (v0.04j)
+
+   Provides:
+   1. Colour-blind friendly palette  (body.cb-mode)
+   2. Reduced motion                 (body.no-motion + prefers-reduced-motion)
+   3. Keyboard focus indicators      (all pages)
+   4. Screen-reader utility classes
+   ============================================================ */
+
+/* ============================================================
+   1. Keyboard focus indicators
+   Ensure visible focus on all interactive elements regardless of
+   mouse vs keyboard navigation.
+   ============================================================ */
+
+:focus-visible {
+  outline: 2px solid var(--focus-color, #00ff41);
+  outline-offset: 2px;
+}
+
+/* Colour-blind mode focus uses blue */
+body.cb-mode :focus-visible {
+  outline-color: var(--cb-primary, #0088ff);
+}
+
+/* ============================================================
+   2. Colour-blind palette overrides
+   Applied when body.cb-mode is set.
+   Replaces red/green reliance with blue/orange + shape markers.
+   ============================================================ */
+
+body.cb-mode {
+  /* Primary interactive colour: green → blue */
+  --primary:         #0088ff;
+  --primary-dim:     rgba(0, 136, 255, 0.3);
+  --border-primary:  rgba(0, 136, 255, 0.4);
+
+  /* Alert / hostile: red → orange */
+  --alert-red:       #ff7700;
+  --hostile:         #ff7700;
+
+  /* Warning: amber — kept but shifted slightly warmer */
+  --warning:         #ffcc00;
+  --system-warning:  #ffcc00;
+
+  /* Friendly contacts: green → blue */
+  --friendly:        #0088ff;
+
+  /* Neutral: amber → purple */
+  --neutral:         #9955cc;
+
+  /* Status dot colours */
+  --dot-connected:    #0088ff;
+  --dot-disconnected: #ff7700;
+}
+
+/* Colour-blind status dots (override inline colours) */
+body.cb-mode .status-dot--connected    { background: #0088ff !important; box-shadow: 0 0 6px #0088ff; }
+body.cb-mode .status-dot--disconnected { background: #ff7700 !important; }
+
+/* Role-card colours in cb mode */
+body.cb-mode .role-card--occupied {
+  border-color: rgba(0, 136, 255, 0.6);
+}
+
+body.cb-mode .role-card--mine {
+  border-color: #0088ff;
+  box-shadow: 0 0 8px rgba(0, 136, 255, 0.3);
+}
+
+/* Alert level text colours in cb mode */
+body.cb-mode [data-alert="red"]    { color: #ff7700; }
+body.cb-mode [data-alert="yellow"] { color: #ffcc00; }
+body.cb-mode [data-alert="green"]  { color: #0088ff; }
+
+/* Admin engagement dots in cb mode */
+body.cb-mode .admin-mini__engagement--active  { background: #0088ff; box-shadow: 0 0 4px #0088ff; }
+body.cb-mode .admin-mini__engagement--idle    { background: #ffcc00; box-shadow: 0 0 4px #ffcc00; }
+body.cb-mode .admin-mini__engagement--away    { background: #ff7700; box-shadow: 0 0 4px #ff7700; }
+
+/* Button colours */
+body.cb-mode .btn--primary {
+  border-color: #0088ff;
+  color: #0088ff;
+}
+body.cb-mode .btn--primary:hover {
+  background: rgba(0, 136, 255, 0.15);
+}
+
+body.cb-mode .text-title,
+body.cb-mode .text-header,
+body.cb-mode .text-data {
+  color: #0088ff;
+}
+
+/* ============================================================
+   3. Reduced motion
+   Applied by body.no-motion class AND by prefers-reduced-motion
+   media query (automatic OS setting).
+   ============================================================ */
+
+body.no-motion *,
+body.no-motion *::before,
+body.no-motion *::after,
+@media (prefers-reduced-motion: reduce) {
+  animation-duration:    0.001ms !important;
+  animation-iteration-count: 1  !important;
+  transition-duration:   0.001ms !important;
+}
+
+/* Disable specific animations */
+body.no-motion .scanline-effect,
+body.no-motion .starfield-parallax {
+  display: none !important;
+}
+
+/* Disable pulse / glow animations */
+body.no-motion .status-dot--connected,
+body.no-motion .admin-mini__engagement--active {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+/* Disable training HUD slide-in */
+body.no-motion .training-hint {
+  animation: none !important;
+}
+
+/* Disable panel fade-in animations */
+body.no-motion .panel,
+body.no-motion .login-profile,
+body.no-motion .role-card {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Disable hull-hit flash */
+body.no-motion .station-container--hull-hit {
+  animation: none !important;
+  outline: 2px solid var(--alert-red, #ff2020) !important;
+}
+
+/* ============================================================
+   4. Screen-reader utilities
+   ============================================================ */
+
+/* Visually hidden but accessible to screen readers */
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Live region for dynamic updates */
+.a11y-live {
+  position: absolute;
+  left: -9999px;
+}

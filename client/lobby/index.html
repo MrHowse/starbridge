@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STARBRIDGE — LOBBY</title>
   <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="../shared/accessibility.css">
   <link rel="stylesheet" href="lobby.css">
 </head>
 <body>
@@ -79,7 +80,7 @@
             <option value="medical_ship">HOPE-CLASS — Hospital vessel (crew 5–8)</option>
             <option value="carrier">ATLAS-CLASS — Drone carrier (crew 7–12)</option>
           </select>
-          <button class="btn btn--primary lobby-launch__btn" data-launch-btn disabled>
+          <button class="btn btn--primary lobby-launch__btn" data-launch-btn disabled aria-label="Launch mission">
             LAUNCH
           </button>
         </div>
@@ -124,5 +125,6 @@
 
   </div>
   <script type="module" src="lobby.js"></script>
+  <script type="module" src="../shared/a11y_widget.js"></script>
 </body>
 </html>

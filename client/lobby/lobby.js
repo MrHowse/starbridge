@@ -131,8 +131,8 @@ function buildRoleCards() {
       <div class="role-card__body">
         <span class="role-card__occupant text-data" data-occupant="${role}">VACANT</span>
         <div class="role-card__actions">
-          <button class="btn btn--primary role-card__claim" data-claim="${role}">CLAIM</button>
-          <button class="btn role-card__release" data-release="${role}">RELEASE</button>
+          <button class="btn btn--primary role-card__claim" data-claim="${role}" aria-label="Claim ${ROLE_LABELS[role]}">CLAIM</button>
+          <button class="btn role-card__release" data-release="${role}" aria-label="Release ${ROLE_LABELS[role]}">RELEASE</button>
         </div>
       </div>
     `;
