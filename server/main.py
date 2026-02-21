@@ -27,6 +27,8 @@ from server.models.messages import Message, VALID_SYSTEMS
 from server.models.world import World, spawn_enemy
 import server.save_system as _ss
 import server.profiles as _prof
+import server.admin as _admin
+from server.difficulty import get_preset as _get_preset
 from server.missions.loader import load_mission as _load_mission
 from server.models.interior import make_default_interior as _make_default_interior
 from server.models.ship_class import list_ship_classes as _list_ship_classes
@@ -152,6 +154,10 @@ async def _handle_message(connection_id: str, raw: str) -> None:
         )
         return
 
+    # Track last interaction per station role for admin engagement monitoring.
+    if category in _admin.ALL_STATION_ROLES:
+        _admin.update_interaction(category)
+
     await handler(connection_id, message)
 
 
@@ -255,6 +261,119 @@ async def save_mission_endpoint(payload: dict) -> dict:
     dest = MISSIONS_DIR / f"{mission_id}.json"
     dest.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"saved": True, "file": dest.name, "warnings": errors}
+
+
+# ---------------------------------------------------------------------------
+# Admin Dashboard endpoints (v0.04h)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/admin")
+async def admin_page() -> RedirectResponse:
+    """Redirect browser to the admin dashboard client page."""
+    return RedirectResponse(url="/client/admin/", status_code=302)
+
+
+@app.get("/admin/state")
+async def admin_state() -> dict:
+    """Return engagement report + ship snapshot for the admin dashboard."""
+    engagement = _admin.build_engagement_report()
+    ship = world.ship
+    ship_snapshot: dict = {
+        "hull":       round(ship.hull, 1),
+        "alert_level": ship.alert_level,
+        "velocity":   round(ship.velocity, 1),
+        "heading":    round(ship.heading, 1),
+        "systems": {
+            name: {"power": round(s.power, 1), "health": round(s.health, 1)}
+            for name, s in ship.systems.items()
+        },
+        "enemy_count": len(world.enemies),
+    }
+    return {
+        "paused":     game_loop.is_paused(),
+        "running":    game_loop.is_running(),
+        "tick_count": game_loop.get_tick_count(),
+        "engagement": engagement,
+        "ship":       ship_snapshot,
+    }
+
+
+@app.post("/admin/pause")
+async def admin_pause() -> dict:
+    """Pause the game loop.  All clients see a 'PAUSED' overlay."""
+    if not game_loop.is_running():
+        raise HTTPException(status_code=409, detail="No game is currently running.")
+    game_loop.pause()
+    await manager.broadcast(Message.build("game.paused", {"paused_by": "admin"}))
+    return {"paused": True}
+
+
+@app.post("/admin/resume")
+async def admin_resume() -> dict:
+    """Resume the game loop after an admin pause."""
+    if not game_loop.is_running():
+        raise HTTPException(status_code=409, detail="No game is currently running.")
+    game_loop.resume()
+    await manager.broadcast(Message.build("game.resumed", {}))
+    return {"paused": False}
+
+
+@app.post("/admin/annotate")
+async def admin_annotate(payload: dict) -> dict:
+    """Send an annotation message to a specific station role."""
+    role    = str(payload.get("role", "")).strip()
+    message = str(payload.get("message", "")).strip()
+    if not role:
+        raise HTTPException(status_code=400, detail="'role' is required.")
+    if not message:
+        raise HTTPException(status_code=400, detail="'message' is required.")
+    await manager.broadcast_to_roles(
+        [role],
+        Message.build("admin.annotation", {"role": role, "message": message}),
+    )
+    return {"sent": True, "role": role}
+
+
+@app.post("/admin/broadcast")
+async def admin_broadcast_msg(payload: dict) -> dict:
+    """Broadcast an admin message to all connected clients."""
+    message = str(payload.get("message", "")).strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="'message' is required.")
+    await manager.broadcast(Message.build("admin.broadcast", {"message": message}))
+    return {"sent": True}
+
+
+@app.post("/admin/difficulty")
+async def admin_set_difficulty(payload: dict) -> dict:
+    """Change the difficulty preset mid-game."""
+    from server.difficulty import PRESETS as _PRESETS
+    preset = str(payload.get("preset", "")).strip()
+    if not preset:
+        raise HTTPException(status_code=400, detail="'preset' is required.")
+    if preset not in _PRESETS:
+        raise HTTPException(status_code=400, detail=f"Unknown difficulty preset: '{preset}'.")
+    world.ship.difficulty = _get_preset(preset)
+    preset = preset  # keep variable for return
+    logger.info("[ADMIN] Difficulty changed to '%s'", preset)
+    return {"difficulty": preset}
+
+
+@app.post("/admin/save")
+async def admin_save_game() -> dict:
+    """Trigger a game save from the admin dashboard."""
+    if not game_loop.is_running():
+        raise HTTPException(status_code=409, detail="No game is currently running.")
+    save_id = _ss.save_game(
+        world=world,
+        mission_id=game_loop.get_mission_id(),
+        difficulty_preset=game_loop.get_difficulty_preset(),
+        ship_class=game_loop.get_ship_class_id(),
+        tick_count=game_loop.get_tick_count(),
+    )
+    logger.info("[ADMIN] Game saved as '%s'", save_id)
+    return {"save_id": save_id}
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Starbridge — Admin Dashboard</title>
+  <link rel="stylesheet" href="/client/shared/theme.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="admin-body">
+
+  <!-- Header -->
+  <header class="admin-header">
+    <div class="admin-header__title">
+      <span class="text-title">★ ADMIN DASHBOARD</span>
+    </div>
+    <div class="admin-header__status">
+      <span class="text-dim" id="game-status">LOADING…</span>
+      <span class="text-dim admin-tick" id="tick-count"></span>
+    </div>
+  </header>
+
+  <!-- Main layout: grid + controls sidebar -->
+  <div class="admin-layout">
+
+    <!-- Station grid -->
+    <section class="admin-grid-section">
+      <div class="admin-grid" id="station-grid">
+        <!-- 12 mini-panels injected by admin.js -->
+      </div>
+    </section>
+
+    <!-- Control panel sidebar -->
+    <aside class="admin-controls panel">
+      <div class="panel__header">
+        <span class="text-header">CONTROLS</span>
+      </div>
+      <div class="admin-controls__body">
+
+        <!-- Pause / Resume -->
+        <div class="admin-control-group">
+          <span class="text-label">GAME FLOW</span>
+          <div class="admin-btn-row">
+            <button id="pause-btn" class="btn btn--warning admin-ctrl-btn">PAUSE</button>
+            <button id="resume-btn" class="btn btn--primary admin-ctrl-btn">RESUME</button>
+          </div>
+        </div>
+
+        <!-- Broadcast -->
+        <div class="admin-control-group">
+          <span class="text-label">BROADCAST TO ALL</span>
+          <textarea id="broadcast-input" class="admin-textarea" rows="2" maxlength="200"
+                    placeholder="Message…"></textarea>
+          <button id="broadcast-btn" class="btn btn--secondary admin-ctrl-btn">SEND</button>
+        </div>
+
+        <!-- Annotate station -->
+        <div class="admin-control-group">
+          <span class="text-label">ANNOTATE STATION</span>
+          <select id="annotate-role" class="lobby-select admin-select">
+            <option value="">SELECT STATION…</option>
+            <option value="captain">CAPTAIN</option>
+            <option value="helm">HELM</option>
+            <option value="weapons">WEAPONS</option>
+            <option value="engineering">ENGINEERING</option>
+            <option value="science">SCIENCE</option>
+            <option value="medical">MEDICAL</option>
+            <option value="security">SECURITY</option>
+            <option value="comms">COMMS</option>
+            <option value="flight_ops">FLIGHT OPS</option>
+            <option value="electronic_warfare">ELEC WARFARE</option>
+            <option value="tactical">TACTICAL</option>
+            <option value="damage_control">DAMAGE CTRL</option>
+          </select>
+          <textarea id="annotate-input" class="admin-textarea" rows="2" maxlength="200"
+                    placeholder="Note for this station…"></textarea>
+          <button id="annotate-btn" class="btn btn--secondary admin-ctrl-btn">SEND NOTE</button>
+        </div>
+
+        <!-- Difficulty -->
+        <div class="admin-control-group">
+          <span class="text-label">DIFFICULTY</span>
+          <select id="difficulty-select" class="lobby-select admin-select">
+            <option value="cadet">CADET — Easy</option>
+            <option value="officer" selected>OFFICER — Normal</option>
+            <option value="commander">COMMANDER — Hard</option>
+            <option value="admiral">ADMIRAL — Expert</option>
+          </select>
+          <button id="difficulty-btn" class="btn btn--secondary admin-ctrl-btn">APPLY</button>
+        </div>
+
+        <!-- Save -->
+        <div class="admin-control-group">
+          <span class="text-label">SAVE GAME</span>
+          <button id="save-btn" class="btn btn--secondary admin-ctrl-btn">SAVE NOW</button>
+          <span class="text-dim" id="save-status" style="font-size:.65rem"></span>
+        </div>
+
+        <!-- Status log -->
+        <div class="admin-control-group">
+          <span class="text-label">ADMIN LOG</span>
+          <div id="admin-log" class="admin-log"></div>
+        </div>
+
+      </div>
+    </aside>
+  </div>
+
+  <!-- Ship summary bar -->
+  <footer class="admin-ship-bar">
+    <span class="text-label admin-ship-item">HULL: <span class="text-data" id="ship-hull">—</span></span>
+    <span class="text-label admin-ship-item">ALERT: <span class="text-data" id="ship-alert">—</span></span>
+    <span class="text-label admin-ship-item">VELOCITY: <span class="text-data" id="ship-vel">—</span></span>
+    <span class="text-label admin-ship-item">HEADING: <span class="text-data" id="ship-hdg">—</span></span>
+    <span class="text-label admin-ship-item">ENEMIES: <span class="text-data" id="enemy-count">—</span></span>
+  </footer>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

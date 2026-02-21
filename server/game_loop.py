@@ -153,6 +153,9 @@ SENSOR_ASSIST_THRESHOLD: float = 1.2
 # at game end.
 _session_players: dict[str, str] = {}
 
+# Admin pause flag — when True the tick body is skipped, only sleep runs.
+_paused: bool = False
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -217,6 +220,25 @@ def set_session_players(players: dict[str, str]) -> None:
     _session_players = dict(players)
 
 
+def pause() -> None:
+    """Pause the game loop.  Ticks are skipped until resume() is called."""
+    global _paused
+    _paused = True
+    logger.info("Game loop paused by admin")
+
+
+def resume() -> None:
+    """Resume the game loop after a pause() call."""
+    global _paused
+    _paused = False
+    logger.info("Game loop resumed by admin")
+
+
+def is_paused() -> bool:
+    """Return True if the game loop is currently paused."""
+    return _paused
+
+
 def is_running() -> bool:
     """Return True if the game loop task is active."""
     return _task is not None and not _task.done()
@@ -267,6 +289,8 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
         logger.warning("Unknown ship class %r — using frigate defaults", ship_class)
         sc = load_ship_class("frigate")
 
+    global _paused
+    _paused = False  # always start unpaused
     glw.reset(initial_ammo=sc.torpedo_ammo)
     glmed.reset()
     gls.reset()
@@ -376,6 +400,11 @@ async def _loop() -> None:
 
     while True:
         tick_start = asyncio.get_event_loop().time()
+
+        # Admin pause: skip all tick work, just sleep.
+        if _paused:
+            await asyncio.sleep(TICK_DT)
+            continue
 
         # 1. Drain inputs. 1.5 Signal scans.
         action_events = _drain_queue(_world.ship, _world)
