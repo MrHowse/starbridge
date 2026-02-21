@@ -1,7 +1,7 @@
 /**
  * Starbridge — Admin Dashboard (v0.04h)
  *
- * Polls GET /admin/state every 2 seconds for live engagement monitoring
+ * Polls GET /admin/state every 3 seconds for live engagement monitoring
  * and ship snapshot.  Control actions use direct REST POST calls.
  */
 
@@ -109,6 +109,10 @@ function updatePanels(state) {
   gameStatus.style.color = !running ? 'rgba(0,255,65,.4)' : paused ? '#ffb000' : '#00ff41';
   tickCountEl.textContent = running ? `TICK ${tick_count}` : '';
 
+  // Control buttons — only enabled when the game state makes them meaningful.
+  pauseBtn.disabled  = !running || paused;
+  resumeBtn.disabled = !running || !paused;
+
   // Ship summary bar
   if (ship) {
     shipHull.textContent  = ship.hull ?? '—';
@@ -187,7 +191,7 @@ async function poll() {
 
 function startPolling() {
   poll(); // immediate first call
-  _pollTimer = setInterval(poll, 2000);
+  _pollTimer = setInterval(poll, 3000);
 }
 
 // ---------------------------------------------------------------------------

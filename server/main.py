@@ -97,8 +97,16 @@ SITE_DIR     = Path(__file__).parent.parent / "client" / "site"
 # Handlers have signature: async (connection_id: str, message: Message) -> None
 _MessageHandler = Callable[[str, Message], Awaitable[None]]
 
+async def _handle_game_message(connection_id: str, message: Message) -> None:
+    """Handle 'game.*' messages sent from the briefing page."""
+    if message.type == "game.briefing_launch":
+        await manager.broadcast(Message.build("game.all_ready", {}))
+        logger.info("Captain launched from briefing — broadcasting game.all_ready")
+
+
 _HANDLERS: dict[str, _MessageHandler] = {
     "lobby": lobby.handle_lobby_message,
+    "game": _handle_game_message,
     "helm": helm.handle_helm_message,
     "engineering": engineering.handle_engineering_message,
     "weapons": weapons.handle_weapons_message,

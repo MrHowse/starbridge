@@ -116,7 +116,7 @@ class ConnectionManager:
     # ------------------------------------------------------------------
 
     async def send(self, connection_id: str, message: Message) -> None:
-        """Send a message to a single connection. Logs and ignores send errors."""
+        """Send a message to a single connection. Logs and removes stale connections on error."""
         info = self._connections.get(connection_id)
         if info is None:
             logger.warning("send() called on unknown connection: %s", connection_id)
@@ -125,9 +125,10 @@ class ConnectionManager:
             await info.websocket.send_text(message.to_json())
         except Exception as exc:
             logger.error("send() failed for %s: %s", connection_id, exc)
+            self._connections.pop(connection_id, None)
 
     async def broadcast(self, message: Message) -> None:
-        """Send a message to all connected clients."""
+        """Send a message to all connected clients. Removes stale connections on error."""
         payload = message.to_json()
         for info in list(self._connections.values()):
             try:
@@ -136,9 +137,10 @@ class ConnectionManager:
                 logger.error(
                     "broadcast() failed for %s: %s", info.connection_id, exc
                 )
+                self._connections.pop(info.connection_id, None)
 
     async def broadcast_to_roles(self, roles: list[str], message: Message) -> None:
-        """Send a message to all connections whose role is in `roles`."""
+        """Send a message to all connections whose role is in `roles`. Removes stale connections on error."""
         payload = message.to_json()
         role_set = set(roles)
         for info in list(self._connections.values()):
@@ -151,3 +153,4 @@ class ConnectionManager:
                         info.connection_id,
                         exc,
                     )
+                    self._connections.pop(info.connection_id, None)
