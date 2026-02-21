@@ -67,7 +67,7 @@ from server.models.interior import make_default_interior
 from server.models.ship_class import load_ship_class
 from server.difficulty import get_preset
 from server.models.ship import Ship
-from server.models.world import World
+from server.models.world import World, spawn_enemy
 from server.systems import physics, sensors
 from server.systems.ai import tick_enemies
 from server.systems.combat import regenerate_shields
@@ -85,6 +85,7 @@ import server.game_loop_flight_ops as glfo
 import server.game_loop_ew as glew
 import server.game_loop_tactical as gltac
 import server.game_loop_training as gltr
+import server.game_loop_sandbox as glsb
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -306,6 +307,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     glew.reset()
     gltac.reset()
     gltr.reset()
+    glsb.reset(active=(mission_id == "sandbox"))
     _puzzle_engine.reset()
     _applied_sensor_assists.clear()
     _applied_science_medical_assists.clear()
@@ -676,6 +678,41 @@ async def _loop() -> None:
                 "intruder_count": len(boarding_action.get("intruders", [])),
             })
 
+        # 8.72. Sandbox activity events (free-play only).
+        for sb_evt in glsb.tick(_world, TICK_DT):
+            _sb_type = sb_evt["type"]
+            if _sb_type == "spawn_enemy":
+                _world.enemies.append(
+                    spawn_enemy(sb_evt["enemy_type"], sb_evt["x"], sb_evt["y"], sb_evt["id"])
+                )
+                gl.log_event("sandbox", "enemy_spawned", {
+                    "type": sb_evt["enemy_type"], "id": sb_evt["id"],
+                })
+            elif _sb_type == "system_damage":
+                _sb_sys = _world.ship.systems.get(sb_evt["system"])
+                if _sb_sys is not None:
+                    _sb_sys.health = max(0.0, _sb_sys.health - sb_evt["amount"])
+                    await _manager.broadcast(Message.build(
+                        "ship.system_damaged",
+                        {"system": sb_evt["system"],
+                         "new_health": round(_sb_sys.health, 1),
+                         "cause": "environment"},
+                    ))
+                    gl.log_event("sandbox", "system_damaged", {
+                        "system": sb_evt["system"], "amount": sb_evt["amount"],
+                    })
+            elif _sb_type == "crew_casualty":
+                _world.ship.crew.apply_casualties(sb_evt["deck"], sb_evt["count"])
+                gl.log_event("sandbox", "crew_casualty", {
+                    "deck": sb_evt["deck"], "count": sb_evt["count"],
+                })
+            elif _sb_type == "start_boarding":
+                if not gls.is_boarding_active():
+                    gls.start_boarding(_world.ship.interior, [], sb_evt["intruders"])
+                    gl.log_event("security", "sandbox_boarding_started", {
+                        "intruder_count": len(sb_evt["intruders"]),
+                    })
+
         # 9. Hull check (safety net when no mission engine).
         if glm.get_mission_engine() is None and _world.ship.hull <= 0.0:
             stats = _build_game_stats()
@@ -855,12 +892,12 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
 
         if msg_type == "helm.set_heading" and isinstance(payload, HelmSetHeadingPayload):
             if payload.heading != ship.target_heading:
-                gl.log_event("helm", "heading_changed", {"from": round(ship.target_heading, 1), "to": payload.heading})
+                gl.log_debounced("helm", "heading_changed", {"from": round(ship.target_heading, 1), "to": payload.heading})
             ship.target_heading = payload.heading
             _set_training_flag(glm, "helm_heading_set")
         elif msg_type == "helm.set_throttle" and isinstance(payload, HelmSetThrottlePayload):
             if payload.throttle != ship.throttle:
-                gl.log_event("helm", "throttle_changed", {"from": ship.throttle, "to": payload.throttle})
+                gl.log_debounced("helm", "throttle_changed", {"from": ship.throttle, "to": payload.throttle})
             ship.throttle = payload.throttle
             _set_training_flag(glm, "helm_throttle_set")
         elif msg_type == "engineering.set_power" and isinstance(payload, EngineeringSetPowerPayload):

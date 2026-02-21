@@ -30,6 +30,8 @@ class GameLogger:
         self._active: bool = False
         self._tick: int = 0
         self._start_ts: float = 0.0
+        # Debounce buffer: key → (deadline, category, event, data)
+        self._debounce_pending: dict[str, tuple[float, str, str, dict]] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -69,15 +71,41 @@ class GameLogger:
         except Exception as exc:
             print(f"[game_logger] WARNING: log write failed: {exc}", file=sys.stderr)
 
+    def log_debounced(
+        self, category: str, event: str, data: dict, window_s: float = 0.2
+    ) -> None:
+        """Queue an event; only write it after a quiet window of *window_s* seconds.
+
+        If the same category+event is re-queued before the window expires the
+        deadline is refreshed and the ``"to"`` field (if present) is updated to
+        the latest value while the original ``"from"`` is preserved.  This
+        prevents a single slider drag from flooding the log with intermediate
+        steps — only the final settled value is recorded.
+        """
+        if not self._active:
+            return
+        key = f"{category}.{event}"
+        deadline = _time.monotonic() + window_s
+        if key in self._debounce_pending:
+            _, orig_cat, orig_evt, orig_data = self._debounce_pending[key]
+            merged = dict(orig_data)
+            if "to" in data:
+                merged["to"] = data["to"]
+            self._debounce_pending[key] = (deadline, orig_cat, orig_evt, merged)
+        else:
+            self._debounce_pending[key] = (deadline, category, event, dict(data))
+
     def set_tick(self, tick: int) -> None:
         """Update the current tick counter. Called each game tick."""
         self._tick = tick
+        self._flush_debounced()
 
     def stop(self, result: str, stats: dict | None = None) -> None:
         """Write session footer and close the log file."""
         if not self._active:
             return
         try:
+            self._flush_debounced(force=True)
             self._write({
                 "tick": self._tick,
                 "ts": round(_time.monotonic() - self._start_ts, 3),
@@ -112,6 +140,23 @@ class GameLogger:
     # high values risk losing events on crash.  10 = flush ~1×/s at 10 Hz.
     _FLUSH_INTERVAL: int = 10
 
+    def _flush_debounced(self, force: bool = False) -> None:
+        """Write debounced events whose quiet window has elapsed.
+
+        When *force* is True all pending events are flushed regardless of their
+        deadline (used at session end to guarantee no events are lost).
+        """
+        if not self._debounce_pending:
+            return
+        now = _time.monotonic()
+        to_flush = [
+            k for k, (deadline, *_) in self._debounce_pending.items()
+            if force or now >= deadline
+        ]
+        for key in to_flush:
+            _, category, event, data = self._debounce_pending.pop(key)
+            self.log(category, event, data)
+
     def _write(self, record: dict) -> None:
         """Write one record. Caller is responsible for catching exceptions."""
         assert self._fh is not None
@@ -138,6 +183,17 @@ def start_logging(mission_id: str, players: dict[str, str]) -> None:
 def log_event(category: str, event: str, data: dict | None = None) -> None:
     """Log a game event. No-op when logging is disabled or inactive."""
     _logger.log(category, event, data)
+
+
+def log_debounced(
+    category: str, event: str, data: dict | None = None, window_s: float = 0.2
+) -> None:
+    """Log an event debounced — only records the final settled value after *window_s* seconds.
+
+    Suitable for high-frequency slider events (helm heading/throttle) where only
+    the last value after a drag is meaningful for post-session analysis.
+    """
+    _logger.log_debounced(category, event, data or {}, window_s)
 
 
 def set_tick(tick: int) -> None:
