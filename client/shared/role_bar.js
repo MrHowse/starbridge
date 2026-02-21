@@ -22,25 +22,33 @@ import { on } from './connection.js';
 // ---------------------------------------------------------------------------
 
 const ROLE_URLS = {
-  captain:     '/client/captain/',
-  helm:        '/client/helm/',
-  weapons:     '/client/weapons/',
-  engineering: '/client/engineering/',
-  science:     '/client/science/',
-  medical:     '/client/medical/',
-  security:    '/client/security/',
-  comms:       '/client/comms/',
+  captain:            '/client/captain/',
+  helm:               '/client/helm/',
+  weapons:            '/client/weapons/',
+  engineering:        '/client/engineering/',
+  science:            '/client/science/',
+  medical:            '/client/medical/',
+  security:           '/client/security/',
+  comms:              '/client/comms/',
+  flight_ops:         '/client/flight_ops/',
+  electronic_warfare: '/client/ew/',
+  tactical:           '/client/tactical/',
+  damage_control:     '/client/damage_control/',
 };
 
 const ROLE_LABELS = {
-  captain:     'CAPT',
-  helm:        'HELM',
-  weapons:     'WPN',
-  engineering: 'ENG',
-  science:     'SCI',
-  medical:     'MED',
-  security:    'SEC',
-  comms:       'COM',
+  captain:            'CAPT',
+  helm:               'HELM',
+  weapons:            'WPN',
+  engineering:        'ENG',
+  science:            'SCI',
+  medical:            'MED',
+  security:           'SEC',
+  comms:              'COM',
+  flight_ops:         'FLT',
+  electronic_warfare: 'EW',
+  tactical:           'TAC',
+  damage_control:     'DC',
 };
 
 // ---------------------------------------------------------------------------
@@ -96,28 +104,39 @@ function _renderBar(players) {
   label.textContent = 'STATIONS';
   _barEl.appendChild(label);
 
+  // Identify own claimed roles so we can click back to them.
+  const myName = sessionStorage.getItem('player_name') || '';
+
   for (const [role, url] of Object.entries(ROLE_URLS)) {
     const playerName = players[role] || null;
     const isSelf     = role === _currentRole;
     const isOpen     = playerName === null;
+    // True if the current player is at this role on a different page.
+    const isMyRole   = !isSelf && myName && playerName === myName;
 
     const pill = document.createElement('div');
     pill.className = [
       'role-bar__pill',
-      isSelf      ? 'role-bar__pill--self'     : '',
-      isOpen      ? 'role-bar__pill--open'     : 'role-bar__pill--occupied',
+      isSelf    ? 'role-bar__pill--self'     : '',
+      isMyRole  ? 'role-bar__pill--mine'     : '',
+      isOpen    ? 'role-bar__pill--open'     : 'role-bar__pill--occupied',
     ].join(' ').trim();
 
-    pill.setAttribute('title', isOpen ? `Switch to ${role}` : `${playerName} — ${role}`);
+    pill.setAttribute('title',
+      isSelf   ? `You are here — ${role}` :
+      isMyRole ? `Return to ${role}` :
+      isOpen   ? `Switch to ${role}` :
+                 `${playerName} — ${role}`
+    );
 
     pill.innerHTML =
       `<span class="role-bar__pill-role">${ROLE_LABELS[role] || role.toUpperCase()}</span>` +
       `<span class="role-bar__pill-player">${_esc(playerName || '—')}</span>`;
 
-    if (isOpen && !isSelf && url) {
+    // Open slots and own roles on other pages are clickable.
+    if (!isSelf && (isOpen || isMyRole) && url) {
       pill.classList.add('role-bar__pill--clickable');
       pill.addEventListener('click', () => {
-        // Preserve player name across navigation via sessionStorage.
         window.location.href = url;
       });
     }
@@ -209,6 +228,12 @@ function _injectCSS() {
 
 /* Open slot */
 .role-bar__pill--open .role-bar__pill-player { color: rgba(255, 255, 255, 0.2); }
+
+/* Player's own role on another page */
+.role-bar__pill--mine {
+  border-color: rgba(0, 255, 65, 0.3);
+}
+.role-bar__pill--mine .role-bar__pill-player { color: rgba(0, 255, 65, 0.8); }
 
 /* Open + clickable */
 .role-bar__pill--clickable {

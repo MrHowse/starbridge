@@ -93,6 +93,7 @@ let latestCrewData = {};     // deck_name → { active, injured, critical, dead,
 let activeTreatments = {};   // deck_name → 'injured' | 'critical'
 let medicalSupplies = SUPPLY_MAX;
 let diseaseState = {};       // { infected_decks: {...} }
+let _renderedDeckJson = '';  // hash guard — skip DOM rebuild when nothing changed
 
 // ---------------------------------------------------------------------------
 // Rendering
@@ -113,6 +114,11 @@ function renderSupplies() {
 }
 
 function renderDeckList() {
+  // Avoid 10 Hz DOM thrashing: skip full rebuild if nothing changed.
+  const key = JSON.stringify({ crew: latestCrewData, treatments: activeTreatments, selected: selectedDeck });
+  if (key === _renderedDeckJson) return;
+  _renderedDeckJson = key;
+
   deckListEl.innerHTML = '';
   for (const deckName of DECK_ORDER) {
     const crew = latestCrewData[deckName];

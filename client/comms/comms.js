@@ -7,6 +7,7 @@
 import { connect, on, send } from "/client/shared/connection.js";
 import { setStatusDot, showBriefing, showGameOver } from "/client/shared/ui_components.js";
 import { initPuzzleRenderer } from "/client/shared/puzzle_renderer.js";
+import { initRoleBar } from "/client/shared/role_bar.js";
 import { SoundBank } from "/client/shared/audio.js";
 import "/client/shared/audio_events.js";
 import { wireButtonSounds } from "/client/shared/audio_ui.js";
@@ -104,6 +105,8 @@ function init() {
 
   const callsign = sessionStorage.getItem("callsign") || "—";
   document.getElementById("callsign-display").textContent = callsign;
+
+  initRoleBar(send, 'comms');
 
   on("lobby.welcome", () => {
     send("lobby.claim_role", { role: "comms", player_name: callsign });

@@ -14,6 +14,7 @@
 
 import { initConnection } from '../shared/connection.js';
 import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
+import { initRoleBar } from '../shared/role_bar.js';
 import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
@@ -65,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   _send = send;
   initPuzzleRenderer(send);
+  initRoleBar(send, 'electronic_warfare');
   SoundBank.init();
   wireButtonSounds(SoundBank);
 

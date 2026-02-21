@@ -18,9 +18,11 @@
  */
 
 import { initConnection } from '../shared/connection.js';
+import { initRoleBar } from '../shared/role_bar.js';
 import {
   setStatusDot, setAlertLevel, showGameOver,
 } from '../shared/ui_components.js';
+
 import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
@@ -292,6 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   _send = send;
+  initRoleBar(send, 'damage_control');
   SoundBank.init();
   wireButtonSounds(SoundBank);
 });

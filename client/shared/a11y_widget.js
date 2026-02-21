@@ -19,7 +19,7 @@ import { initSettings, getSetting, toggleSetting } from './settings.js';
 const CSS = `
 .a11y-widget {
   position: fixed;
-  bottom: 12px;
+  bottom: 44px;  /* clear the 2rem role bar + margin */
   right: 12px;
   z-index: 9999;
   display: flex;
