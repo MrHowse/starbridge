@@ -2,7 +2,7 @@
 Training mode sub-module for the game loop.
 
 Activated when a mission has "is_training": true.  Provides:
-  - Auto-simulation of non-target roles (helm, engineering) so the student
+  - Auto-simulation of non-target roles (helm, engineering) so the player
     can focus on their own station without the game grinding to a halt.
   - Per-objective hint tracking so the game loop can broadcast "training.hint"
     messages when the active objective advances.

@@ -24,7 +24,7 @@ All v0.01/v0.02 principles carry forward. v0.03 adds:
 - **Polish before expansion**: QoL improvements land before new roles. Every new role benefits from audio, help overlays, the map system, and difficulty presets from day one.
 - **Ships as data, not code**: Ship classes are JSON definitions, same philosophy as missions-as-data. New ships are authored without code changes.
 - **Scalable crew size**: The game must feel right with 3 players on a Scout AND 12 players on a Battleship. Combined roles and the ship framework make this possible.
-- **Classroom-first design**: Training missions, help overlays, difficulty presets, and the replay viewer are designed for a teacher running this with students, not just friends at a LAN party.
+- **Classroom-first design**: Training missions, help overlays, difficulty presets, and the replay viewer are designed for an admin running this with players, not just friends at a LAN party.
 
 ### 1.3 Pre-Resolved Architectural Decisions
 
@@ -1049,9 +1049,9 @@ Training missions run a simplified game loop where the server auto-plays the mis
 - Auto-helm follows waypoints at safe speed
 - Auto-engineering maintains balanced power
 - Auto-weapons fires at designated targets
-- AI crew fills in whatever the student isn't doing
+- AI crew fills in whatever the player isn't doing
 
-The simulation doesn't need to be sophisticated — it just needs to keep the game running so the student can focus on learning their station.
+The simulation doesn't need to be sophisticated — it just needs to keep the game running so the player can focus on learning their station.
 
 ### Acceptance Criteria
 
