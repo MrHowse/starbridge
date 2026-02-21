@@ -11,10 +11,10 @@ v0.03 built scale — 12 roles, 7 ship classes, audio, QoL polish. v0.04 builds 
 
 - **Captain station overhaul**: 3D wireframe viewports (Elite-style), real-time damage/crew panels, system master controls, a station worthy of the command role
 - **Mission graph system**: Replace the sequential objective model with a state graph supporting parallel, branching, and emergent objectives. Crew decisions shape the mission.
-- **Mission editor**: Visual node-graph editor for creating missions without writing JSON. Students design, share, and playtest each other's missions.
+- **Mission editor**: Visual node-graph editor for creating missions without writing JSON. Players design, share, and playtest each other's missions.
 - **Save and resume**: Pause mid-mission, serialise full game state, resume next session. Essential for 50-minute class periods.
-- **Student profiles**: Persistent player stats, role history, achievements, exportable to CSV for assessment
-- **Teacher dashboard**: Live view of all stations, annotations, engagement monitoring
+- **Player profiles**: Persistent player stats, role history, achievements, exportable to CSV for assessment
+- **Admin dashboard**: Live view of all stations, annotations, engagement monitoring
 - **Compound objectives**: `all_of`, `any_of`, branching triggers, conditional objectives that appear based on game state
 - **Performance hardening**: 12-client stress testing on school WiFi, bottleneck identification and fixes
 
@@ -23,7 +23,7 @@ v0.03 built scale — 12 roles, 7 ship classes, audio, QoL polish. v0.04 builds 
 All previous principles carry forward. v0.04 adds:
 
 - **Player agency over scripted experience**: Missions present situations, not instructions. The crew decides how to respond. Different approaches lead to different outcomes. There is no single "correct" way to complete a mission.
-- **Classroom as first-class deployment target**: Save/resume fits lesson periods. Profiles give assessment data. The mission editor is itself a learning activity. The teacher dashboard enables supervision without interrupting play.
+- **Game as first-class deployment target**: Save/resume fits time periods. Profiles give assessment data. The mission editor is itself a learning activity. The admin dashboard enables supervision without interrupting play.
 - **Command means command**: The Captain makes decisions that matter mechanically, not just socially. System overrides, alert levels, authorisations, and mission branch choices give the Captain real authority backed by game systems.
 
 ### 1.3 Pre-Resolved Architectural Decisions
@@ -55,9 +55,9 @@ v0.04e (Captain station overhaul — 3D viewports, damage/crew panels,
 
 v0.04f (Save and resume system)
 
-v0.04g (Student profiles + achievements)
+v0.04g (Player profiles + achievements)
 
-v0.04h (Teacher dashboard + spectator mode)
+v0.04h (Admin dashboard + spectator mode)
 
 v0.04i (Performance hardening + stress testing)
 
@@ -73,7 +73,7 @@ v0.04k (Final integration + balance + v0.04 gate)
 - v0.04c (new missions) and v0.04d (editor) both need v0.04a+b complete
 - v0.04e (Captain) is independent of the mission system work — can be built in parallel
 - v0.04f (save/resume) needs all game_loop modules stable — build after v0.04a-e
-- v0.04g (profiles) and v0.04h (teacher dashboard) are independent of each other
+- v0.04g (profiles) and v0.04h (admin dashboard) are independent of each other
 - v0.04i (performance) should be near-last — test the complete system
 - v0.04j (accessibility) can be done at any point but benefits from stable UI
 - v0.04k (gate) is always last
@@ -452,7 +452,7 @@ Every migrated mission must produce identical gameplay to the original when play
 - Return to base (sequential)
 - **Debrief varies by path**: Diplomatic gets "first contact success", Combat gets "threat neutralised", Avoidance gets "contact logged, recommend follow-up"
 
-**Why it showcases the system**: The original tutorial becomes replayable. Students can play it three times with different approaches and get three different experiences. The branch is driven by crew action, not a menu choice.
+**Why it showcases the system**: The original tutorial becomes replayable. Players can play it three times with different approaches and get three different experiences. The branch is driven by crew action, not a menu choice.
 
 ### 5.4 Mission: "Pandemic"
 
@@ -566,9 +566,9 @@ GET  /editor/missions     → List all mission files
 GET  /editor/mission/:id  → Load a specific mission for editing
 ```
 
-### 6.5 Classroom Integration
+### 6.5 Game Integration
 
-The mission editor is an assessment activity. Students design missions that demonstrate understanding of:
+The mission editor is an assessment activity. Players design missions that demonstrate understanding of:
 - Conditional logic (trigger conditions)
 - State machines (graph structure)
 - Event-driven programming (on_complete actions)
@@ -834,7 +834,7 @@ def load_game(filepath: Path) -> None:
 
 ### 8.2 Save/Resume Flow
 
-**Save**: Captain presses "SAVE GAME" button (or teacher triggers via the teacher dashboard). The game loop pauses (stops ticking), serialises everything, writes to `saves/save_YYYYMMDD_HHMMSS.json`, confirms to all clients ("GAME SAVED"), then all clients return to lobby.
+**Save**: Captain presses "SAVE GAME" button (or admin triggers via the admin dashboard). The game loop pauses (stops ticking), serialises everything, writes to `saves/save_YYYYMMDD_HHMMSS.json`, confirms to all clients ("GAME SAVED"), then all clients return to lobby.
 
 **Resume**: In the lobby, the host clicks "RESUME GAME" instead of "NEW GAME". A file picker shows available saves. Host selects a save. Server loads the save, restores all state, sends `game.resumed` to all clients with the saved player-role assignments. Each player reclaims their previous role (or a different one if needed). When all required roles are filled, the game loop resumes.
 
@@ -864,7 +864,7 @@ This is essentially the same as a reconnect but from a cold start. Stations must
 
 ---
 
-## 9. v0.04g — STUDENT PROFILES + ACHIEVEMENTS
+## 9. v0.04g — Player PROFILES + ACHIEVEMENTS
 
 **Purpose**: Persistent player identity, stats tracking, achievements, and exportable data.
 
@@ -938,7 +938,7 @@ Achievements are defined as conditions checked at mission end:
 
 ### 9.4 Data Export
 
-`GET /profiles/export` returns a CSV with all player stats — one row per player, columns for every tracked metric. Teachers can download this for assessment records.
+`GET /profiles/export` returns a CSV with all player stats — one row per player, columns for every tracked metric. Admins can download this for player records.
 
 ### Acceptance Criteria
 
@@ -952,13 +952,13 @@ Achievements are defined as conditions checked at mission end:
 
 ---
 
-## 10. v0.04h — TEACHER DASHBOARD + SPECTATOR MODE
+## 10. v0.04h — ADMIN DASHBOARD + SPECTATOR MODE
 
 **Purpose**: Live monitoring of all stations, annotations, engagement tracking.
 
-### 10.1 Teacher Dashboard
+### 10.1 Admin Dashboard
 
-A dedicated view at `/teacher` showing a grid of all connected stations in miniature:
+A dedicated view at `/admin` showing a grid of all connected stations in miniature:
 
 ```
 ┌──────────┬──────────┬──────────┬──────────┐
@@ -978,27 +978,27 @@ A dedicated view at `/teacher` showing a grid of all connected stations in minia
 
 Each mini-panel shows a simplified version of that station's current state — enough to tell if the player is engaged. Click a panel to enlarge it to full-size.
 
-### 10.2 Teacher Controls
+### 10.2 Admin Controls
 
-- **Pause game**: Freeze the game loop (all clients see "PAUSED BY TEACHER")
-- **Send annotation**: Click a station panel, type a message → appears on that student's screen as a teacher note
+- **Pause game**: Freeze the game loop (all clients see "PAUSED BY ADMIN")
+- **Send annotation**: Click a station panel, type a message → appears on that players's screen as a admin note
 - **Broadcast**: Send a message to all stations
 - **Adjust difficulty**: Change difficulty mid-game (multipliers update on next tick)
 - **Trigger event**: Manually fire a mission event (spawn enemies, start puzzle, trigger objective) for teaching purposes
-- **Save game**: Trigger a save from the teacher dashboard
+- **Save game**: Trigger a save from the admin dashboard
 
 ### 10.3 Engagement Monitoring
 
-The teacher dashboard tracks per-station:
+The admin dashboard tracks per-station:
 - Last interaction time (how long since this player clicked/typed anything)
 - Actions per minute (rolling average)
 - Idle indicator (>30 seconds with no interaction = amber, >60 seconds = red)
 
-This helps the teacher spot students who are disengaged, confused, or AFK.
+This helps the admin spot players who are disengaged, confused, or AFK.
 
 ### Acceptance Criteria
 
-- [ ] Teacher dashboard shows all connected stations in grid
+- [ ] Admin dashboard shows all connected stations in grid
 - [ ] Mini-panels update in real-time
 - [ ] Click to enlarge works
 - [ ] Pause/resume from dashboard works
@@ -1013,7 +1013,7 @@ This helps the teacher spot students who are disengaged, confused, or AFK.
 
 ## 11. v0.04i — PERFORMANCE HARDENING
 
-**Purpose**: Verify the game works under real classroom conditions and fix bottlenecks.
+**Purpose**: Verify the game works under real game conditions and fix bottlenecks.
 
 ### 11.1 Stress Test Script
 
@@ -1059,7 +1059,7 @@ tools/stress_test.py
 
 ## 12. v0.04j — ACCESSIBILITY PASS
 
-**Purpose**: Make the game usable by students with different abilities.
+**Purpose**: Make the game usable by players with different abilities.
 
 ### 12.1 Colour-Blind Mode
 
@@ -1089,7 +1089,7 @@ Add ARIA labels to all interactive elements. Add live regions for dynamic conten
 
 ### 12.4 Reduced Motion Mode
 
-For students sensitive to motion: disable parallax starfield, disable screen shake on hull hit, reduce animation speeds, disable scanline flicker. Toggle in settings.
+For players sensitive to motion: disable parallax starfield, disable screen shake on hull hit, reduce animation speeds, disable scanline flicker. Toggle in settings.
 
 ### Acceptance Criteria
 
@@ -1113,7 +1113,7 @@ For students sensitive to motion: disable parallax starfield, disable screen sha
 | 3 | Battleship | 12 | The Convoy | Commander |
 | 4 | Medical Ship | 6 | Pandemic (alien branch) | Cadet |
 | 5 | Any | 1 | Training mission (each station) | Cadet |
-| 6 | Cruiser | 10 | Student-created mission (from editor) | Officer |
+| 6 | Cruiser | 10 | player-created mission (from editor) | Officer |
 | 7 | Any | 8 | Save mid-mission → resume next day | Officer |
 
 ### 13.2 v0.04 Gate Checklist
@@ -1124,15 +1124,15 @@ For students sensitive to motion: disable parallax starfield, disable screen sha
 - [ ] Mission editor creates valid missions from scratch
 - [ ] Captain station has 3D viewports, damage/crew panels, system overrides
 - [ ] Save/resume works (round-trip test passes)
-- [ ] Student profiles persist and accumulate stats
+- [ ] Player profiles persist and accumulate stats
 - [ ] Achievements trigger correctly
-- [ ] Teacher dashboard shows all stations live
+- [ ] Admin dashboard shows all stations live
 - [ ] Performance targets met with 12 simultaneous clients
 - [ ] Colour-blind mode distinguishable
 - [ ] Keyboard navigation works on all stations
 - [ ] All tests pass
 - [ ] All v0.01/v0.02/v0.03 missions still work
-- [ ] README updated with v0.04 features and classroom deployment guide
+- [ ] README updated with v0.04 features and game deployment guide
 
 ---
 
@@ -1146,8 +1146,8 @@ For students sensitive to motion: disable parallax starfield, disable screen sha
 | v0.04d Mission editor | 8-10 | Most complex client work — node graph UI |
 | v0.04e Captain overhaul | 6-8 | 3D projection + multiple panels + system controls |
 | v0.04f Save/resume | 4-5 | Serialisation across all modules |
-| v0.04g Student profiles | 3-4 | Straightforward persistence |
-| v0.04h Teacher dashboard | 5-6 | Live monitoring + controls |
+| v0.04g Player profiles | 3-4 | Straightforward persistence |
+| v0.04h Admin dashboard | 5-6 | Live monitoring + controls |
 | v0.04i Performance hardening | 3-4 | Testing and optimisation |
 | v0.04j Accessibility | 3-4 | Colour-blind, keyboard, screen reader, motion |
 | v0.04k Integration + gate | 4-5 | Comprehensive testing |
@@ -1160,12 +1160,12 @@ For students sensitive to motion: disable parallax starfield, disable screen sha
 
 After v0.04, Starbridge supports:
 - **Player-driven narratives**: Missions respond to crew decisions, not scripts. Different playthroughs produce different stories.
-- **Student creativity**: The mission editor turns mission design into an assessment activity. Students demonstrate computational thinking by building interactive experiences for their peers.
-- **Classroom deployment**: Save/resume fits lesson periods. Profiles provide assessment data. The teacher dashboard enables supervision. Difficulty presets accommodate mixed ability groups.
+- **Player creativity**: The mission editor turns mission design into an assessment activity. Players demonstrate computational thinking by building interactive experiences for their peers.
+- **Game deployment**: Save/resume fits time periods. Profiles provide assessment data. The admin dashboard enables supervision. Difficulty presets accommodate mixed ability groups.
 - **Genuine command authority**: The Captain makes mechanically meaningful decisions — system overrides, branch choices, mission prioritisation.
-- **Accessibility**: Students with different abilities can participate meaningfully.
+- **Accessibility**: Players with different abilities can participate meaningfully.
 
-The remaining gap for a "1.0" release: networked play beyond LAN, community mission sharing, and a mission marketplace where students share and rate each other's creations. Those are v0.05 concerns.
+The remaining gap for a "1.0" release: networked play beyond LAN, community mission sharing, and a mission marketplace where Players share and rate each other's creations. Those are v0.05 concerns.
 
 ---
 
