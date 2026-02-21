@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ — STARBRIDGE</title>
+  <link rel="stylesheet" href="/client/site/site.css">
+  <link rel="stylesheet" href="/client/shared/accessibility.css">
+  <script type="module" src="/client/shared/a11y_widget.js"></script>
+</head>
+<body>
+
+<nav class="site-nav" role="navigation" aria-label="Site navigation">
+  <a href="/" class="site-nav__brand">STARBRIDGE</a>
+  <div class="site-nav__links">
+    <a href="/client/lobby/" class="site-nav__link site-nav__play">PLAY</a>
+    <a href="/admin/"        class="site-nav__link">ADMIN</a>
+    <a href="/editor/"       class="site-nav__link">EDITOR</a>
+    <a href="/manual/"       class="site-nav__link">MANUAL</a>
+    <a href="/faq/"          class="site-nav__link site-nav__link--active">FAQ</a>
+    <a href="/about/"        class="site-nav__link">ABOUT</a>
+  </div>
+</nav>
+
+<div class="docs-wrap">
+
+<aside class="docs-sidebar" role="navigation" aria-label="Table of contents">
+  <div class="docs-sidebar__title">QUESTIONS</div>
+  <a href="#q-join"        class="toc-link">Joining a game</a>
+  <a href="#q-players"     class="toc-link">How many players</a>
+  <a href="#q-solo"        class="toc-link">Solo play</a>
+  <a href="#q-switch-role" class="toc-link">Switching roles</a>
+  <a href="#q-sound"       class="toc-link">No sound</a>
+  <a href="#q-no-update"   class="toc-link">Station not updating</a>
+  <a href="#q-save"        class="toc-link">Save and resume</a>
+  <a href="#q-difficulty"  class="toc-link">Change difficulty</a>
+  <a href="#q-missions"    class="toc-link">Custom missions</a>
+  <a href="#q-alerts"      class="toc-link">Alert levels</a>
+  <a href="#q-power"       class="toc-link">Power budget</a>
+  <a href="#q-ship"        class="toc-link">Choosing a ship</a>
+</aside>
+
+<main class="docs-main" role="main">
+
+  <h1>Frequently Asked Questions</h1>
+  <p class="page-sub">STARBRIDGE SUPPORT REFERENCE</p>
+
+  <div class="faq-list">
+
+    <div id="q-join" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How do I join a game?
+      </div>
+      <div class="faq-a">
+        <p>Open your browser and navigate to the server address (ask the host for the
+        URL, or use <code>http://localhost:8000</code> if running locally). Click
+        <strong>PLAY</strong> on the landing page to go to the lobby. Enter your callsign
+        and press ENTER. You will see a list of station roles — click CLAIM next to the
+        station you want to operate.</p>
+        <p>If a game is already in progress, you can still join a role that has not been
+        claimed. The server will broadcast <code>game.started</code> to you so your
+        station catches up with the current game state.</p>
+      </div>
+    </div>
+
+    <div id="q-players" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How many players do I need?
+      </div>
+      <div class="faq-a">
+        <p>It depends on the ship class. The minimum crew requirement ranges from 3
+        (Scout) to 10 (Battleship). The recommended size for a full experience is 4–8
+        players on a Corvette or Frigate.</p>
+        <p>Smaller crews can still play — unclaimed stations still function, they just
+        can't react to events on their own. The Captain or Engineering player often
+        monitors multiple stations in small-crew games.</p>
+        <p>The lobby shows a soft minimum-crew warning if you try to launch below the
+        ship's recommended crew count. You can override it with a second click.</p>
+      </div>
+    </div>
+
+    <div id="q-solo" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        Can I play solo?
+      </div>
+      <div class="faq-a">
+        <p>Yes — all stations can be navigated in separate browser tabs or windows on
+        the same machine. Claim multiple roles (you can add secondary roles from the
+        role bar at the bottom of any station). It's hectic, but workable for learning
+        the game or testing missions.</p>
+        <p>The training missions are specifically designed for solo play — each one
+        focuses on a single station, and the server runs automated control for all
+        other roles so you can practise in isolation.</p>
+      </div>
+    </div>
+
+    <div id="q-switch-role" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How do I switch roles mid-game?
+      </div>
+      <div class="faq-a">
+        <p>Every station has a role bar along the bottom of the screen showing all
+        crew roles and who holds them. Click any open (unclaimed) slot to navigate to
+        that station. You can also click your <em>own</em> role on a different station
+        to navigate back to it — your role pill appears with a green highlight.</p>
+        <p>Switching navigates your browser to the new station's page. Your original
+        station remains active on the server — another player can claim it, or you can
+        return to it from the role bar.</p>
+      </div>
+    </div>
+
+    <div id="q-sound" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        Why can't I hear any sound?
+      </div>
+      <div class="faq-a">
+        <p>Most browsers block audio until the user interacts with the page. Click
+        anywhere on your station to unblock audio — you should hear the life support
+        ambient hum start shortly after <code>game.started</code>.</p>
+        <p>If sound still doesn't play, check that your browser's site permissions
+        allow audio (some browsers mute new tabs by default). Also confirm your system
+        volume is not muted and the correct audio output device is selected.</p>
+        <p>If you prefer silence, the accessibility widget (⚙ bottom-right) does not
+        control audio, but you can mute the tab directly in your browser.</p>
+      </div>
+    </div>
+
+    <div id="q-no-update" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        My station isn't updating — what do I do?
+      </div>
+      <div class="faq-a">
+        <p>First check the connection indicator in the top-left corner of your station.
+        If it shows DISCONNECTED (red), the WebSocket connection to the server has been
+        lost. The client attempts to reconnect automatically every few seconds — wait
+        10–15 seconds and watch for the indicator to turn green again.</p>
+        <p>If reconnection fails, hard-refresh the page (Ctrl+Shift+R / Cmd+Shift+R).
+        Your role will still be reserved for a short period after disconnect, so you
+        should reconnect cleanly.</p>
+        <p>If the indicator shows CONNECTED but data has stopped: the game may be
+        paused by the admin. Check with the admin or Captain.</p>
+      </div>
+    </div>
+
+    <div id="q-save" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How do I save and resume a game?
+      </div>
+      <div class="faq-a">
+        <p>Only an admin can save and resume — crew stations don't have save controls.
+        Go to <a href="/admin/">the admin dashboard</a>, find the Save section, and
+        click <strong>SAVE GAME</strong>. This creates a timestamped snapshot in the
+        <code>saves/</code> directory.</p>
+        <p>To resume later, open the admin dashboard, find the save in the list, and
+        click <strong>RESUME</strong>. The server restores the world state and broadcasts
+        <code>game.started</code> to any connected clients. Crew can then navigate to
+        their stations as normal.</p>
+      </div>
+    </div>
+
+    <div id="q-difficulty" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How do I change the difficulty?
+      </div>
+      <div class="faq-a">
+        <p>Difficulty is set in the lobby before launching (the host selects a preset),
+        and can also be changed mid-game from the admin dashboard. Available presets:</p>
+        <ul>
+          <li><strong>Cadet:</strong> Reduced enemy damage, faster repairs, more
+          generous resource pools. Recommended for first sessions.</li>
+          <li><strong>Officer:</strong> Default balanced settings.</li>
+          <li><strong>Commander:</strong> Increased enemy aggression, slower healing,
+          tighter time limits on objectives.</li>
+          <li><strong>Admiral:</strong> Maximum difficulty — enemy damage is severe,
+          resources are scarce, and mistakes are rarely recoverable.</li>
+        </ul>
+        <p>Changing difficulty mid-game takes effect immediately on the next tick.</p>
+      </div>
+    </div>
+
+    <div id="q-missions" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How do I create my own missions?
+      </div>
+      <div class="faq-a">
+        <p>Use the visual mission editor at <a href="/editor/">/editor/</a>. The editor
+        lets you build mission graphs — nodes (objectives, branches, parallel tasks,
+        checkpoints) connected by edges (sequence, branch triggers, actions). No JSON
+        knowledge required.</p>
+        <p>Missions are saved to the server's <code>missions/</code> directory and
+        appear in the lobby mission list immediately. You can also edit mission JSON
+        files directly if you prefer — see the graph format documentation in the editor's
+        built-in help.</p>
+        <p>The editor includes a built-in validator that checks for unreachable nodes,
+        missing victory conditions, and duplicate puzzle labels before you save.</p>
+      </div>
+    </div>
+
+    <div id="q-alerts" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        What do the alert levels mean?
+      </div>
+      <div class="faq-a">
+        <p>Alert level is set by the Captain and changes the visual and audio tone
+        across all stations simultaneously:</p>
+        <ul>
+          <li><strong>GREEN alert:</strong> Routine operations. Normal ambient sound.
+          Standard green wire aesthetic.</li>
+          <li><strong>YELLOW alert:</strong> Caution — enemy detected or situation is
+          developing. Amber primary colour, elevated ambient sound.</li>
+          <li><strong>RED alert:</strong> Immediate danger — active combat or critical
+          system failure. Red primary colour, combat-level ambient sound.</li>
+        </ul>
+        <p>Alert level does not directly affect game mechanics (enemies aren't harder
+        at red alert). It is a communication and situational-awareness tool for the crew.</p>
+      </div>
+    </div>
+
+    <div id="q-power" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How does the power budget work?
+      </div>
+      <div class="faq-a">
+        <p>Nine ship systems share a fixed budget of 900 power units (100 per system
+        at default). Engineering can redistribute power freely — raise one system by
+        50 and the other 50 must come from somewhere else. The total cannot exceed 900.</p>
+        <p>A system's <strong>efficiency</strong> scales with its power allocation.
+        At 100 power, a system runs at 100% efficiency (modified by health and crew
+        factor). At 50 power, roughly 50% efficiency. This affects:</p>
+        <ul>
+          <li>Engines → ship speed and turn rate</li>
+          <li>Shields → shield capacity and regen rate</li>
+          <li>Sensors → detection range and scan quality</li>
+          <li>Weapons → beam damage and fire rate</li>
+          <li>Life Support → crew health recovery rate</li>
+          <li>Flight Deck → drone speed and probe range</li>
+          <li>ECM Suite → jam range and effectiveness</li>
+          <li>Point Defence → torpedo intercept probability</li>
+        </ul>
+        <p>Systems damaged below 50 HP also suffer an efficiency penalty proportional
+        to their health — full power to a broken system still underperforms.</p>
+      </div>
+    </div>
+
+    <div id="q-ship" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        What ship class should I pick?
+      </div>
+      <div class="faq-a">
+        <p>For new groups: start with the <strong>Corvette</strong> (Sentinel-class,
+        hull 80, crew 4–6). It has enough hull to survive early mistakes without being
+        overwhelming to manage.</p>
+        <p>For experienced crews of 6–9: the <strong>Frigate</strong> (Resolution-class,
+        hull 100) is the default and offers a balanced experience across all mission
+        types.</p>
+        <p>If your group loves Flight Operations specifically: the <strong>Carrier</strong>
+        (Atlas-class, hull 120) expands the drone bay and probe stock significantly.</p>
+        <p>If you want maximum challenge: the <strong>Battleship</strong>
+        (Sovereign-class, hull 200, crew 10–12) requires every station staffed and
+        active coordination to manage effectively.</p>
+      </div>
+    </div>
+
+  </div><!-- /faq-list -->
+
+</main>
+</div><!-- /docs-wrap -->
+
+<script>
+  document.querySelectorAll('.faq-q').forEach(q => {
+    q.addEventListener('click', () => {
+      const item = q.closest('.faq-item');
+      const isOpen = item.classList.toggle('open');
+      q.setAttribute('aria-expanded', isOpen);
+    });
+    q.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); q.click(); }
+    });
+  });
+
+  // TOC active tracking
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        document.querySelectorAll('.toc-link').forEach(a => a.classList.remove('active'));
+        const link = document.querySelector(`.toc-link[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -80% 0px' });
+
+  document.querySelectorAll('.faq-item[id]').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

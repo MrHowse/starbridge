@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — Cooperative Bridge Crew Simulator</title>
+  <link rel="stylesheet" href="/client/site/site.css">
+  <link rel="stylesheet" href="/client/shared/accessibility.css">
+  <script type="module" src="/client/shared/a11y_widget.js"></script>
+</head>
+<body>
+
+<nav class="site-nav" role="navigation" aria-label="Site navigation">
+  <span class="site-nav__brand">STARBRIDGE</span>
+  <div class="site-nav__links">
+    <a href="/client/lobby/" class="site-nav__link site-nav__play">PLAY</a>
+    <a href="/admin/"        class="site-nav__link">ADMIN</a>
+    <a href="/editor/"       class="site-nav__link">EDITOR</a>
+    <a href="/manual/"       class="site-nav__link">MANUAL</a>
+    <a href="/faq/"          class="site-nav__link">FAQ</a>
+    <a href="/about/"        class="site-nav__link">ABOUT</a>
+  </div>
+</nav>
+
+<main class="landing" role="main">
+
+  <p class="landing__kicker">FEDERATION STARSHIP COMMAND SYSTEM &mdash; BRIDGE TRAINING MODULE</p>
+
+  <h1 class="landing__title">STARBRIDGE</h1>
+
+  <p class="landing__subtitle">Cooperative Bridge Crew Simulator</p>
+
+  <nav class="landing__nav" aria-label="Quick navigation">
+    <a href="/client/lobby/" class="landing__btn landing__btn--primary" aria-label="Play — open the game lobby">PLAY</a>
+    <a href="/admin/"        class="landing__btn" aria-label="Open admin dashboard">ADMIN</a>
+    <a href="/editor/"       class="landing__btn" aria-label="Open mission editor">EDITOR</a>
+    <a href="/manual/"       class="landing__btn" aria-label="Read the manual">MANUAL</a>
+    <a href="/faq/"          class="landing__btn" aria-label="Read frequently asked questions">FAQ</a>
+  </nav>
+
+  <div class="status-panel" role="status" aria-live="polite" aria-label="Server status">
+    <div class="status-panel__header">SERVER STATUS</div>
+    <div class="status-row">
+      <span class="status-label">GAME</span>
+      <span class="status-value" id="st-game">LOADING&hellip;</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">PLAYERS CONNECTED</span>
+      <span class="status-value" id="st-players">&mdash;</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">CURRENT MISSION</span>
+      <span class="status-value" id="st-mission">&mdash;</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">SERVER</span>
+      <span class="status-value" id="st-server">ONLINE</span>
+    </div>
+  </div>
+
+  <p class="landing__footer" id="footer-version">STARBRIDGE v0.04 &bull; MULTI-PLAYER BRIDGE SIMULATION</p>
+
+</main>
+
+<script>
+  async function updateStatus() {
+    try {
+      const r = await fetch('/api/status');
+      if (!r.ok) throw new Error('offline');
+      const d = await r.json();
+
+      const gameEl    = document.getElementById('st-game');
+      const missionEl = document.getElementById('st-mission');
+      const playersEl = document.getElementById('st-players');
+      const serverEl  = document.getElementById('st-server');
+      const versionEl = document.getElementById('footer-version');
+
+      if (d.running) {
+        gameEl.textContent = 'IN PROGRESS';
+        gameEl.className   = 'status-value status-value--active';
+      } else {
+        gameEl.textContent = 'IDLE — LOBBY OPEN';
+        gameEl.className   = 'status-value status-value--idle';
+      }
+
+      playersEl.textContent = d.player_count ?? '0';
+      missionEl.textContent = d.mission_name || '—';
+      serverEl.textContent  = 'ONLINE';
+      serverEl.className    = 'status-value status-value--active';
+
+      if (d.version) {
+        versionEl.textContent =
+          `STARBRIDGE v${d.version} · ${d.phase || ''} · MULTI-PLAYER BRIDGE SIMULATION`;
+      }
+    } catch {
+      const gameEl = document.getElementById('st-game');
+      if (gameEl) {
+        gameEl.textContent = 'OFFLINE';
+        gameEl.className   = 'status-value';
+      }
+      const serverEl = document.getElementById('st-server');
+      if (serverEl) {
+        serverEl.textContent = 'OFFLINE';
+        serverEl.className   = 'status-value';
+      }
+    }
+  }
+
+  updateStatus();
+  setInterval(updateStatus, 5000);
+</script>
+
+</body>
+</html>

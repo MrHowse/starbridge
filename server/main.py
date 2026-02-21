@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
@@ -87,6 +87,7 @@ CLIENT_DIR = Path(__file__).parent.parent / "client"
 app.mount("/client", StaticFiles(directory=str(CLIENT_DIR), html=True), name="client")
 
 MISSIONS_DIR = Path(__file__).parent.parent / "missions"
+SITE_DIR     = Path(__file__).parent.parent / "client" / "site"
 
 # ---------------------------------------------------------------------------
 # Message routing
@@ -167,14 +168,70 @@ async def _handle_message(connection_id: str, raw: str) -> None:
 
 
 @app.get("/")
-async def root() -> dict[str, str]:
-    """Health check and server status."""
+async def landing_page() -> FileResponse:
+    """Serve the Starbridge landing page."""
+    return FileResponse(SITE_DIR / "index.html")
+
+
+@app.get("/health")
+async def health_check() -> dict[str, str]:
+    """JSON health check and server status."""
     return {
         "name": "Starbridge",
         "version": "0.0.1",
         "status": "online",
         "phase": "v0.04",
     }
+
+
+@app.get("/api/status")
+async def api_status() -> dict:
+    """Return current game/server status for the landing page."""
+    running = game_loop.is_running()
+    player_count = 0
+    mission_name = None
+    if running:
+        try:
+            player_count = sum(
+                1 for v in lobby._session.roles.values() if v is not None
+            )
+        except Exception:
+            pass
+        try:
+            mid = game_loop.get_mission_id()
+            if mid and mid != "sandbox":
+                md = _load_mission(mid)
+                mission_name = md.get("name")
+        except Exception:
+            pass
+    return {
+        "running": running,
+        "player_count": player_count,
+        "mission_name": mission_name,
+        "version": "0.0.1",
+        "phase": "v0.04",
+    }
+
+
+@app.get("/manual")
+@app.get("/manual/")
+async def manual_page() -> FileResponse:
+    """Serve the user manual page."""
+    return FileResponse(SITE_DIR / "manual" / "index.html")
+
+
+@app.get("/faq")
+@app.get("/faq/")
+async def faq_page() -> FileResponse:
+    """Serve the FAQ page."""
+    return FileResponse(SITE_DIR / "faq" / "index.html")
+
+
+@app.get("/about")
+@app.get("/about/")
+async def about_page() -> FileResponse:
+    """Serve the about page."""
+    return FileResponse(SITE_DIR / "about" / "index.html")
 
 
 @app.websocket("/ws")

@@ -24,18 +24,25 @@ def reset_lobby() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_root_returns_server_status() -> None:
+def test_root_serves_landing_page() -> None:
     with TestClient(app) as client:
         response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+
+def test_health_endpoint_returns_server_status() -> None:
+    with TestClient(app) as client:
+        response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "online"
     assert data["name"] == "Starbridge"
 
 
-def test_root_includes_version() -> None:
+def test_health_endpoint_includes_version() -> None:
     with TestClient(app) as client:
-        response = client.get("/")
+        response = client.get("/health")
     assert "version" in response.json()
 
 

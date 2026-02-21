@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual — STARBRIDGE</title>
+  <link rel="stylesheet" href="/client/site/site.css">
+  <link rel="stylesheet" href="/client/shared/accessibility.css">
+  <script type="module" src="/client/shared/a11y_widget.js"></script>
+</head>
+<body>
+
+<nav class="site-nav" role="navigation" aria-label="Site navigation">
+  <a href="/" class="site-nav__brand">STARBRIDGE</a>
+  <div class="site-nav__links">
+    <a href="/client/lobby/" class="site-nav__link site-nav__play">PLAY</a>
+    <a href="/admin/"        class="site-nav__link">ADMIN</a>
+    <a href="/editor/"       class="site-nav__link">EDITOR</a>
+    <a href="/manual/"       class="site-nav__link site-nav__link--active">MANUAL</a>
+    <a href="/faq/"          class="site-nav__link">FAQ</a>
+    <a href="/about/"        class="site-nav__link">ABOUT</a>
+  </div>
+</nav>
+
+<div class="docs-wrap">
+
+<!-- ─── Sidebar ─────────────────────────────────────────────────────────── -->
+<aside class="docs-sidebar" role="navigation" aria-label="Table of contents">
+  <div class="docs-sidebar__title">CONTENTS</div>
+
+  <a href="#getting-started" class="toc-link">1. Getting Started</a>
+  <a href="#station-guides"  class="toc-link">2. Station Guides</a>
+  <a href="#s-captain"    class="toc-link toc-link--sub">Captain</a>
+  <a href="#s-helm"       class="toc-link toc-link--sub">Helm</a>
+  <a href="#s-engineering" class="toc-link toc-link--sub">Engineering</a>
+  <a href="#s-weapons"    class="toc-link toc-link--sub">Weapons</a>
+  <a href="#s-science"    class="toc-link toc-link--sub">Science / Sensors</a>
+  <a href="#s-medical"    class="toc-link toc-link--sub">Medical</a>
+  <a href="#s-security"   class="toc-link toc-link--sub">Security</a>
+  <a href="#s-comms"      class="toc-link toc-link--sub">Communications</a>
+  <a href="#s-flightops"  class="toc-link toc-link--sub">Flight Operations</a>
+  <a href="#s-ew"         class="toc-link toc-link--sub">Electronic Warfare</a>
+  <a href="#s-tactical"   class="toc-link toc-link--sub">Tactical Officer</a>
+  <a href="#s-dc"         class="toc-link toc-link--sub">Damage Control</a>
+  <a href="#ship-classes"    class="toc-link">3. Ship Classes</a>
+  <a href="#missions"        class="toc-link">4. Missions</a>
+  <a href="#puzzles"         class="toc-link">5. Puzzles</a>
+  <a href="#admin-guide"     class="toc-link">6. Admin Guide</a>
+  <a href="#shortcuts"       class="toc-link">7. Keyboard Reference</a>
+</aside>
+
+<!-- ─── Main content ─────────────────────────────────────────────────────── -->
+<main class="docs-main" role="main">
+
+  <h1>User Manual</h1>
+  <p class="page-sub">STARBRIDGE BRIDGE CREW SIMULATOR — REFERENCE EDITION</p>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 1 — Getting Started
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="getting-started" class="section">
+    <h2 class="section__heading">1. Getting Started</h2>
+    <div class="section-body">
+
+      <p><strong>Joining a game.</strong> Navigate to the lobby at
+      <a href="/client/lobby/">starbridge/lobby</a>. Enter your callsign (player name) and
+      press ENTER or click CONFIRM. The lobby displays all available station roles and
+      which players currently hold them.</p>
+
+      <p><strong>Claiming a role.</strong> Click CLAIM next to any unclaimed station. You
+      may hold only one role at a time; clicking a second station will prompt you to
+      switch. Once claimed, a RELEASE button appears so you can free the seat for someone
+      else. Some ship classes require a minimum crew count before the host can launch.</p>
+
+      <p><strong>Selecting a ship class.</strong> The host chooses a ship class before
+      launching. Different classes have different hull ratings, torpedo loadouts, and crew
+      requirements. See the <a href="#ship-classes">Ship Classes</a> section for details.</p>
+
+      <p><strong>The briefing screen.</strong> After the host clicks LAUNCH, all players
+      are directed to the briefing room. The mission name and objectives appear alongside a
+      30-second countdown. The Captain can override the countdown by clicking LAUNCH NOW.
+      Use this time to coordinate with your crew.</p>
+
+      <p><strong>Basic concepts.</strong></p>
+      <ul>
+        <li><strong>Game tick:</strong> The server runs at 10 ticks per second. All
+        position, damage, and mission logic updates happen every tick.</li>
+        <li><strong>Power budget:</strong> Nine ship systems share a budget of 900 power
+        units. The default allocation is 100 per system. Engineering can redistribute power
+        freely, but the total cannot exceed 900.</li>
+        <li><strong>System efficiency:</strong> A system's efficiency is proportional to
+        its power allocation, modified by health and crew factor. A system at 50 power
+        operates at roughly 50% efficiency.</li>
+        <li><strong>Hull:</strong> Hull points represent overall ship integrity. Hull damage
+        is permanent within a mission (no passive regeneration). When hull reaches zero, the
+        mission fails.</li>
+        <li><strong>Shields:</strong> The shield system regenerates automatically when
+        powered. Shields absorb incoming fire before hull is damaged.</li>
+        <li><strong>Alert levels:</strong> GREEN (routine), YELLOW (enemy detected),
+        RED (combat). Alert level is set by the Captain and affects ambient sound across
+        all stations.</li>
+        <li><strong>Crew factor:</strong> Each deck has a crew whose health affects system
+        efficiency. Dead crew reduce performance permanently; injured crew have partial
+        effectiveness.</li>
+      </ul>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 2 — Station Guides
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="station-guides" class="section">
+    <h2 class="section__heading">2. Station Guides</h2>
+    <div class="section-body">
+
+      <!-- Captain -->
+      <div id="s-captain" class="station">
+        <h3 class="station__heading">CAPTAIN</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You are the ship's commanding officer. Your station
+          synthesises all tactical information into a single overview. You set the alert
+          level, maintain the captain's log, and are the sole authoriser for nuclear
+          torpedo launches. Other stations report to you — you coordinate, not execute.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Alert Level selector:</strong> Sets ship-wide alert to GREEN,
+            YELLOW, or RED. This changes ambient audio and visual colours across all
+            stations simultaneously.</li>
+            <li><strong>Tactical map (canvas):</strong> North-up overview showing your
+            ship, enemy contacts, friendly units, and hazards. Does not scroll — world
+            radius is 80,000 units.</li>
+            <li><strong>Science summary panel:</strong> Condensed view of current sensor
+            contacts from the Science station.</li>
+            <li><strong>Hull / Shield readout:</strong> Real-time hull and shield
+            percentages.</li>
+            <li><strong>Captain's log:</strong> Type entries; they are timestamped and
+            included verbatim in the post-mission debrief.</li>
+            <li><strong>Nuclear authorisation panel:</strong> Appears when Weapons
+            requests nuclear launch. Approve or deny within the countdown window.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Set YELLOW when a contact appears on
+          sensors; upgrade to RED only when actively firing. Narrate key moments in the
+          log — the debrief awards bonus points for detailed records. Watch the shield
+          readout — if shields fail while hull is low, call Engineering immediately.</div>
+        </div>
+      </div>
+
+      <!-- Helm -->
+      <div id="s-helm" class="station">
+        <h3 class="station__heading">HELM</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You fly the ship. You control heading and throttle,
+          navigate hazard fields, and execute course changes requested by the Captain.
+          Smooth manoeuvring keeps the shields pointed at the threat and reduces the chance
+          of drifting into hazards.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Heading dial:</strong> Click-drag to rotate the ship. The outer
+            ring shows the target bearing; the inner indicator shows current heading.</li>
+            <li><strong>Throttle slider:</strong> Sets engine thrust 0–100%. Actual
+            velocity depends on engine power from Engineering.</li>
+            <li><strong>Bearing input (numeric):</strong> Type a bearing (0–360°) and
+            confirm to set a precise heading.</li>
+            <li><strong>Minimap:</strong> Compact sector overview showing ship position,
+            contacts, and hazards. Contacts sourced from Science.</li>
+            <li><strong>Route Calculation puzzle:</strong> Triggered by missions that
+            require navigating through hazard grids. Solve it to unlock a safe path.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> High throttle plus tight turns bleeds
+          speed — you overshoot. Cut throttle before a sharp course change then increase
+          again on the new heading. Nebulae don't cause damage but obstruct sensors — ask
+          Science if you're flying blind.</div>
+        </div>
+      </div>
+
+      <!-- Engineering -->
+      <div id="s-engineering" class="station">
+        <h3 class="station__heading">ENGINEERING</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You manage power distribution and system repairs.
+          Nine systems share a fixed budget of 900 power units. You decide in real time
+          which systems get priority. You also designate which system the repair crew
+          focuses on. Balancing offence, defence, and propulsion is the core skill.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Power sliders (×9):</strong> One slider per system — Engines,
+            Shields, Sensors, Weapons, Life Support, Flight Deck, ECM Suite, Point
+            Defence, and a ninth system determined by ship class. The running total must
+            not exceed 900.</li>
+            <li><strong>Repair focus selector:</strong> Designates which damaged system
+            the engineering crew repairs. Only one system can be repaired at a time;
+            repairing a healthy system wastes crew time.</li>
+            <li><strong>System health indicators:</strong> Each system shows current
+            health (0–100 HP). Damaged systems operate at reduced efficiency even with
+            full power.</li>
+            <li><strong>Circuit Routing puzzle:</strong> Triggered by mission events.
+            Requires routing power through a grid to reconnect severed conduits.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> The power budget is strict — if you give
+          Shields 150, something else must give up 50. Life Support below 50 power starts
+          reducing crew health over time. In heavy combat: raise Shields and Weapons, lower
+          Flight Deck and ECM. After combat: raise Sensors and Life Support for recovery.</div>
+        </div>
+      </div>
+
+      <!-- Weapons -->
+      <div id="s-weapons" class="station">
+        <h3 class="station__heading">WEAPONS</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You operate the ship's offensive systems — beam
+          cannons and torpedo tubes. You select targets, manage beam frequency to exploit
+          shield vulnerabilities, load torpedo tubes with different warhead types, and
+          handle nuclear authorisation requests from the Captain.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Radar display (canvas):</strong> Your ship at centre; enemy blips
+            around it. Click an enemy to lock target.</li>
+            <li><strong>Beam fire button:</strong> Fires beam cannons at the locked target.
+            Subject to cooldown after each burst.</li>
+            <li><strong>Beam frequency selector:</strong> Four frequencies — ALPHA, BETA,
+            GAMMA, DELTA. Matching the target's shield frequency deals 1.5× damage;
+            mismatching deals 0.5×. Ask Science to scan the target.</li>
+            <li><strong>Torpedo tubes (2):</strong> Each tube must be loaded before
+            firing. Load time: 3 seconds. Available warheads: Standard (50 damage),
+            EMP (15 damage + stun), Probe (sensor scan), Nuclear (80 damage, requires
+            Captain authorisation).</li>
+            <li><strong>Firing Solution puzzle:</strong> Triggered by precision strike
+            missions. Solve to unlock a torpedo firing angle against a moving target.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Always coordinate with Science before
+          engaging — knowing the shield frequency is a 3× swing in effective DPS (1.5×
+          match vs 0.5× mismatch). Use EMP torpedoes to stun fast scouts before they
+          close to beam range. Keep both tubes loaded at all times during combat —
+          a loaded tube fires instantly.</div>
+        </div>
+      </div>
+
+      <!-- Science -->
+      <div id="s-science" class="station">
+        <h3 class="station__heading">SCIENCE / SENSORS</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You operate the sensor array, classify contacts,
+          and run active scans that provide intelligence to all other stations. Your scans
+          reveal shield frequencies for Weapons, hazard routes for Helm, and biological
+          data for Medical. You also triangulate mission signal sources.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Sensor map (canvas):</strong> Sector-scale view with range rings.
+            All contacts, hazards, drones, and probes are drawn here.</li>
+            <li><strong>Scan mode selector:</strong> EM (electromagnetic contacts),
+            GRAV (gravitational anomalies), BIO (biological signatures), SUB (subspace).
+            Different modes reveal different entity types.</li>
+            <li><strong>Contact list:</strong> Click any contact to initiate an active
+            scan. Scan results broadcast to Weapons (shield frequency) and Captain.</li>
+            <li><strong>Bearing compass:</strong> Multiple signal bearings drawn as
+            dashed lines from scan origin — triangulate the source with two or more
+            scans from different positions.</li>
+            <li><strong>Frequency Matching puzzle:</strong> Triggered by mission signal
+            events. Tune waveform components to match an incoming transmission.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Run EM mode in combat to reveal shield
+          frequencies. Switch to BIO during medical emergencies — active outbreaks
+          produce biological signatures. Flight Operations drones extend your sensor range
+          so coordinate with Flight Ops to cover blind spots.</div>
+        </div>
+      </div>
+
+      <!-- Medical -->
+      <div id="s-medical" class="station">
+        <h3 class="station__heading">MEDICAL</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You manage crew health across all six ship decks.
+          Injured crew reduce system efficiency on their deck; dead crew are permanent
+          losses. You also track and respond to disease outbreaks, which spread between
+          connected rooms if untreated.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Deck list:</strong> Shows all six decks (Bridge, Sensors,
+            Weapons, Shields, Engineering, Medical) with crew counts — Active, Injured,
+            Critical, KIA — and a crew efficiency gauge.</li>
+            <li><strong>Treat Injured / Treat Critical buttons:</strong> Start a
+            treatment session on the selected deck. Each treatment costs 2 medical
+            supplies and heals 1 crew member per 2 seconds.</li>
+            <li><strong>Cancel Treatment:</strong> Halts the active treatment and frees
+            the medical team for another deck.</li>
+            <li><strong>Disease panel:</strong> Lists active outbreaks by deck and
+            pathogen type. Outbreaks spread every 30 seconds through unsealed doors.</li>
+            <li><strong>Triage puzzle:</strong> Triggered by mass-casualty events.
+            Diagnose patients by symptom pattern and prescribe correct treatment steps.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Treat critical crew before injured —
+          critical crew contribute zero efficiency and are at risk of dying. Medical
+          supplies cap at 20; you cannot stockpile beyond this. Seal connecting doors
+          immediately when an outbreak is detected to prevent spread.</div>
+        </div>
+      </div>
+
+      <!-- Security -->
+      <div id="s-security" class="station">
+        <h3 class="station__heading">SECURITY</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You coordinate internal ship defence against
+          boarding parties. You deploy marine squads to intercept intruders, seal doors
+          to control movement, and track enemy positions through the ship's interior.
+          Boarding events are time-critical — set up before the intruders arrive.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Ship interior canvas:</strong> A 5-deck × 4-room grid showing
+            all rooms, doors, marine squads, and visible intruder positions. Fog of war
+            applies beyond sensor range.</li>
+            <li><strong>Move Squad:</strong> Select a marine squad then click an
+            adjacent room to order a move. Costs 3 action points (AP).</li>
+            <li><strong>Toggle Door:</strong> Seal or unseal a door. Sealed doors block
+            movement for all units (including intruders). Costs 2 AP.</li>
+            <li><strong>AP gauge:</strong> Each squad has 10 AP; regeneration rate is
+            0.2 AP/tick. Tactical decisions require managing this budget.</li>
+            <li><strong>Tactical Positioning puzzle:</strong> Pre-boarding squad
+            deployment optimisation. Solve it to place squads in ideal intercept
+            positions before the boarding alarm sounds.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Intruders move every 30 seconds and
+          target key objectives. Seal corridor doors to funnel them into rooms where your
+          squads have AP remaining. Set up your squads during the pre-boarding window —
+          you cannot reposition without AP cost after the alarm.</div>
+        </div>
+      </div>
+
+      <!-- Communications -->
+      <div id="s-comms" class="station">
+        <h3 class="station__heading">COMMUNICATIONS</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You manage faction diplomacy and encrypted
+          transmission decoding. You tune to a faction's frequency band, select an
+          appropriate message type, hail them, and interpret their responses. Intelligence
+          from your transmissions feeds directly into mission outcomes.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Frequency scanner (canvas):</strong> Visual spectrum display
+            showing faction signal spikes. Brighter spikes indicate which band you're
+            closest to.</li>
+            <li><strong>Frequency slider:</strong> Tune from 0.000 to 1.000. Lock onto a
+            faction band within ±0.05 tolerance to enable hailing.<br>
+            Faction bands: Imperial 0.15, Rebel 0.42, Alien 0.71, Emergency 0.90.</li>
+            <li><strong>Hail type:</strong> Negotiate, Demand, or Bluff. The correct
+            choice depends on the faction's disposition and mission context.</li>
+            <li><strong>Transmission log:</strong> All incoming NPC responses appear here
+            with timestamps. Scroll to review earlier messages.</li>
+            <li><strong>Contact ID input:</strong> Specify a vessel or station ID when
+            hailing (e.g. "meridian_ship", "talon_ship").</li>
+            <li><strong>Transmission Decoding puzzle:</strong> Triggered when an
+            encrypted signal is intercepted. Break the cipher by solving sum equations
+            linking cipher symbols to numeric values.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Wrong message type can worsen faction
+          relations mid-mission. Listen to NPC responses before hailing again —
+          responses arrive 2 seconds after your transmission. The Frequency Matching
+          puzzle on Science may receive relay data from your decoded transmissions;
+          coordinate with Science when decoding.</div>
+        </div>
+      </div>
+
+      <!-- Flight Operations -->
+      <div id="s-flightops" class="station">
+        <h3 class="station__heading">FLIGHT OPERATIONS</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You operate the ship's drone bay and probe
+          launchers. Drones extend sensor coverage dynamically; probes are deployed
+          permanently at fixed locations. Both feed contacts directly to the Science
+          station's sensor map. Fuel is finite — manage your flight deck carefully.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Sector map (canvas):</strong> Shows ship, drone positions, probe
+            positions, and detection bubbles for each unit.</li>
+            <li><strong>Drone cards:</strong> One card per drone showing state (Hangar /
+            Transit / Deployed / Returning), fuel percentage, and controls.</li>
+            <li><strong>Launch Drone:</strong> Click LAUNCH, then click a destination on
+            the sector map. The drone flies there and enters deployed state.</li>
+            <li><strong>Recall Drone:</strong> Orders the drone back to the ship for
+            refuelling. Refill rate: 20%/sec.</li>
+            <li><strong>Deploy Probe:</strong> Click DEPLOY, then click a position on
+            the map. The probe is permanent (no fuel, no recall). Stock is limited.</li>
+            <li><strong>Probe stock counter:</strong> Shows remaining probes. Default: 4.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> A drone in Transit burns fuel at
+          4%/sec; a deployed drone burns 1.5%/sec. Recall drones above 30% fuel so they
+          can reach the ship before running dry. Place probes at mission waypoints or
+          known choke points — they're permanent but finite.</div>
+        </div>
+      </div>
+
+      <!-- Electronic Warfare -->
+      <div id="s-ew" class="station">
+        <h3 class="station__heading">ELECTRONIC WARFARE</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You degrade enemy combat effectiveness through
+          ECM jamming and network intrusion. Jamming reduces enemy firing accuracy over
+          time; network intrusion can temporarily disable an enemy's systems. You also
+          deploy countermeasures to defeat incoming torpedoes.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>ECM tactical map (canvas):</strong> Ship at centre, enemy
+            contacts as triangles. Dashed ring shows current effective jam range.</li>
+            <li><strong>Jam target selection:</strong> Click an enemy on the map or in
+            the enemy list to designate a jam target. Jam factor builds over time while
+            the target is in range.</li>
+            <li><strong>Countermeasures toggle:</strong> Enable / disable active
+            countermeasures. Each activation depletes a charge (maximum 10).</li>
+            <li><strong>Intrusion target:</strong> Select a jam-target and a target system
+            (propulsion, weapons, etc.), then click Begin Intrusion to launch the
+            Network Intrusion puzzle.</li>
+            <li><strong>Network Intrusion puzzle:</strong> Triggered by Begin Intrusion.
+            Successful completion stuns the target for multiple seconds.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Jam factor maxes out at 80% — beyond
+          that, switch focus to a second enemy. Countermeasure charges don't regenerate;
+          save them for confirmed torpedo volleys. ECM Suite must have adequate power
+          from Engineering or jam range shrinks significantly.</div>
+        </div>
+      </div>
+
+      <!-- Tactical Officer -->
+      <div id="s-tactical" class="station">
+        <h3 class="station__heading">TACTICAL OFFICER</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You are the ship's information officer. You
+          synthesise data from all stations into tactical assessments and relay them to
+          the crew. You do not directly control any system — your value is situational
+          awareness and coordination. A skilled Tactical officer prevents mistakes more
+          than they create successes.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Tactical display (canvas):</strong> North-up sector map showing
+            all contacts, vectors, and hazards. Identical in scope to the Captain's map.</li>
+            <li><strong>Threat priority panel:</strong> Ranked list of enemy contacts by
+            estimated threat level (based on range, heading, and type).</li>
+            <li><strong>Objective tracker:</strong> Mission objective status in real time
+            — Pending, Active, Completed, or Failed.</li>
+            <li><strong>Relay panel:</strong> Send text annotations to other stations
+            via the cross-station notification system.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Call out shield frequency to Weapons
+          as soon as Science completes a scan. Monitor the objective tracker and warn the
+          Captain if a time-limited objective is about to expire. Your station draws the
+          same sensor data as Captain — if they're busy managing crew, you're their
+          second set of eyes.</div>
+        </div>
+      </div>
+
+      <!-- Damage Control -->
+      <div id="s-dc" class="station">
+        <h3 class="station__heading">DAMAGE CONTROL</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You manage hull damage mitigation. When the ship
+          takes hits, rooms catch fire, decompress, or suffer structural damage. You
+          dispatch Damage Control Teams (DCTs) to repair them before the damage spreads.
+          Fire spreads on its own if ignored; decompressed rooms are unrecoverable.</p>
+
+          <p><strong>Controls</strong></p>
+          <ul>
+            <li><strong>Room grid:</strong> Displays all 20 rooms (5 decks × 4 rooms),
+            colour-coded by status: Normal (dim), Damaged (amber), Fire (red),
+            Decompressed (dark).</li>
+            <li><strong>Dispatch DCT:</strong> Select a damaged or burning room and click
+            Dispatch. The DCT begins an 8-second repair cycle. Only one DCT per room.</li>
+            <li><strong>Cancel DCT:</strong> Recalls the team from the selected room,
+            freeing them for a higher-priority location.</li>
+            <li><strong>Active DCTs panel:</strong> Shows all active teams with names,
+            room names, and repair progress bars (0–100%).</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Prioritise fire over damage — fire
+          spreads every 20 seconds to adjacent rooms and cannot be reversed once a room
+          decompresses. A decompressed room cannot be repaired; seal its connecting doors
+          (via Security) to prevent further hull loss. Keep an eye on all decks, not just
+          the one currently taking hits.</div>
+        </div>
+      </div>
+
+    </div><!-- /section-body for station guides -->
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 3 — Ship Classes
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="ship-classes" class="section">
+    <h2 class="section__heading">3. Ship Classes</h2>
+    <div class="section-body">
+
+      <p>The host selects a ship class in the lobby before launching. Ship class
+      determines starting hull, torpedo ammo, and recommended crew size. Harder classes
+      reward coordinated play; lighter classes suit smaller crews.</p>
+
+      <table class="docs-table">
+        <thead>
+          <tr>
+            <th>Class</th>
+            <th>Name</th>
+            <th>Hull</th>
+            <th>Ammo</th>
+            <th>Crew</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="hi">Scout</td>
+            <td>Pathfinder-class</td>
+            <td>60</td>
+            <td>8</td>
+            <td>3–4</td>
+            <td>Fast and light. Best for 1–2 player games; limited survivability.</td>
+          </tr>
+          <tr>
+            <td class="hi">Corvette</td>
+            <td>Sentinel-class</td>
+            <td>80</td>
+            <td>10</td>
+            <td>4–6</td>
+            <td>Balanced entry ship. Good for new crews learning the ropes.</td>
+          </tr>
+          <tr>
+            <td class="hi">Frigate</td>
+            <td>Resolution-class</td>
+            <td>100</td>
+            <td>12</td>
+            <td>6–9</td>
+            <td>Default class. Full system complement; versatile mission loadout.</td>
+          </tr>
+          <tr>
+            <td class="hi">Medical Ship</td>
+            <td>Hope-class</td>
+            <td>80</td>
+            <td>6</td>
+            <td>5–8</td>
+            <td>Lightly armed hospital vessel. Enhanced medical capacity; suited to
+            humanitarian mission types.</td>
+          </tr>
+          <tr>
+            <td class="hi">Cruiser</td>
+            <td>Endeavour-class</td>
+            <td>140</td>
+            <td>16</td>
+            <td>8–11</td>
+            <td>Heavy combat ship. All weapons systems operate at peak capacity.</td>
+          </tr>
+          <tr>
+            <td class="hi">Carrier</td>
+            <td>Atlas-class</td>
+            <td>120</td>
+            <td>8</td>
+            <td>7–12</td>
+            <td>Drone carrier. Expanded flight deck and probe stock. Flight Ops focus.</td>
+          </tr>
+          <tr>
+            <td class="hi">Battleship</td>
+            <td>Sovereign-class</td>
+            <td>200</td>
+            <td>20</td>
+            <td>10–12</td>
+            <td>Maximum firepower and armour. Requires full crew to operate effectively.</td>
+          </tr>
+        </tbody>
+      </table>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 4 — Missions
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="missions" class="section">
+    <h2 class="section__heading">4. Missions</h2>
+    <div class="section-body">
+
+      <p>Missions are the core game unit — each mission gives the crew a set of
+      objectives to complete before a defeat condition triggers. Objectives can be
+      sequential, parallel, or conditional, and some missions branch based on crew
+      decisions or performance.</p>
+
+      <p><strong>Mission types (overview)</strong></p>
+      <ul>
+        <li><strong>Combat missions:</strong> Destroy enemy waves, defend friendly
+        stations, or escort assets through contested space. Weapons, Engineering, and EW
+        carry the load; Science provides targeting data; Medical handles casualties.</li>
+        <li><strong>Exploration missions:</strong> Locate signals, scan anomalies, and
+        navigate hazard fields. Science, Helm, and Flight Operations lead; Damage Control
+        manages the inevitable scrapes.</li>
+        <li><strong>Medical missions:</strong> Respond to outbreaks, perform triage, and
+        resupply emergency stations. Medical and Science are primary; Comms negotiates
+        access.</li>
+        <li><strong>Diplomatic missions:</strong> Negotiate with factions through
+        Communications, fulfil trust-building objectives across multiple stations, and
+        avoid armed conflict. All stations contribute.</li>
+      </ul>
+
+      <p><strong>Branching.</strong> Some missions have conditional tracks that activate
+      or deactivate based on crew actions. For example, a mission might offer a peaceful
+      resolution if Comms hails a faction within a time limit, or escalate to combat if
+      they don't. Pay attention to mission text — the objectives tell you what options
+      are available.</p>
+
+      <p><strong>Defeat conditions.</strong> Most missions end in defeat when hull reaches
+      zero, a time limit expires, or a key objective fails (e.g. a station you were
+      defending is destroyed). Check the objective panel on the Tactical Officer's station
+      for the active defeat condition.</p>
+
+      <p><strong>Training missions.</strong> A suite of 12 single-role training missions
+      walks new players through each station individually. The server runs automated AI
+      crew for all other roles so you can focus on learning yours. Access them from the
+      lobby by selecting a training mission from the mission list.</p>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 5 — Puzzles
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="puzzles" class="section">
+    <h2 class="section__heading">5. Puzzles</h2>
+    <div class="section-body">
+
+      <p>Puzzle overlays appear on specific stations when triggered by mission events.
+      They pause interaction with that station's normal controls until resolved. Puzzles
+      have a time limit; if it expires, the puzzle fails — which may fail the associated
+      objective. Some puzzles can receive assist data from other stations.</p>
+
+      <table class="docs-table">
+        <thead>
+          <tr><th>Puzzle</th><th>Station</th><th>Mechanic</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="hi">Circuit Routing</td>
+            <td>Engineering</td>
+            <td>Route power through a grid of conduits by enabling/disabling cells to
+            create a continuous path from source to destination. BFS validation confirms
+            connectivity.</td>
+          </tr>
+          <tr>
+            <td class="hi">Frequency Matching</td>
+            <td>Science</td>
+            <td>Tune amplitude and frequency sliders for each waveform component until
+            the composite signal matches the target. RMS difference must fall below a
+            tolerance threshold. Comms can relay component data as an assist.</td>
+          </tr>
+          <tr>
+            <td class="hi">Transmission Decoding</td>
+            <td>Communications</td>
+            <td>A set of cipher symbols map to unique digits 1–9. Sum equations provide
+            constraints. Deduce all mappings. Successfully decoded transmissions relay
+            signal data to Science's Frequency Matching puzzle.</td>
+          </tr>
+          <tr>
+            <td class="hi">Triage</td>
+            <td>Medical</td>
+            <td>Multiple patients present symptoms. Identify the correct pathogen for
+            each patient from symptom patterns, then prescribe the correct treatment
+            steps in order. Science can assist by revealing pathogen data.</td>
+          </tr>
+          <tr>
+            <td class="hi">Route Calculation</td>
+            <td>Helm</td>
+            <td>A grid of cells is partially hidden. Some cells contain hazards.
+            Plot a safe path from start to end by clicking cells in order. Hidden cells
+            are revealed on click; a hazard terminates the path attempt. Science can
+            assist by revealing specific hidden cells.</td>
+          </tr>
+          <tr>
+            <td class="hi">Tactical Positioning</td>
+            <td>Security</td>
+            <td>Place marine squads in rooms before a boarding event. A simulation
+            runs internally to score the placement against intruder paths. Science
+            can reveal optimal interception points.</td>
+          </tr>
+          <tr>
+            <td class="hi">Firing Solution</td>
+            <td>Weapons</td>
+            <td>A moving enemy contact appears on a radar canvas. Rotate a firing line
+            to the predicted intercept bearing, accounting for target velocity and
+            heading. Science can assist by revealing velocity data, widening the
+            tolerance arc.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="tip"><strong>Cross-station assists:</strong> Science is the central
+      assist station. When a puzzle starts on another station, Science may receive a
+      notification to send assist data. The receiving station sees an "assist available"
+      banner. Assists widen tolerances, reveal hidden information, or pre-fill
+      answers — always worth using.</div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 6 — Admin Guide
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="admin-guide" class="section">
+    <h2 class="section__heading">6. Admin Guide</h2>
+    <div class="section-body">
+
+      <p>The admin dashboard at <a href="/admin/">/admin/</a> provides game management
+      controls accessible from any browser without claiming a crew role. It is intended
+      for teachers, facilitators, and session organisers.</p>
+
+      <p><strong>Pause / Resume.</strong> The PAUSE button freezes the game loop and
+      sends a PAUSED overlay to all connected stations. All timers stop. Use this for
+      breaks, teaching moments, or to prevent a defeat while troubleshooting. Resume
+      restores normal play instantly.</p>
+
+      <p><strong>Difficulty presets.</strong> Four presets are available: Cadet, Officer,
+      Commander, and Admiral. Each preset adjusts enemy damage multipliers, system repair
+      rates, and resource limits. Difficulty can be changed mid-game from the dashboard.</p>
+
+      <p><strong>Save &amp; Resume.</strong> Click SAVE to snapshot the current game
+      state to disk. Saves are stored in the <code>saves/</code> directory. To resume,
+      use the Saves section of the admin dashboard or POST to
+      <code>/saves/resume/{save_id}</code>. Only one game can be running at a time.</p>
+
+      <p><strong>Player profiles.</strong> Each player's callsign is automatically
+      tracked. After each mission, their profile updates with games played, wins, losses,
+      and any new achievements unlocked. View profiles at
+      <a href="/profiles">/profiles</a> or export all profiles as CSV from
+      <a href="/profiles/export">/profiles/export</a>.</p>
+
+      <p><strong>Annotations.</strong> Send a text message to a specific station role
+      from the admin dashboard. The message appears as a toast notification on that
+      station's screen. Useful for giving hints or scenario instructions without
+      breaking immersion.</p>
+
+      <p><strong>Engagement monitoring.</strong> The dashboard shows the last interaction
+      time for each station, the tick count, and a snapshot of ship systems. Use this to
+      identify stations that may have lost connection or are inactive.</p>
+
+      <p><strong>Mission editor.</strong> The visual mission editor at
+      <a href="/editor/">/editor/</a> allows creating and editing missions without
+      writing JSON. See the editor's built-in help for full documentation. Missions are
+      saved to the <code>missions/</code> directory and available in the lobby
+      immediately.</p>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 7 — Keyboard Quick Reference
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="shortcuts" class="section">
+    <h2 class="section__heading">7. Keyboard Quick Reference</h2>
+    <div class="section-body">
+
+      <p>Starbridge is primarily mouse-driven. The following keyboard shortcuts apply
+      globally across all stations.</p>
+
+      <table class="docs-table">
+        <thead>
+          <tr><th>Key</th><th>Action</th><th>All Stations</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="hi">F1</td><td>Open / close help overlay</td><td>Yes</td></tr>
+          <tr><td class="hi">Escape</td><td>Dismiss puzzle overlay / help overlay</td><td>Yes</td></tr>
+          <tr><td class="hi">Tab</td><td>Focus next interactive element</td><td>Yes</td></tr>
+          <tr><td class="hi">Enter / Space</td><td>Activate focused button</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+
+      <p>Station-specific text inputs (Helm bearing, Communications contact ID, Captain's
+      log) accept standard keyboard entry. Number fields accept arrow keys to
+      increment/decrement values.</p>
+
+      <p><strong>Role bar navigation.</strong> The bottom strip shows all crew roles and
+      who holds them. Click any open role or your own role (shown with a green highlight)
+      to navigate to that station's page.</p>
+
+      <p><strong>Accessibility.</strong> The ⚙ widget in the bottom-right corner provides
+      colour-blind mode (alternative palette) and reduced-motion mode (disables all
+      animations). Settings persist across page loads via localStorage.</p>
+
+    </div>
+  </section>
+
+</main>
+</div><!-- /docs-wrap -->
+
+<script>
+  // Collapsible sections
+  document.querySelectorAll('.section__heading').forEach(h => {
+    h.addEventListener('click', () => {
+      h.closest('.section').classList.toggle('section--collapsed');
+    });
+  });
+
+  // Collapsible station subsections
+  document.querySelectorAll('.station__heading').forEach(h => {
+    h.addEventListener('click', () => {
+      h.closest('.station').classList.toggle('station--collapsed');
+    });
+  });
+
+  // TOC active link tracking via IntersectionObserver
+  const headings = document.querySelectorAll('[id]');
+  const tocLinks = document.querySelectorAll('.toc-link');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        tocLinks.forEach(a => a.classList.remove('active'));
+        const link = document.querySelector(`.toc-link[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-15% 0px -75% 0px' });
+
+  headings.forEach(h => observer.observe(h));
+</script>
+
+</body>
+</html>

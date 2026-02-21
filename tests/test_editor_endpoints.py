@@ -221,6 +221,6 @@ def test_save_with_validation_errors_returns_warnings() -> None:
 
 def test_health_check_phase_v004() -> None:
     with TestClient(app) as client:
-        response = client.get("/")
+        response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["phase"] == "v0.04"

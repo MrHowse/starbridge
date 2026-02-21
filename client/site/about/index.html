@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — STARBRIDGE</title>
+  <link rel="stylesheet" href="/client/site/site.css">
+  <link rel="stylesheet" href="/client/shared/accessibility.css">
+  <script type="module" src="/client/shared/a11y_widget.js"></script>
+</head>
+<body>
+
+<nav class="site-nav" role="navigation" aria-label="Site navigation">
+  <a href="/" class="site-nav__brand">STARBRIDGE</a>
+  <div class="site-nav__links">
+    <a href="/client/lobby/" class="site-nav__link site-nav__play">PLAY</a>
+    <a href="/admin/"        class="site-nav__link">ADMIN</a>
+    <a href="/editor/"       class="site-nav__link">EDITOR</a>
+    <a href="/manual/"       class="site-nav__link">MANUAL</a>
+    <a href="/faq/"          class="site-nav__link">FAQ</a>
+    <a href="/about/"        class="site-nav__link site-nav__link--active">ABOUT</a>
+  </div>
+</nav>
+
+<div class="docs-wrap">
+
+<aside class="docs-sidebar" role="navigation" aria-label="Table of contents">
+  <div class="docs-sidebar__title">CONTENTS</div>
+  <a href="#what-is"      class="toc-link">What is Starbridge</a>
+  <a href="#version-history" class="toc-link">Version History</a>
+  <a href="#credits"      class="toc-link">Credits</a>
+  <a href="#tech-stack"   class="toc-link">Tech Stack</a>
+</aside>
+
+<main class="docs-main" role="main">
+
+  <h1>About Starbridge</h1>
+  <p class="page-sub">VERSION HISTORY &amp; CREDITS</p>
+
+  <!-- What is Starbridge -->
+  <section id="what-is" class="about-section">
+    <h2>What is Starbridge?</h2>
+    <p>Starbridge is a cooperative multiplayer bridge simulation game. Players take on
+    specialised crew roles aboard a starship — Captain, Helm, Engineering, Weapons,
+    Science, Medical, Security, Communications, Flight Operations, Electronic Warfare,
+    Tactical Officer, and Damage Control — and must work together to complete missions.</p>
+
+    <p>Each crew member operates only their own station. You cannot see what other
+    stations look like; you can only see what your role provides. Information must be
+    communicated verbally between players in real time. The game is designed for
+    co-located crews (around a table) as well as remote play over voice chat.</p>
+
+    <p>Starbridge is built for educational and training contexts. Missions can be
+    authored in a visual graph editor, difficulty is tunable, and a full post-mission
+    debrief shows per-station statistics, key moments, and Captain's log entries.
+    Training missions walk new players through individual stations with automated AI
+    crew filling other roles.</p>
+  </section>
+
+  <!-- Version History -->
+  <section id="version-history" class="about-section">
+    <h2>Version History</h2>
+
+    <div class="version-row">
+      <span class="version-tag">v0.01</span>
+      <span class="version-desc">Core gameplay loop. Seven original stations (Captain,
+      Helm, Engineering, Weapons, Science, plus lobby and viewscreen), basic enemy AI,
+      combat system, first mission set, and WebSocket infrastructure. 331 tests.</span>
+    </div>
+
+    <div class="version-row">
+      <span class="version-tag">v0.02</span>
+      <span class="version-desc">Crew health model, ship interior, Medical station,
+      puzzle engine (7 puzzle types), Security &amp; boarding, Communications, the
+      Diplomatic Summit mission, disease outbreak system, ship hazards, EMP &amp;
+      nuclear torpedoes, Captain's log and nuclear authorisation. 948 tests.</span>
+    </div>
+
+    <div class="version-row">
+      <span class="version-tag">v0.03</span>
+      <span class="version-desc">Polish and expansion. Flight Operations, Electronic
+      Warfare, Tactical Officer, Damage Control stations added. Training missions (12).
+      Debrief dashboard and Captain's Replay. Ship class framework (7 classes). Multi-role
+      support and role-switching. Mission briefing room. 1,578 tests.</span>
+    </div>
+
+    <div class="version-row">
+      <span class="version-tag">v0.04</span>
+      <span class="version-desc">Tools and infrastructure. Mission Graph Engine
+      (parallel, branch, conditional node types). Visual mission editor with graph canvas,
+      trigger builder, and validation. Save &amp; resume system. Player profiles and
+      achievements. Admin dashboard with pause/resume, difficulty control, and engagement
+      monitoring. Accessibility pass (colour-blind mode, reduced motion, ARIA labels).
+      Landing page and documentation. 1,987 tests.</span>
+    </div>
+  </section>
+
+  <!-- Credits -->
+  <section id="credits" class="about-section">
+    <h2>Credits</h2>
+
+    <div class="tech-row">
+      <span class="tech-label">Game Design</span>
+      <span class="tech-value">Starbridge Development Team</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Implementation</span>
+      <span class="tech-value">Built with Claude Code (Anthropic)</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Concept</span>
+      <span class="tech-value">Inspired by cooperative bridge-crew games</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Typography</span>
+      <span class="tech-value">Share Tech Mono — Google Fonts (Open Font License)</span>
+    </div>
+  </section>
+
+  <!-- Tech Stack -->
+  <section id="tech-stack" class="about-section">
+    <h2>Tech Stack</h2>
+
+    <div class="tech-row">
+      <span class="tech-label">Backend language</span>
+      <span class="tech-value">Python 3.12</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Web framework</span>
+      <span class="tech-value">FastAPI + Starlette + uvicorn</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Data validation</span>
+      <span class="tech-value">Pydantic v2</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Real-time comms</span>
+      <span class="tech-value">WebSocket (game loop), HTTP REST (editor, admin, profiles)</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Frontend</span>
+      <span class="tech-value">Vanilla JavaScript (ES modules) — no framework, no build step</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Graphics</span>
+      <span class="tech-value">HTML5 Canvas 2D API</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Fonts</span>
+      <span class="tech-value">Share Tech Mono (Google Fonts)</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Test framework</span>
+      <span class="tech-value">pytest + pytest-asyncio + FastAPI TestClient (httpx)</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Persistence</span>
+      <span class="tech-value">JSON files (missions, saves, profiles) — no external database</span>
+    </div>
+    <div class="tech-row">
+      <span class="tech-label">Logging</span>
+      <span class="tech-value">JSONL event logs per session, post-mission debrief analysis</span>
+    </div>
+  </section>
+
+</main>
+</div><!-- /docs-wrap -->
+
+<script>
+  // TOC active tracking
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        document.querySelectorAll('.toc-link').forEach(a => a.classList.remove('active'));
+        const link = document.querySelector(`.toc-link[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -75% 0px' });
+
+  document.querySelectorAll('section[id]').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
