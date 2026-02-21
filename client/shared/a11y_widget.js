@@ -17,6 +17,7 @@ import { initSettings, getSetting, toggleSetting } from './settings.js';
 // ---------------------------------------------------------------------------
 
 const CSS = `
+/* Floating fallback (non-station pages: editor, admin, site) */
 .a11y-widget {
   position: fixed;
   bottom: 44px;  /* clear the 2rem role bar + margin */
@@ -26,6 +27,26 @@ const CSS = `
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+}
+
+/* Inline header variant (station pages) */
+.a11y-header-wrapper {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.a11y-header-wrapper .a11y-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 9999;
 }
 
 .a11y-toggle-btn {
@@ -154,11 +175,6 @@ function buildWidget() {
     document.head.appendChild(style);
   }
 
-  const widget = document.createElement('div');
-  widget.className = 'a11y-widget';
-  widget.setAttribute('role', 'complementary');
-  widget.setAttribute('aria-label', 'Accessibility settings');
-
   // Settings panel (hidden initially)
   const panel = document.createElement('div');
   panel.className = 'a11y-panel a11y-panel-hidden';
@@ -192,9 +208,27 @@ function buildWidget() {
   settingsBtn.title = 'Accessibility settings';
   settingsBtn.textContent = '⚙';
 
-  widget.appendChild(panel);
-  widget.appendChild(settingsBtn);
-  document.body.appendChild(widget);
+  // On station pages, embed the button in the station header so it never
+  // floats over interactive content.  On non-station pages (editor, admin,
+  // site), fall back to fixed-position bottom-right corner.
+  const headerEl = document.querySelector('.station-header');
+  if (headerEl) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'a11y-header-wrapper';
+    wrapper.setAttribute('role', 'complementary');
+    wrapper.setAttribute('aria-label', 'Accessibility settings');
+    wrapper.appendChild(panel);
+    wrapper.appendChild(settingsBtn);
+    headerEl.appendChild(wrapper);
+  } else {
+    const widget = document.createElement('div');
+    widget.className = 'a11y-widget';
+    widget.setAttribute('role', 'complementary');
+    widget.setAttribute('aria-label', 'Accessibility settings');
+    widget.appendChild(panel);
+    widget.appendChild(settingsBtn);
+    document.body.appendChild(widget);
+  }
 
   // Live region for announcements
   let liveRegion = document.getElementById('a11y-live');

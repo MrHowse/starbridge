@@ -114,8 +114,15 @@ function renderSupplies() {
 }
 
 function renderDeckList() {
-  // Avoid 10 Hz DOM thrashing: skip full rebuild if nothing changed.
-  const key = JSON.stringify({ crew: latestCrewData, treatments: activeTreatments, selected: selectedDeck });
+  // Round crew_factor to 2 dp so floating-point jitter doesn't trigger
+  // a DOM rebuild every tick.
+  const roundedCrew = {};
+  for (const [deck, data] of Object.entries(latestCrewData)) {
+    roundedCrew[deck] = { ...data, crew_factor: Math.round(data.crew_factor * 100) / 100 };
+  }
+
+  // Skip full DOM rebuild when nothing has actually changed.
+  const key = JSON.stringify({ crew: roundedCrew, treatments: activeTreatments, selected: selectedDeck });
   if (key === _renderedDeckJson) return;
   _renderedDeckJson = key;
 
@@ -155,8 +162,7 @@ function renderDeckList() {
         <span class="text-data">${factorPct}%</span>
       </div>
     `;
-
-    card.addEventListener('click', () => selectDeck(deckName));
+    // NOTE: click is handled via event delegation on deckListEl (see init()).
     deckListEl.appendChild(card);
   }
 }
@@ -276,6 +282,13 @@ function handleHullHit() {
 // ---------------------------------------------------------------------------
 
 function init() {
+  // Delegated click on the deck list — survives DOM rebuilds at 10 Hz.
+  // Per-card addEventListener would be lost whenever innerHTML is replaced.
+  deckListEl.addEventListener('click', (e) => {
+    const card = e.target.closest('.deck-card');
+    if (card && card.dataset.deck) selectDeck(card.dataset.deck);
+  });
+
   onStatusChange((status) => {
     setStatusDot(statusDotEl, status);
     statusLabelEl.textContent = status.toUpperCase();

@@ -80,8 +80,41 @@ export function initRoleBar(send, currentRole) {
   _buildBar();
 
   on('game.started', (payload) => {
+    // Persist our own player name so isMyRole detection works across navigations.
+    const name = (payload.players || {})[_currentRole];
+    if (name) sessionStorage.setItem('player_name', name);
     _renderBar(payload.players || {});
   });
+
+  // lobby.state is broadcast to all connections (including in-game stations)
+  // whenever any role is claimed or released.  Use it to keep the bar live.
+  on('lobby.state', (payload) => {
+    if (!_barEl) return; // bar not yet built (game not started)
+    _renderBar(_playersFromRoles(payload.roles || {}));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert lobby.state roles dict → players dict suitable for _renderBar.
+ * lobby.state uses 'DISCONNECTED:<name>' for reserved roles; strip the prefix
+ * so the player can still be detected as isMyRole and click back.
+ */
+function _playersFromRoles(roles) {
+  const players = {};
+  for (const [role, val] of Object.entries(roles)) {
+    if (!val) {
+      players[role] = null;
+    } else if (val.startsWith('DISCONNECTED:')) {
+      players[role] = val.slice('DISCONNECTED:'.length);
+    } else {
+      players[role] = val;
+    }
+  }
+  return players;
 }
 
 // ---------------------------------------------------------------------------

@@ -162,6 +162,12 @@ body::after {
   animation: flicker 4s infinite;
 }
 
+/* Station header needs position:relative so the a11y widget can be
+   absolutely positioned within it, avoiding overlap with station content. */
+.station-header {
+  position: relative;
+}
+
 /* =========================================================================
    Panels
    ========================================================================= */
