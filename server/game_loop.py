@@ -12,6 +12,7 @@ stop() — halt the loop.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
 import time as _time
@@ -156,6 +157,9 @@ _session_players: dict[str, str] = {}
 # Admin pause flag — when True the tick body is skipped, only sleep runs.
 _paused: bool = False
 
+# Performance: last serialised DC state — avoid redundant broadcasts when idle.
+_last_dc_state_json: str = ""
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -289,8 +293,9 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
         logger.warning("Unknown ship class %r — using frigate defaults", ship_class)
         sc = load_ship_class("frigate")
 
-    global _paused
+    global _paused, _last_dc_state_json
     _paused = False  # always start unpaused
+    _last_dc_state_json = ""
     glw.reset(initial_ammo=sc.torpedo_ammo)
     glmed.reset()
     gls.reset()
@@ -751,15 +756,20 @@ async def _loop() -> None:
             )
 
         # 11i. Engineering damage-control state → Engineering + Damage Control stations.
+        # Performance: only broadcast if state has changed since last tick.
+        global _last_dc_state_json
         _dc_state_msg = gldc.build_dc_state(_world.ship.interior)
-        await _manager.broadcast_to_roles(
-            ["engineering"],
-            Message.build("engineering.dc_state", _dc_state_msg),
-        )
-        await _manager.broadcast_to_roles(
-            ["damage_control"],
-            Message.build("damage_control.state", _dc_state_msg),
-        )
+        _dc_json = json.dumps(_dc_state_msg, separators=(",", ":"), sort_keys=True)
+        if _dc_json != _last_dc_state_json:
+            _last_dc_state_json = _dc_json
+            await _manager.broadcast_to_roles(
+                ["engineering"],
+                Message.build("engineering.dc_state", _dc_state_msg),
+            )
+            await _manager.broadcast_to_roles(
+                ["damage_control"],
+                Message.build("damage_control.state", _dc_state_msg),
+            )
 
         # 11j. Flight ops state → Flight Ops station.
         await _manager.broadcast_to_roles(

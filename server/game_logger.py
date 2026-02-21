@@ -108,11 +108,19 @@ class GameLogger:
     # Internal
     # ------------------------------------------------------------------
 
+    # Number of writes between automatic flushes.  Low values increase I/O;
+    # high values risk losing events on crash.  10 = flush ~1×/s at 10 Hz.
+    _FLUSH_INTERVAL: int = 10
+
     def _write(self, record: dict) -> None:
         """Write one record. Caller is responsible for catching exceptions."""
         assert self._fh is not None
         self._fh.write(json.dumps(record) + "\n")
-        self._fh.flush()
+        # Flush every _FLUSH_INTERVAL writes to reduce I/O without losing events.
+        self._pending_writes = getattr(self, "_pending_writes", 0) + 1
+        if self._pending_writes >= self._FLUSH_INTERVAL:
+            self._fh.flush()
+            self._pending_writes = 0
 
 
 # ---------------------------------------------------------------------------
