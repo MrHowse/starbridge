@@ -713,3 +713,25 @@ This creates the crew dependency loop: *"Science, scan that cruiser." "I can't �
 - Re-apply assist continuously while sensors > 1.2 — rejected: would rapidly stack tolerance to max; one application per puzzle is the right balance
 
 ---
+
+## 2026-02-21 — Profile achievements are career-cumulative, separate from session awards (v0.04g)
+
+**Decision**: Player profile achievements (first_command, bridge_regular, veteran, sharpshooter, life_saver, explorer) are career-cumulative milestones that unlock once and persist in the profile JSON. They are separate from the session awards computed by `game_debrief.py` (which are one-off per-game awards). Profile stats accumulate across all sessions; debrief awards are ephemeral.
+
+**Reasoning**: Career milestones reward long-term engagement and give players a reason to return. Session awards provide immediate per-game feedback. Keeping these separate avoids conflating "you played a good game" with "you hit a life milestone". The profile JSON is the only persistent cross-session store.
+
+**Alternatives considered**:
+- Career achievements computed from JSONL logs — rejected: log files are not guaranteed to persist; profiles are the authoritative cross-session store
+- Session awards stored in profiles — rejected: game-specific context (mission, difficulty) makes awards meaningless out of context
+
+---
+
+## 2026-02-21 — Admin pause skips tick body, not the loop itself (v0.04h)
+
+**Decision**: When the admin pauses the game, `_loop()` skips the tick body with `continue` but keeps `asyncio.sleep(TICK_DT)` running. The WebSocket connections remain open. The loop state variable `_paused` is set by `pause()` and cleared by `resume()`.
+
+**Reasoning**: Pausing by stopping the loop (e.g., cancelling the task) would require complex restart logic and would break WebSocket connections. Keeping the loop alive and just skipping the tick body is simpler, more predictable, and reversible in one line.
+
+**Alternatives considered**:
+- Cancel game loop task on pause, restart on resume — rejected: complex restart; connection state lost
+- Slow-motion pause (reduce tick rate to 1 Hz) — rejected: introduces state drift; admin needs a clean frozen state

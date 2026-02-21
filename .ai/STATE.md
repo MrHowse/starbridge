@@ -3,11 +3,12 @@
 > **LIVING DOCUMENT** — Update after every AI engineering session.
 > This is the single source of truth for what exists in the project.
 
-**Last updated**: 2026-02-20 (v0.04c COMPLETE — new graph-native missions)
-**Current phase**: v0.04c COMPLETE ✓
-**Overall status**: 1781 tests passing. 11 active player roles + viewscreen (passive) = 12 stations.
-27 JSON missions (15 story + 12 training) + sandbox (synthetic) — all in graph format. 9 puzzle types.
-7 ship classes (5 combat + 2 specialised). 4 difficulty presets.
+**Last updated**: 2026-02-21 (v0.04k COMPLETE — Final Integration Gate)
+**Current phase**: v0.04k COMPLETE ✓ — v0.04 CLOSED
+**Overall status**: 1987 tests passing. 12 stations (11 active + viewscreen passive).
+27 JSON missions (15 story + 12 training) + sandbox — all in graph format. 9 puzzle types.
+7 ship classes. 4 difficulty presets. Mission editor. Save/resume. Player profiles. Admin dashboard.
+Accessibility pass (colour-blind mode, reduced-motion, keyboard nav) across all 19 pages.
 Game event logger (JSONL) + Debrief Dashboard + Captain's Replay.
 MissionGraph engine (parallel/branch/conditional nodes) — all missions use graph format.
 Bug fix: MissionGraph.tick() now returns parallel parent IDs when they complete.
@@ -277,9 +278,82 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 | `test_mission_graph.py` | 118 | v0.04a |
 | `test_graph_missions.py` | 60 | v0.04c |
 
-**Total: 1781 tests** ✓ (verified by pytest run 2026-02-20, post-v0.04c)
+**Total at v0.04c: 1781 tests** ✓
+
+### v0.04 Additions (tests/test_gate_v004.py + more)
+
+| File | Tests | Phase |
+|------|-------|-------|
+| `test_mission_validator.py` | 20 | v0.04d |
+| `test_editor_endpoints.py` | 15 | v0.04d |
+| `test_profiles.py` | 25 | v0.04g |
+| `test_admin_endpoints.py` | 20 | v0.04h |
+| `test_gate_v004.py` | 74 | v0.04k |
+
+**Additional tests (save system, terminology, misc)**: ~52 more tests across v0.04e–v0.04f
+
+**Total: 1987 tests** ✓ (verified by pytest run 2026-02-21, post-v0.04k)
 
 ---
+
+## v0.04 Additions to What Exists
+
+### New Server Modules (v0.04d–v0.04j)
+- `server/mission_validator.py` — **[v0.04d]** `validate_mission(dict) → list[str]`. 9 rules: id/name presence, start_node exists, victory_nodes non-empty, edges reference real nodes, branch ≥2 trigger edges, parallel ≥2 children, BFS reachability check (excluding conditionals), unique puzzle labels.
+- `server/save_system.py` — **[v0.04f]** `save_game()`, `list_saves()`, `load_save(id)`, `restore_game(id, world)`. Saves JSON to `saves/{id}.json`. Full ship + world + all module state (12 sub-modules). Serialised/restored dataclasses.
+- `server/profiles.py` — **[v0.04g]** `PROFILES_DIR = profiles/`. `get_or_create_profile(name)`, `update_game_result(name, role, result, mission_id, duration_s, station_stats)`, `get_profile(name)`, `list_profiles()`, `export_csv()`. 6 career achievements: first_command, bridge_regular, veteran, sharpshooter, life_saver, explorer.
+- `server/admin.py` — **[v0.04h]** `reset()`, `update_interaction(role)`, `get_engagement_status(role)`, `build_engagement_report()`. Constants: IDLE_SECS=30, AWAY_SECS=60. ALL_STATION_ROLES list (12 roles).
+
+### New main.py Endpoints (v0.04d–v0.04j)
+- `GET /editor` → redirect to `/client/editor/`
+- `GET /editor/missions` → list all missions in missions/ dir
+- `GET /editor/mission/{mission_id}` → load single mission JSON
+- `POST /editor/validate` → `{"valid": bool, "errors": list[str]}`
+- `POST /editor/save` → save mission to missions/ dir; validates id chars; returns warnings
+- `GET /admin` → redirect to `/client/admin/`
+- `GET /admin/state` → `{game_running, tick, ship, engagement, preset, saved_games}`
+- `POST /admin/pause`, `/admin/resume` → 409 if no game running
+- `POST /admin/annotate` → log annotation entry
+- `POST /admin/broadcast` → broadcast text to all clients
+- `POST /admin/difficulty` → change difficulty preset mid-game (validates against PRESETS)
+- `POST /admin/save` → save current game (409 if not running)
+- `GET /saves` → list saved games
+- `GET /saves/{save_id}` → load save metadata
+- `POST /saves/resume/{save_id}` → restore game from save
+- `POST /profiles/login` → get or create profile
+- `GET /profiles/leaderboard` → sorted by games_won
+- `GET /profiles/export` → CSV string
+- `GET /profiles` → list all profiles
+- `GET /profiles/{name}` → single profile
+
+### game_loop.py Additions (v0.04g–v0.04i)
+- `_session_players: dict[str, str]` — role→player_name map for profile updates
+- `set_session_players(players)` — called from _on_game_start wrapper in main.py
+- `_update_profiles(result, stats)` — updates all session players on game-over
+- `_paused: bool` — pause state; `pause()`, `resume()`, `is_paused()`
+- `_last_dc_state_json: str` — JSON hash for DC state change detection
+
+### game_logger.py Additions (v0.04i)
+- `_FLUSH_INTERVAL = 10` — flush every 10 writes (was every write)
+- `_pending_writes` counter — tracks writes since last flush
+
+### New Client Directories (v0.04d–v0.04j)
+- `client/editor/` — **[v0.04d]** Mission editor SPA: index.html, editor.js, editor.css, graph_renderer.js, node_panel.js, edge_panel.js, trigger_builder.js, entity_placer.js, validator.js, exporter.js
+- `client/damage_control/` — **[v0.04e]** Damage control station: index.html, damage_control.js, damage_control.css
+- `client/login/` — **[v0.04g]** Player login: index.html, login.js, login.css; callsign input + profile card + leaderboard modal
+- `client/admin/` — **[v0.04h]** Admin dashboard: index.html, admin.js, admin.css; 12-panel grid, engagement dots, pause/resume controls
+
+### Shared Accessibility Files (v0.04j)
+- `client/shared/settings.js` — `initSettings()`, `getSetting(key)`, `toggleSetting(key)`, `setSetting(key, value)`. localStorage key `starbridge_settings`. Auto-applies `body.cb-mode` and `body.no-motion` classes.
+- `client/shared/accessibility.css` — Colour-blind palette (`body.cb-mode`: green→blue, red→orange), reduced motion (`body.no-motion` + `prefers-reduced-motion`), `:focus-visible` keyboard indicators, `.sr-only` utility.
+- `client/shared/a11y_widget.js` — Self-injecting floating ⚙ button (bottom-right). Settings panel with toggle switches. Keyboard: Escape closes. `announce(text)` for screen reader live region.
+- All 19 HTML pages include accessibility.css + a11y_widget.js.
+
+### Saves Directory
+- `saves/` — runtime directory for save JSON files (gitignored)
+
+### Profiles Directory
+- `profiles/` — runtime directory for player profile JSON files (gitignored)
 
 ## What Works (v0.03)
 
@@ -387,6 +461,30 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 - Stale health endpoint phase string
 - min_crew not enforced at launch
 - medical_ship/carrier have no differentiated mechanics
+
+### v0.04 Gate: COMPLETE ✓ — 2026-02-21
+
+- [x] 1987 tests passing; 0 regressions from v0.04c baseline (1781 tests)
+- [x] Mission Graph Engine: MissionGraph in game_loop_mission; all 23 missions in graph format
+- [x] 4 new graph-native missions (salvage_run, first_contact_remastered, the_convoy, pandemic)
+- [x] Mission validator: validate_mission() returns error list
+- [x] Editor REST endpoints: /editor/validate, /editor/save, /editor/missions, /editor/mission/{id}
+- [x] Mission editor SPA: client/editor/ with 8 JS files
+- [x] Damage control station: client/damage_control/ (dedicated page)
+- [x] Save system: save_game/list_saves/load_save/restore_game; saves/ dir; lobby resume UI
+- [x] Player profiles: profiles.py; 6 achievements; REST API (/profiles/*); login page
+- [x] Admin dashboard: admin.py engagement tracking; pause/resume; /admin/* endpoints; client/admin/
+- [x] Performance: logger flush batching (10×); DC state change detection; stress_test.py
+- [x] Accessibility: settings.js + accessibility.css + a11y_widget.js; wired on all 19 pages
+- [x] Health check phase: "v0.04"
+- [x] Gate tests: test_gate_v004.py — 74 tests covering all sub-releases
+
+**Known gaps at v0.04 close (not blocking)**:
+- No audio (placeholder remains)
+- No automated E2E tests
+- Admin engage tracking polls at 2s (no server push)
+- Profile leaderboard is client-fetch on demand (no live updates)
+- medical_ship/carrier still have no differentiated gameplay mechanics
 
 ---
 
