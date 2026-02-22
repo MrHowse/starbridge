@@ -1,21 +1,28 @@
 /**
- * Starbridge — Medical Station
+ * Starbridge — Medical Station v2
  *
- * Displays crew status by deck and allows Medical to start/cancel treatment
- * sessions that heal injured or stabilise critical crew over time.
+ * Individual crew member casualty tracking, body diagram, injury detail,
+ * treatment flow, quarantine, and status bar.
  *
  * Server messages received:
- *   game.started          — show medical UI; store mission label
- *   ship.state            — crew counts, crew_factor, medical_supplies,
- *                           active_treatments
- *   ship.alert_changed    — update station alert colour
- *   ship.hull_hit         — hit-flash border
- *   game.over             — defeat/victory overlay
+ *   game.started           — show medical UI; store mission label
+ *   ship.state             — crew counts, medical_supplies (legacy compat)
+ *   medical.state          — full v2 medical state
+ *   medical.crew_roster    — individual crew member data
+ *   medical.event          — severity change, death, treatment complete, etc.
+ *   ship.alert_changed     — update station alert colour
+ *   ship.hull_hit          — hit-flash border
+ *   game.over              — defeat/victory overlay
  *
  * Server messages sent:
- *   lobby.claim_role      { role: 'medical', player_name }
- *   medical.treat_crew    { deck, injury_type: 'injured'|'critical' }
- *   medical.cancel_treatment { deck }
+ *   lobby.claim_role        { role: 'medical', player_name }
+ *   medical.admit           { crew_id }
+ *   medical.treat           { crew_id, injury_id }
+ *   medical.stabilise       { crew_id, injury_id }
+ *   medical.discharge       { crew_id }
+ *   medical.quarantine      { crew_id }
+ *   medical.treat_crew      { deck, injury_type }          (legacy compat)
+ *   medical.cancel_treatment { deck }                       (legacy compat)
  */
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
@@ -31,28 +38,34 @@ import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
 
 registerHelp([
-  { selector: '#deck-list',         text: 'Crew by deck — shows active, injured, critical, dead counts.', position: 'right' },
-  { selector: '#supply-count',      text: 'Medical supplies — each treatment costs 2 units.', position: 'below' },
-  { selector: '#btn-treat-injured', text: 'Start treatment for injured crew on selected deck.', position: 'above' },
-  { selector: '#btn-treat-critical',text: 'Start treatment for critical crew (higher priority).', position: 'above' },
+  { selector: '#casualty-list',  text: 'Casualty list — click a crew member to view their injuries. Use sort/filter buttons to organise.', position: 'right' },
+  { selector: '#body-diagram',   text: 'Body diagram — shows injury locations. Click a region to filter injuries.', position: 'left' },
+  { selector: '#injury-list',    text: 'Injuries for selected patient. Click treatment buttons to begin.', position: 'left' },
+  { selector: '.med-status-bar', text: 'Status bar — beds, queue, supplies, quarantine, morgue, crew count.', position: 'above' },
 ]);
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const SUPPLY_MAX    = 20;
-const HIT_FLASH_MS  = 500;
+const HIT_FLASH_MS = 500;
+const SEVERITY_ORDER = { critical: 0, serious: 1, moderate: 2, minor: 3 };
+const SEVERITY_LABELS = { critical: 'CRITICAL', serious: 'SERIOUS', moderate: 'MODERATE', minor: 'MINOR' };
+const SEVERITY_COLORS = {
+  critical: '#ff3333',
+  serious:  '#ff8800',
+  moderate: '#ffaa00',
+  minor:    '#888888',
+};
 
-// Deck display order and labels
-const DECK_ORDER = ['bridge', 'sensors', 'weapons', 'shields', 'engineering', 'medical'];
-const DECK_LABELS = {
-  bridge:      'Bridge',
-  sensors:     'Sensors',
-  weapons:     'Weapons',
-  shields:     'Shields',
-  engineering: 'Engineering',
-  medical:     'Medical',
+// Body diagram region layout (relative to 240x320 canvas)
+const BODY_REGIONS = {
+  head:      { x: 96,  y: 10,  w: 48, h: 48, label: 'HEAD' },
+  torso:     { x: 76,  y: 66,  w: 88, h: 100, label: 'TORSO' },
+  left_arm:  { x: 24,  y: 70,  w: 44, h: 90, label: 'L.ARM' },
+  right_arm: { x: 172, y: 70,  w: 44, h: 90, label: 'R.ARM' },
+  left_leg:  { x: 76,  y: 174, w: 40, h: 120, label: 'L.LEG' },
+  right_leg: { x: 124, y: 174, w: 40, h: 120, label: 'R.LEG' },
 };
 
 // ---------------------------------------------------------------------------
@@ -66,44 +79,512 @@ const medicalMainEl  = document.querySelector('[data-medical-main]');
 const missionLabelEl = document.getElementById('mission-label');
 const stationEl      = document.querySelector('.station-container');
 
-const supplyFillEl   = document.getElementById('supply-fill');
-const supplyCountEl  = document.getElementById('supply-count');
-const deckListEl     = document.getElementById('deck-list');
+const casualtyListEl  = document.getElementById('casualty-list');
+const patientNameEl   = document.getElementById('patient-name');
+const detailEmptyEl   = document.getElementById('detail-empty');
+const detailViewEl    = document.getElementById('detail-view');
+const ptRankNameEl    = document.getElementById('pt-rank-name');
+const ptStationEl     = document.getElementById('pt-station');
+const ptDeckEl        = document.getElementById('pt-deck');
+const ptLocationEl    = document.getElementById('pt-location');
+const bodyCanvas      = document.getElementById('body-diagram');
+const bodyCtx         = bodyCanvas ? bodyCanvas.getContext('2d') : null;
+const injuryListEl    = document.getElementById('injury-list');
+const btnAdmit        = document.getElementById('btn-admit');
+const btnDischarge    = document.getElementById('btn-discharge');
+const btnQuarantine   = document.getElementById('btn-quarantine');
 
-const diseaseListEl     = document.getElementById('disease-list');
-
-const treatmentNoneEl   = document.getElementById('treatment-none');
-const treatmentActiveEl = document.getElementById('treatment-active');
-const treatDeckLabelEl  = document.getElementById('treatment-deck-label');
-const trActiveEl        = document.getElementById('tr-active');
-const trInjuredEl       = document.getElementById('tr-injured');
-const trCriticalEl      = document.getElementById('tr-critical');
-const trDeadEl          = document.getElementById('tr-dead');
-const trStatusEl        = document.getElementById('tr-status');
-const btnTreatInjuredEl = document.getElementById('btn-treat-injured');
-const btnTreatCritEl    = document.getElementById('btn-treat-critical');
-const btnCancelEl       = document.getElementById('btn-cancel');
+// Status bar
+const stBedsEl        = document.getElementById('st-beds');
+const stQueueEl       = document.getElementById('st-queue');
+const supplyFillEl    = document.getElementById('supply-fill');
+const supplyCountEl   = document.getElementById('supply-count');
+const stQuarantineEl  = document.getElementById('st-quarantine');
+const stMorgueEl      = document.getElementById('st-morgue');
+const stCrewEl        = document.getElementById('st-crew');
+const stTreatWrapEl   = document.getElementById('st-treatment-wrap');
+const stTreatLabelEl  = document.getElementById('st-treatment-label');
+const stTreatFillEl   = document.getElementById('st-treatment-fill');
+const stTreatPctEl    = document.getElementById('st-treatment-pct');
+const morgueItemEl    = document.getElementById('morgue-item');
+const morgueOverlayEl = document.getElementById('morgue-overlay');
+const morgueListEl    = document.getElementById('morgue-list');
+const btnCloseMorgue  = document.getElementById('btn-close-morgue');
 
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
-let selectedDeck = null;     // deck name or null
-let latestCrewData = {};     // deck_name → { active, injured, critical, dead, crew_factor }
-let activeTreatments = {};   // deck_name → 'injured' | 'critical'
-let medicalSupplies = SUPPLY_MAX;
-let diseaseState = {};       // { infected_decks: {...} }
-let _renderedDeckJson = '';  // hash guard — skip DOM rebuild when nothing changed
+let crewRoster = {};          // crew_id → crew member dict
+let medicalState = {};        // beds, queue, treatments, supplies, quarantine, morgue
+let selectedCrewId = null;    // currently selected casualty
+let sortMode = 'urgency';     // urgency | deck | name | arrival
+let filterSeverity = 'all';   // all | critical | serious | moderate | minor
+let filterDeck = 'all';       // all | 1-5
+let bodyRegionFilter = null;  // null or body region string
+let _renderedCasualtyHash = '';
+let _renderedDetailHash = '';
+let _highlightIndex = -1;     // keyboard nav index
 
 // ---------------------------------------------------------------------------
-// Rendering
+// Sorting & filtering
 // ---------------------------------------------------------------------------
 
-function renderSupplies() {
-  const pct = Math.max(0, (medicalSupplies / SUPPLY_MAX) * 100);
+function getCasualties() {
+  const list = Object.values(crewRoster).filter(m => {
+    if (m.status === 'active' && (!m.injuries || m.injuries.length === 0)) return false;
+    return true;
+  });
+
+  // Filter by severity
+  if (filterSeverity !== 'all') {
+    const keep = list.filter(m => {
+      if (m.status === 'dead') return filterSeverity === 'critical';
+      return m.injuries && m.injuries.some(i => !i.treated && i.severity === filterSeverity);
+    });
+    return sortCasualties(keep);
+  }
+
+  // Filter by deck
+  if (filterDeck !== 'all') {
+    const deckNum = parseInt(filterDeck, 10);
+    const keep = list.filter(m => m.deck === deckNum);
+    return sortCasualties(keep);
+  }
+
+  return sortCasualties(list);
+}
+
+function getWorstSeverity(member) {
+  if (member.status === 'dead') return 'critical';
+  if (!member.injuries || member.injuries.length === 0) return null;
+  const untreated = member.injuries.filter(i => !i.treated);
+  if (untreated.length === 0) return null;
+  let worst = null;
+  for (const inj of untreated) {
+    if (worst === null || (SEVERITY_ORDER[inj.severity] ?? 99) < (SEVERITY_ORDER[worst] ?? 99)) {
+      worst = inj.severity;
+    }
+  }
+  return worst;
+}
+
+function getWorstTimer(member) {
+  if (!member.injuries) return Infinity;
+  let minTimer = Infinity;
+  for (const inj of member.injuries) {
+    if (inj.treated || inj.treating) continue;
+    if (inj.severity === 'critical' && inj.death_timer != null) {
+      minTimer = Math.min(minTimer, inj.death_timer);
+    } else if (inj.degrade_timer != null) {
+      minTimer = Math.min(minTimer, inj.degrade_timer);
+    }
+  }
+  return minTimer;
+}
+
+function sortCasualties(list) {
+  switch (sortMode) {
+    case 'urgency':
+      return list.sort((a, b) => {
+        const sa = SEVERITY_ORDER[getWorstSeverity(a)] ?? 99;
+        const sb = SEVERITY_ORDER[getWorstSeverity(b)] ?? 99;
+        if (sa !== sb) return sa - sb;
+        return getWorstTimer(a) - getWorstTimer(b);
+      });
+    case 'deck':
+      return list.sort((a, b) => (a.deck || 0) - (b.deck || 0));
+    case 'name':
+      return list.sort((a, b) => {
+        const na = `${a.surname || ''} ${a.first_name || ''}`;
+        const nb = `${b.surname || ''} ${b.first_name || ''}`;
+        return na.localeCompare(nb);
+      });
+    case 'arrival':
+      return list.sort((a, b) => {
+        const ta = a.injuries && a.injuries.length > 0 ? Math.max(...a.injuries.map(i => i.tick_received || 0)) : 0;
+        const tb = b.injuries && b.injuries.length > 0 ? Math.max(...b.injuries.map(i => i.tick_received || 0)) : 0;
+        return tb - ta;
+      });
+    default:
+      return list;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
+function fmtTimer(seconds) {
+  if (seconds == null || seconds === Infinity) return '--:--';
+  const s = Math.max(0, Math.ceil(seconds));
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+function fmtRegion(region) {
+  if (!region) return '';
+  return region.replace(/_/g, ' ');
+}
+
+function displayName(member) {
+  const rank = member.rank || '';
+  const surname = member.surname || '';
+  return `${rank} ${surname}`.trim();
+}
+
+// ---------------------------------------------------------------------------
+// Rendering: Casualty list
+// ---------------------------------------------------------------------------
+
+function renderCasualtyList() {
+  const casualties = getCasualties();
+  const hash = JSON.stringify({ ids: casualties.map(c => c.id), sel: selectedCrewId, sort: sortMode, filt: filterSeverity, deck: filterDeck });
+  if (hash === _renderedCasualtyHash) return;
+  _renderedCasualtyHash = hash;
+
+  casualtyListEl.innerHTML = '';
+
+  if (casualties.length === 0) {
+    casualtyListEl.innerHTML = '<p class="text-body text-dim med-empty-msg">No casualties reported.</p>';
+    return;
+  }
+
+  for (const member of casualties) {
+    const worst = getWorstSeverity(member);
+    const isDead = member.status === 'dead';
+    const isSelected = member.id === selectedCrewId;
+
+    const card = document.createElement('div');
+    card.className = 'cas-card';
+    if (isDead) card.classList.add('cas-card--dead');
+    else if (worst) card.classList.add(`cas-card--${worst}`);
+    if (isSelected) card.classList.add('cas-card--selected');
+    card.dataset.crewId = member.id;
+    card.setAttribute('role', 'option');
+    card.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+
+    // Row 1: Name + severity badge
+    const sevBadge = isDead
+      ? '<span class="cas-card__severity sev--critical">DECEASED</span>'
+      : worst
+        ? `<span class="cas-card__severity sev--${worst}">${SEVERITY_LABELS[worst] || worst.toUpperCase()}</span>`
+        : '';
+
+    // Row 2: Worst injury description + timer
+    const worstInj = !isDead && member.injuries ? member.injuries.filter(i => !i.treated).sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99))[0] : null;
+    const injDesc = worstInj ? worstInj.description || worstInj.type.replace(/_/g, ' ') : '';
+
+    let timerHtml = '';
+    if (!isDead && worstInj) {
+      if (worstInj.severity === 'critical' && worstInj.death_timer != null) {
+        timerHtml = `<span class="cas-card__timer cas-card__timer--death">${fmtTimer(worstInj.death_timer)}</span>`;
+      } else if (worstInj.degrade_timer != null) {
+        timerHtml = `<span class="cas-card__timer cas-card__timer--degrade">${fmtTimer(worstInj.degrade_timer)}</span>`;
+      }
+    }
+
+    // Row 3: Deck + duty station
+    const deckLabel = member.deck != null ? `Deck ${member.deck}` : '';
+    const stationLabel = member.duty_station ? member.duty_station.replace(/_/g, ' ') : '';
+
+    card.innerHTML = `
+      <div class="cas-card__row1">
+        <span class="cas-card__name">${displayName(member)}</span>
+        ${sevBadge}
+      </div>
+      <div class="cas-card__row2">
+        <span class="cas-card__injury">${injDesc}</span>
+        ${timerHtml}
+      </div>
+      <div class="cas-card__row3">${deckLabel}${stationLabel ? ' — ' + stationLabel : ''}</div>
+      ${isDead ? '<span class="cas-deceased-overlay">DECEASED</span>' : ''}
+    `;
+
+    casualtyListEl.appendChild(card);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rendering: Patient detail
+// ---------------------------------------------------------------------------
+
+function renderPatientDetail() {
+  if (!selectedCrewId || !crewRoster[selectedCrewId]) {
+    detailEmptyEl.style.display = '';
+    detailViewEl.style.display = 'none';
+    patientNameEl.textContent = 'No patient selected';
+    return;
+  }
+
+  detailEmptyEl.style.display = 'none';
+  detailViewEl.style.display = '';
+
+  const member = crewRoster[selectedCrewId];
+  patientNameEl.textContent = displayName(member);
+  ptRankNameEl.textContent = `${member.rank || ''} ${member.first_name || ''} ${member.surname || ''}`.trim();
+  ptStationEl.textContent = member.duty_station ? member.duty_station.replace(/_/g, ' ').toUpperCase() : '';
+  ptDeckEl.textContent = member.deck != null ? `DECK ${member.deck}` : '';
+  ptLocationEl.textContent = member.location ? member.location.replace(/_/g, ' ').toUpperCase() : '';
+
+  renderBodyDiagram(member);
+  renderInjuryList(member);
+  updateActionButtons(member);
+}
+
+// ---------------------------------------------------------------------------
+// Rendering: Body diagram
+// ---------------------------------------------------------------------------
+
+function renderBodyDiagram(member) {
+  if (!bodyCtx) return;
+  const w = bodyCanvas.width;
+  const h = bodyCanvas.height;
+  bodyCtx.clearRect(0, 0, w, h);
+
+  // Build injury map: region → worst severity + count
+  const regionMap = {};
+  if (member.injuries) {
+    for (const inj of member.injuries) {
+      if (inj.treated) continue;
+      const region = inj.body_region;
+      if (region === 'whole_body') {
+        // Highlight all regions
+        for (const r of Object.keys(BODY_REGIONS)) {
+          _addToRegionMap(regionMap, r, inj.severity);
+        }
+      } else if (BODY_REGIONS[region]) {
+        _addToRegionMap(regionMap, region, inj.severity);
+      }
+    }
+  }
+
+  // Draw each region
+  const now = Date.now();
+  for (const [regionId, reg] of Object.entries(BODY_REGIONS)) {
+    const info = regionMap[regionId];
+    const isFiltered = bodyRegionFilter && bodyRegionFilter !== regionId;
+
+    if (regionId === 'head') {
+      _drawHeadRegion(reg, info, now, isFiltered);
+    } else {
+      _drawRectRegion(reg, info, now, isFiltered);
+    }
+
+    // Region label
+    bodyCtx.font = '9px monospace';
+    bodyCtx.fillStyle = isFiltered ? 'rgba(100,100,100,0.3)' : 'rgba(200,200,200,0.6)';
+    bodyCtx.textAlign = 'center';
+    const labelY = regionId.includes('leg') ? reg.y + reg.h + 12 : reg.y - 4;
+    bodyCtx.fillText(reg.label, reg.x + reg.w / 2, labelY);
+
+    // Injury count badge
+    if (info && info.count > 1) {
+      const bx = reg.x + reg.w - 6;
+      const by = reg.y + 2;
+      bodyCtx.fillStyle = SEVERITY_COLORS[info.worst] || '#888';
+      bodyCtx.fillRect(bx - 2, by - 8, 14, 12);
+      bodyCtx.fillStyle = '#000';
+      bodyCtx.font = 'bold 9px monospace';
+      bodyCtx.fillText(String(info.count), bx + 4, by + 1);
+    }
+  }
+}
+
+function _addToRegionMap(map, region, severity) {
+  if (!map[region]) {
+    map[region] = { worst: severity, count: 1 };
+  } else {
+    map[region].count++;
+    if ((SEVERITY_ORDER[severity] ?? 99) < (SEVERITY_ORDER[map[region].worst] ?? 99)) {
+      map[region].worst = severity;
+    }
+  }
+}
+
+function _drawHeadRegion(reg, info, now, dimmed) {
+  const cx = reg.x + reg.w / 2;
+  const cy = reg.y + reg.h / 2;
+  const r = reg.w / 2;
+
+  bodyCtx.beginPath();
+  bodyCtx.arc(cx, cy, r, 0, Math.PI * 2);
+
+  if (info && !dimmed) {
+    const alpha = _pulseAlpha(info.worst, now);
+    const color = SEVERITY_COLORS[info.worst] || '#888';
+    bodyCtx.fillStyle = _withAlpha(color, alpha * 0.4);
+    bodyCtx.fill();
+    bodyCtx.strokeStyle = _withAlpha(color, alpha);
+    bodyCtx.lineWidth = 2;
+  } else {
+    bodyCtx.strokeStyle = dimmed ? 'rgba(60,60,60,0.3)' : 'rgba(100,100,100,0.5)';
+    bodyCtx.lineWidth = 1;
+  }
+  bodyCtx.stroke();
+}
+
+function _drawRectRegion(reg, info, now, dimmed) {
+  if (info && !dimmed) {
+    const alpha = _pulseAlpha(info.worst, now);
+    const color = SEVERITY_COLORS[info.worst] || '#888';
+    bodyCtx.fillStyle = _withAlpha(color, alpha * 0.4);
+    bodyCtx.fillRect(reg.x, reg.y, reg.w, reg.h);
+    bodyCtx.strokeStyle = _withAlpha(color, alpha);
+    bodyCtx.lineWidth = 2;
+  } else {
+    bodyCtx.strokeStyle = dimmed ? 'rgba(60,60,60,0.3)' : 'rgba(100,100,100,0.5)';
+    bodyCtx.lineWidth = 1;
+  }
+  bodyCtx.strokeRect(reg.x, reg.y, reg.w, reg.h);
+}
+
+function _pulseAlpha(severity, now) {
+  const speed = { critical: 3, serious: 1.5, moderate: 0.8, minor: 0.4 }[severity] || 0.5;
+  return 0.5 + 0.5 * Math.sin(now / 1000 * speed * Math.PI * 2);
+}
+
+function _withAlpha(hex, alpha) {
+  // Convert #rrggbb to rgba
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
+}
+
+// ---------------------------------------------------------------------------
+// Rendering: Injury list
+// ---------------------------------------------------------------------------
+
+function renderInjuryList(member) {
+  injuryListEl.innerHTML = '';
+
+  if (!member.injuries || member.injuries.length === 0) {
+    injuryListEl.innerHTML = '<p class="text-body text-dim">No injuries.</p>';
+    return;
+  }
+
+  // Sort: untreated first, by severity
+  const sorted = [...member.injuries].sort((a, b) => {
+    if (a.treated !== b.treated) return a.treated ? 1 : -1;
+    return (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99);
+  });
+
+  // Filter by body region if set
+  const filtered = bodyRegionFilter
+    ? sorted.filter(i => i.body_region === bodyRegionFilter || i.body_region === 'whole_body')
+    : sorted;
+
+  for (const inj of filtered) {
+    const card = document.createElement('div');
+    card.className = 'inj-card';
+    if (inj.treated) card.classList.add('inj-card--treated');
+    if (inj.treating) card.classList.add('inj-card--treating');
+
+    const sevClass = `sev--${inj.severity}`;
+    const typeName = (inj.type || '').replace(/_/g, ' ');
+    const regionLabel = fmtRegion(inj.body_region);
+
+    // Timer
+    let timerHtml = '';
+    if (!inj.treated && !inj.treating) {
+      if (inj.severity === 'critical' && inj.death_timer != null) {
+        timerHtml = `<span class="inj-card__timer inj-card__timer--death">Death in: ${fmtTimer(inj.death_timer)}</span>`;
+      } else if (inj.degrade_timer != null) {
+        timerHtml = `<span class="inj-card__timer inj-card__timer--degrade">Degrades in: ${fmtTimer(inj.degrade_timer)}</span>`;
+      }
+    }
+
+    // Treatment actions or progress
+    let actionsHtml = '';
+    if (inj.treated) {
+      actionsHtml = '<span class="text-label" style="color:var(--system-healthy)">TREATED</span>';
+    } else if (inj.treating) {
+      // Show progress bar
+      const treatment = _findTreatment(member.id);
+      const pct = treatment ? Math.min(100, Math.round((treatment.elapsed / treatment.duration) * 100)) : 0;
+      const puzzleWait = treatment && treatment.puzzle_required && !treatment.puzzle_completed;
+      const label = puzzleWait ? 'AWAITING PROCEDURE' : `${pct}%`;
+      actionsHtml = `
+        <div class="inj-progress">
+          <div class="gauge"><div class="gauge__fill" style="width:${puzzleWait ? 0 : pct}%"></div></div>
+          <span class="inj-progress__pct">${label}</span>
+        </div>
+      `;
+    } else {
+      const treatType = inj.treatment_type || 'first_aid';
+      const treatDur = inj.treatment_duration ? Math.round(inj.treatment_duration) : '?';
+      const treatLabel = treatType.replace(/_/g, ' ').toUpperCase();
+      const inBed = member.treatment_bed != null;
+      const hasTreatment = _findTreatment(member.id) != null;
+
+      actionsHtml = `
+        <div class="inj-card__actions">
+          <button class="btn" data-action="treat" data-crew-id="${member.id}" data-injury-id="${inj.id}"
+                  ${(!inBed || hasTreatment) ? 'disabled' : ''}>${treatLabel} ${treatDur}s</button>
+          <button class="btn" data-action="stabilise" data-crew-id="${member.id}" data-injury-id="${inj.id}"
+                  >STABILISE</button>
+        </div>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="inj-card__header">
+        <span class="inj-card__type">${typeName} <span class="cas-card__severity ${sevClass}">${SEVERITY_LABELS[inj.severity] || ''}</span></span>
+        <span class="inj-card__region">${regionLabel}</span>
+      </div>
+      <div class="inj-card__desc">${inj.description || ''}</div>
+      ${timerHtml}
+      ${actionsHtml}
+    `;
+
+    injuryListEl.appendChild(card);
+  }
+}
+
+function _findTreatment(crewId) {
+  if (!medicalState.active_treatments) return null;
+  return medicalState.active_treatments[crewId] || null;
+}
+
+// ---------------------------------------------------------------------------
+// Rendering: Action buttons
+// ---------------------------------------------------------------------------
+
+function updateActionButtons(member) {
+  const isDead = member.status === 'dead';
+  const inBay = member.location === 'medical_bay';
+  const inQuarantine = member.location === 'quarantine';
+  const allTreated = member.injuries && member.injuries.length > 0 && member.injuries.every(i => i.treated);
+  const hasContagion = member.injuries && member.injuries.some(i =>
+    !i.treated && i.type && i.type.startsWith('infection_stage')
+  );
+
+  btnAdmit.disabled = isDead || inBay || inQuarantine;
+  btnDischarge.disabled = isDead || (!inBay && !inQuarantine) || !allTreated;
+  btnQuarantine.disabled = isDead || inQuarantine || !hasContagion;
+}
+
+// ---------------------------------------------------------------------------
+// Rendering: Status bar
+// ---------------------------------------------------------------------------
+
+function renderStatusBar() {
+  const beds = medicalState.beds_total || 4;
+  const occupied = medicalState.beds_occupied ? Object.keys(medicalState.beds_occupied).length : 0;
+  const bedDots = Array.from({ length: beds }, (_, i) => i < occupied ? '\u25CF' : '\u25CB').join('');
+  stBedsEl.textContent = `${bedDots} ${occupied}/${beds}`;
+
+  const queueLen = medicalState.queue ? medicalState.queue.length : 0;
+  stQueueEl.textContent = String(queueLen);
+
+  // Supplies
+  const supplies = medicalState.supplies ?? 100;
+  const suppliesMax = medicalState.supplies_max ?? 100;
+  const pct = Math.max(0, Math.round((supplies / suppliesMax) * 100));
   supplyFillEl.style.width = `${pct}%`;
-  supplyCountEl.textContent = `${medicalSupplies}/${SUPPLY_MAX}`;
-  // Colour-code the supply bar
+  supplyCountEl.textContent = `${pct}%`;
   if (pct > 50) {
     supplyFillEl.className = 'gauge__fill gauge__fill--supply';
   } else if (pct > 25) {
@@ -111,152 +592,374 @@ function renderSupplies() {
   } else {
     supplyFillEl.className = 'gauge__fill gauge__fill--supply gauge__fill--danger';
   }
-}
 
-function renderDeckList() {
-  // Round crew_factor to 2 dp so floating-point jitter doesn't trigger
-  // a DOM rebuild every tick.
-  const roundedCrew = {};
-  for (const [deck, data] of Object.entries(latestCrewData)) {
-    roundedCrew[deck] = { ...data, crew_factor: Math.round(data.crew_factor * 100) / 100 };
-  }
+  // Quarantine
+  const qTotal = medicalState.quarantine_total || 2;
+  const qOccupied = medicalState.quarantine_occupied ? Object.keys(medicalState.quarantine_occupied).length : 0;
+  stQuarantineEl.textContent = `${qOccupied}/${qTotal}`;
 
-  // Skip full DOM rebuild when nothing has actually changed.
-  const key = JSON.stringify({ crew: roundedCrew, treatments: activeTreatments, selected: selectedDeck });
-  if (key === _renderedDeckJson) return;
-  _renderedDeckJson = key;
+  // Morgue
+  const morgueCount = medicalState.morgue ? medicalState.morgue.length : 0;
+  stMorgueEl.textContent = String(morgueCount);
 
-  deckListEl.innerHTML = '';
-  for (const deckName of DECK_ORDER) {
-    const crew = latestCrewData[deckName];
-    if (!crew) continue;
+  // Crew count
+  const totalCrew = Object.keys(crewRoster).length;
+  const activeCrew = Object.values(crewRoster).filter(m => m.status === 'active').length;
+  stCrewEl.textContent = `${activeCrew}/${totalCrew}`;
 
-    const isSelected = (deckName === selectedDeck);
-    const treatment = activeTreatments[deckName];
-    const factorPct = Math.round(crew.crew_factor * 100);
-
-    const card = document.createElement('div');
-    card.className = 'deck-card' + (isSelected ? ' deck-card--selected' : '');
-    card.dataset.deck = deckName;
-
-    const treatBadge = treatment
-      ? `<span class="treatment-badge treatment-badge--${treatment}">${treatment.toUpperCase()}</span>`
-      : '';
-
-    card.innerHTML = `
-      <div class="deck-card__header">
-        <span class="text-label deck-card__name">${DECK_LABELS[deckName] || deckName}</span>
-        ${treatBadge}
-      </div>
-      <div class="deck-card__counts">
-        <span class="c-active">ACT:${crew.active}</span>
-        <span class="c-injured">INJ:${crew.injured}</span>
-        <span class="c-critical">CRT:${crew.critical}</span>
-        ${crew.dead > 0 ? `<span class="text-dim">KIA:${crew.dead}</span>` : ''}
-      </div>
-      <div class="deck-card__factor-row">
-        <div class="gauge deck-card__factor-gauge">
-          <div class="gauge__fill ${factorPct < 50 ? 'gauge__fill--danger' : factorPct < 75 ? 'gauge__fill--warn' : ''}"
-               style="width:${factorPct}%"></div>
-        </div>
-        <span class="text-data">${factorPct}%</span>
-      </div>
-    `;
-    // NOTE: click is handled via event delegation on deckListEl (see init()).
-    deckListEl.appendChild(card);
-  }
-}
-
-function renderTreatmentPanel() {
-  if (!selectedDeck || !latestCrewData[selectedDeck]) {
-    treatDeckLabelEl.textContent = 'No deck selected';
-    treatmentNoneEl.style.display = '';
-    treatmentActiveEl.style.display = 'none';
-    return;
-  }
-
-  const crew = latestCrewData[selectedDeck];
-  const treatment = activeTreatments[selectedDeck];
-
-  treatDeckLabelEl.textContent = DECK_LABELS[selectedDeck] || selectedDeck;
-  treatmentNoneEl.style.display = 'none';
-  treatmentActiveEl.style.display = '';
-
-  trActiveEl.textContent   = crew.active;
-  trInjuredEl.textContent  = crew.injured;
-  trCriticalEl.textContent = crew.critical;
-  trDeadEl.textContent     = crew.dead;
-
-  if (treatment) {
-    trStatusEl.textContent = `TREATING ${treatment.toUpperCase()}`;
-    trStatusEl.className = `text-data treatment-status--active`;
+  // Treatment progress in status bar
+  const treatments = medicalState.active_treatments || {};
+  const treatIds = Object.keys(treatments);
+  if (treatIds.length > 0) {
+    stTreatWrapEl.style.display = '';
+    // Show first active treatment
+    const t = treatments[treatIds[0]];
+    const member = crewRoster[t.crew_member_id];
+    const name = member ? displayName(member) : '?';
+    const treatLabel = (t.treatment_type || '').replace(/_/g, ' ');
+    const tPct = t.duration > 0 ? Math.min(100, Math.round((t.elapsed / t.duration) * 100)) : 0;
+    stTreatLabelEl.textContent = `${name} — ${treatLabel}`;
+    stTreatFillEl.style.width = `${tPct}%`;
+    stTreatPctEl.textContent = `${tPct}%`;
   } else {
-    trStatusEl.textContent = 'IDLE';
-    trStatusEl.className = 'text-data text-dim';
+    stTreatWrapEl.style.display = 'none';
   }
-
-  const hasSupplies = medicalSupplies >= 2;
-  btnTreatInjuredEl.disabled = crew.injured === 0 || !hasSupplies;
-  btnTreatCritEl.disabled    = crew.critical === 0 || !hasSupplies;
-  btnCancelEl.disabled       = !treatment;
 }
 
-function renderDiseasePanel() {
-  if (!diseaseListEl) return;
-  const infected = diseaseState.infected_decks || {};
-  const decks = Object.keys(infected);
-  if (decks.length === 0) {
-    diseaseListEl.innerHTML = '<span class="disease-clean text-dim label-sm">CLEAN — no outbreaks detected</span>';
+// ---------------------------------------------------------------------------
+// Rendering: Morgue overlay
+// ---------------------------------------------------------------------------
+
+function renderMorgueList() {
+  const morgueIds = medicalState.morgue || [];
+  if (morgueIds.length === 0) {
+    morgueListEl.innerHTML = '<p class="text-body text-dim">No casualties.</p>';
     return;
   }
-  diseaseListEl.innerHTML = decks.map(deck =>
-    `<div class="disease-deck-row">
-      <span class="disease-deck-name">${deck}</span>
-      <span class="disease-pathogen">${infected[deck]}</span>
-    </div>`
-  ).join('');
+  morgueListEl.innerHTML = '';
+  for (const cid of morgueIds) {
+    const member = crewRoster[cid];
+    if (!member) continue;
+    const name = `${member.rank || ''} ${member.first_name || ''} ${member.surname || ''}`.trim();
+    const cause = member.injuries ? member.injuries.filter(i => i.severity === 'critical').map(i => i.description || i.type.replace(/_/g, ' ')).join(', ') : 'Unknown';
+
+    const row = document.createElement('div');
+    row.className = 'morgue-row';
+    row.innerHTML = `
+      <span class="morgue-row__name">${name}</span>
+      <span class="morgue-row__cause">${cause}</span>
+    `;
+    morgueListEl.appendChild(row);
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Master render
+// ---------------------------------------------------------------------------
 
 function render() {
-  renderSupplies();
-  renderDeckList();
-  renderTreatmentPanel();
-  renderDiseasePanel();
+  renderCasualtyList();
+  renderPatientDetail();
+  renderStatusBar();
+}
+
+// Body diagram animation loop (separate from data render)
+let _animFrame = null;
+function _startDiagramLoop() {
+  function frame() {
+    if (selectedCrewId && crewRoster[selectedCrewId]) {
+      renderBodyDiagram(crewRoster[selectedCrewId]);
+    }
+    _animFrame = requestAnimationFrame(frame);
+  }
+  if (!_animFrame) _animFrame = requestAnimationFrame(frame);
 }
 
 // ---------------------------------------------------------------------------
 // Interaction
 // ---------------------------------------------------------------------------
 
-function selectDeck(deckName) {
-  selectedDeck = (selectedDeck === deckName) ? null : deckName;
+function selectCrew(crewId) {
+  selectedCrewId = (selectedCrewId === crewId) ? null : crewId;
+  bodyRegionFilter = null;
+  _renderedCasualtyHash = '';
+  _renderedDetailHash = '';
   render();
 }
 
-btnTreatInjuredEl.addEventListener('click', () => {
-  if (!selectedDeck) return;
-  send('medical.treat_crew', { deck: selectedDeck, injury_type: 'injured' });
+// Body diagram click → region filter
+if (bodyCanvas) {
+  bodyCanvas.addEventListener('click', (e) => {
+    const rect = bodyCanvas.getBoundingClientRect();
+    const scaleX = bodyCanvas.width / rect.width;
+    const scaleY = bodyCanvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    for (const [regionId, reg] of Object.entries(BODY_REGIONS)) {
+      if (regionId === 'head') {
+        const cx = reg.x + reg.w / 2;
+        const cy = reg.y + reg.h / 2;
+        const r = reg.w / 2;
+        if (Math.hypot(mx - cx, my - cy) <= r) {
+          bodyRegionFilter = bodyRegionFilter === regionId ? null : regionId;
+          render();
+          return;
+        }
+      } else {
+        if (mx >= reg.x && mx <= reg.x + reg.w && my >= reg.y && my <= reg.y + reg.h) {
+          bodyRegionFilter = bodyRegionFilter === regionId ? null : regionId;
+          render();
+          return;
+        }
+      }
+    }
+    // Click outside regions → clear filter
+    bodyRegionFilter = null;
+    render();
+  });
+}
+
+// Injury list action buttons (delegated)
+if (injuryListEl) {
+  injuryListEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn || btn.disabled) return;
+    const action = btn.dataset.action;
+    const crewId = btn.dataset.crewId;
+    const injuryId = btn.dataset.injuryId;
+    if (action === 'treat') {
+      send('medical.treat', { crew_id: crewId, injury_id: injuryId });
+    } else if (action === 'stabilise') {
+      send('medical.stabilise', { crew_id: crewId, injury_id: injuryId });
+    }
+  });
+}
+
+// Casualty list click (delegated)
+if (casualtyListEl) {
+  casualtyListEl.addEventListener('click', (e) => {
+    const card = e.target.closest('.cas-card');
+    if (card && card.dataset.crewId) selectCrew(card.dataset.crewId);
+  });
+}
+
+// Sort buttons
+document.querySelectorAll('[data-sort]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sortMode = btn.dataset.sort;
+    document.querySelectorAll('[data-sort]').forEach(b => b.classList.remove('med-sort-btn--active'));
+    btn.classList.add('med-sort-btn--active');
+    _renderedCasualtyHash = '';
+    render();
+  });
 });
 
-btnTreatCritEl.addEventListener('click', () => {
-  if (!selectedDeck) return;
-  send('medical.treat_crew', { deck: selectedDeck, injury_type: 'critical' });
+// Severity filter buttons
+document.querySelectorAll('[data-filter]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    filterSeverity = btn.dataset.filter;
+    document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('med-filter-btn--active'));
+    btn.classList.add('med-filter-btn--active');
+    _renderedCasualtyHash = '';
+    render();
+  });
 });
 
-btnCancelEl.addEventListener('click', () => {
-  if (!selectedDeck) return;
-  send('medical.cancel_treatment', { deck: selectedDeck });
+// Deck filter buttons
+document.querySelectorAll('[data-deck]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    filterDeck = btn.dataset.deck;
+    document.querySelectorAll('[data-deck]').forEach(b => b.classList.remove('med-filter-btn--active'));
+    btn.classList.add('med-filter-btn--active');
+    _renderedCasualtyHash = '';
+    render();
+  });
 });
+
+// Action buttons
+if (btnAdmit) {
+  btnAdmit.addEventListener('click', () => {
+    if (selectedCrewId) send('medical.admit', { crew_id: selectedCrewId });
+  });
+}
+
+if (btnDischarge) {
+  btnDischarge.addEventListener('click', () => {
+    if (selectedCrewId) send('medical.discharge', { crew_id: selectedCrewId });
+  });
+}
+
+if (btnQuarantine) {
+  btnQuarantine.addEventListener('click', () => {
+    if (selectedCrewId) send('medical.quarantine', { crew_id: selectedCrewId });
+  });
+}
+
+// Morgue toggle
+if (morgueItemEl) {
+  morgueItemEl.addEventListener('click', () => {
+    renderMorgueList();
+    morgueOverlayEl.style.display = '';
+  });
+}
+
+if (btnCloseMorgue) {
+  btnCloseMorgue.addEventListener('click', () => {
+    morgueOverlayEl.style.display = 'none';
+  });
+}
+
+// Close morgue on overlay background click
+if (morgueOverlayEl) {
+  morgueOverlayEl.addEventListener('click', (e) => {
+    if (e.target === morgueOverlayEl) morgueOverlayEl.style.display = 'none';
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+document.addEventListener('keydown', (e) => {
+  // Don't intercept when typing in inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  const casualties = getCasualties();
+
+  switch (e.key) {
+    case 'ArrowUp': {
+      e.preventDefault();
+      if (casualties.length === 0) return;
+      const curIdx = casualties.findIndex(c => c.id === selectedCrewId);
+      const newIdx = curIdx <= 0 ? casualties.length - 1 : curIdx - 1;
+      selectCrew(casualties[newIdx].id);
+      _scrollToCard(casualties[newIdx].id);
+      break;
+    }
+    case 'ArrowDown': {
+      e.preventDefault();
+      if (casualties.length === 0) return;
+      const curIdx = casualties.findIndex(c => c.id === selectedCrewId);
+      const newIdx = curIdx >= casualties.length - 1 ? 0 : curIdx + 1;
+      selectCrew(casualties[newIdx].id);
+      _scrollToCard(casualties[newIdx].id);
+      break;
+    }
+    case 'Enter':
+      // Already selected, do nothing extra
+      break;
+    case 'a':
+    case 'A':
+      if (selectedCrewId && btnAdmit && !btnAdmit.disabled) btnAdmit.click();
+      break;
+    case 'd':
+    case 'D':
+      if (selectedCrewId && btnDischarge && !btnDischarge.disabled) btnDischarge.click();
+      break;
+    case 'q':
+    case 'Q':
+      if (selectedCrewId && btnQuarantine && !btnQuarantine.disabled) btnQuarantine.click();
+      break;
+    case 's':
+    case 'S': {
+      // Stabilise worst untreated injury
+      if (!selectedCrewId) break;
+      const member = crewRoster[selectedCrewId];
+      if (!member || !member.injuries) break;
+      const worst = member.injuries
+        .filter(i => !i.treated && !i.treating)
+        .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99))[0];
+      if (worst) send('medical.stabilise', { crew_id: selectedCrewId, injury_id: worst.id });
+      break;
+    }
+    case 't':
+    case 'T': {
+      // Treat worst untreated injury
+      if (!selectedCrewId) break;
+      const member = crewRoster[selectedCrewId];
+      if (!member || !member.injuries || member.treatment_bed == null) break;
+      if (_findTreatment(selectedCrewId)) break;
+      const worst = member.injuries
+        .filter(i => !i.treated && !i.treating)
+        .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99))[0];
+      if (worst) send('medical.treat', { crew_id: selectedCrewId, injury_id: worst.id });
+      break;
+    }
+    case '0':
+      _clickFilter('[data-deck="all"]');
+      break;
+    case '1': case '2': case '3': case '4': case '5':
+      _clickFilter(`[data-deck="${e.key}"]`);
+      break;
+    default:
+      break;
+  }
+});
+
+function _scrollToCard(crewId) {
+  const card = casualtyListEl.querySelector(`[data-crew-id="${crewId}"]`);
+  if (card) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function _clickFilter(selector) {
+  const btn = document.querySelector(selector);
+  if (btn) btn.click();
+}
 
 // ---------------------------------------------------------------------------
 // WebSocket message handlers
 // ---------------------------------------------------------------------------
 
 function handleShipState(payload) {
-  if (payload.crew)              latestCrewData   = payload.crew;
-  if (payload.active_treatments) activeTreatments = payload.active_treatments;
-  if (payload.medical_supplies !== undefined) medicalSupplies = payload.medical_supplies;
+  // Legacy compat: update medical supplies from ship.state if present
+  if (payload.medical_supplies !== undefined && !medicalState.supplies) {
+    medicalState.supplies = payload.medical_supplies;
+    medicalState.supplies_max = 20; // old system max
+  }
   render();
+}
+
+function handleMedicalState(payload) {
+  medicalState = payload;
+  render();
+}
+
+function handleCrewRoster(payload) {
+  // payload is { members: { id: memberDict, ... } } or flat { id: memberDict, ... }
+  const members = payload.members || payload;
+  for (const [id, data] of Object.entries(members)) {
+    crewRoster[id] = data;
+  }
+  _renderedCasualtyHash = '';
+  render();
+}
+
+function handleMedicalEvent(payload) {
+  const event = payload.event;
+
+  switch (event) {
+    case 'severity_changed':
+      SoundBank.play('system_damage');
+      break;
+    case 'crew_death':
+      SoundBank.play('defeat');
+      break;
+    case 'treatment_complete':
+      SoundBank.play('puzzle_success');
+      break;
+    case 'patient_admitted':
+      SoundBank.play('scan_complete');
+      break;
+    case 'contagion_spread':
+      SoundBank.play('boarding_alert');
+      break;
+    default:
+      break;
+  }
+
+  _renderedCasualtyHash = '';
+  _renderedDetailHash = '';
 }
 
 function handleGameStarted(payload) {
@@ -264,11 +967,7 @@ function handleGameStarted(payload) {
   medicalMainEl.style.display = '';
   if (payload.mission_name) missionLabelEl.textContent = payload.mission_name;
   showBriefing(payload.mission_name, payload.briefing_text);
-}
-
-function handleDiseaseState(payload) {
-  diseaseState = payload;
-  renderDiseasePanel();
+  _startDiagramLoop();
 }
 
 function handleHullHit() {
@@ -282,13 +981,6 @@ function handleHullHit() {
 // ---------------------------------------------------------------------------
 
 function init() {
-  // Delegated click on the deck list — survives DOM rebuilds at 10 Hz.
-  // Per-card addEventListener would be lost whenever innerHTML is replaced.
-  deckListEl.addEventListener('click', (e) => {
-    const card = e.target.closest('.deck-card');
-    if (card && card.dataset.deck) selectDeck(card.dataset.deck);
-  });
-
   onStatusChange((status) => {
     setStatusDot(statusDotEl, status);
     statusLabelEl.textContent = status.toUpperCase();
@@ -296,10 +988,12 @@ function init() {
 
   on('game.started',          handleGameStarted);
   on('ship.state',            handleShipState);
+  on('medical.state',         handleMedicalState);
+  on('medical.crew_roster',   handleCrewRoster);
+  on('medical.event',         handleMedicalEvent);
   on('ship.alert_changed',    (p) => setAlertLevel(p.level));
   on('ship.hull_hit',         handleHullHit);
   on('game.over',             (p) => { SoundBank.play(p.result === 'victory' ? 'victory' : 'defeat'); showGameOver(p.result, p.stats); });
-  on('medical.disease_state', handleDiseaseState);
 
   initPuzzleRenderer(send);
 

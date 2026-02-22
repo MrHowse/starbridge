@@ -8,7 +8,15 @@ from pydantic import BaseModel, Field
 
 from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
 from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPayload
-from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
+from server.models.messages.medical import (
+    MedicalAdmitPayload,
+    MedicalCancelTreatmentPayload,
+    MedicalDischargePayload,
+    MedicalQuarantinePayload,
+    MedicalStabilisePayload,
+    MedicalTreatCrewPayload,
+    MedicalTreatPayload,
+)
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
 from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
 from server.models.messages.flight_ops import (
@@ -114,9 +122,15 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "captain.add_log": CaptainAddLogPayload,
     "captain.system_override": CaptainSystemOverridePayload,
     "captain.save_game": CaptainSaveGamePayload,
-    # Medical
+    # Medical (legacy)
     "medical.treat_crew": MedicalTreatCrewPayload,
     "medical.cancel_treatment": MedicalCancelTreatmentPayload,
+    # Medical (v0.06.1 individual crew)
+    "medical.admit": MedicalAdmitPayload,
+    "medical.treat": MedicalTreatPayload,
+    "medical.stabilise": MedicalStabilisePayload,
+    "medical.discharge": MedicalDischargePayload,
+    "medical.quarantine": MedicalQuarantinePayload,
     # Security
     "security.move_squad": SecurityMoveSquadPayload,
     "security.toggle_door": SecurityToggleDoorPayload,

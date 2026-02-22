@@ -66,7 +66,15 @@ from server.models.messages.docking import (
 )
 
 # Medical
-from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
+from server.models.messages.medical import (
+    MedicalAdmitPayload,
+    MedicalCancelTreatmentPayload,
+    MedicalDischargePayload,
+    MedicalQuarantinePayload,
+    MedicalStabilisePayload,
+    MedicalTreatCrewPayload,
+    MedicalTreatPayload,
+)
 
 # Security
 from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
@@ -174,6 +182,11 @@ __all__ = [
     # medical
     "MedicalTreatCrewPayload",
     "MedicalCancelTreatmentPayload",
+    "MedicalAdmitPayload",
+    "MedicalTreatPayload",
+    "MedicalStabilisePayload",
+    "MedicalDischargePayload",
+    "MedicalQuarantinePayload",
     # security
     "SecurityMoveSquadPayload",
     "SecurityToggleDoorPayload",

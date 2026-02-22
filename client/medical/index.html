@@ -33,85 +33,133 @@
     </main>
 
     <!-- ── Active medical layout ───────────────────────────────────────── -->
-    <div class="medical-main" data-medical-main style="display:none">
+    <div class="med-main" data-medical-main style="display:none">
 
-      <!-- ── Left: Crew status by deck ─────────────────────────────────── -->
-      <div class="crew-panel panel">
-        <div class="panel__header">
-          <span class="text-label">CREW STATUS</span>
-          <div class="supply-row">
-            <span class="text-label">SUPPLIES</span>
-            <div class="supply-gauge gauge">
-              <div class="gauge__fill gauge__fill--supply" id="supply-fill" style="width:100%"></div>
-            </div>
-            <span class="text-data" id="supply-count">20/20</span>
+      <!-- ── Left column: Casualty list ──────────────────────────────── -->
+      <div class="med-left panel">
+        <div class="panel__header med-left__header">
+          <span class="text-label">CASUALTY LIST</span>
+          <div class="med-sort-row">
+            <button class="med-sort-btn med-sort-btn--active" data-sort="urgency">URGENCY</button>
+            <button class="med-sort-btn" data-sort="deck">DECK</button>
+            <button class="med-sort-btn" data-sort="name">NAME</button>
+            <button class="med-sort-btn" data-sort="arrival">ARRIVAL</button>
           </div>
         </div>
-        <div id="deck-list" class="deck-list">
-          <!-- Deck cards injected by medical.js -->
+        <div class="med-filter-row">
+          <button class="med-filter-btn med-filter-btn--active" data-filter="all">ALL</button>
+          <button class="med-filter-btn" data-filter="critical">CRIT</button>
+          <button class="med-filter-btn" data-filter="serious">SER</button>
+          <button class="med-filter-btn" data-filter="moderate">MOD</button>
+          <button class="med-filter-btn" data-filter="minor">MIN</button>
+          <span class="med-filter-sep"></span>
+          <button class="med-filter-btn med-filter-btn--active" data-deck="all">ALL</button>
+          <button class="med-filter-btn" data-deck="1">1</button>
+          <button class="med-filter-btn" data-deck="2">2</button>
+          <button class="med-filter-btn" data-deck="3">3</button>
+          <button class="med-filter-btn" data-deck="4">4</button>
+          <button class="med-filter-btn" data-deck="5">5</button>
+        </div>
+        <div id="casualty-list" class="med-casualty-list" role="listbox" aria-label="Casualty list">
+          <p class="text-body text-dim med-empty-msg">No casualties reported.</p>
         </div>
       </div>
 
-      <!-- ── Right: Treatment controls ─────────────────────────────────── -->
-      <div class="treatment-panel panel">
+      <!-- ── Right column: Patient detail ────────────────────────────── -->
+      <div class="med-right panel">
         <div class="panel__header">
-          <span class="text-label">TREATMENT</span>
-          <span class="text-data text-dim" id="treatment-deck-label">No deck selected</span>
+          <span class="text-label">PATIENT DETAIL</span>
+          <span class="text-data text-dim" id="patient-name">No patient selected</span>
         </div>
 
-        <!-- No deck selected -->
-        <div id="treatment-none" class="treatment-body treatment-body--empty">
-          <p class="text-body text-dim">Select a deck to view treatment options.</p>
+        <!-- No patient selected -->
+        <div id="detail-empty" class="med-detail-empty">
+          <p class="text-body text-dim">Select a casualty to view details.</p>
         </div>
 
-        <!-- Deck selected -->
-        <div id="treatment-active" class="treatment-body" style="display:none">
-          <div class="treatment-counts">
-            <div class="treatment-count-row">
-              <span class="text-label">ACTIVE</span>
-              <span class="text-data text-bright" id="tr-active">—</span>
-            </div>
-            <div class="treatment-count-row">
-              <span class="text-label">INJURED</span>
-              <span class="text-data c-injured" id="tr-injured">—</span>
-            </div>
-            <div class="treatment-count-row">
-              <span class="text-label">CRITICAL</span>
-              <span class="text-data c-critical" id="tr-critical">—</span>
-            </div>
-            <div class="treatment-count-row">
-              <span class="text-label">DEAD</span>
-              <span class="text-data text-dim" id="tr-dead">—</span>
-            </div>
+        <!-- Patient detail view -->
+        <div id="detail-view" class="med-detail-view" style="display:none">
+          <!-- Patient info bar -->
+          <div class="med-patient-info">
+            <span class="text-data" id="pt-rank-name"></span>
+            <span class="text-label" id="pt-station"></span>
+            <span class="text-label" id="pt-deck"></span>
+            <span class="text-label" id="pt-location"></span>
           </div>
 
-          <div class="treatment-status-row">
-            <span class="text-label">STATUS</span>
-            <span class="text-data" id="tr-status">IDLE</span>
+          <!-- Body diagram canvas -->
+          <div class="med-body-wrap">
+            <canvas id="body-diagram" width="240" height="320" aria-label="Body diagram showing injury locations"></canvas>
           </div>
 
-          <div class="treatment-buttons">
-            <button class="fire-btn" id="btn-treat-injured">TREAT INJURED</button>
-            <button class="fire-btn fire-btn--hostile" id="btn-treat-critical">TREAT CRITICAL</button>
-            <button class="fire-btn fire-btn--small" id="btn-cancel">CANCEL</button>
+          <!-- Injury list -->
+          <div id="injury-list" class="med-injury-list" aria-label="Injury list">
           </div>
 
-          <p class="text-dim text-label treatment-cost-note" id="cost-note">
-            Cost: 2 supplies per session
-          </p>
+          <!-- Action buttons -->
+          <div class="med-action-row">
+            <button class="btn" id="btn-admit" aria-label="Admit patient (A)">ADMIT</button>
+            <button class="btn" id="btn-discharge" aria-label="Discharge patient (D)">DISCHARGE</button>
+            <button class="btn btn--danger" id="btn-quarantine" aria-label="Quarantine patient (Q)">QUARANTINE</button>
+          </div>
         </div>
       </div>
 
-      <!-- ── Right-bottom: Outbreak status ───────────────────────────────── -->
-      <div class="disease-panel">
-        <div class="disease-panel__header">OUTBREAK STATUS</div>
-        <div id="disease-list">
-          <span class="disease-clean label-sm c-dim">CLEAN — no outbreaks detected</span>
+      <!-- ── Bottom status bar ───────────────────────────────────────── -->
+      <div class="med-status-bar panel">
+        <div class="med-status-item">
+          <span class="text-label">BEDS</span>
+          <span class="text-data" id="st-beds">●●○○ 0/4</span>
+        </div>
+        <div class="med-status-item">
+          <span class="text-label">QUEUE</span>
+          <span class="text-data" id="st-queue">0</span>
+        </div>
+        <div class="med-status-item med-status-item--supply">
+          <span class="text-label">SUPPLIES</span>
+          <div class="gauge med-supply-gauge">
+            <div class="gauge__fill gauge__fill--supply" id="supply-fill" style="width:100%"></div>
+          </div>
+          <span class="text-data" id="supply-count">100%</span>
+        </div>
+        <div class="med-status-item">
+          <span class="text-label">QUARANTINE</span>
+          <span class="text-data" id="st-quarantine">0/2</span>
+        </div>
+        <div class="med-status-item med-status-item--morgue" id="morgue-item">
+          <span class="text-label">MORGUE</span>
+          <span class="text-data" id="st-morgue">0</span>
+        </div>
+        <div class="med-status-item">
+          <span class="text-label">CREW</span>
+          <span class="text-data" id="st-crew">0/0</span>
+        </div>
+        <!-- Treatment progress (visible when treatment active) -->
+        <div class="med-status-item med-status-item--treatment" id="st-treatment-wrap" style="display:none">
+          <span class="text-label" id="st-treatment-label">—</span>
+          <div class="gauge med-treatment-gauge">
+            <div class="gauge__fill" id="st-treatment-fill" style="width:0%"></div>
+          </div>
+          <span class="text-data" id="st-treatment-pct">0%</span>
         </div>
       </div>
 
     </div>
   </div>
+
+  <!-- ── Morgue overlay (toggled by clicking MORGUE) ──────────────── -->
+  <div id="morgue-overlay" class="med-overlay" style="display:none">
+    <div class="med-overlay__box panel">
+      <div class="panel__header">
+        <span class="text-label">MORGUE</span>
+        <button class="btn btn--small" id="btn-close-morgue">CLOSE</button>
+      </div>
+      <div id="morgue-list" class="med-morgue-list">
+        <p class="text-body text-dim">No casualties.</p>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="medical.js"></script>
   <script type="module" src="../shared/a11y_widget.js"></script>
 </body>
