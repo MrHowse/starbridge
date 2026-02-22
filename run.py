@@ -28,7 +28,7 @@ def get_local_ip() -> str:
 def main() -> None:
     """Start the Starbridge server."""
     host = "0.0.0.0"
-    port = 8666
+    port = 8668
     local_ip = get_local_ip()
 
     print()
@@ -36,7 +36,7 @@ def main() -> None:
     print("  ╔═╗╔╦╗╔═╗╦═╗╔╗ ╦═╗╦╔╦╗╔═╗╔═╗")
     print("  ╚═╗ ║ ╠═╣╠╦╝╠╩╗╠╦╝║ ║║║ ╦║╣ ")
     print("  ╚═╝ ╩ ╩ ╩╩╚═╚═╝╩╚═╩═╩╝╚═╝╚═╝")
-    print("  Bridge Crew Simulator v0.0.1")
+    print("  Bridge Crew Simulator v0.6.7")
     print("=" * 56)
     print()
     print(f"  Server running on: http://{local_ip}:{port}")
