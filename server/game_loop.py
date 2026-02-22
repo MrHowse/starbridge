@@ -71,7 +71,7 @@ from server.models.messages import (
     WeaponsFireTorpedoPayload,
     WeaponsLoadTubePayload,
     WeaponsSelectTargetPayload,
-    WeaponsSetShieldsPayload,
+    WeaponsSetShieldFocusPayload,
     MapPlotRoutePayload,
     MapClearRoutePayload,
 )
@@ -79,7 +79,7 @@ from server.models.crew import CrewRoster
 from server.models.interior import make_default_interior
 from server.models.ship_class import load_ship_class
 from server.difficulty import get_preset
-from server.models.ship import Ship
+from server.models.ship import Ship, calculate_shield_distribution
 from server.models.world import (
     World, spawn_enemy, spawn_creature, spawn_station_from_feature, STATION_FEATURE_TYPES,
 )
@@ -517,8 +517,10 @@ async def _loop() -> None:
             gl.log_event("game", "tick_summary", {
                 "hull": round(_world.ship.hull, 1),
                 "shields": {
-                    "front": round(_world.ship.shields.front, 1),
-                    "rear": round(_world.ship.shields.rear, 1),
+                    "fore":      round(_world.ship.shields.fore, 1),
+                    "aft":       round(_world.ship.shields.aft,  1),
+                    "port":      round(_world.ship.shields.port, 1),
+                    "starboard": round(_world.ship.shields.starboard, 1),
                 },
                 "ammo": glw.get_ammo(),
                 "enemy_count": len(_world.enemies),
@@ -600,6 +602,17 @@ async def _loop() -> None:
         for comp_ev in glw.pop_component_destroyed_events():
             await _manager.broadcast(
                 Message.build("station.component_destroyed", comp_ev)
+            )
+        # Diplomatic incidents from firing on non-hostile stations.
+        for diplo_ev in glw.pop_diplomatic_events():
+            await _manager.broadcast(
+                Message.build("weapons.diplomatic_incident", diplo_ev)
+            )
+        # Friendly targeting denials — route only to weapons role.
+        for denial in glw.pop_targeting_denials():
+            await _manager.broadcast_to_roles(
+                ["weapons"],
+                Message.build("weapons.targeting_denied", denial),
             )
         # Station outcomes (capture / destroyed).
         for station in list(_world.stations):
@@ -1275,9 +1288,16 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             gldc.cancel_dct(payload.room_id)
             gl.log_event("engineering", "dct_cancelled", {"room_id": payload.room_id})
         elif msg_type == "weapons.select_target" and isinstance(payload, WeaponsSelectTargetPayload):
-            glw.set_target(payload.entity_id)
-            gl.log_event("weapons", "target_selected", {"target_id": payload.entity_id})
-            _set_training_flag(glm, "weapons_target_selected")
+            if world is not None:
+                denial = glw.try_select_target(payload.entity_id, world)
+                if not denial:
+                    gl.log_event("weapons", "target_selected", {"target_id": payload.entity_id})
+                    _set_training_flag(glm, "weapons_target_selected")
+                # Denial payload stored in glw._pending_targeting_denials; broadcast in async loop.
+            else:
+                glw.set_target(payload.entity_id)
+                gl.log_event("weapons", "target_selected", {"target_id": payload.entity_id})
+                _set_training_flag(glm, "weapons_target_selected")
         elif msg_type == "weapons.fire_beams" and isinstance(payload, WeaponsFireBeamsPayload):
             if world is not None:
                 evt = glw.fire_player_beams(ship, world, beam_frequency=payload.beam_frequency)
@@ -1295,11 +1315,11 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             evt = glw.load_tube(payload.tube, payload.torpedo_type)
             if evt:
                 events.append(evt)
-        elif msg_type == "weapons.set_shields" and isinstance(payload, WeaponsSetShieldsPayload):
-            ship.shields.front = payload.front
-            ship.shields.rear = payload.rear
-            gl.log_event("weapons", "shield_changed", {"front": payload.front, "rear": payload.rear})
-            _set_training_flag(glm, "weapons_shields_set")
+        elif msg_type == "weapons.set_shield_focus" and isinstance(payload, WeaponsSetShieldFocusPayload):
+            ship.shield_focus = {"x": payload.x, "y": payload.y}
+            ship.shield_distribution = calculate_shield_distribution(payload.x, payload.y)
+            gl.log_event("weapons", "shield_focus_changed", {"x": payload.x, "y": payload.y})
+            _set_training_flag(glm, "weapons_shield_focus_set")
         elif msg_type == "science.start_scan" and isinstance(payload, ScienceStartScanPayload):
             if glm.is_signal_scan(payload.entity_id):
                 events.append(("signal.scan_result", {"ship_x": ship.x, "ship_y": ship.y}))
@@ -1565,9 +1585,13 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "throttle": ship.throttle,
             "hull": ship.hull,
             "shields": {
-                "front": round(ship.shields.front, 2),
-                "rear": round(ship.shields.rear, 2),
+                "fore":      round(ship.shields.fore,      2),
+                "aft":       round(ship.shields.aft,       2),
+                "port":      round(ship.shields.port,      2),
+                "starboard": round(ship.shields.starboard, 2),
             },
+            "shield_focus":        ship.shield_focus,
+            "shield_distribution": ship.shield_distribution,
             "systems": {
                 name: {
                     "power": s.power,

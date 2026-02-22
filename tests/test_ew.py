@@ -482,8 +482,7 @@ def test_countermeasure_reduces_hull_damage():
     """Active countermeasures with charges reduce hull damage."""
     ship = make_ship()
     ship.hull = 100.0
-    ship.shields.front = 0.0
-    ship.shields.rear = 0.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 0.0
     ship.ew_countermeasure_active = True
     ship.countermeasure_charges = 5
 
@@ -498,8 +497,7 @@ def test_countermeasure_reduces_hull_damage():
 def test_countermeasure_consumes_one_charge_per_hit():
     ship = make_ship()
     ship.hull = 100.0
-    ship.shields.front = 0.0
-    ship.shields.rear = 0.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 0.0
     ship.ew_countermeasure_active = True
     ship.countermeasure_charges = 5
 
@@ -512,8 +510,7 @@ def test_countermeasure_consumes_one_charge_per_hit():
 def test_countermeasure_auto_deactivates_at_zero_charges():
     ship = make_ship()
     ship.hull = 100.0
-    ship.shields.front = 0.0
-    ship.shields.rear = 0.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 0.0
     ship.ew_countermeasure_active = True
     ship.countermeasure_charges = 1
 
@@ -527,8 +524,7 @@ def test_countermeasure_auto_deactivates_at_zero_charges():
 def test_no_countermeasure_when_inactive():
     ship = make_ship()
     ship.hull = 100.0
-    ship.shields.front = 0.0
-    ship.shields.rear = 0.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 0.0
     ship.ew_countermeasure_active = False
     ship.countermeasure_charges = 10
 
@@ -542,8 +538,7 @@ def test_no_countermeasure_when_inactive():
 def test_no_countermeasure_when_charges_zero():
     ship = make_ship()
     ship.hull = 100.0
-    ship.shields.front = 0.0
-    ship.shields.rear = 0.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 0.0
     ship.ew_countermeasure_active = True
     ship.countermeasure_charges = 0
 

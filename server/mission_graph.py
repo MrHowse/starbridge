@@ -498,7 +498,8 @@ class MissionGraph:
             duration = trigger_def.get("duration", 0)
 
             dist = distance(ship.x, ship.y, target_x, target_y)
-            shield_ok = min(ship.shields.front, ship.shields.rear) >= min_shield
+            shield_ok = min(ship.shields.fore, ship.shields.aft,
+                            ship.shields.port, ship.shields.starboard) >= min_shield
             timer_key = f"prox_{node_id}"
 
             if dist < radius and shield_ok:

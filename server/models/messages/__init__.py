@@ -42,7 +42,7 @@ from server.models.messages.weapons import (
     WeaponsFireTorpedoPayload,
     WeaponsLoadTubePayload,
     WeaponsSelectTargetPayload,
-    WeaponsSetShieldsPayload,
+    WeaponsSetShieldFocusPayload,
 )
 
 # Science
@@ -153,7 +153,7 @@ __all__ = [
     "WeaponsFireBeamsPayload",
     "WeaponsFireTorpedoPayload",
     "WeaponsLoadTubePayload",
-    "WeaponsSetShieldsPayload",
+    "WeaponsSetShieldFocusPayload",
     # science
     "ScienceStartScanPayload",
     "ScienceCancelScanPayload",

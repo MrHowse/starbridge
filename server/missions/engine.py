@@ -238,7 +238,8 @@ class MissionEngine:
             duration = args["duration"]
 
             dist_to_target = distance(ship.x, ship.y, target_x, target_y)
-            shield_ok = min(ship.shields.front, ship.shields.rear) >= min_shield
+            shield_ok = min(ship.shields.fore, ship.shields.aft,
+                            ship.shields.port, ship.shields.starboard) >= min_shield
 
             if dist_to_target < radius and shield_ok:
                 self._proximity_timer += self._last_dt

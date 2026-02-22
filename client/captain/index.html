@@ -45,20 +45,34 @@
          ================================================================ -->
     <main class="captain-main" data-captain-main style="display:none">
 
-      <!-- Row 1+2 left: 2×2 wireframe viewports -->
-      <div class="viewport-grid">
-        <div class="viewport-cell">
-          <canvas id="vp-forward" class="viewport-canvas"></canvas>
+      <!-- Row 1+2 left: viewport area (toolbar + quad grid OR single view) -->
+      <div class="viewport-area" id="viewport-area">
+
+        <!-- View-mode toolbar -->
+        <div class="viewport-toolbar" id="viewport-toolbar">
+          <button class="vp-mode-btn vp-mode-btn--active" data-mode="quad"      title="All four views (5)">QUAD</button>
+          <button class="vp-mode-btn" data-mode="fore"      title="Forward view (1)">FORE</button>
+          <button class="vp-mode-btn" data-mode="aft"       title="Aft view (2)">AFT</button>
+          <button class="vp-mode-btn" data-mode="port"      title="Port view (3)">PORT</button>
+          <button class="vp-mode-btn" data-mode="starboard" title="Starboard view (4)">STAR</button>
+          <div class="vp-toolbar-sep"></div>
+          <button class="vp-toggle-btn" id="highlights-btn" data-on="false" title="Toggle highlights (H)">HIGHLIGHTS: OFF</button>
+          <button class="vp-toggle-btn" id="labels-btn"     data-on="false" title="Toggle labels (L)">LABELS: OFF</button>
         </div>
-        <div class="viewport-cell">
-          <canvas id="vp-aft" class="viewport-canvas"></canvas>
+
+        <!-- Quad 2×2 grid (default) -->
+        <div class="viewport-grid" id="viewport-grid">
+          <div class="viewport-cell"><canvas id="vp-forward"   class="viewport-canvas"></canvas></div>
+          <div class="viewport-cell"><canvas id="vp-aft"       class="viewport-canvas"></canvas></div>
+          <div class="viewport-cell"><canvas id="vp-port"      class="viewport-canvas"></canvas></div>
+          <div class="viewport-cell"><canvas id="vp-starboard" class="viewport-canvas"></canvas></div>
         </div>
-        <div class="viewport-cell">
-          <canvas id="vp-port" class="viewport-canvas"></canvas>
+
+        <!-- Single full-screen view (hidden by default) -->
+        <div class="viewport-single" id="viewport-single">
+          <canvas id="vp-single" class="viewport-canvas"></canvas>
         </div>
-        <div class="viewport-cell">
-          <canvas id="vp-starboard" class="viewport-canvas"></canvas>
-        </div>
+
       </div>
 
       <!-- Right column: ship status + system controls (spans all rows) -->
@@ -91,14 +105,24 @@
               <span class="qs-val" id="hull-text">100</span>
             </div>
             <div class="quick-row">
-              <span class="qs-label">FWD</span>
-              <div class="qs-bar"><div id="shield-fwd-fill" class="qs-fill"></div></div>
-              <span class="qs-val" id="shield-fwd-text">100</span>
+              <span class="qs-label">FORE</span>
+              <div class="qs-bar"><div id="shield-fore-fill" class="qs-fill qs-fill--shield"></div></div>
+              <span class="qs-val" id="shield-fore-text">50</span>
             </div>
             <div class="quick-row">
               <span class="qs-label">AFT</span>
-              <div class="qs-bar"><div id="shield-aft-fill" class="qs-fill"></div></div>
-              <span class="qs-val" id="shield-aft-text">100</span>
+              <div class="qs-bar"><div id="shield-aft-fill" class="qs-fill qs-fill--shield"></div></div>
+              <span class="qs-val" id="shield-aft-text">50</span>
+            </div>
+            <div class="quick-row">
+              <span class="qs-label">PORT</span>
+              <div class="qs-bar"><div id="shield-port-fill" class="qs-fill qs-fill--shield"></div></div>
+              <span class="qs-val" id="shield-port-text">50</span>
+            </div>
+            <div class="quick-row">
+              <span class="qs-label">STAR</span>
+              <div class="qs-bar"><div id="shield-star-fill" class="qs-fill qs-fill--shield"></div></div>
+              <span class="qs-val" id="shield-star-text">50</span>
             </div>
           </div>
         </div>

@@ -49,7 +49,7 @@ from server.models.messages.weapons import (
     WeaponsFireTorpedoPayload,
     WeaponsLoadTubePayload,
     WeaponsSelectTargetPayload,
-    WeaponsSetShieldsPayload,
+    WeaponsSetShieldFocusPayload,
 )
 
 
@@ -104,7 +104,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "weapons.fire_beams": WeaponsFireBeamsPayload,
     "weapons.fire_torpedo": WeaponsFireTorpedoPayload,
     "weapons.load_tube": WeaponsLoadTubePayload,
-    "weapons.set_shields": WeaponsSetShieldsPayload,
+    "weapons.set_shield_focus": WeaponsSetShieldFocusPayload,
     # Science
     "science.start_scan": ScienceStartScanPayload,
     "science.cancel_scan": ScienceCancelScanPayload,

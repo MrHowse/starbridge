@@ -286,8 +286,10 @@ def test_build_ship_state_shields():
     ship = Ship()
     msg = game_loop._build_ship_state(ship, tick=1)
     assert "shields" in msg.payload
-    assert msg.payload["shields"]["front"] == 100.0
-    assert msg.payload["shields"]["rear"] == 100.0
+    assert msg.payload["shields"]["fore"]      == pytest.approx(50.0)
+    assert msg.payload["shields"]["aft"]       == pytest.approx(50.0)
+    assert msg.payload["shields"]["port"]      == pytest.approx(50.0)
+    assert msg.payload["shields"]["starboard"] == pytest.approx(50.0)
 
 
 def test_build_ship_state_alert_level_present():

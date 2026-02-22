@@ -314,8 +314,8 @@ async def tick(world, ship, manager, dt: float) -> None:
         ship.throttle = 0.0
     # Shields capped for all non-flight docking states.
     if _state in ("sequencing", "docked", "undocking"):
-        ship.shields.front = min(ship.shields.front, SHIELDS_DOCKED_CAP)
-        ship.shields.rear = min(ship.shields.rear, SHIELDS_DOCKED_CAP)
+        for _facing in ("fore", "aft", "port", "starboard"):
+            setattr(ship.shields, _facing, min(getattr(ship.shields, _facing), SHIELDS_DOCKED_CAP))
 
     # --- State machine transitions ---
     if _state == "clearance_pending":

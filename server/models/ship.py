@@ -55,13 +55,39 @@ class ShipSystem:
 # Shields
 # ---------------------------------------------------------------------------
 
+TOTAL_SHIELD_CAPACITY: float = 200.0  # HP pool distributed across 4 facings
+
+
+def calculate_shield_distribution(focus_x: float, focus_y: float) -> dict[str, float]:
+    """Compute per-facing shield distribution from a 2D focus point.
+
+    focus_x: -1 = full port, +1 = full starboard.
+    focus_y: -1 = full aft,  +1 = full fore.
+    Returns a dict with 'fore', 'aft', 'port', 'starboard' fractions summing to 1.0.
+    """
+    base = 0.25
+    bias = 0.25
+    fore = base + focus_y * bias
+    aft  = base - focus_y * bias
+    star = base + focus_x * bias
+    port = base - focus_x * bias
+    total = fore + aft + star + port
+    return {
+        "fore":      fore / total,
+        "aft":       aft  / total,
+        "starboard": star / total,
+        "port":      port / total,
+    }
+
 
 @dataclass
 class Shields:
-    """Front and rear shield charge levels. 0 = down, 100 = full strength."""
+    """Four-facing shield charge levels (HP, not %). 0 = down, max set by distribution."""
 
-    front: float = 100.0  # 0-100 (%)
-    rear: float = 100.0   # 0-100 (%)
+    fore:      float = 50.0   # default = TOTAL_SHIELD_CAPACITY × 0.25 (centre focus)
+    aft:       float = 50.0
+    port:      float = 50.0
+    starboard: float = 50.0
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +134,9 @@ class Ship:
 
     # --- Shields ---
     shields: Shields = field(default_factory=Shields)
+    shield_focus:        dict = field(default_factory=lambda: {"x": 0.0, "y": 0.0})
+    shield_distribution: dict = field(default_factory=lambda: {
+        "fore": 0.25, "aft": 0.25, "port": 0.25, "starboard": 0.25})
 
     # --- Subsystems ---
     systems: dict[str, ShipSystem] = field(default_factory=_default_systems)

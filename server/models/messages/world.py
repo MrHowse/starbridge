@@ -12,6 +12,6 @@ class ShipStatePayload(BaseModel):
     velocity: float
     throttle: float
     hull: float
-    shields: dict[str, float]             # {"front": float, "rear": float}
+    shields: dict[str, float]             # {"fore": float, "aft": float, "port": float, "starboard": float}
     systems: dict[str, dict[str, float]]  # {name: {"power", "health", "efficiency"}}
     alert_level: str

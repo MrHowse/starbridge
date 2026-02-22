@@ -317,16 +317,20 @@ async def test_docked_shields_capped():
     gldo._target_station_id = "s1"
 
     ship = _fresh_ship()
-    ship.shields.front = 100.0
-    ship.shields.rear = 100.0
+    ship.shields.fore      = 100.0
+    ship.shields.aft       = 100.0
+    ship.shields.port      = 100.0
+    ship.shields.starboard = 100.0
     st = _friendly_station()
     world = _fresh_world(st)
     mgr = _make_manager()
 
     await gldo.tick(world, ship, mgr, 0.1)
 
-    assert ship.shields.front == pytest.approx(SHIELDS_DOCKED_CAP)
-    assert ship.shields.rear == pytest.approx(SHIELDS_DOCKED_CAP)
+    assert ship.shields.fore      == pytest.approx(SHIELDS_DOCKED_CAP)
+    assert ship.shields.aft       == pytest.approx(SHIELDS_DOCKED_CAP)
+    assert ship.shields.port      == pytest.approx(SHIELDS_DOCKED_CAP)
+    assert ship.shields.starboard == pytest.approx(SHIELDS_DOCKED_CAP)
 
 
 @pytest.mark.asyncio
@@ -337,15 +341,17 @@ async def test_shields_capped_during_sequencing():
     gldo._sequence_timer = 5.0
 
     ship = _fresh_ship()
-    ship.shields.front = 100.0
-    ship.shields.rear = 100.0
+    ship.shields.fore      = 100.0
+    ship.shields.aft       = 100.0
+    ship.shields.port      = 100.0
+    ship.shields.starboard = 100.0
     st = _friendly_station()
     world = _fresh_world(st)
     mgr = _make_manager()
 
     await gldo.tick(world, ship, mgr, 0.1)
 
-    assert ship.shields.front == pytest.approx(SHIELDS_DOCKED_CAP)
+    assert ship.shields.fore == pytest.approx(SHIELDS_DOCKED_CAP)
 
 
 # ---------------------------------------------------------------------------

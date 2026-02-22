@@ -37,13 +37,14 @@ def _make_world(enemies=None, stations=None):
     return w
 
 
-def _make_ship(x=50_000, y=50_000, hull=100.0, front_shield=100.0, rear_shield=100.0):
+def _make_ship(x=50_000, y=50_000, hull=100.0, front_shield=50.0, rear_shield=50.0):
     s = Ship()
     s.x = x
     s.y = y
     s.hull = hull
-    s.shields.front = front_shield
-    s.shields.rear = rear_shield
+    # Set all 4 facings to average of the two legacy values for backward compat.
+    per_facing = (front_shield + rear_shield) / 4.0
+    s.shields.fore = s.shields.aft = s.shields.port = s.shields.starboard = per_facing
     return s
 
 

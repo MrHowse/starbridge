@@ -31,6 +31,10 @@ import {
   updateViewportAlert,
   triggerHullHitFlash,
   resizeViewports,
+  setViewMode,
+  setSingleCanvas,
+  setHighlights,
+  setLabels,
 } from './wireframe.js';
 import {
   initShipStatus,
@@ -69,12 +73,16 @@ const mapCanvas = document.getElementById('captain-canvas');
 const mapCtx    = mapCanvas ? mapCanvas.getContext('2d') : null;
 
 // Quick-status bars
-const hullFill      = document.getElementById('hull-fill');
-const hullText      = document.getElementById('hull-text');
-const shieldFwdFill = document.getElementById('shield-fwd-fill');
-const shieldFwdText = document.getElementById('shield-fwd-text');
-const shieldAftFill = document.getElementById('shield-aft-fill');
-const shieldAftText = document.getElementById('shield-aft-text');
+const hullFill       = document.getElementById('hull-fill');
+const hullText       = document.getElementById('hull-text');
+const shieldForeFill = document.getElementById('shield-fore-fill');
+const shieldForeText = document.getElementById('shield-fore-text');
+const shieldAftFill  = document.getElementById('shield-aft-fill');
+const shieldAftText  = document.getElementById('shield-aft-text');
+const shieldPortFill = document.getElementById('shield-port-fill');
+const shieldPortText = document.getElementById('shield-port-text');
+const shieldStarFill = document.getElementById('shield-star-fill');
+const shieldStarText = document.getElementById('shield-star-text');
 
 // Science
 const scanActiveRow      = document.getElementById('scan-active-row');
@@ -125,6 +133,11 @@ let mapRenderer  = null;
 let _sectorMap   = null;
 let _pendingAuthId = null;
 const _logEntries  = [];
+
+// Viewport mode controls
+let _vpMode      = 'quad';
+let _highlightsOn = false;
+let _labelsOn     = false;
 
 // Science sector-scan status indicator (shown on tactical map).
 let _scanIndicatorText = null;
@@ -206,14 +219,37 @@ function init() {
     });
   });
 
-  // Zoom keyboard shortcuts (Z cycle, 1/2/3 direct)
+  // Viewport keys (1–5 for mode, H/L for highlights/labels) + fallthrough to sector map zoom
   document.addEventListener('keydown', (e) => {
-    if (!gameActive || !_sectorMap) return;
-    if (_sectorMap.handleKey(e.key)) {
+    if (!gameActive) return;
+    const VP_KEYS = { '1': 'fore', '2': 'aft', '3': 'port', '4': 'starboard', '5': 'quad' };
+    if (VP_KEYS[e.key]) {
+      _setVpMode(VP_KEYS[e.key]);
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'h' || e.key === 'H') {
+      _highlightsOn = !_highlightsOn;
+      setHighlights(_highlightsOn);
+      _updateVpToolbarUI();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'l' || e.key === 'L') {
+      _labelsOn = !_labelsOn;
+      setLabels(_labelsOn);
+      _updateVpToolbarUI();
+      e.preventDefault();
+      return;
+    }
+    // Pass remaining keys to sector map (Z to cycle zoom)
+    if (_sectorMap && _sectorMap.handleKey(e.key)) {
       _updateZoomUI();
       e.preventDefault();
     }
   });
+
+  _initViewportToolbar();
 
   SoundBank.init();
   wireButtonSounds(SoundBank);
@@ -240,6 +276,7 @@ function handleGameStarted(payload) {
     port:      document.getElementById('vp-port'),
     starboard: document.getElementById('vp-starboard'),
   });
+  setSingleCanvas(document.getElementById('vp-single'));
 
   // Ship silhouette + system controls
   const silhouetteCanvas = document.getElementById('ship-silhouette');
@@ -317,17 +354,27 @@ function handleShipState(payload) {
 }
 
 function _updateQuickStatus(state) {
+  const TOTAL = 200.0;
   const hull    = Math.max(0, Math.min(100, state.hull || 0));
   const shields = state.shields || {};
-  const fwd     = Math.max(0, Math.min(100, shields.front ?? 100));
-  const aft     = Math.max(0, Math.min(100, shields.rear  ?? 100));
+  const dist    = state.shield_distribution || { fore: 0.25, aft: 0.25, port: 0.25, starboard: 0.25 };
 
-  if (hullFill)      hullFill.style.width      = `${hull}%`;
-  if (hullText)      hullText.textContent       = Math.round(hull);
-  if (shieldFwdFill) shieldFwdFill.style.width  = `${fwd}%`;
-  if (shieldFwdText) shieldFwdText.textContent  = Math.round(fwd);
-  if (shieldAftFill) shieldAftFill.style.width  = `${aft}%`;
-  if (shieldAftText) shieldAftText.textContent  = Math.round(aft);
+  if (hullFill) hullFill.style.width = `${hull}%`;
+  if (hullText) hullText.textContent = Math.round(hull);
+
+  const facingMap = [
+    { fill: shieldForeFill, text: shieldForeText, key: 'fore' },
+    { fill: shieldAftFill,  text: shieldAftText,  key: 'aft'  },
+    { fill: shieldPortFill, text: shieldPortText,  key: 'port' },
+    { fill: shieldStarFill, text: shieldStarText,  key: 'starboard' },
+  ];
+  for (const { fill, text, key } of facingMap) {
+    const hp    = Math.max(0, shields[key] ?? 50);
+    const maxHp = TOTAL * (dist[key] ?? 0.25);
+    const pct   = maxHp > 0 ? Math.min(100, (hp / maxHp) * 100) : 0;
+    if (fill) fill.style.width  = `${pct}%`;
+    if (text) text.textContent  = Math.round(hp);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -645,6 +692,55 @@ function handleGameOver({ result, stats = {} }) {
   if (debriefBtn && stats.debrief != null) debriefBtn.style.display = '';
 
   if (gameOverOverlay) gameOverOverlay.style.display = '';
+}
+
+// ---------------------------------------------------------------------------
+// Viewport mode + toolbar
+// ---------------------------------------------------------------------------
+
+function _initViewportToolbar() {
+  document.querySelectorAll('.vp-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => _setVpMode(btn.dataset.mode));
+  });
+  document.getElementById('highlights-btn')?.addEventListener('click', () => {
+    _highlightsOn = !_highlightsOn;
+    setHighlights(_highlightsOn);
+    _updateVpToolbarUI();
+  });
+  document.getElementById('labels-btn')?.addEventListener('click', () => {
+    _labelsOn = !_labelsOn;
+    setLabels(_labelsOn);
+    _updateVpToolbarUI();
+  });
+}
+
+function _setVpMode(mode) {
+  _vpMode = mode;
+  setViewMode(mode);
+  const grid   = document.getElementById('viewport-grid');
+  const single = document.getElementById('viewport-single');
+  if (grid)   grid.style.display   = mode === 'quad' ? '' : 'none';
+  if (single) single.style.display = mode === 'quad' ? 'none' : 'block';
+  resizeViewports();
+  _updateVpToolbarUI();
+}
+
+function _updateVpToolbarUI() {
+  document.querySelectorAll('.vp-mode-btn').forEach(btn => {
+    btn.classList.toggle('vp-mode-btn--active', btn.dataset.mode === _vpMode);
+  });
+  const hBtn = document.getElementById('highlights-btn');
+  const lBtn = document.getElementById('labels-btn');
+  if (hBtn) {
+    hBtn.dataset.on  = _highlightsOn;
+    hBtn.textContent = `HIGHLIGHTS: ${_highlightsOn ? 'ON' : 'OFF'}`;
+    hBtn.classList.toggle('vp-toggle-btn--on', _highlightsOn);
+  }
+  if (lBtn) {
+    lBtn.dataset.on  = _labelsOn;
+    lBtn.textContent = `LABELS: ${_labelsOn ? 'ON' : 'OFF'}`;
+    lBtn.classList.toggle('vp-toggle-btn--on', _labelsOn);
+  }
 }
 
 // ---------------------------------------------------------------------------

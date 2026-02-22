@@ -49,8 +49,10 @@ def test_ship_system_zero_health_zero_efficiency():
 
 def test_shields_defaults():
     sh = Shields()
-    assert sh.front == pytest.approx(100.0)
-    assert sh.rear == pytest.approx(100.0)
+    assert sh.fore      == pytest.approx(50.0)
+    assert sh.aft       == pytest.approx(50.0)
+    assert sh.port      == pytest.approx(50.0)
+    assert sh.starboard == pytest.approx(50.0)
 
 
 # ---------------------------------------------------------------------------

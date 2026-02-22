@@ -18,7 +18,7 @@
  *   weapons.select_target  { entity_id }
  *   weapons.fire_beams     {}
  *   weapons.fire_torpedo   { tube }
- *   weapons.set_shields    { front, rear }
+ *   weapons.set_shield_focus { x, y }
  */
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
@@ -34,11 +34,11 @@ import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
 
 registerHelp([
-  { selector: '#radar-canvas',     text: 'Tactical radar — click enemy to select as target.', position: 'right' },
-  { selector: '#beam-fire-btn',    text: 'Fire beams — hold for sustained fire within weapon arc.', position: 'left' },
-  { selector: '#tube1-fire-btn',   text: 'Fire torpedo tube 1 — needs ammo loaded.', position: 'left' },
-  { selector: '#tube2-fire-btn',   text: 'Fire torpedo tube 2 — independent reload timer.', position: 'left' },
-  { selector: '#shield-slider',    text: 'Shield balance — slide forward (100%) vs rear (0%).', position: 'above' },
+  { selector: '#radar-canvas',          text: 'Tactical radar — click enemy to select as target.', position: 'right' },
+  { selector: '#beam-fire-btn',         text: 'Fire beams — hold for sustained fire within weapon arc.', position: 'left' },
+  { selector: '#tube1-fire-btn',        text: 'Fire torpedo tube 1 — needs ammo loaded.', position: 'left' },
+  { selector: '#tube2-fire-btn',        text: 'Fire torpedo tube 2 — independent reload timer.', position: 'left' },
+  { selector: '#shield-focus-canvas',   text: 'Shield focus — drag to direct shield energy across all four facings.', position: 'above' },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -63,9 +63,17 @@ const EXPLOSION_DURATION  = 500;     // explosion ring animation duration ms
 
 // Enemy wireframe sizes (half-size in pixels at radar scale)
 const ENEMY_SHAPES = {
-  scout:     { size: 8,  color: '#ff4040' },
-  cruiser:   { size: 10, color: '#ff4040' },
-  destroyer: { size: 13, color: '#ff4040' },
+  scout:     { size: 8  },
+  cruiser:   { size: 10 },
+  destroyer: { size: 13 },
+};
+
+// Contact colours by classification.
+const CONTACT_COLORS = {
+  hostile:  '#ff4040',   // confirmed enemy — red
+  unknown:  '#ffffff',   // unscanned — white (pulsing)
+  friendly: '#00ff41',   // friendly transponder — green
+  neutral:  '#ffaa00',   // neutral / derelict — amber
 };
 
 // ---------------------------------------------------------------------------
@@ -83,16 +91,18 @@ const stationEl      = document.getElementById('station-container');
 const radarCanvas = document.getElementById('radar-canvas');
 
 // Target info
-const targetIdLabel       = document.getElementById('target-id-label');
-const targetHullFill      = document.getElementById('target-hull-fill');
-const targetHullText      = document.getElementById('target-hull-text');
-const targetShieldFwdFill = document.getElementById('target-shield-fwd-fill');
-const targetShieldFwdText = document.getElementById('target-shield-fwd-text');
-const targetShieldAftFill = document.getElementById('target-shield-aft-fill');
-const targetShieldAftText = document.getElementById('target-shield-aft-text');
-const targetRange         = document.getElementById('target-range');
-const targetBearing       = document.getElementById('target-bearing');
-const targetTypeEl        = document.getElementById('target-type');
+const targetIdLabel          = document.getElementById('target-id-label');
+const targetClassificationEl = document.getElementById('target-classification');
+const targetHullFill         = document.getElementById('target-hull-fill');
+const targetHullText         = document.getElementById('target-hull-text');
+const targetShieldFwdFill    = document.getElementById('target-shield-fwd-fill');
+const targetShieldFwdText    = document.getElementById('target-shield-fwd-text');
+const targetShieldAftFill    = document.getElementById('target-shield-aft-fill');
+const targetShieldAftText    = document.getElementById('target-shield-aft-text');
+const targetRange            = document.getElementById('target-range');
+const targetBearing          = document.getElementById('target-bearing');
+const targetTypeEl           = document.getElementById('target-type');
+const targetAdvisoryEl       = document.getElementById('target-advisory');
 
 // Beam
 const beamFireBtn  = document.getElementById('beam-fire-btn');
@@ -107,10 +117,15 @@ const tube2Status    = document.getElementById('tube2-status');
 const tube1FireBtn   = document.getElementById('tube1-fire-btn');
 const tube2FireBtn   = document.getElementById('tube2-fire-btn');
 
-// Shields
-const shieldSlider  = document.getElementById('shield-slider');
-const shieldFwdPct  = document.getElementById('shield-fwd-pct');
-const shieldAftPct  = document.getElementById('shield-aft-pct');
+// Shield focus
+const shieldCanvas    = document.getElementById('shield-focus-canvas');
+const shldForePct     = document.getElementById('shld-fore-pct');
+const shldAftPct      = document.getElementById('shld-aft-pct');
+const shldPortPct     = document.getElementById('shld-port-pct');
+const shldStarPct     = document.getElementById('shld-star-pct');
+const shieldLockXBtn  = document.getElementById('shield-lock-x');
+const shieldLockYBtn  = document.getElementById('shield-lock-y');
+const shieldCentreBtn = document.getElementById('shield-centre');
 
 // ---------------------------------------------------------------------------
 // Game state
@@ -138,6 +153,12 @@ let torpedoAmmoMax = {};   // type → max count
 
 // Pending nuclear auth: request_id for each tube (or null).
 let pendingAuth = [null, null];
+
+// Shield focus state.
+let _sfX = 0.0, _sfY = 0.0;        // focus point (-1..+1)
+let _sfLockX = false, _sfLockY = false;
+let _sfDragging = false;
+let _sfSendTimer = null;
 
 // Beam frequency selection.
 let currentFrequency = 'alpha';
@@ -177,9 +198,11 @@ function init() {
   on('weapons.torpedo_hit',          handleTorpedoHit);
   on('weapons.tube_loading',         handleTubeLoading);
   on('weapons.tube_loaded',          handleTubeLoaded);
-  on('captain.authorization_request', handleAuthRequest);
-  on('weapons.authorization_result', handleAuthResult);
-  on('game.over',                    handleGameOver);
+  on('captain.authorization_request',  handleAuthRequest);
+  on('weapons.authorization_result',   handleAuthResult);
+  on('weapons.targeting_denied',       handleTargetingDenied);
+  on('weapons.diplomatic_incident',    handleDiplomaticIncident);
+  on('game.over',                      handleGameOver);
 
   initPuzzleRenderer(send);
   setupControls();
@@ -217,28 +240,47 @@ function handleGameStarted(payload) {
       interactive: true,
       zoom: { enabled: false },
       drawContact: (ctx, sx, sy, contact, selected, now) => {
-        // Cadet hint pulsing ring before the shape.
-        if (hintsEnabled && contact.id === suggestedId && !selected) {
+        const cls  = contact.classification || 'hostile';
+        const kind = contact.kind || 'enemy';
+
+        // Determine colour; unknown contacts pulse white.
+        let color;
+        if (cls === 'unknown') {
+          const alpha = 0.5 + 0.5 * Math.sin(now * 0.004);
+          color = `rgba(255,255,255,${alpha})`;
+        } else {
+          color = CONTACT_COLORS[cls] || CONTACT_COLORS.hostile;
+        }
+
+        // Cadet hint ring (hostile/unknown only — never suggest friendly).
+        if (hintsEnabled && contact.id === suggestedId && !selected && cls !== 'friendly') {
           const pulse = 0.5 + 0.5 * Math.sin(now * 0.004);
-          const shape = ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser;
+          const hintR = (ENEMY_SHAPES[contact.type]?.size || 10) + 10;
           ctx.save();
-          ctx.strokeStyle = `rgba(255, 176, 0, ${0.5 + 0.4 * pulse})`;
-          ctx.lineWidth   = 1.5;
+          ctx.strokeStyle  = `rgba(255, 176, 0, ${0.5 + 0.4 * pulse})`;
+          ctx.lineWidth    = 1.5;
           ctx.setLineDash([4, 4]);
           ctx.beginPath();
-          ctx.arc(sx, sy, shape.size + 10, 0, Math.PI * 2);
+          ctx.arc(sx, sy, hintR, 0, Math.PI * 2);
           ctx.stroke();
           ctx.setLineDash([]);
-          ctx.fillStyle  = `rgba(255, 176, 0, ${0.6 + 0.3 * pulse})`;
-          ctx.font       = '8px "Share Tech Mono", monospace';
-          ctx.textAlign  = 'center';
+          ctx.fillStyle    = `rgba(255, 176, 0, ${0.6 + 0.3 * pulse})`;
+          ctx.font         = '8px "Share Tech Mono", monospace';
+          ctx.textAlign    = 'center';
           ctx.textBaseline = 'bottom';
-          ctx.fillText('SUGGESTED TARGET', sx, sy - shape.size - 14);
+          ctx.fillText('SUGGESTED TARGET', sx, sy - hintR - 4);
           ctx.restore();
         }
-        drawEnemyShape(ctx, sx, sy, contact.type,
-          (ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser).size,
-          '#ff4040', selected);
+
+        if (kind === 'station') {
+          drawStationShape(ctx, sx, sy, color, selected);
+        } else if (kind === 'creature') {
+          drawCreatureShape(ctx, sx, sy, color, selected);
+        } else {
+          drawEnemyShape(ctx, sx, sy, contact.type,
+            (ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser).size,
+            color, selected);
+        }
       },
     });
     radarRenderer.onContactClick((id) => selectTarget(id));
@@ -249,6 +291,9 @@ function handleGameStarted(payload) {
   if (payload.briefing_text) {
     showBriefing(payload.mission_name, payload.briefing_text);
   }
+
+  // Initialise shield focus canvas.
+  _drawShieldFocus(_calcShieldDist(0, 0));
 
   console.log(`[weapons] Game started — mission: ${payload.mission_id}`);
 }
@@ -266,6 +311,16 @@ function handleShipState(payload) {
     torpedoAmmoMax = payload.torpedo_ammo_max;
   updateTubeUI(payload);
   updateMagazinePanel();
+
+  // Shield focus update (from server state).
+  if (payload.shield_distribution) {
+    const d = payload.shield_distribution;
+    _updateShieldPctLabels(d);
+    if (!_sfDragging) {
+      if (payload.shield_focus) { _sfX = payload.shield_focus.x; _sfY = payload.shield_focus.y; }
+      _drawShieldFocus(d);
+    }
+  }
 }
 
 function handleSensorContacts(payload) {
@@ -273,10 +328,11 @@ function handleSensorContacts(payload) {
   contacts  = payload.contacts  || [];
   torpedoes = payload.torpedoes || [];
 
-  // Cadet hint: keep suggestedId pointing at the nearest enemy contact.
+  // Cadet hint: nearest hostile/unknown contact (never friendly).
   if (hintsEnabled && contacts.length > 0 && shipState) {
     let nearest = null, minDist = Infinity;
     for (const c of contacts) {
+      if (c.classification === 'friendly') continue;
       const dx = c.x - shipState.position.x;
       const dy = c.y - shipState.position.y;
       const d  = Math.hypot(dx, dy);
@@ -377,6 +433,35 @@ function _setTubeAuthStatus(tube, pending) {
   if (fireBtn)  fireBtn.disabled = pending;
 }
 
+function _showDenial(id) {
+  const prev      = beamStatus.textContent;
+  const prevColor = beamStatus.style.color;
+  beamStatus.textContent   = 'TARGETING DENIED — FRIENDLY CONTACT';
+  beamStatus.style.color   = CONTACT_COLORS.friendly;
+  setTimeout(() => {
+    beamStatus.textContent = prev;
+    beamStatus.style.color = prevColor;
+  }, 2500);
+  console.warn(`[weapons] Targeting denied: friendly contact ${id}`);
+}
+
+function handleTargetingDenied({ entity_id }) {
+  _showDenial(entity_id || '?');
+}
+
+function handleDiplomaticIncident({ station_id, station_name }) {
+  const name      = (station_name || station_id || 'UNKNOWN').toUpperCase();
+  const prev      = beamStatus.textContent;
+  const prevColor = beamStatus.style.color;
+  beamStatus.textContent   = `DIPLOMATIC INCIDENT — ${name} NOW HOSTILE`;
+  beamStatus.style.color   = CONTACT_COLORS.neutral;
+  setTimeout(() => {
+    beamStatus.textContent = prev;
+    beamStatus.style.color = prevColor;
+  }, 4000);
+  console.warn(`[weapons] Diplomatic incident — ${station_name} (${station_id}) is now hostile`);
+}
+
 // ---------------------------------------------------------------------------
 // Control setup
 // ---------------------------------------------------------------------------
@@ -431,15 +516,36 @@ function setupControls() {
   // Load type buttons — inject into the torpedo section dynamically.
   _buildLoadControls();
 
-  // Shield balance slider.
-  shieldSlider.addEventListener('input', () => {
-    if (!gameActive) return;
-    const v     = parseInt(shieldSlider.value, 10);
-    const front = v;
-    const rear  = 100 - v;
-    shieldFwdPct.textContent = `${front}%`;
-    shieldAftPct.textContent = `${rear}%`;
-    send('weapons.set_shields', { front: front, rear: rear });
+  // Shield focus — drag on canvas.
+  if (shieldCanvas) {
+    shieldCanvas.addEventListener('mousedown', e => { _sfDragging = true; _sfHandleDrag(e); });
+    shieldCanvas.addEventListener('touchstart', e => {
+      _sfDragging = true; _sfHandleDrag(e.touches[0]); e.preventDefault();
+    }, { passive: false });
+    shieldCanvas.addEventListener('keydown', e => {
+      const NUDGE = 0.05;
+      if (e.key === 'ArrowLeft')  { _sfX = Math.max(-1, _sfX - NUDGE); _sfApplyAndSend(); e.preventDefault(); }
+      if (e.key === 'ArrowRight') { _sfX = Math.min( 1, _sfX + NUDGE); _sfApplyAndSend(); e.preventDefault(); }
+      if (e.key === 'ArrowUp')    { _sfY = Math.min( 1, _sfY + NUDGE); _sfApplyAndSend(); e.preventDefault(); }
+      if (e.key === 'ArrowDown')  { _sfY = Math.max(-1, _sfY - NUDGE); _sfApplyAndSend(); e.preventDefault(); }
+      if (e.key === 'x' || e.key === 'X') { _sfLockX = !_sfLockX; _sfUpdateLockUI(); }
+      if (e.key === 'y' || e.key === 'Y') { _sfLockY = !_sfLockY; _sfUpdateLockUI(); }
+      if (e.key === 'c' || e.key === 'C') { _sfX = 0; _sfY = 0; _sfLockX = false; _sfLockY = false; _sfUpdateLockUI(); _sfApplyAndSend(); }
+    });
+  }
+  document.addEventListener('mousemove', e => { if (_sfDragging) _sfHandleDrag(e); });
+  document.addEventListener('mouseup',   () => { _sfDragging = false; });
+  document.addEventListener('touchmove', e => {
+    if (_sfDragging) { _sfHandleDrag(e.touches[0]); e.preventDefault(); }
+  }, { passive: false });
+  document.addEventListener('touchend', () => { _sfDragging = false; });
+
+  // Shield quick buttons.
+  shieldLockXBtn?.addEventListener('click', () => { _sfLockX = !_sfLockX; _sfUpdateLockUI(); });
+  shieldLockYBtn?.addEventListener('click', () => { _sfLockY = !_sfLockY; _sfUpdateLockUI(); });
+  shieldCentreBtn?.addEventListener('click', () => {
+    _sfX = 0; _sfY = 0; _sfLockX = false; _sfLockY = false;
+    _sfUpdateLockUI(); _sfApplyAndSend();
   });
 
   // Radar click is handled by MapRenderer's onContactClick callback.
@@ -498,10 +604,134 @@ function _buildLoadControls() {
 }
 
 function selectTarget(id) {
+  const contact = contacts.find(c => c.id === id);
+  if (contact && contact.classification === 'friendly') {
+    _showDenial(id);
+    return;
+  }
   selectedId = id;
   if (radarRenderer) radarRenderer.selectContact(id);
   send('weapons.select_target', { entity_id: id });
   updateTargetPanel();
+}
+
+// ---------------------------------------------------------------------------
+// Shield focus helpers
+// ---------------------------------------------------------------------------
+
+function _calcShieldDist(x, y) {
+  const base = 0.25, bias = 0.25;
+  const fore = base + y * bias;
+  const aft  = base - y * bias;
+  const star = base + x * bias;
+  const port = base - x * bias;
+  const t = fore + aft + star + port;
+  return { fore: fore / t, aft: aft / t, starboard: star / t, port: port / t };
+}
+
+function _drawShieldFocus(dist) {
+  if (!shieldCanvas) return;
+  const ctx = shieldCanvas.getContext('2d');
+  const W = shieldCanvas.width, H = shieldCanvas.height;
+  const cx = W / 2, cy = H / 2;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#000a14';
+  ctx.fillRect(0, 0, W, H);
+
+  // Hull rect outline (60% of canvas, centred).
+  const hullW = W * 0.6, hullH = H * 0.6;
+  const hullX = (W - hullW) / 2, hullY = (H - hullH) / 2;
+  ctx.strokeStyle = 'rgba(0,170,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(hullX, hullY, hullW, hullH);
+
+  // 4 edge bands.
+  const bands = [
+    { facing: 'fore',      x: 0,       y: 0,       w: W,   h: 0 },
+    { facing: 'aft',       x: 0,       y: H,       w: W,   h: 0 },
+    { facing: 'port',      x: 0,       y: 0,       w: 0,   h: H },
+    { facing: 'starboard', x: W,       y: 0,       w: 0,   h: H },
+  ];
+  const facingRects = {
+    fore:      (t) => ({ x: 0,     y: 0,     w: W,  h: t  }),
+    aft:       (t) => ({ x: 0,     y: H - t, w: W,  h: t  }),
+    port:      (t) => ({ x: 0,     y: 0,     w: t,  h: H  }),
+    starboard: (t) => ({ x: W - t, y: 0,     w: t,  h: H  }),
+  };
+  for (const facing of ['fore', 'aft', 'port', 'starboard']) {
+    const f   = dist[facing] ?? 0.25;
+    const t   = Math.round(f * 16);
+    const alpha = Math.min(0.9, f * 2);
+    ctx.fillStyle = `rgba(0,170,255,${alpha})`;
+    const r = facingRects[facing](t);
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  }
+
+  // Axis lock lines (dashed).
+  if (_sfLockX || _sfLockY) {
+    ctx.strokeStyle = 'rgba(255,176,0,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    if (_sfLockX) {
+      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
+    }
+    if (_sfLockY) {
+      ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // Focus dot.
+  const fx = cx + _sfX * (cx - 6);
+  const fy = cy - _sfY * (cy - 6);
+  ctx.beginPath();
+  ctx.arc(fx, fy, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ff4040';
+  ctx.fill();
+}
+
+function _updateShieldPctLabels(d) {
+  if (shldForePct) shldForePct.textContent = `${Math.round(d.fore * 100)}%`;
+  if (shldAftPct)  shldAftPct.textContent  = `${Math.round(d.aft  * 100)}%`;
+  if (shldPortPct) shldPortPct.textContent = `${Math.round(d.port * 100)}%`;
+  if (shldStarPct) shldStarPct.textContent = `${Math.round(d.starboard * 100)}%`;
+}
+
+function _sfUpdateLockUI() {
+  shieldLockXBtn?.classList.toggle('shield-quick-btn--active', _sfLockX);
+  shieldLockYBtn?.classList.toggle('shield-quick-btn--active', _sfLockY);
+}
+
+function _sfHandleDrag(e) {
+  if (!shieldCanvas) return;
+  const r = shieldCanvas.getBoundingClientRect();
+  let x = ((e.clientX - r.left)  / r.width)  * 2 - 1;
+  let y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  x = Math.max(-1, Math.min(1, x));
+  y = Math.max(-1, Math.min(1, y));
+  if (_sfLockX) x = 0;
+  if (_sfLockY) y = 0;
+  _sfX = x; _sfY = y;
+  const d = _calcShieldDist(x, y);
+  _drawShieldFocus(d);
+  _updateShieldPctLabels(d);
+  _sfThrottleSend();
+}
+
+function _sfThrottleSend() {
+  if (_sfSendTimer) return;
+  _sfSendTimer = setTimeout(() => {
+    _sfSendTimer = null;
+    if (gameActive) send('weapons.set_shield_focus', { x: _sfX, y: _sfY });
+  }, 100);
+}
+
+function _sfApplyAndSend() {
+  const d = _calcShieldDist(_sfX, _sfY);
+  _drawShieldFocus(d);
+  _updateShieldPctLabels(d);
+  _sfThrottleSend();
 }
 
 // ---------------------------------------------------------------------------
@@ -515,25 +745,52 @@ function updateTargetPanel() {
   const shieldFreqEl    = document.getElementById('target-shield-freq');
 
   if (!target) {
-    targetIdLabel.textContent       = 'NONE';
-    targetHullFill.style.width      = '0%';
-    targetHullText.textContent      = '—';
-    targetShieldFwdFill.style.width = '0%';
-    targetShieldFwdText.textContent = '—';
-    targetShieldAftFill.style.width = '0%';
-    targetShieldAftText.textContent = '—';
-    targetRange.textContent         = '—';
-    targetBearing.textContent       = '—';
-    targetTypeEl.textContent        = '—';
-    beamStatus.textContent          = 'NO TARGET';
-    beamFireBtn.disabled            = true;
+    targetIdLabel.textContent            = 'NONE';
+    if (targetClassificationEl) { targetClassificationEl.textContent = ''; targetClassificationEl.style.display = 'none'; }
+    if (targetAdvisoryEl)       { targetAdvisoryEl.textContent = ''; targetAdvisoryEl.style.display = 'none'; }
+    targetHullFill.style.width           = '0%';
+    targetHullText.textContent           = '—';
+    targetShieldFwdFill.style.width      = '0%';
+    targetShieldFwdText.textContent      = '—';
+    targetShieldAftFill.style.width      = '0%';
+    targetShieldAftText.textContent      = '—';
+    targetRange.textContent              = '—';
+    targetBearing.textContent            = '—';
+    targetTypeEl.textContent             = '—';
+    beamStatus.textContent               = 'NO TARGET';
+    beamFireBtn.disabled                 = true;
     if (shieldFreqRowEl) shieldFreqRowEl.style.display = 'none';
     return;
   }
 
   targetIdLabel.textContent = target.id.toUpperCase();
 
-  // Shield frequency (revealed by science scan).
+  // Classification badge.
+  const cls = target.classification || 'hostile';
+  if (targetClassificationEl) {
+    const CLS_LABELS = { hostile: 'HOSTILE', friendly: 'FRIENDLY', neutral: 'NEUTRAL', unknown: 'UNKNOWN' };
+    targetClassificationEl.textContent   = CLS_LABELS[cls] || cls.toUpperCase();
+    targetClassificationEl.style.display = '';
+    targetClassificationEl.style.color   = CONTACT_COLORS[cls] || 'var(--primary)';
+  }
+
+  // Advisory text for non-hostile contacts.
+  if (targetAdvisoryEl) {
+    if (cls === 'unknown') {
+      targetAdvisoryEl.textContent   = 'UNIDENTIFIED — recommend Science scan before engagement';
+      targetAdvisoryEl.style.display = '';
+      targetAdvisoryEl.style.color   = 'var(--warning)';
+    } else if (cls === 'neutral') {
+      targetAdvisoryEl.textContent   = 'NEUTRAL CONTACT — engagement may cause diplomatic incident';
+      targetAdvisoryEl.style.display = '';
+      targetAdvisoryEl.style.color   = 'var(--warning)';
+    } else {
+      targetAdvisoryEl.textContent   = '';
+      targetAdvisoryEl.style.display = 'none';
+    }
+  }
+
+  // Shield frequency (revealed by science scan, enemy contacts only).
   if (target.shield_frequency && shieldFreqRowEl && shieldFreqEl) {
     const freq     = target.shield_frequency.toUpperCase();
     const isMatch  = target.shield_frequency === currentFrequency;
@@ -544,8 +801,29 @@ function updateTargetPanel() {
     shieldFreqRowEl.style.display = 'none';
   }
 
-  if (target.scan_state === 'scanned') {
-    // Max hull by type (from server ENEMY_TYPE_PARAMS).
+  const kind = target.kind || 'enemy';
+
+  if (kind === 'station') {
+    // Stations always have full data.
+    const hullPct = Math.max(0, (target.hull / (target.hull_max || 100)) * 100);
+    targetHullFill.style.width      = `${hullPct}%`;
+    targetHullText.textContent      = `${Math.round(target.hull)}`;
+    targetShieldFwdFill.style.width = '0%';
+    targetShieldFwdText.textContent = '—';
+    targetShieldAftFill.style.width = '0%';
+    targetShieldAftText.textContent = '—';
+    targetTypeEl.textContent        = (target.station_type || 'STATION').toUpperCase();
+  } else if (kind === 'creature') {
+    const hullPct = Math.max(0, target.hull / 100 * 100);
+    targetHullFill.style.width      = `${hullPct}%`;
+    targetHullText.textContent      = `${Math.round(target.hull)}`;
+    targetShieldFwdFill.style.width = '0%';
+    targetShieldFwdText.textContent = '—';
+    targetShieldAftFill.style.width = '0%';
+    targetShieldAftText.textContent = '—';
+    targetTypeEl.textContent        = (target.creature_type || 'CREATURE').toUpperCase();
+  } else if (target.scan_state === 'scanned') {
+    // Scanned enemy — full data.
     const MAX_HULL = { scout: 40, cruiser: 70, destroyer: 100 };
     const maxHull  = MAX_HULL[target.type] ?? 100;
     const hullPct  = Math.max(0, (target.hull / maxHull) * 100);
@@ -557,7 +835,7 @@ function updateTargetPanel() {
     targetShieldAftText.textContent = `${Math.round(target.shield_rear)}`;
     targetTypeEl.textContent        = target.type.toUpperCase();
   } else {
-    // Unknown contact — no scan data yet.
+    // Unscanned enemy — no scan data yet.
     targetHullFill.style.width      = '0%';
     targetHullText.textContent      = '—';
     targetShieldFwdFill.style.width = '0%';
@@ -582,7 +860,7 @@ function updateTargetPanel() {
     const diff       = Math.abs(((brg - shipHead + 180 + 360) % 360) - 180);
     if (dist > BEAM_RANGE) {
       beamStatus.textContent = 'OUT OF RANGE';
-      beamFireBtn.disabled   = false;  // still allow fire attempt
+      beamFireBtn.disabled   = false;
     } else if (diff > ARC) {
       beamStatus.textContent = 'OUT OF ARC';
       beamFireBtn.disabled   = false;
@@ -807,6 +1085,55 @@ function drawEnemyShape(ctx, sx, sy, type, halfSize, color, selected) {
     ctx.stroke();
   }
 
+  ctx.restore();
+}
+
+// Station — square with protruding crosshair lines.
+function drawStationShape(ctx, sx, sy, color, selected) {
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = selected ? 2 : 1.5;
+  const s = 8;
+  ctx.beginPath();
+  ctx.rect(-s, -s, s * 2, s * 2);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-s - 4, 0); ctx.lineTo(s + 4, 0);
+  ctx.moveTo(0, -s - 4); ctx.lineTo(0, s + 4);
+  ctx.stroke();
+  if (selected) {
+    ctx.strokeStyle = C_FRIENDLY;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, s + 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Creature — circle with central dot.
+function drawCreatureShape(ctx, sx, sy, color, selected) {
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = selected ? 2 : 1.5;
+  const r = 7;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, 2, 0, Math.PI * 2);
+  ctx.fill();
+  if (selected) {
+    ctx.strokeStyle = C_FRIENDLY;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 6, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

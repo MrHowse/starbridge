@@ -45,8 +45,10 @@ def _fresh_ship() -> Ship:
     s.heading = 45.0
     s.velocity = 250.0
     s.hull = 77.5
-    s.shields.front = 80.0
-    s.shields.rear  = 60.0
+    s.shields.fore      = 80.0
+    s.shields.aft       = 60.0
+    s.shields.port      = 40.0
+    s.shields.starboard = 45.0
     s.alert_level = "red"
     s.medical_supplies = 12
     return s
@@ -71,8 +73,10 @@ def test_serialise_ship_basic_fields():
 def test_serialise_ship_shields():
     ship = _fresh_ship()
     data = ss._serialise_ship(ship)
-    assert data["shields"]["front"] == pytest.approx(80.0)
-    assert data["shields"]["rear"] == pytest.approx(60.0)
+    assert data["shields"]["fore"]      == pytest.approx(80.0)
+    assert data["shields"]["aft"]       == pytest.approx(60.0)
+    assert data["shields"]["port"]      == pytest.approx(40.0)
+    assert data["shields"]["starboard"] == pytest.approx(45.0)
 
 
 def test_serialise_ship_systems_include_captain_offline():
@@ -97,8 +101,10 @@ def test_deserialise_ship_restores_shields():
     data = ss._serialise_ship(ship)
     target = Ship()
     ss._deserialise_ship(data, target)
-    assert target.shields.front == pytest.approx(80.0)
-    assert target.shields.rear  == pytest.approx(60.0)
+    assert target.shields.fore      == pytest.approx(80.0)
+    assert target.shields.aft       == pytest.approx(60.0)
+    assert target.shields.port      == pytest.approx(40.0)
+    assert target.shields.starboard == pytest.approx(45.0)
 
 
 def test_deserialise_ship_restores_alert_level():

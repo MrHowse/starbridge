@@ -67,7 +67,12 @@ def _serialise_ship(ship: Ship) -> dict:
         "hull": ship.hull,
         "hull_max": ship.hull_max,
         "docked_at": ship.docked_at,
-        "shields": {"front": ship.shields.front, "rear": ship.shields.rear},
+        "shields": {
+            "fore": ship.shields.fore, "aft": ship.shields.aft,
+            "port": ship.shields.port, "starboard": ship.shields.starboard,
+        },
+        "shield_focus":        ship.shield_focus,
+        "shield_distribution": ship.shield_distribution,
         "systems": {
             name: {
                 "power": sys.power,
@@ -206,8 +211,12 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.docked_at = data.get("docked_at")
 
     shields_d = data.get("shields", {})
-    ship.shields.front = float(shields_d.get("front", ship.shields.front))
-    ship.shields.rear = float(shields_d.get("rear", ship.shields.rear))
+    ship.shields.fore      = float(shields_d.get("fore",      ship.shields.fore))
+    ship.shields.aft       = float(shields_d.get("aft",       ship.shields.aft))
+    ship.shields.port      = float(shields_d.get("port",      ship.shields.port))
+    ship.shields.starboard = float(shields_d.get("starboard", ship.shields.starboard))
+    ship.shield_focus        = data.get("shield_focus",        ship.shield_focus)
+    ship.shield_distribution = data.get("shield_distribution", ship.shield_distribution)
 
     for sys_name, sys_d in data.get("systems", {}).items():
         sys_obj = ship.systems.get(sys_name)

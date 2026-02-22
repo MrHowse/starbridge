@@ -135,6 +135,10 @@ _entity_counter: int = 0
 _stations_attacked_this_tick: set[str] = set()
 # v0.05i — component-destroyed events pending broadcast by game_loop.py
 _pending_component_destroyed: list[dict] = []
+# v0.06 — diplomatic incidents triggered by firing on neutral contacts
+_pending_diplomatic_events: list[dict] = []
+# v0.06 — targeting denial payloads (friendly lock refused) pending broadcast
+_pending_targeting_denials: list[dict] = []
 
 
 def reset(initial_loadout: dict[str, int] | None = None) -> None:
@@ -156,6 +160,8 @@ def reset(initial_loadout: dict[str, int] | None = None) -> None:
     _entity_counter = 0
     _stations_attacked_this_tick.clear()
     _pending_component_destroyed.clear()
+    _pending_diplomatic_events.clear()
+    _pending_targeting_denials.clear()
 
 
 def serialise() -> dict:
@@ -262,6 +268,72 @@ def pop_component_destroyed_events() -> list[dict]:
     result = list(_pending_component_destroyed)
     _pending_component_destroyed.clear()
     return result
+
+
+def pop_diplomatic_events() -> list[dict]:
+    """Return and clear pending weapons.diplomatic_incident event dicts."""
+    result = list(_pending_diplomatic_events)
+    _pending_diplomatic_events.clear()
+    return result
+
+
+def pop_targeting_denials() -> list[dict]:
+    """Return and clear pending weapons.targeting_denied payloads."""
+    result = list(_pending_targeting_denials)
+    _pending_targeting_denials.clear()
+    return result
+
+
+def _classify_target(world: World, entity_id: str | None) -> str:
+    """Return the classification of a potential target entity.
+
+    Returns one of: 'hostile', 'friendly', 'neutral', 'unknown'.
+    """
+    if entity_id is None:
+        return "unknown"
+    if any(e.id == entity_id for e in world.enemies):
+        return "hostile"
+    if any(c.id == entity_id for c in world.creatures):
+        return "unknown"
+    station = _find_station_by_id(world, entity_id)
+    if station is not None:
+        if station.faction == "hostile":
+            return "hostile"
+        if station.faction == "friendly":
+            return "friendly"
+        return "neutral"    # neutral or none (derelict)
+    comp_result = _find_station_component(world, entity_id)
+    if comp_result is not None:
+        s, _ = comp_result
+        if s.faction == "friendly":
+            return "friendly"
+        if s.faction == "hostile":
+            return "hostile"
+        return "neutral"
+    return "unknown"
+
+
+def try_select_target(entity_id: str | None, world: World) -> dict | None:
+    """Validate and apply a target selection request.
+
+    Returns a denial payload dict if the target is a friendly contact
+    (Weapons cannot lock onto friendly contacts), or None on success
+    (target has been set via set_target()).
+    """
+    if entity_id is None:
+        set_target(None)
+        return None
+    cls = _classify_target(world, entity_id)
+    if cls == "friendly":
+        denial = {
+            "denied": True,
+            "entity_id": entity_id,
+            "reason": "TARGETING DENIED — friendly contact",
+        }
+        _pending_targeting_denials.append(denial)
+        return denial
+    set_target(entity_id)
+    return None
 
 
 def tick_cooldowns(dt: float) -> None:
@@ -435,6 +507,34 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
             },
         )
 
+    # ── Creature target ────────────────────────────────────────────────────
+    creature = next((c for c in world.creatures if c.id == _weapons_target), None)
+    if creature is not None:
+        dist = distance(ship.x, ship.y, creature.x, creature.y)
+        if dist > BEAM_PLAYER_RANGE:
+            return None
+        brg = bearing_to(ship.x, ship.y, creature.x, creature.y)
+        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+            return None
+        creature.hull = max(0.0, creature.hull - dmg)
+        if creature.hull <= 0.0:
+            world.creatures = [c for c in world.creatures if c.id != creature.id]
+            if _weapons_target == creature.id:
+                _weapons_target = None
+            gl.log_event("combat", "creature_destroyed", {
+                "creature_id": creature.id, "cause": "beam",
+            })
+        return (
+            "weapons.beam_fired",
+            {
+                "target_id": creature.id,
+                "target_x": creature.x,
+                "target_y": creature.y,
+                "damage": round(dmg, 2),
+                "beam_frequency": beam_frequency,
+            },
+        )
+
     # ── Station component target ───────────────────────────────────────────
     comp_result = _find_station_component(world, _weapons_target)
     if comp_result is not None:
@@ -470,9 +570,9 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
             },
         )
 
-    # ── Station hull target ────────────────────────────────────────────────
+    # ── Station hull target (hostile / neutral / derelict — friendly rejected at select) ─
     station = _find_station_by_id(world, _weapons_target)
-    if station is not None and station.faction == "hostile":
+    if station is not None and station.faction != "friendly":
         dist = distance(ship.x, ship.y, station.x, station.y)
         if dist > BEAM_PLAYER_RANGE:
             return None
@@ -486,6 +586,13 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
                 dmg *= 0.2
         station.hull = max(0.0, station.hull - dmg)
         _stations_attacked_this_tick.add(station.id)
+        # Diplomatic incident when firing on a non-hostile station.
+        if station.faction in ("neutral", "none"):
+            station.faction = "hostile"   # target retaliates
+            _pending_diplomatic_events.append({
+                "station_id": station.id,
+                "station_name": station.name,
+            })
 
         return (
             "weapons.beam_fired",
@@ -722,15 +829,14 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                     events.append(event)
                     dead_torpedo_ids.append(torp.id)
 
-                # If no enemy hit, check station hull.
+                # If no enemy hit, check station hull (not friendly stations).
                 if hit_enemy is None and torp.id not in dead_torpedo_ids:
                     for station in world.stations:
-                        if station.faction != "hostile":
+                        if station.faction == "friendly":
                             continue
                         if distance(torp.x, torp.y, station.x, station.y) >= 500.0:
                             continue
                         # Shield arc absorption.
-                        brg = bearing_to(torp.x, torp.y, station.x, station.y)
                         eff_dmg = damage
                         if station.defenses is not None:
                             atk_brg = bearing_to(station.x, station.y, torp.x, torp.y)
@@ -738,6 +844,13 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                                 eff_dmg *= 0.2
                         station.hull = max(0.0, station.hull - eff_dmg)
                         _stations_attacked_this_tick.add(station.id)
+                        # Diplomatic incident for non-hostile station hits.
+                        if station.faction in ("neutral", "none"):
+                            station.faction = "hostile"
+                            _pending_diplomatic_events.append({
+                                "station_id": station.id,
+                                "station_name": station.name,
+                            })
                         events.append({
                             "torpedo_id": torp.id,
                             "target_id": station.id,
@@ -780,8 +893,10 @@ async def handle_enemy_beam_hits(
                         "damage": ev.damage,
                         "hull": world.ship.hull,
                         "shields": {
-                            "front": world.ship.shields.front,
-                            "rear": world.ship.shields.rear,
+                            "fore":      world.ship.shields.fore,
+                            "aft":       world.ship.shields.aft,
+                            "port":      world.ship.shields.port,
+                            "starboard": world.ship.shields.starboard,
                         },
                     },
                 )

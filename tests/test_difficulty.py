@@ -84,8 +84,10 @@ def _make_ship(difficulty: str = "officer") -> Ship:
     ship = Ship()
     ship.x, ship.y = 0.0, 0.0
     ship.heading = 0.0
-    ship.shields.front = 0.0
-    ship.shields.rear = 0.0
+    ship.shields.fore      = 0.0
+    ship.shields.aft       = 0.0
+    ship.shields.port      = 0.0
+    ship.shields.starboard = 0.0
     ship.difficulty = get_preset(difficulty)
     return ship
 

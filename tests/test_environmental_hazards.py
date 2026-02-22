@@ -423,8 +423,10 @@ class TestRadiationZoneSectorHazard:
 
     def _ship_in_sector(self, shields_front: float = 0.0, shields_rear: float = 0.0) -> Ship:
         s = _ship(x=50_000.0, y=50_000.0)
-        s.shields.front = shields_front
-        s.shields.rear = shields_rear
+        # Set all 4 facings to the same values for radiation absorption check.
+        total = shields_front + shields_rear
+        per_facing = total / 4.0
+        s.shields.fore = s.shields.aft = s.shields.port = s.shields.starboard = per_facing
         return s
 
     def test_radiation_sector_deals_hull_damage(self):
@@ -568,34 +570,34 @@ class TestShieldRegenModifier:
 
     def test_regen_default_modifier(self):
         ship = _ship()
-        ship.shields.front = 0.0
-        ship.shields.rear = 0.0
+        ship.shields.fore = 0.0
+        ship.shields.aft  = 0.0
         ship.systems["shields"].power = 100.0
         regenerate_shields(ship, hazard_modifier=1.0)
         expected = SHIELD_REGEN_PER_TICK * ship.systems["shields"].efficiency
-        assert ship.shields.front == pytest.approx(expected)
-        assert ship.shields.rear == pytest.approx(expected)
+        assert ship.shields.fore == pytest.approx(expected)
+        assert ship.shields.aft  == pytest.approx(expected)
 
     def test_regen_half_modifier(self):
         ship = _ship()
-        ship.shields.front = 0.0
-        ship.shields.rear = 0.0
+        ship.shields.fore = 0.0
+        ship.shields.aft  = 0.0
         ship.systems["shields"].power = 100.0
         regenerate_shields(ship, hazard_modifier=1.0)
-        regen_full = ship.shields.front
+        regen_full = ship.shields.fore
 
-        ship.shields.front = 0.0
-        ship.shields.rear = 0.0
+        ship.shields.fore = 0.0
+        ship.shields.aft  = 0.0
         regenerate_shields(ship, hazard_modifier=0.5)
-        assert ship.shields.front == pytest.approx(regen_full * 0.5)
+        assert ship.shields.fore == pytest.approx(regen_full * 0.5)
 
     def test_regen_nebula_modifier(self):
         ship = _ship()
-        ship.shields.front = 0.0
+        ship.shields.fore = 0.0
         ship.systems["shields"].power = 100.0
         regenerate_shields(ship, hazard_modifier=NEBULA_SHIELD_REGEN_MODIFIER)
         expected = SHIELD_REGEN_PER_TICK * ship.systems["shields"].efficiency * NEBULA_SHIELD_REGEN_MODIFIER
-        assert ship.shields.front == pytest.approx(expected)
+        assert ship.shields.fore == pytest.approx(expected)
 
 
 # ---------------------------------------------------------------------------

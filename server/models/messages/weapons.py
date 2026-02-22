@@ -25,6 +25,6 @@ class WeaponsLoadTubePayload(BaseModel):
     torpedo_type: Literal["standard", "emp", "probe", "nuclear"] = "standard"
 
 
-class WeaponsSetShieldsPayload(BaseModel):
-    front: float = Field(ge=0.0, le=100.0)
-    rear: float = Field(ge=0.0, le=100.0)
+class WeaponsSetShieldFocusPayload(BaseModel):
+    x: float = Field(ge=-1.0, le=1.0)
+    y: float = Field(ge=-1.0, le=1.0)

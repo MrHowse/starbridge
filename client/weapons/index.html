@@ -53,6 +53,7 @@
           <div class="panel__header">
             <span class="text-label">TARGET</span>
             <span class="text-data" id="target-id-label">NONE</span>
+            <span class="text-data" id="target-classification" style="display:none;font-size:10px;letter-spacing:.5px;margin-left:auto"></span>
           </div>
           <div class="target-body" id="target-body">
             <div class="target-row">
@@ -94,6 +95,7 @@
               <span class="text-label">SHIELD FREQ</span>
               <span class="text-data" id="target-shield-freq">—</span>
             </div>
+            <div id="target-advisory" style="display:none;padding:4px 0;font-size:10px;text-align:center;letter-spacing:.5px"></div>
           </div>
         </section>
 
@@ -139,22 +141,35 @@
           </div>
         </section>
 
-        <!-- Shield Balance -->
+        <!-- Shield Focus -->
         <section class="ctrl-section panel">
-          <div class="panel__header">
-            <span class="text-label">SHIELD BALANCE</span>
-          </div>
-          <div class="shield-body">
-            <div class="shield-bar-row">
-              <span class="text-label">FWD</span>
-              <input type="range" id="shield-slider" min="0" max="100" step="1" value="50"
-                     aria-label="Shield balance (0=full rear, 100=full forward)">
-              <span class="text-label">AFT</span>
+          <div class="panel__header"><span class="text-label">SHIELD FOCUS</span></div>
+          <div class="shield-focus-body">
+            <div class="shield-canvas-wrap">
+              <span class="shield-dir-label shield-dir-label--top">BOW</span>
+              <div class="shield-canvas-row">
+                <span class="shield-dir-label shield-dir-label--side">PORT</span>
+                <canvas id="shield-focus-canvas" width="160" height="160"
+                        aria-label="Shield focus — drag to direct shield energy" tabindex="0"></canvas>
+                <span class="shield-dir-label shield-dir-label--side">STAR</span>
+              </div>
+              <span class="shield-dir-label shield-dir-label--top">STERN</span>
             </div>
-            <div class="shield-readout">
-              <span class="text-data" id="shield-fwd-pct">50%</span>
-              <span class="text-label">↔</span>
-              <span class="text-data" id="shield-aft-pct">50%</span>
+            <div class="shield-pct-grid">
+              <span></span>
+              <span class="shield-pct-val" id="shld-fore-pct">25%</span>
+              <span></span>
+              <span class="shield-pct-val" id="shld-port-pct">25%</span>
+              <span class="shield-pct-val text-dim" style="font-size:.6rem">◈</span>
+              <span class="shield-pct-val" id="shld-star-pct">25%</span>
+              <span></span>
+              <span class="shield-pct-val" id="shld-aft-pct">25%</span>
+              <span></span>
+            </div>
+            <div class="shield-quick-btns">
+              <button class="shield-quick-btn" id="shield-lock-x" title="Lock Y-axis (X)">═ X-LOCK</button>
+              <button class="shield-quick-btn" id="shield-lock-y" title="Lock X-axis (Y)">║ Y-LOCK</button>
+              <button class="shield-quick-btn" id="shield-centre" title="Centre (C)">⊕ CTR</button>
             </div>
           </div>
         </section>

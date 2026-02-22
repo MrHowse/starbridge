@@ -49,6 +49,30 @@ def beam_in_arc(shooter_heading: float, bearing: float, arc_deg: float) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def get_hit_facing(
+    ship_heading: float,
+    ship_x: float,
+    ship_y: float,
+    attacker_x: float,
+    attacker_y: float,
+) -> str:
+    """Return 'fore'|'aft'|'port'|'starboard' for an incoming hit.
+
+    Uses the attacker's bearing relative to the ship's heading:
+      fore:      |diff| ≤ 45°
+      aft:       |diff| ≥ 135°
+      starboard: diff  > 0  (right side)
+      port:      diff  < 0  (left side)
+    """
+    brg  = bearing_to(ship_x, ship_y, attacker_x, attacker_y)
+    diff = angle_diff(ship_heading, brg)   # -180..+180; positive = clockwise = starboard
+    if abs(diff) <= 45.0:
+        return "fore"
+    if abs(diff) >= 135.0:
+        return "aft"
+    return "starboard" if diff > 0 else "port"
+
+
 def apply_hit_to_player(
     ship: Ship,
     damage: float,
@@ -61,18 +85,13 @@ def apply_hit_to_player(
     Returns a list of (system_name, new_health) for any system that took
     structural damage this hit (for broadcasting ship.system_damaged events).
     """
-    # 1. Determine whether the hit is from the front or rear.
-    brg = bearing_to(ship.x, ship.y, attacker_x, attacker_y)
-    diff = angle_diff(ship.heading, brg)
-    is_front = abs(diff) < 90.0
+    # 1. Determine which facing takes the hit.
+    facing    = get_hit_facing(ship.heading, ship.x, ship.y, attacker_x, attacker_y)
+    shield_hp = getattr(ship.shields, facing)
 
     # 2. Shield absorption: shields absorb up to shield_hp × COEFF of the hit.
-    if is_front:
-        absorbed = min(ship.shields.front * SHIELD_ABSORPTION_COEFF, damage)
-        ship.shields.front = max(0.0, ship.shields.front - absorbed / SHIELD_ABSORPTION_COEFF)
-    else:
-        absorbed = min(ship.shields.rear * SHIELD_ABSORPTION_COEFF, damage)
-        ship.shields.rear = max(0.0, ship.shields.rear - absorbed / SHIELD_ABSORPTION_COEFF)
+    absorbed = min(shield_hp * SHIELD_ABSORPTION_COEFF, damage)
+    setattr(ship.shields, facing, max(0.0, shield_hp - absorbed / SHIELD_ABSORPTION_COEFF))
 
     # Apply difficulty enemy damage multiplier.
     hull_damage = (damage - absorbed) * ship.difficulty.enemy_damage_mult
@@ -157,9 +176,13 @@ def apply_hit_to_enemy(
 def regenerate_shields(ship: Ship, hazard_modifier: float = 1.0) -> None:
     """Regenerate player shields each tick, scaled by shield system efficiency.
 
+    Each facing regenerates toward its distribution-based maximum.
     *hazard_modifier* reduces the regen rate when inside a nebula (0.5 = 50%
     slower).  Defaults to 1.0 (no reduction).
     """
+    from server.models.ship import TOTAL_SHIELD_CAPACITY
     regen = SHIELD_REGEN_PER_TICK * ship.systems["shields"].efficiency * hazard_modifier
-    ship.shields.front = min(100.0, ship.shields.front + regen)
-    ship.shields.rear = min(100.0, ship.shields.rear + regen)
+    for facing in ("fore", "aft", "port", "starboard"):
+        max_hp  = TOTAL_SHIELD_CAPACITY * ship.shield_distribution[facing]
+        current = getattr(ship.shields, facing)
+        setattr(ship.shields, facing, min(max_hp, current + regen))

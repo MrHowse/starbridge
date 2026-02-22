@@ -641,8 +641,8 @@ def test_proximity_with_shields_completes_after_duration():
     engine = MissionEngine(mission)
     # Ship inside radius
     ship = _make_ship(x=72_000, y=68_000)
-    ship.shields.front = 90.0
-    ship.shields.rear = 90.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 90.0
+    
     world = _make_world()
 
     # 9 ticks of dt=1.0 — not yet done
@@ -666,15 +666,15 @@ def test_proximity_with_shields_resets_timer_when_leaving_range():
 
     # 3 ticks inside range
     ship_in = _make_ship(x=72_000, y=68_000)
-    ship_in.shields.front = 90.0
-    ship_in.shields.rear = 90.0
+    ship_in.shields.fore = ship_in.shields.aft = ship_in.shields.port = ship_in.shields.starboard = 90.0
+    
     for _ in range(3):
         engine.tick(world, ship_in, dt=1.0)
 
     # 1 tick outside range — timer resets
     ship_out = _make_ship(x=80_000, y=80_000)
-    ship_out.shields.front = 90.0
-    ship_out.shields.rear = 90.0
+    ship_out.shields.fore = ship_out.shields.aft = ship_out.shields.port = ship_out.shields.starboard = 90.0
+    
     engine.tick(world, ship_out, dt=1.0)
 
     # 4 more ticks inside — total valid = 4, not yet 5
@@ -696,8 +696,7 @@ def test_proximity_with_shields_fails_if_shields_too_low():
     )
     engine = MissionEngine(mission)
     ship = _make_ship(x=72_000, y=68_000)
-    ship.shields.front = 50.0  # below min_shield
-    ship.shields.rear = 50.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 50.0  # below min_shield
     world = _make_world()
 
     for _ in range(5):
@@ -716,13 +715,13 @@ def test_proximity_timer_resets_on_low_shield():
 
     # 3 ticks with good shields
     ship = _make_ship(x=72_000, y=68_000)
-    ship.shields.front = 90.0
-    ship.shields.rear = 90.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 90.0
+    
     for _ in range(3):
         engine.tick(world, ship, dt=1.0)
 
     # Shields drop — timer resets to 0
-    ship.shields.front = 30.0
+    ship.shields.fore = ship.shields.aft = ship.shields.port = ship.shields.starboard = 30.0
     engine.tick(world, ship, dt=1.0)
     assert engine._proximity_timer == 0.0
 

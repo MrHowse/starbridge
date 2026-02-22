@@ -205,7 +205,8 @@ def tick_hazards(world: World, ship: Ship, dt: float) -> list[dict]:
                 if "radiation_zone" not in active:
                     active.append("radiation_zone")
                 _sensor_modifier = min(_sensor_modifier, smod)
-                total_shields = ship.shields.front + ship.shields.rear
+                total_shields = (ship.shields.fore + ship.shields.aft
+                                 + ship.shields.port + ship.shields.starboard)
                 absorption = (
                     RADIATION_SHIELD_ABSORPTION_FRAC
                     if total_shields >= RADIATION_SHIELD_THRESHOLD

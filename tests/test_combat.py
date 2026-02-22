@@ -2,9 +2,9 @@
 
 Covers:
   beam_in_arc — target in arc, out of arc, edge cases
-  apply_hit_to_player — front/rear shield absorption, hull damage, system damage roll
+  apply_hit_to_player — 4-facing shield absorption, hull damage, system damage roll
   apply_hit_to_enemy — hull and shield reduction
-  regenerate_shields — heals per tick scaled by shield efficiency, caps at 100
+  regenerate_shields — heals per tick scaled by shield efficiency, caps per distribution
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ import pytest
 
 from server.models.ship import Ship
 from server.models.world import Enemy, spawn_enemy
+from server.models.ship import TOTAL_SHIELD_CAPACITY
 from server.systems.combat import (
     BEAM_PLAYER_ARC_DEG,
     HULL_SYSTEM_DAMAGE_CHANCE,
@@ -24,6 +25,7 @@ from server.systems.combat import (
     apply_hit_to_enemy,
     apply_hit_to_player,
     beam_in_arc,
+    get_hit_facing,
     regenerate_shields,
 )
 
@@ -83,42 +85,35 @@ def test_beam_in_arc_behind():
 
 
 # ---------------------------------------------------------------------------
-# apply_hit_to_player — front shield absorbs front hit
+# apply_hit_to_player — 4-facing shield absorption
 # ---------------------------------------------------------------------------
 
 
-def test_hit_from_front_reduces_front_shield():
-    # Attacker south of ship (y+) bearing 180° from ship heading 0°.
-    # angle_diff(0, 180) = 180 → abs = 180 >= 90 → rear!
-    # Wait: ship faces north (heading 0), attacker is south.
-    # bearing_to(0,0, 0, 1000) = atan2(0-0, 0-1000) = atan2(0, -1000) = 180°.
-    # angle_diff(0, 180) = 180; abs=180 >= 90 → rear hit.
-    # So to test front hit: attacker must be in front (north of ship).
-    # bearing_to(0,0, 0, -1000) = atan2(0, 1000) = 0° (north).
-    # angle_diff(0, 0) = 0 < 90 → front hit.
+def test_hit_from_fore_reduces_fore_shield():
+    # Ship heading 0° (north). Attacker due north → bearing 0° → diff=0 → fore.
     ship = make_ship(x=0.0, y=0.0, heading=0.0)
-    initial_front = ship.shields.front
-    initial_rear = ship.shields.rear
+    initial_fore = ship.shields.fore
+    initial_aft  = ship.shields.aft
     damage = 10.0
     apply_hit_to_player(ship, damage, 0.0, -1_000.0)  # attacker north of ship
-    assert ship.shields.front < initial_front, "Front shield should absorb front hit"
-    assert ship.shields.rear == initial_rear, "Rear shield should be unchanged"
+    assert ship.shields.fore < initial_fore, "Fore shield should absorb fore hit"
+    assert ship.shields.aft == initial_aft, "Aft shield should be unchanged"
 
 
-def test_hit_from_rear_reduces_rear_shield():
+def test_hit_from_aft_reduces_aft_shield():
     ship = make_ship(x=0.0, y=0.0, heading=0.0)
-    initial_rear = ship.shields.rear
-    initial_front = ship.shields.front
+    initial_aft  = ship.shields.aft
+    initial_fore = ship.shields.fore
     damage = 10.0
-    # Attacker south = bearing 180° → rear hit.
+    # Attacker due south = bearing 180° → diff=180 → aft hit.
     apply_hit_to_player(ship, damage, 0.0, 1_000.0)
-    assert ship.shields.rear < initial_rear, "Rear shield should absorb rear hit"
-    assert ship.shields.front == initial_front, "Front shield unchanged for rear hit"
+    assert ship.shields.aft < initial_aft, "Aft shield should absorb aft hit"
+    assert ship.shields.fore == initial_fore, "Fore shield unchanged for aft hit"
 
 
 def test_hull_damage_when_shields_depleted():
     ship = make_ship(x=0.0, y=0.0, heading=0.0)
-    ship.shields.front = 0.0  # no front shields
+    ship.shields.fore = 0.0  # no fore shields
     initial_hull = ship.hull
     damage = 20.0
 
@@ -134,7 +129,7 @@ def test_hull_damage_when_shields_depleted():
 def test_hull_damage_partial_shield_absorption():
     """With partial shields, hull takes the unabsorbed remainder."""
     ship = make_ship(x=0.0, y=0.0, heading=0.0)
-    ship.shields.front = 12.5  # can absorb 12.5 × 0.8 = 10 damage
+    ship.shields.fore = 12.5  # can absorb 12.5 × 0.8 = 10 damage
     damage = 20.0
 
     mock_rng = MagicMock()
@@ -148,7 +143,7 @@ def test_hull_damage_partial_shield_absorption():
 
 def test_system_damage_on_hull_hit_when_rng_triggers():
     ship = make_ship(x=0.0, y=0.0, heading=0.0)
-    ship.shields.front = 0.0  # ensure hull damage
+    ship.shields.fore = 0.0  # ensure hull damage
     damage = 20.0
 
     mock_rng = MagicMock()
@@ -165,7 +160,7 @@ def test_system_damage_on_hull_hit_when_rng_triggers():
 
 def test_no_system_damage_when_rng_suppresses():
     ship = make_ship(x=0.0, y=0.0, heading=0.0)
-    ship.shields.front = 0.0
+    ship.shields.fore = 0.0
     damage = 20.0
 
     mock_rng = MagicMock()
@@ -178,21 +173,21 @@ def test_no_system_damage_when_rng_suppresses():
 def test_no_system_damage_when_hull_damage_is_zero():
     """If shields absorb the full hit, no hull damage → no system damage roll."""
     ship = make_ship(x=0.0, y=0.0, heading=0.0)
-    ship.shields.front = 100.0  # full shields
-    damage = 1.0  # tiny hit — absorbed fully by 100 × 0.8 = 80 capacity
+    ship.shields.fore = 50.0  # full fore shields (default distribution max)
+    damage = 1.0  # tiny hit — absorbed fully by 50 × 0.8 = 40 capacity
 
     mock_rng = MagicMock()
     mock_rng.random.return_value = 0.0  # would trigger if called
 
     result = apply_hit_to_player(ship, damage, 0.0, -1_000.0, rng=mock_rng)
-    # Hull damage = 1 - min(80, 1) = 0 → no system damage
+    # Hull damage = 1 - min(40, 1) = 0 → no system damage
     assert ship.hull == 100.0
     assert result == []
 
 
 def test_hull_does_not_go_below_zero():
     ship = make_ship()
-    ship.shields.front = 0.0
+    ship.shields.fore = 0.0
     ship.hull = 5.0
 
     mock_rng = MagicMock()
@@ -239,37 +234,46 @@ def test_apply_hit_to_enemy_hull_does_not_go_below_zero():
 # ---------------------------------------------------------------------------
 
 
-def test_regenerate_shields_heals_both_hemispheres():
+def test_regenerate_shields_heals_all_facings():
     ship = make_ship()
-    ship.shields.front = 80.0
-    ship.shields.rear = 70.0
+    ship.shields.fore      = 30.0
+    ship.shields.aft       = 20.0
+    ship.shields.port      = 25.0
+    ship.shields.starboard = 25.0
     ship.systems["shields"].power = 100.0  # efficiency = 1.0
     ship.systems["shields"].health = 100.0
 
     regenerate_shields(ship)
 
     expected_regen = SHIELD_REGEN_PER_TICK * 1.0
-    assert ship.shields.front == pytest.approx(80.0 + expected_regen)
-    assert ship.shields.rear == pytest.approx(70.0 + expected_regen)
+    assert ship.shields.fore      == pytest.approx(30.0 + expected_regen)
+    assert ship.shields.aft       == pytest.approx(20.0 + expected_regen)
+    assert ship.shields.port      == pytest.approx(25.0 + expected_regen)
+    assert ship.shields.starboard == pytest.approx(25.0 + expected_regen)
 
 
-def test_regenerate_shields_caps_at_100():
+def test_regenerate_shields_caps_at_distribution_max():
+    # Centre distribution: max per facing = TOTAL_SHIELD_CAPACITY × 0.25 = 50.0
     ship = make_ship()
-    ship.shields.front = 99.9
-    ship.shields.rear = 99.9
+    cap = TOTAL_SHIELD_CAPACITY * 0.25  # 50.0
+    ship.shields.fore      = cap - 0.1
+    ship.shields.aft       = cap - 0.1
+    ship.shields.port      = cap - 0.1
+    ship.shields.starboard = cap - 0.1
     ship.systems["shields"].power = 100.0
     ship.systems["shields"].health = 100.0
 
     regenerate_shields(ship)
 
-    assert ship.shields.front == 100.0
-    assert ship.shields.rear == 100.0
+    assert ship.shields.fore      == pytest.approx(cap)
+    assert ship.shields.aft       == pytest.approx(cap)
+    assert ship.shields.port      == pytest.approx(cap)
+    assert ship.shields.starboard == pytest.approx(cap)
 
 
 def test_regenerate_shields_scaled_by_efficiency():
     ship = make_ship()
-    ship.shields.front = 50.0
-    ship.shields.rear = 50.0
+    ship.shields.fore = 20.0
     # Set efficiency to 0.5 (50% power, 100% health → efficiency = 0.5).
     ship.systems["shields"].power = 50.0
     ship.systems["shields"].health = 100.0
@@ -277,17 +281,17 @@ def test_regenerate_shields_scaled_by_efficiency():
     regenerate_shields(ship)
 
     expected_regen = SHIELD_REGEN_PER_TICK * 0.5
-    assert ship.shields.front == pytest.approx(50.0 + expected_regen)
+    assert ship.shields.fore == pytest.approx(20.0 + expected_regen)
 
 
 def test_regenerate_shields_zero_when_shields_offline():
     ship = make_ship()
-    ship.shields.front = 50.0
-    ship.shields.rear = 50.0
+    ship.shields.fore = 20.0
+    ship.shields.aft  = 20.0
     ship.systems["shields"].power = 0.0
     ship.systems["shields"].health = 0.0
 
     regenerate_shields(ship)
 
-    assert ship.shields.front == 50.0  # no regen when efficiency = 0
-    assert ship.shields.rear == 50.0
+    assert ship.shields.fore == 20.0  # no regen when efficiency = 0
+    assert ship.shields.aft  == 20.0

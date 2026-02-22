@@ -107,47 +107,47 @@ async def test_fire_torpedo_invalid_tube_returns_error():
 
 
 # ---------------------------------------------------------------------------
-# weapons.set_shields
+# weapons.set_shield_focus
 # ---------------------------------------------------------------------------
 
 
-async def test_set_shields_valid_enqueues():
+async def test_set_shield_focus_valid_enqueues():
     _, queue = fresh_handler()
-    msg = Message.build("weapons.set_shields", {"front": 80.0, "rear": 20.0})
+    msg = Message.build("weapons.set_shield_focus", {"x": 0.5, "y": -0.5})
     await weapons.handle_weapons_message("conn1", msg)
     assert queue.qsize() == 1
     msg_type, payload = await queue.get()
-    assert msg_type == "weapons.set_shields"
-    assert payload.front == 80.0
-    assert payload.rear == 20.0
+    assert msg_type == "weapons.set_shield_focus"
+    assert payload.x == pytest.approx(0.5)
+    assert payload.y == pytest.approx(-0.5)
 
 
-async def test_set_shields_front_out_of_range_returns_error():
+async def test_set_shield_focus_invalid_x_rejected():
     sender, queue = fresh_handler()
-    msg = Message.build("weapons.set_shields", {"front": 110.0, "rear": 50.0})
+    msg = Message.build("weapons.set_shield_focus", {"x": 1.5, "y": 0.0})
     await weapons.handle_weapons_message("conn1", msg)
     assert queue.empty()
     assert sender.sent[0].type == "error.validation"
 
 
-async def test_set_shields_rear_out_of_range_returns_error():
+async def test_set_shield_focus_invalid_y_rejected():
     sender, queue = fresh_handler()
-    msg = Message.build("weapons.set_shields", {"front": 50.0, "rear": -10.0})
+    msg = Message.build("weapons.set_shield_focus", {"x": 0.0, "y": -1.5})
     await weapons.handle_weapons_message("conn1", msg)
     assert queue.empty()
     assert sender.sent[0].type == "error.validation"
 
 
-async def test_set_shields_zero_values_valid():
+async def test_set_shield_focus_centre_valid():
     _, queue = fresh_handler()
-    msg = Message.build("weapons.set_shields", {"front": 0.0, "rear": 0.0})
+    msg = Message.build("weapons.set_shield_focus", {"x": 0.0, "y": 0.0})
     await weapons.handle_weapons_message("conn1", msg)
     assert queue.qsize() == 1
 
 
-async def test_set_shields_max_values_valid():
+async def test_set_shield_focus_extremes_valid():
     _, queue = fresh_handler()
-    msg = Message.build("weapons.set_shields", {"front": 100.0, "rear": 100.0})
+    msg = Message.build("weapons.set_shield_focus", {"x": 1.0, "y": 1.0})
     await weapons.handle_weapons_message("conn1", msg)
     assert queue.qsize() == 1
 
