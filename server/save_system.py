@@ -26,7 +26,7 @@ import logging
 from pathlib import Path
 
 import server.game_loop_weapons as glw
-import server.game_loop_medical as glmed
+import server.game_loop_medical_v2 as glmed
 import server.game_loop_security as gls
 import server.game_loop_flight_ops as glfo
 import server.game_loop_damage_control as gldc

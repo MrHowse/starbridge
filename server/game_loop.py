@@ -54,8 +54,13 @@ from server.models.messages import (
     EngineeringSetRepairPayload,
     HelmSetHeadingPayload,
     HelmSetThrottlePayload,
+    MedicalAdmitPayload,
     MedicalCancelTreatmentPayload,
+    MedicalDischargePayload,
+    MedicalQuarantinePayload,
+    MedicalStabilisePayload,
     MedicalTreatCrewPayload,
+    MedicalTreatPayload,
     Message,
     PuzzleAssistPayload,
     PuzzleCancelPayload,
@@ -92,7 +97,7 @@ import server.game_logger as gl
 import server.game_debrief as gdb
 import server.game_loop_weapons as glw
 import server.game_loop_mission as glm
-import server.game_loop_medical as glmed
+import server.game_loop_medical_v2 as glmed
 import server.game_loop_security as gls
 import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
@@ -550,6 +555,9 @@ async def _loop() -> None:
         _world.ship.update_crew_factors()
         glmed.tick_treatments(_world.ship, TICK_DT)
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
+        # v0.06.1: tick individual crew injuries/treatments if roster initialised.
+        _med_roster = glmed.get_roster()
+        medical_v2_events = glmed.tick(_med_roster, TICK_DT) if _med_roster else []
         security_events = gls.tick_security(_world.ship.interior, _world.ship, TICK_DT)
         station_boarding_events = gls.tick_station_boarding(_world.ship, TICK_DT)
         comms_responses = glco.tick_comms(TICK_DT)
@@ -1077,6 +1085,25 @@ async def _loop() -> None:
                 Message.build("medical.disease_spread", dev),
             )
 
+        # 11g2. v0.06.1 Medical v2 state + crew roster broadcast.
+        await _manager.broadcast_to_roles(
+            ["medical"],
+            Message.build("medical.state", glmed.get_medical_state()),
+        )
+        roster = glmed.get_roster()
+        if roster is not None:
+            await _manager.broadcast_to_roles(
+                ["medical"],
+                Message.build("medical.crew_roster", {"members": {
+                    cid: m.to_dict() for cid, m in roster.members.items()
+                }}),
+            )
+        for mev in medical_v2_events:
+            await _manager.broadcast_to_roles(
+                ["medical"],
+                Message.build("medical.event", mev),
+            )
+
         # 11h. Hazard damage events → hull_hit broadcast + hazard status.
         for hev in hazard_events:
             await _manager.broadcast(
@@ -1248,6 +1275,20 @@ def _build_sector_grid_payload(world: World) -> dict:
     }
 
 
+def _get_treatment_type(crew_id: str, injury_id: str) -> str:
+    """Look up the treatment_type for a specific injury on a crew member."""
+    roster = glmed.get_roster()
+    if roster is None:
+        return "first_aid"
+    member = roster.members.get(crew_id)
+    if member is None:
+        return "first_aid"
+    for inj in member.injuries:
+        if inj.id == injury_id:
+            return inj.treatment_type
+    return "first_aid"
+
+
 def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict]]:
     """Apply all pending input messages; return list of (event_type, payload) to broadcast."""
     assert _queue is not None
@@ -1358,6 +1399,22 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "medical.cancel_treatment" and isinstance(payload, MedicalCancelTreatmentPayload):
             glmed.cancel_treatment(payload.deck)
             _set_training_flag(glm, "medical_treatment_cancelled")
+        # v0.06.1 individual crew medical messages
+        elif msg_type == "medical.admit" and isinstance(payload, MedicalAdmitPayload):
+            result = glmed.admit_patient(payload.crew_id)
+            gl.log_event("medical", "patient_admit", {"crew_id": payload.crew_id, "success": result["success"]})
+        elif msg_type == "medical.treat" and isinstance(payload, MedicalTreatPayload):
+            result = glmed.start_crew_treatment(payload.crew_id, payload.injury_id, _get_treatment_type(payload.crew_id, payload.injury_id))
+            gl.log_event("medical", "treatment_v2_started", {"crew_id": payload.crew_id, "injury_id": payload.injury_id, "success": result["success"]})
+        elif msg_type == "medical.stabilise" and isinstance(payload, MedicalStabilisePayload):
+            result = glmed.stabilise_crew(payload.crew_id, payload.injury_id)
+            gl.log_event("medical", "stabilise", {"crew_id": payload.crew_id, "injury_id": payload.injury_id, "success": result["success"]})
+        elif msg_type == "medical.discharge" and isinstance(payload, MedicalDischargePayload):
+            result = glmed.discharge_patient(payload.crew_id)
+            gl.log_event("medical", "discharge", {"crew_id": payload.crew_id, "success": result["success"]})
+        elif msg_type == "medical.quarantine" and isinstance(payload, MedicalQuarantinePayload):
+            result = glmed.quarantine_crew(payload.crew_id)
+            gl.log_event("medical", "quarantine", {"crew_id": payload.crew_id, "success": result["success"]})
         elif msg_type == "security.move_squad" and isinstance(payload, SecurityMoveSquadPayload):
             gls.move_squad(ship.interior, payload.squad_id, payload.room_id)
             gl.log_event("security", "squad_moved", {"squad_id": payload.squad_id, "room_id": payload.room_id})
