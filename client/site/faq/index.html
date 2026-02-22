@@ -38,6 +38,9 @@
   <a href="#q-alerts"      class="toc-link">Alert levels</a>
   <a href="#q-power"       class="toc-link">Power budget</a>
   <a href="#q-ship"        class="toc-link">Choosing a ship</a>
+  <a href="#q-docking"     class="toc-link">Docking at stations</a>
+  <a href="#q-creatures"   class="toc-link">Space creatures</a>
+  <a href="#q-scan-modes"  class="toc-link">Scan modes</a>
 </aside>
 
 <main class="docs-main" role="main">
@@ -258,6 +261,79 @@
         <p>If you want maximum challenge: the <strong>Battleship</strong>
         (Sovereign-class, hull 200, crew 10–12) requires every station staffed and
         active coordination to manage effectively.</p>
+      </div>
+    </div>
+
+    <div id="q-docking" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How do I dock at a space station?
+      </div>
+      <div class="faq-a">
+        <p>Helm reduces throttle to 10% or below and flies within the station's docking
+        range (shown on the Science sensor map). Once in range, the docking clearance
+        request is sent automatically. Friendly stations grant clearance after ~2 seconds;
+        neutral stations take ~4 seconds. The 10-second docking sequence then begins —
+        hold course until complete.</p>
+        <p>While docked, the ship is stationary and shields cap at 50%. Services start
+        automatically and run in parallel. Helm can undock at any time (5-second
+        sequence), or the Captain can trigger an emergency undock instantly.</p>
+        <p>Some missions require docking with a specific station as an objective — check
+        the station's type first (repair dock, research, derelict). Derelict stations
+        should be BIO-scanned by Science before approach to confirm no hull leeches.</p>
+      </div>
+    </div>
+
+    <div id="q-creatures" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How do I deal with space creatures?
+      </div>
+      <div class="faq-a">
+        <p>Each creature type has a preferred interaction method — combat is rarely the
+        best option:</p>
+        <ul>
+          <li><strong>Void whale:</strong> Docile. Science uses BIO scan mode to study it
+          (60 seconds of proximity). Does not attack; flees if approached too closely.</li>
+          <li><strong>Rift stalker:</strong> Territorial. EW can sedate it, Comms can
+          negotiate, or you can fight it. Sedation takes 120 seconds to wear off.
+          It regenerates 2 HP/s, so prolonged combat is costly.</li>
+          <li><strong>Hull leech:</strong> Attaches to the hull and drains 3 HP every 5 s.
+          Science BIO scan reveals its location. Remove via: Engineering electrical
+          discharge, depressurise the room (Security seals doors), or EVA (Security).
+          Any method works — do it fast.</li>
+          <li><strong>Swarm:</strong> EW dispersal is most effective; Science first studies
+          it to reveal the correct dispersal frequency. Weapons fire works but takes
+          longer.</li>
+          <li><strong>Leviathan:</strong> 800 HP, very dangerous. Attempt Communication
+          (Comms) or Science study before engaging. Direct combat requires full crew
+          coordination and high shield/hull reserves.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="q-scan-modes" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        What do the four scan modes (EM / GRAV / BIO / SUB) do?
+      </div>
+      <div class="faq-a">
+        <p>Scan mode determines which entity types appear first (and most clearly) during
+        a sector sweep or long-range scan. The mode affects both entity scans and area
+        scans:</p>
+        <ul>
+          <li><strong>EM (Electromagnetic):</strong> Prioritises energy sources — stations,
+          powered outposts, transponders. Use in combat or when looking for stations.</li>
+          <li><strong>GRAV (Gravitational):</strong> Prioritises mass concentrations —
+          asteroid fields, gravity wells, derelicts, debris clouds. Use when planning
+          routes or looking for salvage.</li>
+          <li><strong>BIO (Biological):</strong> Prioritises life signs — creatures,
+          inhabited stations, disease outbreaks. Essential before docking with a derelict
+          or before approaching unknown creatures.</li>
+          <li><strong>SUB (Subspace):</strong> Prioritises subspace phenomena — anomalies,
+          signal relays, cloaked contacts, distortions. Use when triangulating a mission
+          signal source.</li>
+        </ul>
+        <p>For a sector sweep, choose the mode that matches your current objective.
+        All entities are eventually revealed regardless of mode — mode only affects
+        which ones appear first in the 30-second sweep cycle.</p>
       </div>
     </div>
 

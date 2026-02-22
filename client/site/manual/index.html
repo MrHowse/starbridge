@@ -43,10 +43,15 @@
   <a href="#s-tactical"   class="toc-link toc-link--sub">Tactical Officer</a>
   <a href="#s-dc"         class="toc-link toc-link--sub">Damage Control</a>
   <a href="#ship-classes"    class="toc-link">3. Ship Classes</a>
-  <a href="#missions"        class="toc-link">4. Missions</a>
-  <a href="#puzzles"         class="toc-link">5. Puzzles</a>
-  <a href="#admin-guide"     class="toc-link">6. Admin Guide</a>
-  <a href="#shortcuts"       class="toc-link">7. Keyboard Reference</a>
+  <a href="#environment"     class="toc-link">4. Environment</a>
+  <a href="#env-sectors"     class="toc-link toc-link--sub">Sector Grid &amp; Navigation</a>
+  <a href="#env-docking"     class="toc-link toc-link--sub">Stations &amp; Docking</a>
+  <a href="#env-hazards"     class="toc-link toc-link--sub">Environmental Hazards</a>
+  <a href="#env-creatures"   class="toc-link toc-link--sub">Space Creatures</a>
+  <a href="#missions"        class="toc-link">5. Missions</a>
+  <a href="#puzzles"         class="toc-link">6. Puzzles</a>
+  <a href="#admin-guide"     class="toc-link">7. Admin Guide</a>
+  <a href="#shortcuts"       class="toc-link">8. Keyboard Reference</a>
 </aside>
 
 <!-- ─── Main content ─────────────────────────────────────────────────────── -->
@@ -167,7 +172,12 @@
             <li><strong>Bearing input (numeric):</strong> Type a bearing (0–360°) and
             confirm to set a precise heading.</li>
             <li><strong>Minimap:</strong> Compact sector overview showing ship position,
-            contacts, and hazards. Contacts sourced from Science.</li>
+            contacts, hazards, and any plotted route from Navigation.</li>
+            <li><strong>Docking approach:</strong> To dock at a station, reduce throttle
+            to 10% or below while within the station's docking range, then request
+            clearance. Friendly stations grant clearance within ~2 seconds; neutral
+            stations within ~4 seconds. The docking sequence takes 10 seconds — hold
+            course until complete.</li>
             <li><strong>Route Calculation puzzle:</strong> Triggered by missions that
             require navigating through hazard grids. Solve it to unlock a safe path.</li>
           </ul>
@@ -175,8 +185,11 @@
           <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
           <div class="tip"><strong>Tips:</strong> High throttle plus tight turns bleeds
           speed — you overshoot. Cut throttle before a sharp course change then increase
-          again on the new heading. Nebulae don't cause damage but obstruct sensors — ask
-          Science if you're flying blind.</div>
+          again on the new heading. Nebulae don't cause damage but obstruct sensors —
+          ask Science if you're flying blind. When approaching a station to dock, cut
+          throttle well in advance; you must be below 10% before clearance can be
+          requested. Gravity wells cap your speed to 100 u/s regardless of engine
+          power — don't fight it, plot around them.</div>
         </div>
       </div>
 
@@ -232,9 +245,20 @@
             GAMMA, DELTA. Matching the target's shield frequency deals 1.5× damage;
             mismatching deals 0.5×. Ask Science to scan the target.</li>
             <li><strong>Torpedo tubes (2):</strong> Each tube must be loaded before
-            firing. Load time: 3 seconds. Available warheads: Standard (50 damage),
-            EMP (15 damage + stun), Probe (sensor scan), Nuclear (80 damage, requires
-            Captain authorisation).</li>
+            firing. Load time: 3 seconds to swap warhead type. Eight warhead types:
+            <ul style="margin-top:0.4rem">
+              <li><em>Standard</em> — 50 dmg, 3 s reload. General purpose.</li>
+              <li><em>Homing</em> — 35 dmg, 4 s reload. Tracks the locked target in flight.</li>
+              <li><em>Ion</em> — 10 dmg, 5 s reload. Drains enemy shields and stuns for 10 s.</li>
+              <li><em>Piercing</em> — 40 dmg, 4 s reload. Ignores 75% of shield absorption.</li>
+              <li><em>Heavy</em> — 100 dmg, 8 s reload. Slow velocity; maximum single-hit damage.</li>
+              <li><em>Proximity</em> — 30 dmg, 4 s reload. AOE blast — damages all enemies within 2,000 units.</li>
+              <li><em>Nuclear</em> — 200 dmg, 10 s reload. Devastating; requires Captain authorisation before firing.</li>
+              <li><em>Experimental</em> — 60 dmg, 6 s reload. Unpredictable secondary effects; resupply only.</li>
+            </ul></li>
+            <li><strong>Point Defence:</strong> Automated system (9th ship system) that
+            intercepts incoming enemy torpedoes. Intercept chance scales with Point Defence
+            efficiency. Engineering can allocate more power to improve coverage.</li>
             <li><strong>Firing Solution puzzle:</strong> Triggered by precision strike
             missions. Solve to unlock a torpedo firing angle against a moving target.</li>
           </ul>
@@ -242,9 +266,11 @@
           <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
           <div class="tip"><strong>Tips:</strong> Always coordinate with Science before
           engaging — knowing the shield frequency is a 3× swing in effective DPS (1.5×
-          match vs 0.5× mismatch). Use EMP torpedoes to stun fast scouts before they
-          close to beam range. Keep both tubes loaded at all times during combat —
-          a loaded tube fires instantly.</div>
+          match vs 0.5× mismatch). Use Ion torpedoes to stun fast scouts before they
+          close to beam range. Use Proximity against clustered enemies; use Piercing
+          against heavily shielded targets. Keep both tubes loaded at all times during
+          combat — a loaded tube fires instantly. Nuclear requires Captain authorisation
+          — request it before combat, not during.</div>
         </div>
       </div>
 
@@ -261,23 +287,35 @@
           <ul>
             <li><strong>Sensor map (canvas):</strong> Sector-scale view with range rings.
             All contacts, hazards, drones, and probes are drawn here.</li>
-            <li><strong>Scan mode selector:</strong> EM (electromagnetic contacts),
-            GRAV (gravitational anomalies), BIO (biological signatures), SUB (subspace).
-            Different modes reveal different entity types.</li>
+            <li><strong>Scan mode selector:</strong> Four modes affect what each scan
+            reveals as it progresses:
+            EM (energy sources — stations, transponders),
+            GRAV (mass concentrations — asteroids, gravity wells, derelicts),
+            BIO (life signs — creatures, outbreaks, inhabited stations),
+            SUB (subspace phenomena — anomalies, relays, cloaked contacts).</li>
+            <li><strong>Sector sweep:</strong> Scans the current sector over 30 seconds,
+            revealing features progressively. Interrupted if an enemy closes to within
+            15,000 units — you can dismiss the interrupt or continue at risk.</li>
+            <li><strong>Long-range scan:</strong> Multi-sector sweep over 90 seconds,
+            revealing adjacent sectors on the Captain's strategic map (Scanned status).</li>
             <li><strong>Contact list:</strong> Click any contact to initiate an active
-            scan. Scan results broadcast to Weapons (shield frequency) and Captain.</li>
+            entity scan. Scan results broadcast to Weapons (shield frequency) and
+            Captain.</li>
             <li><strong>Bearing compass:</strong> Multiple signal bearings drawn as
             dashed lines from scan origin — triangulate the source with two or more
-            scans from different positions.</li>
+            scans from different ship positions. Two bearings are required to locate a
+            signal source.</li>
             <li><strong>Frequency Matching puzzle:</strong> Triggered by mission signal
             events. Tune waveform components to match an incoming transmission.</li>
           </ul>
 
           <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
           <div class="tip"><strong>Tips:</strong> Run EM mode in combat to reveal shield
-          frequencies. Switch to BIO during medical emergencies — active outbreaks
-          produce biological signatures. Flight Operations drones extend your sensor range
-          so coordinate with Flight Ops to cover blind spots.</div>
+          frequencies. Switch to BIO near creatures or during medical emergencies — active
+          outbreaks and creatures produce biological signatures. Use BIO to confirm all
+          hull leeches are removed before docking at a derelict. Long-range scans help
+          Helm plan routes through unexplored sectors. Flight Operations drones extend
+          your sensor range — coordinate with Flight Ops to cover blind spots.</div>
         </div>
       </div>
 
@@ -601,10 +639,183 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 4 — Missions
+       SECTION 4 — Environment
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="environment" class="section">
+    <h2 class="section__heading">4. Environment</h2>
+    <div class="section-body">
+
+      <!-- Sector Grid & Navigation -->
+      <div id="env-sectors" class="station">
+        <h3 class="station__heading">SECTOR GRID &amp; NAVIGATION</h3>
+        <div class="station-body">
+          <p>The game world is divided into a named sector grid. Each sector covers a
+          rectangular region of world space. The Captain's map and Tactical display show
+          the full sector grid with six fog-of-war visibility states:</p>
+          <ul>
+            <li><strong>Unknown:</strong> Sector has never been observed.</li>
+            <li><strong>Transponder:</strong> A friendly beacon has auto-revealed basic
+            info about this sector.</li>
+            <li><strong>Scanned:</strong> Science has completed a long-range scan that
+            covers this sector.</li>
+            <li><strong>Surveyed:</strong> Science has completed a sector sweep while
+            adjacent to this sector.</li>
+            <li><strong>Active:</strong> Your ship is currently inside this sector.</li>
+            <li><strong>Visited:</strong> Your ship has previously been in this sector.</li>
+          </ul>
+          <p>Navigation plots a route between sectors. The route is displayed on the
+          Helm minimap as waypoints. Sectors with hazards generate route warnings;
+          Science can perform a sector sweep to reveal the exact hazard layout before
+          Helm commits to a path.</p>
+          <div class="tip"><strong>Crew coordination:</strong> Science → long-range scan
+          to reveal adjacent sectors before a transit. Helm plans the approach. Captain
+          monitors the strategic map. Flight Ops can launch drones ahead into unknown
+          sectors as a forward sensor picket.</div>
+        </div>
+      </div>
+
+      <!-- Stations & Docking -->
+      <div id="env-docking" class="station">
+        <h3 class="station__heading">SPACE STATIONS &amp; DOCKING</h3>
+        <div class="station-body">
+          <p>Multiple station types can appear in the game world, each with different
+          services, hull ratings, and faction alignments:</p>
+          <ul>
+            <li><strong>Military:</strong> High hull. Restricted services; may require
+            identification.</li>
+            <li><strong>Civilian / Trade Hub:</strong> Open to all. Standard commercial
+            services.</li>
+            <li><strong>Research:</strong> Specialist science data and sensor packages.</li>
+            <li><strong>Repair Dock:</strong> Full hull repair and system services. Primary
+            resupply point.</li>
+            <li><strong>Derelict:</strong> No active services; may contain salvage.
+            Requires Science BIO scan to confirm safety before docking.</li>
+            <li><strong>Enemy:</strong> Hostile. Cannot dock; must be neutralised or
+            captured by Security boarding.</li>
+          </ul>
+          <p><strong>Docking services</strong> run in parallel while docked. Available
+          services include hull repair (45 s), system repair (15 s per system), torpedo
+          resupply (30 s), medical transfer (45 s), atmospheric resupply (30 s), drone
+          service (40 s), EW database update (30 s), crew rest (60 s), sensor data
+          package (30 s), and intel briefing (30 s). Not all stations offer all
+          services — check the station listing before docking.</p>
+          <p><strong>Enemy station assault:</strong> Enemy stations have defensive
+          components — shield generators, turrets, torpedo launchers, and a garrison.
+          The typical assault sequence: EW jams the sensor array, Weapons destroys
+          shield generators, Security boards and captures the station.</p>
+        </div>
+      </div>
+
+      <!-- Environmental Hazards -->
+      <div id="env-hazards" class="station">
+        <h3 class="station__heading">ENVIRONMENTAL HAZARDS</h3>
+        <div class="station-body">
+          <p>Hazards appear as positioned zones in world space (entity hazards) and as
+          properties of entire sectors (sector hazards). Both types apply ongoing effects
+          when your ship is inside them.</p>
+          <table class="docs-table">
+            <thead><tr><th>Type</th><th>Entity effect</th><th>Sector effect</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="hi">Nebula</td>
+                <td>Sensor range ×0.5; shield regen ×0.5</td>
+                <td>Sensor range per sector modifier; shield regen ×0.5</td>
+              </tr>
+              <tr>
+                <td class="hi">Minefield</td>
+                <td>4 HP/s hull damage</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td class="hi">Gravity Well</td>
+                <td>Velocity capped to 100 u/s</td>
+                <td>Velocity capped to 200 u/s</td>
+              </tr>
+              <tr>
+                <td class="hi">Radiation Zone</td>
+                <td>2 HP/s hull damage; sensor range reduced</td>
+                <td>1.5 HP/s hull damage; shields absorb 60% if above 50 HP; sensor ×0.75</td>
+              </tr>
+              <tr>
+                <td class="hi">Asteroid Field</td>
+                <td>—</td>
+                <td>2 HP/s hull damage when throttle &gt;30%</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>Tips:</strong> Nebulae are the least dangerous but
+          most tactically relevant — sensors are degraded on both sides, so enemies
+          can't detect you easily either. Radiation zones are survivable if shields are
+          maintained above 50 HP combined (they absorb 60% of incoming radiation).
+          Minefields require precise navigation; consult Science's sector sweep first.
+          In asteroid fields, cut throttle to below 30% to stop hull damage.</div>
+        </div>
+      </div>
+
+      <!-- Space Creatures -->
+      <div id="env-creatures" class="station">
+        <h3 class="station__heading">SPACE CREATURES</h3>
+        <div class="station-body">
+          <p>Five creature types roam the game world. Each requires a different
+          response from the crew:</p>
+          <table class="docs-table">
+            <thead>
+              <tr><th>Creature</th><th>Behaviour</th><th>Interaction</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="hi">Void Whale</td>
+                <td>Docile; migrates slowly. Flees when approached too close.</td>
+                <td>Science BIO scan: complete bio-catalogue study over 60 s while
+                maintaining proximity. Does not attack.</td>
+              </tr>
+              <tr>
+                <td class="hi">Rift Stalker</td>
+                <td>Territorial predator. Attacks intruders in its territory; regenerates
+                2 HP/s. Beam damage: 6 HP/hit.</td>
+                <td>Four paths: fight (weapons), sedate (EW — 120 s recovery), negotiate
+                (Communications), or flee its territory.</td>
+              </tr>
+              <tr>
+                <td class="hi">Hull Leech</td>
+                <td>Attaches to ship hull; deals 3 HP every 5 s passively.</td>
+                <td>Three removal methods: depressurise the attached section, electrical
+                discharge (Engineering), or EVA (Security). Requires Science BIO scan
+                to detect.</td>
+              </tr>
+              <tr>
+                <td class="hi">Swarm</td>
+                <td>Group attacker. Engulfs the ship and fires continuously.</td>
+                <td>EW dispersal (best option) or sustained weapons fire. Science can
+                study the swarm to reveal dispersal frequencies.</td>
+              </tr>
+              <tr>
+                <td class="hi">Leviathan</td>
+                <td>Apex predator. Extremely high hull (800 HP), long weapon range
+                (8,000 u), heavy damage (25 HP/hit). Generates a wake zone.</td>
+                <td>Communication (Comms channel — 90 s protocol), study (Science —
+                60 s), or avoidance. Direct combat is extremely risky without full crew
+                coordination.</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>Tips:</strong> Void whales only appear as bonus
+          objectives — they never attack. Hull leeches are invisible without a BIO scan;
+          Science should sweep any derelict or creature-heavy area before Helm closes
+          range. Rift stalkers are stationary until provoked — if your route crosses
+          their territory, ask Comms to attempt negotiation before entering range.
+          Never engage a Leviathan without a plan — preferably communication first.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 5 — Missions
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="missions" class="section">
-    <h2 class="section__heading">4. Missions</h2>
+    <h2 class="section__heading">5. Missions</h2>
     <div class="section-body">
 
       <p>Missions are the core game unit — each mission gives the crew a set of
@@ -617,9 +828,18 @@
         <li><strong>Combat missions:</strong> Destroy enemy waves, defend friendly
         stations, or escort assets through contested space. Weapons, Engineering, and EW
         carry the load; Science provides targeting data; Medical handles casualties.</li>
+        <li><strong>Station assault missions:</strong> Attack and capture enemy
+        installations. Typical sequence: EW jams sensors → Weapons destroys shield
+        generators → Security boards and captures. Station may call reinforcements if
+        not jammed in time.</li>
         <li><strong>Exploration missions:</strong> Locate signals, scan anomalies, and
         navigate hazard fields. Science, Helm, and Flight Operations lead; Damage Control
-        manages the inevitable scrapes.</li>
+        manages the inevitable scrapes. May require visiting multiple grid sectors or
+        triangulating a signal from two positions.</li>
+        <li><strong>Creature encounter missions:</strong> Interact with space creature
+        populations — study void whales, negotiate or sedate rift stalkers, clear hull
+        leeches from a derelict, or disperse a swarm infestation. Science and Comms
+        take the primary roles; Weapons is last resort.</li>
         <li><strong>Medical missions:</strong> Respond to outbreaks, perform triage, and
         resupply emergency stations. Medical and Science are primary; Comms negotiates
         access.</li>
@@ -648,10 +868,10 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 5 — Puzzles
+       SECTION 6 — Puzzles
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="puzzles" class="section">
-    <h2 class="section__heading">5. Puzzles</h2>
+    <h2 class="section__heading">6. Puzzles</h2>
     <div class="section-body">
 
       <p>Puzzle overlays appear on specific stations when triggered by mission events.
@@ -728,10 +948,10 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 6 — Admin Guide
+       SECTION 7 — Admin Guide
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="admin-guide" class="section">
-    <h2 class="section__heading">6. Admin Guide</h2>
+    <h2 class="section__heading">7. Admin Guide</h2>
     <div class="section-body">
 
       <p>The admin dashboard at <a href="/admin/">/admin/</a> provides game management
@@ -777,10 +997,10 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 7 — Keyboard Quick Reference
+       SECTION 8 — Keyboard Quick Reference
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="shortcuts" class="section">
-    <h2 class="section__heading">7. Keyboard Quick Reference</h2>
+    <h2 class="section__heading">8. Keyboard Quick Reference</h2>
     <div class="section-body">
 
       <p>Starbridge is primarily mouse-driven. The following keyboard shortcuts apply
