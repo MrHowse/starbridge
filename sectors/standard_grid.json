@@ -1,0 +1,441 @@
+{
+    "id": "standard_grid",
+    "grid_size": [5, 5],
+    "sectors": [
+        {
+            "id": "A1",
+            "name": "Homeward Reach",
+            "grid_position": [0, 0],
+            "world_bounds": { "min_x": 0, "min_y": 0, "max_x": 100000, "max_y": 100000 },
+            "properties": {
+                "type": "friendly_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "imperial",
+                "threat_level": "low"
+            },
+            "features": [
+                {
+                    "id": "homeward_station",
+                    "type": "friendly_station",
+                    "position": [25000, 30000],
+                    "name": "Homeward Station",
+                    "visible_without_scan": true
+                }
+            ],
+            "patrol_routes": []
+        },
+        {
+            "id": "B1",
+            "name": "Orbital Shelf",
+            "grid_position": [1, 0],
+            "world_bounds": { "min_x": 100000, "min_y": 0, "max_x": 200000, "max_y": 100000 },
+            "properties": {
+                "type": "friendly_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "imperial",
+                "threat_level": "low"
+            },
+            "features": [],
+            "patrol_routes": [
+                {
+                    "faction": "imperial",
+                    "waypoints": [[110000, 20000], [180000, 50000], [150000, 80000]],
+                    "ship_count": 2,
+                    "ship_type": "scout"
+                }
+            ]
+        },
+        {
+            "id": "C1",
+            "name": "The Narrows",
+            "grid_position": [2, 0],
+            "world_bounds": { "min_x": 200000, "min_y": 0, "max_x": 300000, "max_y": 100000 },
+            "properties": {
+                "type": "contested_space",
+                "sensor_modifier": 0.9,
+                "navigation_hazard": "low",
+                "faction": "contested",
+                "threat_level": "medium"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "D1",
+            "name": "Keldra Wastes",
+            "grid_position": [3, 0],
+            "world_bounds": { "min_x": 300000, "min_y": 0, "max_x": 400000, "max_y": 100000 },
+            "properties": {
+                "type": "deep_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "unclaimed",
+                "threat_level": "low"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "E1",
+            "name": "Far Frontier",
+            "grid_position": [4, 0],
+            "world_bounds": { "min_x": 400000, "min_y": 0, "max_x": 500000, "max_y": 100000 },
+            "properties": {
+                "type": "hostile_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "rebel",
+                "threat_level": "high"
+            },
+            "features": [],
+            "patrol_routes": [
+                {
+                    "faction": "rebel",
+                    "waypoints": [[420000, 30000], [480000, 70000]],
+                    "ship_count": 3,
+                    "ship_type": "cruiser"
+                }
+            ]
+        },
+        {
+            "id": "A2",
+            "name": "Merchant Route",
+            "grid_position": [0, 1],
+            "world_bounds": { "min_x": 0, "min_y": 100000, "max_x": 100000, "max_y": 200000 },
+            "properties": {
+                "type": "friendly_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "imperial",
+                "threat_level": "low"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "B2",
+            "name": "Kepler Reach",
+            "grid_position": [1, 1],
+            "world_bounds": { "min_x": 100000, "min_y": 100000, "max_x": 200000, "max_y": 200000 },
+            "properties": {
+                "type": "nebula",
+                "sensor_modifier": 0.6,
+                "navigation_hazard": "moderate",
+                "faction": "contested",
+                "threat_level": "medium"
+            },
+            "features": [
+                {
+                    "id": "kepler_research",
+                    "type": "friendly_station",
+                    "position": [150000, 150000],
+                    "name": "Kepler Research Station",
+                    "visible_without_scan": true
+                }
+            ],
+            "patrol_routes": []
+        },
+        {
+            "id": "C2",
+            "name": "Iron Belt",
+            "grid_position": [2, 1],
+            "world_bounds": { "min_x": 200000, "min_y": 100000, "max_x": 300000, "max_y": 200000 },
+            "properties": {
+                "type": "asteroid_field",
+                "sensor_modifier": 0.8,
+                "navigation_hazard": "high",
+                "faction": "unclaimed",
+                "threat_level": "low"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "D2",
+            "name": "Dust Cloud",
+            "grid_position": [3, 1],
+            "world_bounds": { "min_x": 300000, "min_y": 100000, "max_x": 400000, "max_y": 200000 },
+            "properties": {
+                "type": "nebula",
+                "sensor_modifier": 0.5,
+                "navigation_hazard": "moderate",
+                "faction": "unclaimed",
+                "threat_level": "medium"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "E2",
+            "name": "Void's Edge",
+            "grid_position": [4, 1],
+            "world_bounds": { "min_x": 400000, "min_y": 100000, "max_x": 500000, "max_y": 200000 },
+            "properties": {
+                "type": "hostile_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "rebel",
+                "threat_level": "high"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "A3",
+            "name": "Sentinel Post",
+            "grid_position": [0, 2],
+            "world_bounds": { "min_x": 0, "min_y": 200000, "max_x": 100000, "max_y": 300000 },
+            "properties": {
+                "type": "friendly_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "imperial",
+                "threat_level": "low"
+            },
+            "features": [
+                {
+                    "id": "sentinel_station",
+                    "type": "friendly_station",
+                    "position": [50000, 250000],
+                    "name": "Sentinel Station",
+                    "visible_without_scan": true
+                }
+            ],
+            "patrol_routes": []
+        },
+        {
+            "id": "B3",
+            "name": "Contested Core",
+            "grid_position": [1, 2],
+            "world_bounds": { "min_x": 100000, "min_y": 200000, "max_x": 200000, "max_y": 300000 },
+            "properties": {
+                "type": "contested_space",
+                "sensor_modifier": 0.85,
+                "navigation_hazard": "low",
+                "faction": "contested",
+                "threat_level": "high"
+            },
+            "features": [],
+            "patrol_routes": [
+                {
+                    "faction": "rebel",
+                    "waypoints": [[110000, 220000], [190000, 280000]],
+                    "ship_count": 2,
+                    "ship_type": "scout"
+                }
+            ]
+        },
+        {
+            "id": "C3",
+            "name": "The Crossing",
+            "grid_position": [2, 2],
+            "world_bounds": { "min_x": 200000, "min_y": 200000, "max_x": 300000, "max_y": 300000 },
+            "properties": {
+                "type": "deep_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "unclaimed",
+                "threat_level": "medium"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "D3",
+            "name": "Crimson Shoals",
+            "grid_position": [3, 2],
+            "world_bounds": { "min_x": 300000, "min_y": 200000, "max_x": 400000, "max_y": 300000 },
+            "properties": {
+                "type": "radiation_zone",
+                "sensor_modifier": 0.7,
+                "navigation_hazard": "moderate",
+                "faction": "unclaimed",
+                "threat_level": "high"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "E3",
+            "name": "Enemy Staging",
+            "grid_position": [4, 2],
+            "world_bounds": { "min_x": 400000, "min_y": 200000, "max_x": 500000, "max_y": 300000 },
+            "properties": {
+                "type": "hostile_space",
+                "sensor_modifier": 0.9,
+                "navigation_hazard": "none",
+                "faction": "rebel",
+                "threat_level": "critical"
+            },
+            "features": [],
+            "patrol_routes": [
+                {
+                    "faction": "rebel",
+                    "waypoints": [[410000, 210000], [490000, 290000], [450000, 250000]],
+                    "ship_count": 4,
+                    "ship_type": "cruiser"
+                }
+            ]
+        },
+        {
+            "id": "A4",
+            "name": "The Spine",
+            "grid_position": [0, 3],
+            "world_bounds": { "min_x": 0, "min_y": 300000, "max_x": 100000, "max_y": 400000 },
+            "properties": {
+                "type": "deep_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "unclaimed",
+                "threat_level": "low"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "B4",
+            "name": "Nebular Veil",
+            "grid_position": [1, 3],
+            "world_bounds": { "min_x": 100000, "min_y": 300000, "max_x": 200000, "max_y": 400000 },
+            "properties": {
+                "type": "nebula",
+                "sensor_modifier": 0.4,
+                "navigation_hazard": "moderate",
+                "faction": "unclaimed",
+                "threat_level": "medium"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "C4",
+            "name": "Gravity Cradle",
+            "grid_position": [2, 3],
+            "world_bounds": { "min_x": 200000, "min_y": 300000, "max_x": 300000, "max_y": 400000 },
+            "properties": {
+                "type": "gravity_well",
+                "sensor_modifier": 0.9,
+                "navigation_hazard": "severe",
+                "faction": "unclaimed",
+                "threat_level": "medium"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "D4",
+            "name": "Dead Zone",
+            "grid_position": [3, 3],
+            "world_bounds": { "min_x": 300000, "min_y": 300000, "max_x": 400000, "max_y": 400000 },
+            "properties": {
+                "type": "hostile_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "rebel",
+                "threat_level": "high"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "E4",
+            "name": "Enemy Fortress",
+            "grid_position": [4, 3],
+            "world_bounds": { "min_x": 400000, "min_y": 300000, "max_x": 500000, "max_y": 400000 },
+            "properties": {
+                "type": "hostile_space",
+                "sensor_modifier": 0.8,
+                "navigation_hazard": "none",
+                "faction": "rebel",
+                "threat_level": "critical"
+            },
+            "features": [
+                {
+                    "id": "enemy_fortress_main",
+                    "type": "enemy_station",
+                    "position": [450000, 350000],
+                    "name": "Rebel Fortress Alpha",
+                    "visible_without_scan": false
+                }
+            ],
+            "patrol_routes": []
+        },
+        {
+            "id": "A5",
+            "name": "Southern Reach",
+            "grid_position": [0, 4],
+            "world_bounds": { "min_x": 0, "min_y": 400000, "max_x": 100000, "max_y": 500000 },
+            "properties": {
+                "type": "deep_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "unclaimed",
+                "threat_level": "low"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "B5",
+            "name": "Wraith Dust",
+            "grid_position": [1, 4],
+            "world_bounds": { "min_x": 100000, "min_y": 400000, "max_x": 200000, "max_y": 500000 },
+            "properties": {
+                "type": "nebula",
+                "sensor_modifier": 0.45,
+                "navigation_hazard": "moderate",
+                "faction": "unclaimed",
+                "threat_level": "medium"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "C5",
+            "name": "Silent Fields",
+            "grid_position": [2, 4],
+            "world_bounds": { "min_x": 200000, "min_y": 400000, "max_x": 300000, "max_y": 500000 },
+            "properties": {
+                "type": "deep_space",
+                "sensor_modifier": 1.0,
+                "navigation_hazard": "none",
+                "faction": "unclaimed",
+                "threat_level": "low"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "D5",
+            "name": "Reaper's Gulch",
+            "grid_position": [3, 4],
+            "world_bounds": { "min_x": 300000, "min_y": 400000, "max_x": 400000, "max_y": 500000 },
+            "properties": {
+                "type": "hostile_space",
+                "sensor_modifier": 0.9,
+                "navigation_hazard": "low",
+                "faction": "rebel",
+                "threat_level": "high"
+            },
+            "features": [],
+            "patrol_routes": []
+        },
+        {
+            "id": "E5",
+            "name": "The Abyss",
+            "grid_position": [4, 4],
+            "world_bounds": { "min_x": 400000, "min_y": 400000, "max_x": 500000, "max_y": 500000 },
+            "properties": {
+                "type": "hostile_space",
+                "sensor_modifier": 0.7,
+                "navigation_hazard": "none",
+                "faction": "rebel",
+                "threat_level": "critical"
+            },
+            "features": [],
+            "patrol_routes": []
+        }
+    ]
+}

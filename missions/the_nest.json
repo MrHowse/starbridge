@@ -1,0 +1,82 @@
+{
+  "id": "the_nest",
+  "name": "The Nest",
+  "briefing": "A cluster of rift stalkers has claimed territory blocking our approach to Relay Station Kappa. Escort ships carrying vital scientific data are waiting for clearance. You may fight through the stalkers' armed escorts, or sedate all three stalkers with targeted bio-sedatives to negotiate safe passage.",
+  "spawn": [
+    {"type": "creature",  "id": "stalker_a", "creature_type": "rift_stalker", "x": 40000, "y": 40000},
+    {"type": "creature",  "id": "stalker_b", "creature_type": "rift_stalker", "x": 44000, "y": 36000},
+    {"type": "creature",  "id": "stalker_c", "creature_type": "rift_stalker", "x": 36000, "y": 44000},
+    {"type": "station",   "id": "relay_kappa", "x": 80000, "y": 40000},
+    {"type": "scout",     "id": "escort_1", "x": 30000, "y": 30000},
+    {"type": "scout",     "id": "escort_2", "x": 32000, "y": 48000},
+    {"type": "destroyer", "id": "escort_3", "x": 28000, "y": 40000}
+  ],
+  "nodes": [
+    {
+      "id": "approach",
+      "type": "objective",
+      "text": "Navigation: Approach the stalker territory boundary",
+      "trigger": {"type": "player_in_area", "x": 40000, "y": 40000, "r": 20000}
+    },
+    {
+      "id": "conflict",
+      "type": "branch",
+      "text": "Choose your approach: fight through the escorts or sedate all three stalkers"
+    },
+    {
+      "id": "fight_outcome",
+      "type": "checkpoint",
+      "text": "The stalkers have retreated — path cleared by force"
+    },
+    {
+      "id": "peace_outcome",
+      "type": "checkpoint",
+      "text": "All stalkers sedated — diplomatic passage secured"
+    },
+    {
+      "id": "reach_relay",
+      "type": "objective",
+      "text": "Navigation: Dock with Relay Station Kappa",
+      "trigger": {"type": "player_in_area", "x": 80000, "y": 40000, "r": 6000}
+    }
+  ],
+  "edges": [
+    {
+      "from": "approach",
+      "to": "conflict",
+      "type": "sequence"
+    },
+    {
+      "from": "conflict",
+      "to": "fight_outcome",
+      "type": "branch_trigger",
+      "trigger": {"type": "wave_defeated", "prefix": "escort_"}
+    },
+    {
+      "from": "conflict",
+      "to": "peace_outcome",
+      "type": "branch_trigger",
+      "trigger": {
+        "type": "all_of",
+        "triggers": [
+          {"type": "creature_state", "creature_id": "stalker_a", "state": "sedated"},
+          {"type": "creature_state", "creature_id": "stalker_b", "state": "sedated"},
+          {"type": "creature_state", "creature_id": "stalker_c", "state": "sedated"}
+        ]
+      }
+    },
+    {
+      "from": "fight_outcome",
+      "to": "reach_relay",
+      "type": "sequence"
+    },
+    {
+      "from": "peace_outcome",
+      "to": "reach_relay",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "approach",
+  "victory_nodes": ["reach_relay"],
+  "defeat_condition": {"type": "player_hull_zero"}
+}

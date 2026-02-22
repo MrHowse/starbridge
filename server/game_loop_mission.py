@@ -321,8 +321,13 @@ def build_sensor_contacts(
     world: World,
     ship: object,
     extra_bubbles: list[tuple[float, float, float]] | None = None,
+    hazard_modifier: float = 1.0,
 ) -> Message:
-    """Build the sensor.contacts message for Weapons / Science clients."""
+    """Build the sensor.contacts message for Weapons / Science clients.
+
+    *hazard_modifier* reduces the effective sensor range when environmental
+    hazards are active (e.g. 0.5 inside a nebula sector).
+    """
     torpedoes = [
         {
             "id": t.id,
@@ -336,10 +341,50 @@ def build_sensor_contacts(
     return Message.build(
         "sensor.contacts",
         {
-            "contacts": sensors.build_sensor_contacts(world, ship, extra_bubbles),  # type: ignore[arg-type]
+            "contacts": sensors.build_sensor_contacts(world, ship, extra_bubbles, hazard_modifier),  # type: ignore[arg-type]
             "torpedoes": torpedoes,
         },
     )
+
+
+def _serialise_defenses(defenses: object) -> dict:
+    """Serialise EnemyStationDefenses to a JSON-safe dict."""
+    arcs = [
+        {"id": g.id, "hp": round(g.hp, 1), "hp_max": g.hp_max,
+         "arc_start": g.arc_start, "arc_end": g.arc_end, "active": g.active}
+        for g in defenses.shield_arcs  # type: ignore[attr-defined]
+    ]
+    turrets = [
+        {"id": t.id, "hp": round(t.hp, 1), "hp_max": t.hp_max,
+         "facing": t.facing, "arc_deg": t.arc_deg, "active": t.active}
+        for t in defenses.turrets  # type: ignore[attr-defined]
+    ]
+    launchers = [
+        {"id": l.id, "hp": round(l.hp, 1), "hp_max": l.hp_max, "active": l.active}
+        for l in defenses.launchers  # type: ignore[attr-defined]
+    ]
+    bays = [
+        {"id": b.id, "hp": round(b.hp, 1), "hp_max": b.hp_max,
+         "active": b.active, "fighters_in_bay": b.fighters_in_bay}
+        for b in defenses.fighter_bays  # type: ignore[attr-defined]
+    ]
+    sa = defenses.sensor_array  # type: ignore[attr-defined]
+    reactor = defenses.reactor  # type: ignore[attr-defined]
+    return {
+        "shield_arcs": arcs,
+        "turrets": turrets,
+        "launchers": launchers,
+        "fighter_bays": bays,
+        "sensor_array": {
+            "id": sa.id, "hp": round(sa.hp, 1), "hp_max": sa.hp_max,
+            "active": sa.active, "jammed": sa.jammed,
+        },
+        "reactor": {
+            "id": reactor.id, "hp": round(reactor.hp, 1),
+            "hp_max": reactor.hp_max, "active": reactor.active,
+        },
+        "garrison_count": defenses.garrison_count,  # type: ignore[attr-defined]
+    }
 
 
 def build_world_entities(world: World) -> Message:
@@ -375,6 +420,7 @@ def build_world_entities(world: World) -> Message:
             "y": round(s.y, 1),
             "hull": round(s.hull, 1),
             "hull_max": s.hull_max,
+            "defenses": _serialise_defenses(s.defenses) if s.defenses else None,
         }
         for s in world.stations
     ]

@@ -4,6 +4,10 @@
   "description": "Drone carrier with an expanded flight deck. Relies on its drone complement for sensor coverage and combat support. Flight Ops is the decisive station. Best with 8-12 players.",
   "max_hull": 120,
   "torpedo_ammo": 8,
+  "torpedo_loadout": {
+    "standard": 6, "homing": 4, "ion": 2, "piercing": 2,
+    "heavy": 0, "proximity": 4, "nuclear": 1, "experimental": 0
+  },
   "min_crew": 7,
   "max_crew": 12
 }

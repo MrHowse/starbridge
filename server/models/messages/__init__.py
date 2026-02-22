@@ -46,10 +46,24 @@ from server.models.messages.weapons import (
 )
 
 # Science
-from server.models.messages.science import ScienceCancelScanPayload, ScienceStartScanPayload
+from server.models.messages.science import (
+    ScienceCancelScanPayload,
+    ScienceStartScanPayload,
+    ScienceStartSectorScanPayload,
+    ScienceCancelSectorScanPayload,
+    ScienceScanInterruptResponsePayload,
+)
 
 # Captain
 from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
+
+# Docking
+from server.models.messages.docking import (
+    CaptainUndockPayload,
+    DockingCancelServicePayload,
+    DockingRequestClearancePayload,
+    DockingStartServicePayload,
+)
 
 # Medical
 from server.models.messages.medical import MedicalCancelTreatmentPayload, MedicalTreatCrewPayload
@@ -104,6 +118,17 @@ from server.models.messages.game import (
 # World entities
 from server.models.messages.world import ShipStatePayload
 
+# Navigation
+from server.models.messages.navigation import MapClearRoutePayload, MapPlotRoutePayload
+
+# Creatures (v0.05k)
+from server.models.messages.creatures import (
+    CreatureSedatePayload,
+    CreatureEWDisruptPayload,
+    CreatureCommProgressPayload,
+    CreatureLeeechRemovePayload,
+)
+
 __all__ = [
     # base
     "Message",
@@ -132,12 +157,20 @@ __all__ = [
     # science
     "ScienceStartScanPayload",
     "ScienceCancelScanPayload",
+    "ScienceStartSectorScanPayload",
+    "ScienceCancelSectorScanPayload",
+    "ScienceScanInterruptResponsePayload",
     # captain
     "CaptainSetAlertPayload",
     "CaptainAuthorizePayload",
     "CaptainAddLogPayload",
     "CaptainSystemOverridePayload",
     "CaptainSaveGamePayload",
+    # docking
+    "DockingRequestClearancePayload",
+    "DockingStartServicePayload",
+    "DockingCancelServicePayload",
+    "CaptainUndockPayload",
     # medical
     "MedicalTreatCrewPayload",
     "MedicalCancelTreatmentPayload",
@@ -178,4 +211,12 @@ __all__ = [
     "GameOverPayload",
     # world
     "ShipStatePayload",
+    # navigation
+    "MapPlotRoutePayload",
+    "MapClearRoutePayload",
+    # creatures
+    "CreatureSedatePayload",
+    "CreatureEWDisruptPayload",
+    "CreatureCommProgressPayload",
+    "CreatureLeeechRemovePayload",
 ]

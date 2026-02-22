@@ -1,0 +1,102 @@
+{
+  "id": "first_survey",
+  "name": "First Survey",
+  "briefing": "An unmapped region has been flagged for first survey. Your mission: map at least four of the six designated grid sectors, then document your findings — either through leviathan bio-cataloguing or long-range signal triangulation. No weapon discharge authorised. Science, Helm, Comms, and Flight Ops take the lead on this one.",
+  "spawn": [
+    {"type": "station",  "id": "research_hq",     "x": 50000, "y": 50000},
+    {"type": "creature", "id": "leviathan_alpha",  "creature_type": "leviathan",   "x": 78000, "y": 78000},
+    {"type": "creature", "id": "survey_rift",      "creature_type": "rift_stalker","x": 18000, "y": 18000}
+  ],
+  "nodes": [
+    {
+      "id": "depart_hq",
+      "type": "objective",
+      "text": "Navigation: Depart from Research HQ and begin survey operations",
+      "trigger": {"type": "player_in_area", "x": 50000, "y": 50000, "r": 6000}
+    },
+    {
+      "id": "survey_grid",
+      "type": "parallel",
+      "text": "Survey at least 4 of 6 designated grid sectors",
+      "complete_when": {"count": 4},
+      "children": [
+        {
+          "id": "grid_nw",
+          "type": "objective",
+          "text": "Navigation: Survey north-west sector",
+          "trigger": {"type": "player_in_area", "x": 15000, "y": 15000, "r": 10000}
+        },
+        {
+          "id": "grid_n",
+          "type": "objective",
+          "text": "Navigation: Survey northern sector",
+          "trigger": {"type": "player_in_area", "x": 50000, "y": 12000, "r": 10000}
+        },
+        {
+          "id": "grid_ne",
+          "type": "objective",
+          "text": "Navigation: Survey north-east sector",
+          "trigger": {"type": "player_in_area", "x": 85000, "y": 15000, "r": 10000}
+        },
+        {
+          "id": "grid_e",
+          "type": "objective",
+          "text": "Navigation: Survey eastern sector",
+          "trigger": {"type": "player_in_area", "x": 88000, "y": 50000, "r": 10000}
+        },
+        {
+          "id": "grid_se",
+          "type": "objective",
+          "text": "Navigation: Survey south-east sector — leviathan activity detected",
+          "trigger": {"type": "player_in_area", "x": 80000, "y": 82000, "r": 12000}
+        },
+        {
+          "id": "grid_sw",
+          "type": "objective",
+          "text": "Navigation: Survey south-west sector",
+          "trigger": {"type": "player_in_area", "x": 15000, "y": 82000, "r": 10000}
+        }
+      ]
+    },
+    {
+      "id": "document_findings",
+      "type": "parallel",
+      "text": "Document findings: complete bio-catalogue OR triangulate a signal relay",
+      "complete_when": "any",
+      "children": [
+        {
+          "id": "bio_catalogue",
+          "type": "objective",
+          "text": "Science: Complete BIO scan of the leviathan-class entity",
+          "trigger": {"type": "creature_study_complete", "creature_id": "leviathan_alpha"}
+        },
+        {
+          "id": "comms_relay",
+          "type": "objective",
+          "text": "Science/Comms: Triangulate the unknown signal relay",
+          "trigger": {"type": "signal_located"}
+        }
+      ]
+    },
+    {
+      "id": "survey_complete",
+      "type": "objective",
+      "text": "Navigation: Return to Research HQ with survey data",
+      "trigger": {"type": "player_in_area", "x": 50000, "y": 50000, "r": 6000}
+    },
+    {
+      "id": "stalker_territory_warning",
+      "type": "conditional",
+      "text": "WARNING: Rift stalker territory detected — avoid the north-west region",
+      "condition": {"type": "creature_state", "creature_id": "survey_rift", "state": "aggressive"}
+    }
+  ],
+  "edges": [
+    {"from": "depart_hq",         "to": "survey_grid",        "type": "sequence"},
+    {"from": "survey_grid",       "to": "document_findings",  "type": "sequence"},
+    {"from": "document_findings", "to": "survey_complete",    "type": "sequence"}
+  ],
+  "start_node": "depart_hq",
+  "victory_nodes": ["survey_complete"],
+  "defeat_condition": {"type": "player_hull_zero"}
+}

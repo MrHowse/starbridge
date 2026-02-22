@@ -383,3 +383,70 @@
   from { opacity: 0.4; }
   to   { opacity: 1.0; }
 }
+
+/* ── Scan scale selector ─────────────────────────────────────────────────── */
+
+.scale-selector {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scale-btn {
+  background: transparent;
+  border: 1px solid rgba(0, 255, 65, 0.22);
+  color: rgba(0, 255, 65, 0.4);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  white-space: nowrap;
+  flex: 1;
+  text-align: center;
+}
+
+.scale-btn:hover:not(:disabled) {
+  border-color: var(--friendly, #00aaff);
+  color: var(--friendly, #00aaff);
+}
+
+.scale-btn--active {
+  border-color: var(--friendly, #00aaff);
+  color: var(--friendly, #00aaff);
+  background: rgba(0, 170, 255, 0.07);
+}
+
+.scale-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Hostile fire button variant (abort/cancel) ──────────────────────────── */
+
+.fire-btn--hostile {
+  border-color: var(--hostile, #ff3333);
+  color: var(--hostile, #ff3333);
+}
+
+.fire-btn--hostile:hover:not(:disabled) {
+  background: rgba(255, 51, 51, 0.12);
+}
+
+.fire-btn--hostile:active:not(:disabled) {
+  background: rgba(255, 51, 51, 0.25);
+}
+
+/* ── Sector scan interrupt warning ──────────────────────────────────────── */
+
+.scan-interrupt-panel {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 51, 51, 0.35);
+  background: rgba(255, 51, 51, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.1rem 0;
+}

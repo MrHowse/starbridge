@@ -109,7 +109,12 @@
       <section class="captain-tactical">
         <div class="panel-header">
           <span>TACTICAL</span>
-          <span id="map-zoom-label" class="text-muted">80K WU</span>
+          <span id="map-zoom-label" class="text-muted">SECTOR</span>
+          <div class="map-zoom-btns" style="display:flex;gap:4px;margin-left:auto">
+            <button class="zoom-btn" data-zoom="tactical" title="Tactical view (1)">TAC</button>
+            <button class="zoom-btn" data-zoom="sector"   title="Sector view (2)">SEC</button>
+            <button class="zoom-btn zoom-btn--active" data-zoom="strategic" title="Strategic view (3)">STR</button>
+          </div>
         </div>
         <canvas id="captain-canvas"></canvas>
       </section>
@@ -125,6 +130,19 @@
         <div id="auth-panel" style="display:none" class="auth-panel">
           <div class="panel-header"><span>AUTHORIZATION REQUIRED</span></div>
           <div id="auth-content"></div>
+        </div>
+
+        <!-- Docking panel (shown while docked or sequencing) -->
+        <div id="docking-panel" style="display:none" class="auth-panel">
+          <div class="panel-header">
+            <span id="docking-panel-title">DOCKED</span>
+            <span id="docking-station-name" class="text-dim"></span>
+          </div>
+          <div id="docking-services-list" style="margin-bottom:6px;font-size:.7rem"></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button id="undock-btn" class="btn btn--secondary" style="font-size:.65rem;flex:1">UNDOCK</button>
+            <button id="emergency-undock-btn" class="btn btn--danger" style="font-size:.65rem;flex:1">EMERGENCY UNDOCK</button>
+          </div>
         </div>
 
         <!-- Captain's log -->

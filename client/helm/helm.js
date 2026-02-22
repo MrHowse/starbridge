@@ -25,6 +25,7 @@ import { wireButtonSounds } from '../shared/audio_ui.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { SectorMap } from '../shared/sector_map.js';
 
 registerHelp([
   { selector: '#compass',          text: 'Heading dial — click to set target heading. Ship turns toward it.', position: 'right' },
@@ -128,6 +129,18 @@ let vsCtx  = null; // viewscreen
 let cmpCtx = null; // compass
 let mmCtx  = null; // minimap
 
+// Sector map (handles minimap zoom levels: tactical/sector/strategic).
+let _sectorMap       = null;
+let _routeData       = null;   // current route from map.route_updated
+let _stationEntities = [];     // station entities from map.sector_grid (v0.05e)
+
+// Science sector-scan status indicator (shown on minimap).
+let _scanIndicatorText = null;
+
+// Docking state (v0.05f).
+let _dockedAt      = null;   // station ID if docked, null otherwise
+let _approachInfo  = null;   // latest docking.approach_info payload
+
 // ---------------------------------------------------------------------------
 // Initialisation
 // ---------------------------------------------------------------------------
@@ -146,6 +159,11 @@ function init() {
   on('ship.hull_hit',      handleHullHit);
   on('weapons.beam_fired', handleBeamFired);
   on('game.over',          handleGameOver);
+  on('map.sector_grid',    (p) => { if (_sectorMap) _sectorMap.updateSectorGrid(p); _routeData = p.route || null; _stationEntities = p.station_entities || []; });
+  on('map.scan_indicator', ({ text }) => { _scanIndicatorText = text || null; });
+  on('docking.approach_info', (info) => { _approachInfo = info; });
+  on('docking.complete',      ({ station_name }) => { _approachInfo = null; console.log('[helm] Docked at', station_name); });
+  on('docking.undocked',      () => { _dockedAt = null; });
 
   initPuzzleRenderer(send);
   setupKeyboard();
@@ -173,6 +191,14 @@ function handleGameStarted(payload) {
   standbyEl.style.display    = 'none';
   helmMainEl.style.display   = 'grid';
   gameActive = true;
+
+  // Sector map for minimap zoom (tactical/sector/strategic).
+  _sectorMap = new SectorMap({
+    allowedLevels: ['tactical', 'sector', 'strategic'],
+    defaultZoom:   'tactical',
+    onRoutePlot:   (wx, wy) => send('map.plot_route', { to_x: wx, to_y: wy }),
+  });
+  if (minimapCanvas) _sectorMap.setupStrategicClick(minimapCanvas);
 
   // Defer canvas setup to the next frame so the grid layout is fully
   // computed before we read clientWidth/clientHeight for sizing.
@@ -202,7 +228,13 @@ function handleShipState(payload) {
   prevState    = currState;
   currState    = payload;
   lastTickTime = performance.now();
+  _dockedAt = payload.docked_at ?? null;
+  // Clear approach info once docked — it's no longer relevant.
+  if (_dockedAt) _approachInfo = null;
   SoundBank.setAmbient('engine_hum', { throttle: payload.throttle ?? 0, enginePower: payload.systems?.engines?.efficiency ?? 1 });
+  if (_sectorMap && payload.position) {
+    _sectorMap.updateShipPosition(payload.position.x, payload.position.y, payload.heading ?? 0);
+  }
 }
 
 function handleWorldEntities(payload) {
@@ -298,11 +330,50 @@ function drawCompassPanel(state) {
 
 function drawMinimapPanel(state) {
   const size = minimapCanvas.width;
+  if (_sectorMap && _sectorMap.isStrategic()) {
+    // Strategic zoom: render the sector grid on the minimap canvas.
+    _sectorMap.renderStrategic(minimapCanvas, performance.now());
+    return;
+  }
+  // Tactical / sector zoom: standard minimap rendering.
   drawMinimap(mmCtx, size, state.position.x, state.position.y, state.heading);
   drawMinimapHazards(mmCtx, size);
+  drawMinimapStations(mmCtx, size);
   drawMinimapContacts(mmCtx, size, state);
   drawMinimapBeamFlash(mmCtx, size, state);
   if (hintsEnabled) drawMinimapThreatArrow(mmCtx, size, state);
+  // Sector zoom: draw the route overlay on the minimap.
+  if (_sectorMap && _sectorMap.getZoomLevel() === 'sector' && _routeData?.plot_x) {
+    _drawMinimapRoute(mmCtx, size, _routeData);
+  }
+  // Science scan indicator overlay.
+  if (_scanIndicatorText) {
+    mmCtx.save();
+    mmCtx.font         = '8px "Share Tech Mono",monospace';
+    mmCtx.textAlign    = 'left';
+    mmCtx.textBaseline = 'bottom';
+    mmCtx.fillStyle    = 'rgba(255,176,0,0.9)';
+    mmCtx.fillText(_scanIndicatorText, 4, size - 3);
+    mmCtx.restore();
+  }
+  // Docking state overlay.
+  if (_dockedAt) {
+    mmCtx.save();
+    mmCtx.font         = '9px "Share Tech Mono",monospace';
+    mmCtx.textAlign    = 'center';
+    mmCtx.textBaseline = 'top';
+    mmCtx.fillStyle    = 'rgba(0,200,255,0.9)';
+    mmCtx.fillText('DOCKED', size / 2, 4);
+    mmCtx.restore();
+  } else if (_approachInfo && _approachInfo.in_range) {
+    mmCtx.save();
+    mmCtx.font         = '8px "Share Tech Mono",monospace';
+    mmCtx.textAlign    = 'center';
+    mmCtx.textBaseline = 'top';
+    mmCtx.fillStyle    = 'rgba(0,255,160,0.9)';
+    mmCtx.fillText('IN DOCK RANGE', size / 2, 4);
+    mmCtx.restore();
+  }
 }
 
 /**
@@ -392,6 +463,33 @@ function drawMinimapBeamFlash(ctx, size, state) {
   ctx.moveTo(sx, sy);
   ctx.lineTo(tx, ty);
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draw space station markers on the minimap (v0.05e).
+ * Only transponder-active stations are shown.
+ */
+function drawMinimapStations(ctx, size) {
+  if (!_stationEntities.length) return;
+
+  const PAD    = 6;
+  const SECTOR = 100_000;
+  const mapW   = size - PAD * 2;
+
+  ctx.save();
+  for (const st of _stationEntities) {
+    if (!st.transponder_active) continue;
+    const sx = PAD + (st.x / SECTOR) * mapW;
+    const sy = PAD + (st.y / SECTOR) * mapW;
+    const color = st.faction === 'hostile' ? 'rgba(255, 64, 64, 0.8)'
+                : st.faction === 'neutral'  ? 'rgba(255, 176, 0, 0.8)'
+                :                             'rgba(0, 170, 255, 0.8)';
+    // Small square marker for station.
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1;
+    ctx.strokeRect(sx - 3, sy - 3, 6, 6);
+  }
   ctx.restore();
 }
 
@@ -488,9 +586,41 @@ function resizeViewscreen() {
 // Keyboard controls
 // ---------------------------------------------------------------------------
 
+function _drawMinimapRoute(ctx, size, route) {
+  const PAD = 6;
+  const SECTOR = 100_000;
+  const mapW = size - PAD * 2;
+  const fromSx = PAD + (route.from_x / SECTOR) * mapW;
+  const fromSy = PAD + (route.from_y / SECTOR) * mapW;
+  const toSx   = PAD + (route.plot_x  / SECTOR) * mapW;
+  const toSy   = PAD + (route.plot_y  / SECTOR) * mapW;
+  const pulse  = 0.5 + 0.3 * Math.sin(performance.now() * 0.003);
+  ctx.save();
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = `rgba(255, 176, 0, ${pulse})`;
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(fromSx, fromSy);
+  ctx.lineTo(toSx, toSy);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = `rgba(255, 176, 0, ${pulse})`;
+  ctx.beginPath();
+  ctx.arc(toSx, toSy, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function setupKeyboard() {
   document.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
+    // Zoom cycle for minimap (Z/1/2/3).
+    if (key === 'z' || key === '1' || key === '2' || key === '3') {
+      if (_sectorMap && gameActive) {
+        const consumed = _sectorMap.handleKey(e.key);
+        if (consumed) { e.preventDefault(); return; }
+      }
+    }
     if (['arrowleft','arrowright','arrowup','arrowdown','a','d','w','s'].includes(key)) {
       e.preventDefault();
       if (!heldKeys.has(key)) {
@@ -545,6 +675,7 @@ function setupKeyboard() {
  */
 function processHeldKeys(now) {
   if (!gameActive) return;
+  if (_dockedAt) return;  // controls locked while docked
   if (now - lastControlSend < TICK_MS) return;   // send at most 10/sec
 
   let headingChanged  = false;
@@ -577,6 +708,7 @@ function processHeldKeys(now) {
  */
 function applyControl(key) {
   if (!gameActive) return;
+  if (_dockedAt) return;  // controls locked while docked
 
   let headingChanged  = false;
   let throttleChanged = false;

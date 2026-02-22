@@ -1,16 +1,20 @@
 """
 Weapons sub-module for the game loop.
 
-Manages all weapons state and computation: target selection, torpedo ammo,
+Manages all weapons state and computation: target selection, torpedo magazine,
 tube cooldowns, torpedo type loading, beam/torpedo firing, torpedo movement,
 and applying enemy beam hits to the player or stations.
 
-v0.02g additions:
-  - Four torpedo types: standard, emp, probe, nuclear.
-  - Per-tube loading system (TUBE_LOAD_TIME to switch torpedo type).
-  - EMP torpedoes stun enemy weapon systems (stun_ticks).
-  - Probe torpedoes trigger an automatic sensor scan on impact.
-  - Nuclear torpedoes require Captain authorisation before firing.
+v0.05g additions:
+  - Eight torpedo types: standard, homing, ion, piercing, heavy, proximity,
+    nuclear, experimental (replaces old standard/emp/probe/nuclear).
+  - Per-type magazine management (dict[str, int] instead of single int).
+  - Homing torpedoes track the selected target in flight (HOMING_TURN_RATE).
+  - Ion torpedoes drain enemy shields and stun for 10 seconds (100 ticks).
+  - Piercing torpedoes ignore 75% of shield absorption.
+  - Proximity torpedoes detonate in an AOE blast radius.
+  - Heavy torpedoes deal maximum damage at reduced velocity.
+  - Per-type reload times (slower for heavy/nuclear, faster for standard).
 """
 from __future__ import annotations
 
@@ -30,35 +34,88 @@ from server.systems.combat import (
     apply_hit_to_player,
     beam_in_arc,
 )
-from server.utils.math_helpers import bearing_to, distance
+from server.utils.math_helpers import angle_diff, bearing_to, distance, wrap_angle
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-TORPEDO_RELOAD_TIME: float = 5.0   # seconds after firing (scaled by efficiency)
 TUBE_LOAD_TIME: float = 3.0        # seconds to load a different torpedo type
 
-#: Damage dealt on impact by each torpedo type.
+#: All valid torpedo type identifiers.
+TORPEDO_TYPES: list[str] = [
+    "standard", "homing", "ion", "piercing",
+    "heavy", "proximity", "nuclear", "experimental",
+]
+
+#: Damage dealt on direct impact by each torpedo type.
 TORPEDO_DAMAGE_BY_TYPE: dict[str, float] = {
-    "standard": 50.0,
-    "emp":      15.0,   # lower damage, but stuns weapon systems
-    "probe":     5.0,   # minimal damage, auto-scans target
-    "nuclear":  80.0,   # high damage, requires Captain authorisation
+    "standard":     50.0,
+    "homing":       35.0,   # tracks target; offset by guidance advantage
+    "ion":          10.0,   # low hull damage + drains shields + stuns 10s
+    "piercing":     40.0,   # ignores 75% of shield absorption
+    "heavy":       100.0,   # maximum damage; very slow
+    "proximity":    30.0,   # AOE — hits all enemies within blast radius
+    "nuclear":     200.0,   # devastating; Captain authorisation required
+    "experimental": 60.0,   # unpredictable; secondary effects vary
 }
 
-#: EMP stun duration in ticks (at 10 Hz → 5 seconds).
-EMP_STUN_TICKS: int = 50
+#: Velocity (world units / second) for each torpedo type.
+TORPEDO_VELOCITY_BY_TYPE: dict[str, float] = {
+    "standard":   500.0,
+    "homing":     500.0,
+    "ion":        500.0,
+    "piercing":   400.0,
+    "heavy":      300.0,   # very slow — easily intercepted
+    "proximity":  500.0,
+    "nuclear":    400.0,   # slow for maximum drama
+    "experimental": 500.0,
+}
+
+#: Base reload time (seconds) after firing — scaled by torpedoes system efficiency.
+TORPEDO_RELOAD_BY_TYPE: dict[str, float] = {
+    "standard":   3.0,
+    "homing":     4.0,
+    "ion":        5.0,
+    "piercing":   4.0,
+    "heavy":      8.0,
+    "proximity":  4.0,
+    "nuclear":   10.0,
+    "experimental": 6.0,
+}
+
+#: Default loadout matching the frigate and scope document.
+DEFAULT_TORPEDO_LOADOUT: dict[str, int] = {
+    "standard": 8, "homing": 4, "ion": 4, "piercing": 4,
+    "heavy": 2, "proximity": 4, "nuclear": 1, "experimental": 0,
+}
+
+#: Proximity torpedo blast radius (world units) — all enemies inside detonate.
+PROXIMITY_BLAST_RADIUS: float = 2_000.0
+
+#: Ion torpedo: drain shields + stun ticks (100 ticks @ 10 Hz = 10 seconds).
+ION_STUN_TICKS: int = 100
+
+#: Homing torpedo turn rate (degrees / second).
+HOMING_TURN_RATE: float = 90.0
 
 # ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
 
 _weapons_target: str | None = None
-_torpedo_ammo: int = 10
+
+# Per-type ammo counts.
+_torpedo_ammo: dict[str, int] = dict(DEFAULT_TORPEDO_LOADOUT)
+# Maximum ammo counts (set from ship class at game start; used for resupply).
+_torpedo_ammo_max: dict[str, int] = dict(DEFAULT_TORPEDO_LOADOUT)
 
 # Reload timers (seconds until tube can fire again after launch).
 _tube_cooldowns: list[float] = [0.0, 0.0]
+
+# Reference total reload time for each tube (set when fired; for UI progress).
+_tube_reload_times: list[float] = [TORPEDO_RELOAD_BY_TYPE["standard"],
+                                    TORPEDO_RELOAD_BY_TYPE["standard"]]
 
 # Currently loaded torpedo type per tube.
 _tube_types: list[str] = ["standard", "standard"]
@@ -74,42 +131,68 @@ _pending_nuclear_auths: dict[str, dict] = {}
 
 _entity_counter: int = 0
 
+# v0.05i — station IDs attacked by the player this tick (for sensor-array logic)
+_stations_attacked_this_tick: set[str] = set()
+# v0.05i — component-destroyed events pending broadcast by game_loop.py
+_pending_component_destroyed: list[dict] = []
 
-def reset(initial_ammo: int = 10) -> None:
+
+def reset(initial_loadout: dict[str, int] | None = None) -> None:
     """Reset all weapons state. Call at game start."""
-    global _weapons_target, _torpedo_ammo, _tube_cooldowns, _entity_counter
+    global _weapons_target, _torpedo_ammo, _torpedo_ammo_max, _entity_counter
     global _tube_types, _tube_loading, _tube_type_loading, _pending_nuclear_auths
+    global _tube_cooldowns, _tube_reload_times
+    loadout = dict(initial_loadout) if initial_loadout else dict(DEFAULT_TORPEDO_LOADOUT)
+    _torpedo_ammo = dict(loadout)
+    _torpedo_ammo_max = dict(loadout)
     _weapons_target = None
-    _torpedo_ammo = initial_ammo
     _tube_cooldowns = [0.0, 0.0]
+    _tube_reload_times = [TORPEDO_RELOAD_BY_TYPE["standard"],
+                          TORPEDO_RELOAD_BY_TYPE["standard"]]
     _tube_types = ["standard", "standard"]
     _tube_loading = [0.0, 0.0]
     _tube_type_loading = ["standard", "standard"]
     _pending_nuclear_auths = {}
     _entity_counter = 0
-
-
+    _stations_attacked_this_tick.clear()
+    _pending_component_destroyed.clear()
 
 
 def serialise() -> dict:
     return {
         "weapons_target": _weapons_target,
-        "torpedo_ammo": _torpedo_ammo,
+        "torpedo_ammo": dict(_torpedo_ammo),
+        "torpedo_ammo_max": dict(_torpedo_ammo_max),
         "tube_cooldowns": list(_tube_cooldowns),
+        "tube_reload_times": list(_tube_reload_times),
         "tube_types": list(_tube_types),
         "tube_loading": list(_tube_loading),
         "tube_type_loading": list(_tube_type_loading),
         "entity_counter": _entity_counter,
-        # pending nuclear auths not serialised — authorization requests don't survive save/resume
+        # pending nuclear auths not serialised — requests don't survive save/resume
     }
 
 
 def deserialise(data: dict) -> None:
-    global _weapons_target, _torpedo_ammo, _tube_cooldowns, _tube_types
-    global _tube_loading, _tube_type_loading, _entity_counter
-    _weapons_target       = data.get("weapons_target")
-    _torpedo_ammo         = data.get("torpedo_ammo", 10)
+    global _weapons_target, _torpedo_ammo, _torpedo_ammo_max, _tube_cooldowns
+    global _tube_types, _tube_loading, _tube_type_loading, _entity_counter
+    global _tube_reload_times
+    _weapons_target = data.get("weapons_target")
+
+    # Backward compat: old saves stored torpedo_ammo as an int.
+    raw_ammo = data.get("torpedo_ammo", dict(DEFAULT_TORPEDO_LOADOUT))
+    if isinstance(raw_ammo, int):
+        _torpedo_ammo = dict(DEFAULT_TORPEDO_LOADOUT)
+    else:
+        _torpedo_ammo = dict(raw_ammo)
+
+    raw_max = data.get("torpedo_ammo_max", dict(_torpedo_ammo))
+    _torpedo_ammo_max = dict(raw_max) if isinstance(raw_max, dict) else dict(_torpedo_ammo)
+
     _tube_cooldowns[:]    = data.get("tube_cooldowns", [0.0, 0.0])
+    _tube_reload_times[:] = data.get("tube_reload_times",
+                                     [TORPEDO_RELOAD_BY_TYPE["standard"],
+                                      TORPEDO_RELOAD_BY_TYPE["standard"]])
     _tube_types[:]        = data.get("tube_types", ["standard", "standard"])
     _tube_loading[:]      = data.get("tube_loading", [0.0, 0.0])
     _tube_type_loading[:] = data.get("tube_type_loading", ["standard", "standard"])
@@ -131,17 +214,32 @@ def set_target(entity_id: str | None) -> None:
     _weapons_target = entity_id
 
 
-def get_ammo() -> int:
-    return _torpedo_ammo
+def get_ammo() -> dict[str, int]:
+    """Return a copy of the per-type ammo dict."""
+    return dict(_torpedo_ammo)
 
 
-def set_ammo(ammo: int) -> None:
+def get_ammo_max() -> dict[str, int]:
+    """Return the maximum per-type ammo (ship class loadout)."""
+    return dict(_torpedo_ammo_max)
+
+
+def get_ammo_for_type(torpedo_type: str) -> int:
+    return _torpedo_ammo.get(torpedo_type, 0)
+
+
+def set_ammo_for_type(torpedo_type: str, count: int) -> None:
     global _torpedo_ammo
-    _torpedo_ammo = ammo
+    _torpedo_ammo[torpedo_type] = max(0, count)
 
 
 def get_cooldowns() -> list[float]:
-    return _tube_cooldowns
+    return list(_tube_cooldowns)
+
+
+def get_tube_reload_times() -> list[float]:
+    """Return reference reload times for each tube (set when last fired)."""
+    return list(_tube_reload_times)
 
 
 def get_tube_types() -> list[str]:
@@ -150,6 +248,20 @@ def get_tube_types() -> list[str]:
 
 def get_tube_loading() -> list[float]:
     return list(_tube_loading)
+
+
+def pop_stations_attacked() -> set[str]:
+    """Return and clear the set of station IDs hit by the player this tick."""
+    result = set(_stations_attacked_this_tick)
+    _stations_attacked_this_tick.clear()
+    return result
+
+
+def pop_component_destroyed_events() -> list[dict]:
+    """Return and clear pending station.component_destroyed event dicts."""
+    result = list(_pending_component_destroyed)
+    _pending_component_destroyed.clear()
+    return result
 
 
 def tick_cooldowns(dt: float) -> None:
@@ -182,6 +294,9 @@ def load_tube(tube: int, torpedo_type: str) -> tuple[str, dict] | None:
 
     Returns a broadcast event tuple or None if tube is busy.
     """
+    if torpedo_type not in TORPEDO_TYPES:
+        return None
+
     tube_idx = tube - 1
     if _tube_loading[tube_idx] > 0.0:
         return None   # already loading
@@ -238,7 +353,9 @@ def resolve_nuclear_auth(
         return [result_event]
 
     # Captain approved — attempt to fire.
-    if _torpedo_ammo <= 0 or _tube_cooldowns[tube_idx] > 0.0 or _tube_loading[tube_idx] > 0.0:
+    if (_torpedo_ammo.get("nuclear", 0) <= 0
+            or _tube_cooldowns[tube_idx] > 0.0
+            or _tube_loading[tube_idx] > 0.0):
         # Tube no longer ready.
         return [result_event]
 
@@ -253,48 +370,153 @@ def resolve_nuclear_auth(
 # ---------------------------------------------------------------------------
 
 
+def _find_station_component(
+    world: World,
+    entity_id: str,
+) -> "tuple[Station, object] | None":
+    """Return (station, component) for a component entity_id, or None."""
+    from server.models.world import Station  # already imported indirectly, but keep explicit
+    for station in world.stations:
+        if station.defenses is None:
+            continue
+        for comp in station.defenses.all_components():
+            if comp.id == entity_id:
+                return station, comp
+    return None
+
+
+def _find_station_by_id(world: World, entity_id: str) -> "Station | None":
+    """Return a Station with the matching id, or None."""
+    return next((s for s in world.stations if s.id == entity_id), None)
+
+
 def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tuple[str, dict] | None:
     """Fire player beam weapons at the selected target. Returns broadcast event or None.
 
-    *beam_frequency* — the Weapons station's selected frequency (alpha/beta/gamma/delta).
-    Matched frequencies deal 1.5× damage; mismatched deal 0.5×.
+    Targets can be:
+      - Enemy entity_id  → existing enemy damage logic
+      - Component ID     → damage that specific station component
+      - Station ID       → damage station hull (with shield-arc absorption)
+
+    *beam_frequency* — alpha/beta/gamma/delta; frequency matching gives ±50% dmg vs enemies.
     """
     global _weapons_target
 
     if _weapons_target is None:
         return None
 
-    target = next((e for e in world.enemies if e.id == _weapons_target), None)
-    if target is None:
-        return None
-
-    dist = distance(ship.x, ship.y, target.x, target.y)
-    if dist > BEAM_PLAYER_RANGE:
-        return None
-
-    brg = bearing_to(ship.x, ship.y, target.x, target.y)
-    if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
-        return None
-
     dmg = BEAM_PLAYER_DAMAGE * ship.systems["beams"].efficiency
-    apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency)
 
-    if target.hull <= 0.0:
-        world.enemies = [e for e in world.enemies if e.id != target.id]
-        if _weapons_target == target.id:
-            _weapons_target = None
-        gl.log_event("combat", "enemy_destroyed", {"enemy_id": target.id, "cause": "beam"})
+    # ── Enemy target (existing behaviour) ─────────────────────────────────
+    target = next((e for e in world.enemies if e.id == _weapons_target), None)
+    if target is not None:
+        dist = distance(ship.x, ship.y, target.x, target.y)
+        if dist > BEAM_PLAYER_RANGE:
+            return None
+        brg = bearing_to(ship.x, ship.y, target.x, target.y)
+        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+            return None
 
-    return (
-        "weapons.beam_fired",
-        {
-            "target_id": target.id,
-            "target_x": target.x,
-            "target_y": target.y,
-            "damage": round(dmg, 2),
-            "beam_frequency": beam_frequency,
-        },
-    )
+        apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency)
+        if target.hull <= 0.0:
+            world.enemies = [e for e in world.enemies if e.id != target.id]
+            if _weapons_target == target.id:
+                _weapons_target = None
+            gl.log_event("combat", "enemy_destroyed", {"enemy_id": target.id, "cause": "beam"})
+
+        return (
+            "weapons.beam_fired",
+            {
+                "target_id": target.id,
+                "target_x": target.x,
+                "target_y": target.y,
+                "damage": round(dmg, 2),
+                "beam_frequency": beam_frequency,
+            },
+        )
+
+    # ── Station component target ───────────────────────────────────────────
+    comp_result = _find_station_component(world, _weapons_target)
+    if comp_result is not None:
+        station, comp = comp_result
+        dist = distance(ship.x, ship.y, station.x, station.y)
+        if dist > BEAM_PLAYER_RANGE:
+            return None
+        brg = bearing_to(ship.x, ship.y, station.x, station.y)
+        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+            return None
+
+        comp.hp = max(0.0, comp.hp - dmg)
+        _stations_attacked_this_tick.add(station.id)
+        if comp.hp <= 0.0 and comp.hp_max > 0.0:
+            # First time hp hits 0 — emit destroyed event.
+            _pending_component_destroyed.append({
+                "station_id": station.id,
+                "component_id": comp.id,
+                "component_type": _component_type(comp),
+            })
+            comp.hp_max = 0.0  # sentinel: prevents re-emitting
+            if _weapons_target == comp.id:
+                _weapons_target = None
+
+        return (
+            "weapons.beam_fired",
+            {
+                "target_id": comp.id,
+                "target_x": station.x,
+                "target_y": station.y,
+                "damage": round(dmg, 2),
+                "beam_frequency": beam_frequency,
+            },
+        )
+
+    # ── Station hull target ────────────────────────────────────────────────
+    station = _find_station_by_id(world, _weapons_target)
+    if station is not None and station.faction == "hostile":
+        dist = distance(ship.x, ship.y, station.x, station.y)
+        if dist > BEAM_PLAYER_RANGE:
+            return None
+        brg = bearing_to(ship.x, ship.y, station.x, station.y)
+        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+            return None
+
+        # Shield arc absorption: if a generator covers this bearing, 80% absorbed.
+        if station.defenses is not None:
+            if station.defenses.arc_is_shielded(bearing_to(station.x, station.y, ship.x, ship.y)):
+                dmg *= 0.2
+        station.hull = max(0.0, station.hull - dmg)
+        _stations_attacked_this_tick.add(station.id)
+
+        return (
+            "weapons.beam_fired",
+            {
+                "target_id": station.id,
+                "target_x": station.x,
+                "target_y": station.y,
+                "damage": round(dmg, 2),
+                "beam_frequency": beam_frequency,
+            },
+        )
+
+    return None
+
+
+def _component_type(comp: object) -> str:
+    """Return a short string label for a component object."""
+    from server.models.world import ShieldArc, Turret, TorpedoLauncher, FighterBay, SensorArray, StationReactor
+    if isinstance(comp, ShieldArc):
+        return "shield_arc"
+    if isinstance(comp, Turret):
+        return "turret"
+    if isinstance(comp, TorpedoLauncher):
+        return "launcher"
+    if isinstance(comp, FighterBay):
+        return "fighter_bay"
+    if isinstance(comp, SensorArray):
+        return "sensor_array"
+    if isinstance(comp, StationReactor):
+        return "reactor"
+    return "unknown"
 
 
 def fire_torpedo(ship: Ship, world: World, tube: int) -> list[tuple[str, dict]]:
@@ -305,14 +527,15 @@ def fire_torpedo(ship: Ship, world: World, tube: int) -> list[tuple[str, dict]]:
     """
     tube_idx = tube - 1
 
-    if _torpedo_ammo <= 0:
-        return []
     if _tube_cooldowns[tube_idx] > 0.0:
         return []
     if _tube_loading[tube_idx] > 0.0:
         return []
 
     torpedo_type = _tube_types[tube_idx]
+
+    if _torpedo_ammo.get(torpedo_type, 0) <= 0:
+        return []
 
     if torpedo_type == "nuclear":
         # Nuclear requires Captain authorisation — do not fire yet.
@@ -329,14 +552,18 @@ def _do_fire(
     torpedo_type: str,
 ) -> tuple[str, dict] | None:
     """Internal: deduct ammo, set cooldown, spawn torpedo. Returns event or None."""
-    global _torpedo_ammo
-    reload_time = TORPEDO_RELOAD_TIME / max(0.01, ship.systems["torpedoes"].efficiency)
-
-    if _torpedo_ammo <= 0:
+    if _torpedo_ammo.get(torpedo_type, 0) <= 0:
         return None
 
-    _torpedo_ammo -= 1
+    eff = max(0.01, ship.systems["torpedoes"].efficiency)
+    base_reload = TORPEDO_RELOAD_BY_TYPE.get(torpedo_type, 3.0)
+    reload_time = base_reload / eff
+
+    _torpedo_ammo[torpedo_type] -= 1
     _tube_cooldowns[tube_idx] = reload_time
+    _tube_reload_times[tube_idx] = reload_time
+
+    velocity = TORPEDO_VELOCITY_BY_TYPE.get(torpedo_type, 500.0)
 
     torp = Torpedo(
         id=next_entity_id("torpedo"),
@@ -345,6 +572,8 @@ def _do_fire(
         y=ship.y,
         heading=ship.heading,
         torpedo_type=torpedo_type,
+        velocity=velocity,
+        homing_target=_weapons_target if torpedo_type == "homing" else None,
     )
     world.torpedoes.append(torp)
 
@@ -359,6 +588,22 @@ def _do_fire(
 # ---------------------------------------------------------------------------
 
 
+def _steer_homing(torp: Torpedo, world: World, dt: float) -> None:
+    """Rotate a homing torpedo toward its target."""
+    if not torp.homing_target:
+        return
+    tgt = next((e for e in world.enemies if e.id == torp.homing_target), None)
+    if tgt is None:
+        return
+    target_brg = math.degrees(
+        math.atan2(tgt.x - torp.x, -(tgt.y - torp.y))
+    ) % 360.0
+    diff = angle_diff(torp.heading, target_brg)
+    max_turn = HOMING_TURN_RATE * dt
+    turn = max(-max_turn, min(max_turn, diff))
+    torp.heading = wrap_angle(torp.heading + turn)
+
+
 def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
     """Move all torpedoes and check for collisions. Returns hit event dicts.
 
@@ -366,17 +611,16 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
     (non-player-owned) torpedoes before they can impact.
     """
     from server.game_loop_physics import TICK_DT
-    from server.systems.sensors import build_scan_result
 
-    heading_rad_cache: dict[str, float] = {}
     dead_torpedo_ids: list[str] = []
     events: list[dict] = []
 
     for torp in world.torpedoes:
-        if torp.id not in heading_rad_cache:
-            heading_rad_cache[torp.id] = math.radians(torp.heading)
-        h_rad = heading_rad_cache[torp.id]
+        # Homing guidance — steer before moving.
+        if torp.torpedo_type == "homing" and torp.homing_target:
+            _steer_homing(torp, world, TICK_DT)
 
+        h_rad = math.radians(torp.heading)
         torp.x += torp.velocity * math.sin(h_rad) * TICK_DT
         torp.y -= torp.velocity * math.cos(h_rad) * TICK_DT
         torp.distance_travelled += torp.velocity * TICK_DT
@@ -401,39 +645,107 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                     continue
 
         if torp.owner == "player":
-            hit_enemy = None
-            for enemy in world.enemies:
-                if distance(torp.x, torp.y, enemy.x, enemy.y) < 200.0:
-                    hit_enemy = enemy
-                    break
+            torp_type = torp.torpedo_type
+            damage = TORPEDO_DAMAGE_BY_TYPE.get(torp_type, 50.0)
 
-            if hit_enemy is not None:
-                torp_type = torp.torpedo_type
-                damage = TORPEDO_DAMAGE_BY_TYPE.get(torp_type, 50.0)
-                apply_hit_to_enemy(hit_enemy, damage, torp.x, torp.y)
+            if torp_type == "proximity":
+                # Proximity: detonate when any enemy enters blast radius.
+                if any(distance(torp.x, torp.y, e.x, e.y) < PROXIMITY_BLAST_RADIUS
+                       for e in world.enemies):
+                    hit_enemies = [
+                        e for e in world.enemies
+                        if distance(torp.x, torp.y, e.x, e.y) < PROXIMITY_BLAST_RADIUS
+                    ]
+                    destroyed_ids: list[str] = []
+                    for h_enemy in hit_enemies:
+                        apply_hit_to_enemy(h_enemy, damage, torp.x, torp.y)
+                        if h_enemy.hull <= 0.0:
+                            destroyed_ids.append(h_enemy.id)
+                            gl.log_event("combat", "enemy_destroyed", {
+                                "enemy_id": h_enemy.id,
+                                "cause": "torpedo",
+                                "torpedo_type": "proximity",
+                            })
+                    if destroyed_ids:
+                        world.enemies = [e for e in world.enemies
+                                         if e.id not in destroyed_ids]
+                    events.append({
+                        "torpedo_id": torp.id,
+                        "target_id": ",".join(e.id for e in hit_enemies),
+                        "damage": damage,
+                        "torpedo_type": "proximity",
+                        "hit_count": len(hit_enemies),
+                    })
+                    dead_torpedo_ids.append(torp.id)
 
-                event: dict = {
-                    "torpedo_id": torp.id,
-                    "target_id": hit_enemy.id,
-                    "damage": damage,
-                    "torpedo_type": torp_type,
-                }
+            else:
+                # Direct hit: 200 unit collision radius.
+                hit_enemy = None
+                for enemy in world.enemies:
+                    if distance(torp.x, torp.y, enemy.x, enemy.y) < 200.0:
+                        hit_enemy = enemy
+                        break
 
-                # Type-specific effects on alive enemies.
-                if hit_enemy.hull > 0.0:
-                    if torp_type == "emp":
-                        hit_enemy.stun_ticks = EMP_STUN_TICKS
-                        event["stun_duration"] = EMP_STUN_TICKS / 10.0  # seconds
-                    elif torp_type == "probe":
-                        # Auto-scan: include scan data in the event.
-                        event["probe_scan"] = build_scan_result(hit_enemy)
+                if hit_enemy is not None:
+                    if torp_type == "piercing":
+                        # Ignores 75% of shield absorption (only 25% absorbed).
+                        apply_hit_to_enemy(hit_enemy, damage, torp.x, torp.y,
+                                           shield_absorption_mult=0.25)
+                    else:
+                        apply_hit_to_enemy(hit_enemy, damage, torp.x, torp.y)
 
-                if hit_enemy.hull <= 0.0:
-                    world.enemies = [e for e in world.enemies if e.id != hit_enemy.id]
-                    gl.log_event("combat", "enemy_destroyed", {"enemy_id": hit_enemy.id, "cause": "torpedo", "torpedo_type": torp_type})
+                    event: dict = {
+                        "torpedo_id": torp.id,
+                        "target_id": hit_enemy.id,
+                        "damage": damage,
+                        "torpedo_type": torp_type,
+                    }
 
-                events.append(event)
-                dead_torpedo_ids.append(torp.id)
+                    # Type-specific effects on enemies that survive the hit.
+                    if hit_enemy.hull > 0.0:
+                        if torp_type == "ion":
+                            hit_enemy.shield_front = 0.0
+                            hit_enemy.shield_rear = 0.0
+                            hit_enemy.stun_ticks = ION_STUN_TICKS
+                            event["shield_drained"] = True
+                            event["stun_duration"] = ION_STUN_TICKS / 10.0
+
+                    if hit_enemy.hull <= 0.0:
+                        world.enemies = [e for e in world.enemies
+                                         if e.id != hit_enemy.id]
+                        gl.log_event("combat", "enemy_destroyed", {
+                            "enemy_id": hit_enemy.id,
+                            "cause": "torpedo",
+                            "torpedo_type": torp_type,
+                        })
+
+                    events.append(event)
+                    dead_torpedo_ids.append(torp.id)
+
+                # If no enemy hit, check station hull.
+                if hit_enemy is None and torp.id not in dead_torpedo_ids:
+                    for station in world.stations:
+                        if station.faction != "hostile":
+                            continue
+                        if distance(torp.x, torp.y, station.x, station.y) >= 500.0:
+                            continue
+                        # Shield arc absorption.
+                        brg = bearing_to(torp.x, torp.y, station.x, station.y)
+                        eff_dmg = damage
+                        if station.defenses is not None:
+                            atk_brg = bearing_to(station.x, station.y, torp.x, torp.y)
+                            if station.defenses.arc_is_shielded(atk_brg):
+                                eff_dmg *= 0.2
+                        station.hull = max(0.0, station.hull - eff_dmg)
+                        _stations_attacked_this_tick.add(station.id)
+                        events.append({
+                            "torpedo_id": torp.id,
+                            "target_id": station.id,
+                            "damage": round(eff_dmg, 2),
+                            "torpedo_type": torp_type,
+                        })
+                        dead_torpedo_ids.append(torp.id)
+                        break
 
     world.torpedoes = [t for t in world.torpedoes if t.id not in dead_torpedo_ids]
     return events

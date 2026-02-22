@@ -56,17 +56,22 @@ def tick_enemies(
     ship: Ship,
     dt: float,
     stations: list[Station] | None = None,
+    sensor_modifier: float = 1.0,
 ) -> list[BeamHitEvent]:
     """Update all enemy AI states and movement; return any beam hit events.
 
     When `stations` is non-empty, enemies use station-priority targeting:
     they chase and attack the nearest station rather than the player ship.
+
+    *sensor_modifier* scales each enemy's detect_range to model nebula /
+    hazard concealment (e.g. 0.5 = half the normal detection range).
     """
     events: list[BeamHitEvent] = []
     dead_ids: list[str] = []
 
     for enemy in enemies:
         params = ENEMY_TYPE_PARAMS[enemy.type]
+        eff_detect_range = params["detect_range"] * sensor_modifier
 
         # ── Determine primary target ───────────────────────────────────────
         if stations:
@@ -78,10 +83,10 @@ def tick_enemies(
         dist = distance(enemy.x, enemy.y, target_x, target_y)
 
         # ── State transitions ─────────────────────────────────────────────
-        _update_state(enemy, params, dist)
+        _update_state(enemy, params, dist, eff_detect_range)
 
         # ── Despawn check (fleeing enemy too far away) ────────────────────
-        if enemy.ai_state == "flee" and dist > 2.0 * params["detect_range"]:
+        if enemy.ai_state == "flee" and dist > 2.0 * eff_detect_range:
             dead_ids.append(enemy.id)
             continue
 
@@ -132,13 +137,18 @@ def tick_enemies(
 # ---------------------------------------------------------------------------
 
 
-def _update_state(enemy: Enemy, params: dict, dist: float) -> None:
-    """Apply state-machine transitions."""
+def _update_state(enemy: Enemy, params: dict, dist: float, detect_range: float | None = None) -> None:
+    """Apply state-machine transitions.
+
+    *detect_range* overrides ``params["detect_range"]`` when provided (used by
+    hazard sensor-modifier to model enemy detection in nebulae).
+    """
     state = enemy.ai_state
     max_hull = params["hull"]
+    eff_detect = detect_range if detect_range is not None else params["detect_range"]
 
     if state == "idle":
-        if dist < params["detect_range"]:
+        if dist < eff_detect:
             enemy.ai_state = "chase"
 
     elif state == "chase":

@@ -4,6 +4,10 @@
   "description": "Light patrol vessel. Good balance of speed and resilience. The classic 5-6 player experience — every role pulls its weight.",
   "max_hull": 80,
   "torpedo_ammo": 10,
+  "torpedo_loadout": {
+    "standard": 6, "homing": 3, "ion": 3, "piercing": 3,
+    "heavy": 1, "proximity": 2, "nuclear": 1, "experimental": 0
+  },
   "min_crew": 4,
   "max_crew": 6
 }

@@ -1,0 +1,89 @@
+{
+  "id": "fortress",
+  "name": "Fortress",
+  "briefing": "Intel has located Cygnus Base, an enemy outpost guarding the Cygnus junction. Your orders: capture or destroy it. Multiple approach strategies are available — coordinate with your crew before committing.",
+  "min_crew": 8,
+  "ship_classes": ["cruiser", "battleship"],
+  "spawn": [
+    {"type": "enemy_station", "id": "cygnus_base", "x": 50000, "y": 50000, "variant": "outpost"},
+    {"type": "scout", "id": "patrol_a", "x": 45000, "y": 42000},
+    {"type": "scout", "id": "patrol_b", "x": 55000, "y": 42000}
+  ],
+  "nodes": [
+    {
+      "id": "approach",
+      "type": "objective",
+      "text": "Advance into the sector and locate Cygnus Base",
+      "trigger": {"type": "player_in_area", "x": 50000, "y": 50000, "r": 30000}
+    },
+    {
+      "id": "choose_approach",
+      "type": "branch",
+      "text": "Determine your assault strategy"
+    },
+    {
+      "id": "stealth_close",
+      "type": "objective",
+      "text": "Close to docking range undetected",
+      "trigger": {"type": "player_in_area", "x": 50000, "y": 50000, "r": 2500}
+    },
+    {
+      "id": "assault_gen1",
+      "type": "objective",
+      "text": "Destroy the second shield generator",
+      "trigger": {"type": "component_destroyed", "component_id": "cygnus_base_gen_1"}
+    },
+    {
+      "id": "assault_weaken",
+      "type": "objective",
+      "text": "Reduce Cygnus Base hull below 50%",
+      "trigger": {"type": "station_hull_below", "station_id": "cygnus_base", "threshold": 400}
+    },
+    {
+      "id": "assault_dock",
+      "type": "objective",
+      "text": "Close to boarding range",
+      "trigger": {"type": "player_in_area", "x": 50000, "y": 50000, "r": 2500}
+    },
+    {
+      "id": "capture_station",
+      "type": "objective",
+      "text": "Board and capture Cygnus Base",
+      "trigger": {"type": "station_captured", "station_id": "cygnus_base"}
+    },
+    {
+      "id": "reinforcements_conditional",
+      "type": "conditional",
+      "text": "Enemy reinforcements inbound",
+      "max_activations": 1,
+      "condition": {"type": "station_reinforcements_called", "station_id": "cygnus_base"},
+      "on_activate": {"action": "spawn_wave", "enemies": [
+        {"type": "scout", "id": "reinf_a", "x": 65000, "y": 50000},
+        {"type": "scout", "id": "reinf_b", "x": 67000, "y": 52000}
+      ]},
+      "deactivate_when": {"type": "station_captured", "station_id": "cygnus_base"}
+    }
+  ],
+  "edges": [
+    {"from": "approach", "to": "choose_approach", "type": "sequence"},
+    {
+      "from": "choose_approach",
+      "to": "stealth_close",
+      "type": "branch_trigger",
+      "trigger": {"type": "station_sensor_jammed", "station_id": "cygnus_base"}
+    },
+    {
+      "from": "choose_approach",
+      "to": "assault_gen1",
+      "type": "branch_trigger",
+      "trigger": {"type": "component_destroyed", "component_id": "cygnus_base_gen_0"}
+    },
+    {"from": "stealth_close", "to": "capture_station", "type": "sequence"},
+    {"from": "assault_gen1", "to": "assault_weaken", "type": "sequence"},
+    {"from": "assault_weaken", "to": "assault_dock", "type": "sequence"},
+    {"from": "assault_dock", "to": "capture_station", "type": "sequence"}
+  ],
+  "start_node": "approach",
+  "victory_nodes": ["capture_station"],
+  "defeat_condition": {"type": "ship_hull_zero"}
+}

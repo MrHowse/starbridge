@@ -1,0 +1,120 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Starbridge Sector Grid",
+    "description": "Schema for sector layout files loaded by server/models/sector.py",
+    "type": "object",
+    "required": ["id", "grid_size", "sectors"],
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Unique identifier for this layout (e.g. 'standard_grid')"
+        },
+        "grid_size": {
+            "type": "array",
+            "items": { "type": "integer" },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "[columns, rows]"
+        },
+        "sectors": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/sector" }
+        }
+    },
+    "$defs": {
+        "sector": {
+            "type": "object",
+            "required": ["id", "name", "grid_position", "world_bounds"],
+            "properties": {
+                "id": { "type": "string", "description": "Sector ID, e.g. 'A1'" },
+                "name": { "type": "string" },
+                "grid_position": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "minItems": 2, "maxItems": 2,
+                    "description": "[col, row], zero-indexed"
+                },
+                "world_bounds": { "$ref": "#/$defs/rect" },
+                "properties": { "$ref": "#/$defs/sector_properties" },
+                "features": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/sector_feature" }
+                },
+                "patrol_routes": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/patrol_route" }
+                }
+            }
+        },
+        "rect": {
+            "type": "object",
+            "required": ["min_x", "min_y", "max_x", "max_y"],
+            "properties": {
+                "min_x": { "type": "number" },
+                "min_y": { "type": "number" },
+                "max_x": { "type": "number" },
+                "max_y": { "type": "number" }
+            }
+        },
+        "sector_properties": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": ["deep_space", "nebula", "asteroid_field", "gravity_well",
+                             "radiation_zone", "friendly_space", "contested_space", "hostile_space"]
+                },
+                "sensor_modifier": { "type": "number", "minimum": 0.0, "maximum": 2.0 },
+                "navigation_hazard": {
+                    "type": "string",
+                    "enum": ["none", "low", "moderate", "high", "severe"]
+                },
+                "faction": {
+                    "type": "string",
+                    "enum": ["unclaimed", "imperial", "rebel", "alien", "contested"]
+                },
+                "threat_level": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical"]
+                }
+            }
+        },
+        "sector_feature": {
+            "type": "object",
+            "required": ["id", "type", "position"],
+            "properties": {
+                "id": { "type": "string" },
+                "type": {
+                    "type": "string",
+                    "enum": ["friendly_station", "enemy_station", "neutral_station",
+                             "derelict", "asteroid_field", "transponder",
+                             "resource_deposit", "anomaly"]
+                },
+                "position": {
+                    "type": "array",
+                    "items": { "type": "number" },
+                    "minItems": 2, "maxItems": 2
+                },
+                "name": { "type": "string" },
+                "visible_without_scan": { "type": "boolean" }
+            }
+        },
+        "patrol_route": {
+            "type": "object",
+            "required": ["faction", "waypoints"],
+            "properties": {
+                "faction": { "type": "string" },
+                "waypoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": { "type": "number" },
+                        "minItems": 2, "maxItems": 2
+                    }
+                },
+                "ship_count": { "type": "integer", "minimum": 1 },
+                "ship_type": { "type": "string" }
+            }
+        }
+    }
+}

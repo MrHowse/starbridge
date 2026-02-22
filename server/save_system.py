@@ -36,6 +36,7 @@ import server.game_loop_training as gltr
 import server.game_loop_ew as glew
 import server.game_loop_tactical as gltac
 import server.game_loop_mission as glm
+import server.game_loop_docking as gldo
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -64,6 +65,8 @@ def _serialise_ship(ship: Ship) -> dict:
         "velocity": ship.velocity,
         "throttle": ship.throttle,
         "hull": ship.hull,
+        "hull_max": ship.hull_max,
+        "docked_at": ship.docked_at,
         "shields": {"front": ship.shields.front, "rear": ship.shields.rear},
         "systems": {
             name: {
@@ -154,7 +157,20 @@ def _serialise_entities(world: World) -> dict:
             for t in world.torpedoes
         ],
         "stations": [
-            {"id": s.id, "x": s.x, "y": s.y, "hull": s.hull, "hull_max": s.hull_max}
+            {
+                "id": s.id, "x": s.x, "y": s.y,
+                "name": s.name,
+                "station_type": s.station_type,
+                "faction": s.faction,
+                "services": s.services,
+                "docking_range": s.docking_range,
+                "docking_ports": s.docking_ports,
+                "transponder_active": s.transponder_active,
+                "shields": s.shields, "shields_max": s.shields_max,
+                "hull": s.hull, "hull_max": s.hull_max,
+                "inventory": s.inventory,
+                "requires_scan": s.requires_scan,
+            }
             for s in world.stations
         ],
         "asteroids": [
@@ -186,6 +202,8 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.velocity = float(data.get("velocity", ship.velocity))
     ship.throttle = float(data.get("throttle", ship.throttle))
     ship.hull = float(data.get("hull", ship.hull))
+    ship.hull_max = float(data.get("hull_max", ship.hull))
+    ship.docked_at = data.get("docked_at")
 
     shields_d = data.get("shields", {})
     ship.shields.front = float(shields_d.get("front", ship.shields.front))
@@ -304,9 +322,22 @@ def _deserialise_entities(data: dict, world: World) -> None:
 
     world.stations.clear()
     for s in data.get("stations", []):
-        st = Station(id=s["id"], x=float(s["x"]), y=float(s["y"]))
-        st.hull = float(s.get("hull", st.hull))
-        st.hull_max = float(s.get("hull_max", st.hull_max))
+        st = Station(
+            id=s["id"], x=float(s["x"]), y=float(s["y"]),
+            name=s.get("name", ""),
+            station_type=s.get("station_type", "military"),
+            faction=s.get("faction", "friendly"),
+            services=list(s.get("services", [])),
+            docking_range=float(s.get("docking_range", 2_000.0)),
+            docking_ports=int(s.get("docking_ports", 2)),
+            transponder_active=bool(s.get("transponder_active", True)),
+            shields=float(s.get("shields", 0.0)),
+            shields_max=float(s.get("shields_max", 0.0)),
+            hull=float(s.get("hull", 500.0)),
+            hull_max=float(s.get("hull_max", 500.0)),
+            inventory=dict(s.get("inventory", {})),
+            requires_scan=bool(s.get("requires_scan", False)),
+        )
         world.stations.append(st)
 
     world.asteroids.clear()
@@ -353,6 +384,8 @@ def save_game(
         "difficulty_preset": difficulty_preset,
         "ship_class": ship_class,
         "tick_count": tick_count,
+        "sector_layout": world.sector_grid.layout_id if world.sector_grid else None,
+        "sector_grid_visibility": world.sector_grid.serialise() if world.sector_grid else None,
         "ship": _serialise_ship(world.ship),
         "entities": _serialise_entities(world),
         "modules": {
@@ -367,6 +400,7 @@ def save_game(
             "ew": glew.serialise(),
             "tactical": gltac.serialise(),
             "mission": glm.serialise_mission(),
+            "docking": gldo.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -454,6 +488,25 @@ def restore_game(save_id: str, world: World) -> dict:
         gltac.deserialise(mods["tactical"])
     if mods.get("mission"):
         glm.deserialise_mission(mods["mission"], mission_id)
+    if mods.get("docking"):
+        gldo.deserialise(mods["docking"])
+
+    # Restore sector grid visibility (v0.05b).
+    sector_layout = data.get("sector_layout")
+    if sector_layout:
+        try:
+            from server.models.sector import load_sector_grid
+            grid = load_sector_grid(sector_layout)
+            grid.apply_transponder_reveals()
+            vis_data = data.get("sector_grid_visibility")
+            if vis_data:
+                grid.deserialise_visibility(vis_data)
+            world.sector_grid = grid
+        except FileNotFoundError:
+            logger.warning("Sector layout %r not found during restore", sector_layout)
+            world.sector_grid = None
+    else:
+        world.sector_grid = None
 
     logger.info(
         "Game restored from save '%s' (mission=%s, tick=%d)",

@@ -1,0 +1,105 @@
+{
+  "id": "supply_line",
+  "name": "Supply Line",
+  "briefing": "Enemy supply depot Alpha is resupplying a blockade fleet. Destroy the depot and intercept all supply convoys before they reinforce the enemy fleet. Additional resupply ships will arrive every 60 seconds — act fast.",
+  "min_crew": 6,
+  "ship_classes": ["frigate", "cruiser"],
+  "spawn": [
+    {"type": "enemy_station", "id": "depot_alpha", "x": 60000, "y": 50000, "variant": "outpost"},
+    {"type": "scout", "id": "supply_1", "x": 35000, "y": 48000},
+    {"type": "scout", "id": "supply_2", "x": 40000, "y": 52000}
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "checkpoint",
+      "text": "Intercept operation initiated"
+    },
+    {
+      "id": "main_ops",
+      "type": "parallel",
+      "text": "Destroy depot and intercept all supply convoys",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "destroy_depot",
+          "type": "objective",
+          "text": "Destroy supply depot Alpha",
+          "trigger": {"type": "station_destroyed", "station_id": "depot_alpha"}
+        },
+        {
+          "id": "intercept_all",
+          "type": "objective",
+          "text": "Destroy all supply convoys",
+          "trigger": {"type": "wave_defeated", "prefix": "supply_"}
+        }
+      ]
+    },
+    {
+      "id": "extract",
+      "type": "objective",
+      "text": "Withdraw to extraction point",
+      "trigger": {"type": "player_in_area", "x": 5000, "y": 50000, "r": 8000}
+    },
+    {
+      "id": "resupply_wave_1",
+      "type": "conditional",
+      "text": "First resupply convoy en route",
+      "max_activations": 1,
+      "condition": {
+        "type": "all_of",
+        "triggers": [
+          {"type": "timer_elapsed", "seconds": 60},
+          {"type": "none_of", "triggers": [
+            {"type": "station_destroyed", "station_id": "depot_alpha"}
+          ]}
+        ]
+      },
+      "on_activate": {"action": "spawn_wave", "enemies": [
+        {"type": "scout", "id": "supply_w1a", "x": 10000, "y": 56000},
+        {"type": "scout", "id": "supply_w1b", "x": 12000, "y": 54000}
+      ]},
+      "deactivate_when": {"type": "station_destroyed", "station_id": "depot_alpha"}
+    },
+    {
+      "id": "resupply_wave_2",
+      "type": "conditional",
+      "text": "Second resupply convoy en route",
+      "max_activations": 1,
+      "condition": {
+        "type": "all_of",
+        "triggers": [
+          {"type": "timer_elapsed", "seconds": 120},
+          {"type": "none_of", "triggers": [
+            {"type": "station_destroyed", "station_id": "depot_alpha"}
+          ]}
+        ]
+      },
+      "on_activate": {"action": "spawn_wave", "enemies": [
+        {"type": "scout", "id": "supply_w2a", "x": 10000, "y": 44000},
+        {"type": "scout", "id": "supply_w2b", "x": 12000, "y": 46000}
+      ]},
+      "deactivate_when": {"type": "station_destroyed", "station_id": "depot_alpha"}
+    },
+    {
+      "id": "reinforcements_conditional",
+      "type": "conditional",
+      "text": "Depot calling for reinforcements",
+      "max_activations": 1,
+      "condition": {"type": "station_reinforcements_called", "station_id": "depot_alpha"},
+      "on_activate": {"action": "spawn_wave", "enemies": [
+        {"type": "scout", "id": "depot_reinf_a", "x": 75000, "y": 50000},
+        {"type": "fighter", "id": "depot_reinf_b", "x": 73000, "y": 49000},
+        {"type": "fighter", "id": "depot_reinf_c", "x": 73000, "y": 51000}
+      ]},
+      "deactivate_when": {"type": "station_destroyed", "station_id": "depot_alpha"}
+    }
+  ],
+  "edges": [
+    {"from": "start", "to": "main_ops", "type": "sequence"},
+    {"from": "main_ops", "to": "extract", "type": "sequence"}
+  ],
+  "start_node": "start",
+  "victory_nodes": ["extract"],
+  "defeat_condition": {"type": "ship_hull_zero"}
+}

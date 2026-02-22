@@ -105,6 +105,15 @@ class MissionGraph:
         self._completed_puzzle_labels: set[str] = set()
         self._failed_puzzle_labels: set[str] = set()
 
+        # Station capture notifications (set by game_loop via notify_station_captured)
+        self._captured_station_ids: set[str] = set()
+
+        # Creature destruction notifications (set by game_loop via notify_creature_destroyed)
+        self._destroyed_creature_ids: set[str] = set()
+
+        # Conditional activation count (for max_activations guard)
+        self._conditional_activation_count: dict[str, int] = {}
+
         # Training flag tracking
         self._training_flags: set[str] = set()
 
@@ -156,6 +165,7 @@ class MissionGraph:
 
         if ntype == "conditional":
             self._conditional_ids.append(nid)
+            self._conditional_activation_count[nid] = 0
 
         if ntype == "parallel":
             children = node_def.get("children", [])
@@ -198,6 +208,9 @@ class MissionGraph:
             self._do_complete_node(node_id)
 
         elif ntype == "conditional":
+            self._conditional_activation_count[node_id] = (
+                self._conditional_activation_count.get(node_id, 0) + 1
+            )
             on_activate = self._all_nodes[node_id].get("on_activate")
             if on_activate:
                 self._queue_action(on_activate)
@@ -314,6 +327,10 @@ class MissionGraph:
             deactivate_when = node_def.get("deactivate_when")
 
             if gobj.status == "pending":
+                max_act = node_def.get("max_activations", 0)  # 0 = unlimited
+                already_fired = self._conditional_activation_count.get(cid, 0)
+                if max_act > 0 and already_fired >= max_act:
+                    continue  # one-shot conditional already used up
                 if condition and self._eval_trigger(condition, world, ship, cid):
                     self._activate_node(cid)
 
@@ -436,6 +453,38 @@ class MissionGraph:
             station = next((s for s in world.stations if s.id == station_id), None)
             return station is not None and station.hull <= threshold
 
+        if t == "station_destroyed":
+            station_id = trigger_def.get("station_id", "")
+            station = next((s for s in world.stations if s.id == station_id), None)
+            return station is None or station.hull <= 0
+
+        if t == "station_captured":
+            station_id = trigger_def.get("station_id", "")
+            return station_id in self._captured_station_ids
+
+        if t == "component_destroyed":
+            comp_id = trigger_def.get("component_id", "")
+            for s in world.stations:
+                if s.defenses is not None:
+                    for comp in s.defenses.all_components():
+                        if comp.id == comp_id:
+                            return comp.hp <= 0
+            return True  # not found in any active station → station gone → destroyed
+
+        if t == "station_sensor_jammed":
+            station_id = trigger_def.get("station_id", "")
+            for s in world.stations:
+                if s.id == station_id and s.defenses is not None:
+                    return s.defenses.sensor_array.jammed
+            return False
+
+        if t == "station_reinforcements_called":
+            station_id = trigger_def.get("station_id", "")
+            for s in world.stations:
+                if s.id == station_id and s.defenses is not None:
+                    return s.defenses.sensor_array.distress_sent
+            return False
+
         # ── Signal / triangulation ─────────────────────────────────────
         if t == "signal_located":
             return self._triangulation_count >= 2
@@ -490,6 +539,40 @@ class MissionGraph:
             interior = getattr(ship, "interior", None)
             return not bool(getattr(interior, "intruders", []))
 
+        # ── Creatures (v0.05k) ─────────────────────────────────────────
+        if t == "creature_state":
+            creature_id = trigger_def.get("creature_id", "")
+            state = trigger_def.get("state", "")
+            return any(
+                c.id == creature_id and c.behaviour_state == state
+                for c in getattr(world, "creatures", [])
+            )
+
+        if t == "creature_destroyed":
+            creature_id = trigger_def.get("creature_id", "")
+            return creature_id in self._destroyed_creature_ids
+
+        if t == "creature_study_complete":
+            creature_id = trigger_def.get("creature_id", "")
+            return any(
+                c.id == creature_id and c.study_progress >= 100.0
+                for c in getattr(world, "creatures", [])
+            )
+
+        if t == "creature_communication_complete":
+            creature_id = trigger_def.get("creature_id", "")
+            return any(
+                c.id == creature_id and c.communication_progress >= 100.0
+                for c in getattr(world, "creatures", [])
+            )
+
+        if t == "no_creatures_type":
+            creature_type = trigger_def.get("creature_type", "")
+            return not any(
+                c.creature_type == creature_type
+                for c in getattr(world, "creatures", [])
+            )
+
         # ── Compound ───────────────────────────────────────────────────
         if t == "all_of":
             return all(
@@ -532,6 +615,14 @@ class MissionGraph:
     def set_training_flag(self, flag: str) -> None:
         """Record a player action flag for training_flag triggers."""
         self._training_flags.add(flag)
+
+    def notify_station_captured(self, station_id: str) -> None:
+        """Record a station capture for station_captured triggers."""
+        self._captured_station_ids.add(station_id)
+
+    def notify_creature_destroyed(self, creature_id: str) -> None:
+        """Record a creature destruction for creature_destroyed triggers."""
+        self._destroyed_creature_ids.add(creature_id)
 
     def record_signal_scan(self, ship_x: float, ship_y: float) -> bool:
         """Record a triangulation scan position.
@@ -598,6 +689,9 @@ class MissionGraph:
             "triangulation_positions": [list(p) for p in self._triangulation_positions],
             "over": self._over,
             "result": self._result,
+            "captured_station_ids": list(self._captured_station_ids),
+            "conditional_activation_count": dict(self._conditional_activation_count),
+            "destroyed_creature_ids": list(self._destroyed_creature_ids),
         }
 
     def deserialise_state(self, state: dict) -> None:
@@ -633,6 +727,13 @@ class MissionGraph:
         # Restore mission end state.
         self._over = bool(state.get("over", False))
         self._result = state.get("result")
+        # Restore station capture and conditional activation tracking.
+        self._captured_station_ids = set(state.get("captured_station_ids", []))
+        self._conditional_activation_count = {
+            k: int(v) for k, v in state.get("conditional_activation_count", {}).items()
+        }
+        # Restore creature destruction tracking.
+        self._destroyed_creature_ids = set(state.get("destroyed_creature_ids", []))
         # Clear transient per-tick state — no stale actions survive a load.
         self._pending_actions.clear()
         self._tick_completions.clear()

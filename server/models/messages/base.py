@@ -38,6 +38,12 @@ from server.models.messages.engineering import (
 from server.models.messages.helm import HelmSetHeadingPayload, HelmSetThrottlePayload
 from server.models.messages.lobby import LobbyClaimRolePayload, LobbyReleaseRolePayload, LobbyStartGamePayload
 from server.models.messages.science import ScienceCancelScanPayload, ScienceStartScanPayload
+from server.models.messages.creatures import (
+    CreatureSedatePayload,
+    CreatureEWDisruptPayload,
+    CreatureCommProgressPayload,
+    CreatureLeeechRemovePayload,
+)
 from server.models.messages.weapons import (
     WeaponsFireBeamsPayload,
     WeaponsFireTorpedoPayload,
@@ -139,6 +145,11 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     # Damage Control (aliases engineering DCT payloads)
     "damage_control.dispatch_dct": EngineeringDispatchDCTPayload,
     "damage_control.cancel_dct":   EngineeringCancelDCTPayload,
+    # Creatures (v0.05k)
+    "creature.sedate":            CreatureSedatePayload,
+    "creature.ew_disrupt":        CreatureEWDisruptPayload,
+    "creature.set_comm_progress": CreatureCommProgressPayload,
+    "creature.leech_remove":      CreatureLeeechRemovePayload,
 }
 
 

@@ -4,6 +4,10 @@
   "description": "Fast and nimble courier vessel. Light hull — relies on speed and sensors to survive. Designed for 3-4 crew who each wear multiple hats.",
   "max_hull": 60,
   "torpedo_ammo": 8,
+  "torpedo_loadout": {
+    "standard": 6, "homing": 2, "ion": 2, "piercing": 2,
+    "heavy": 0, "proximity": 2, "nuclear": 0, "experimental": 0
+  },
   "min_crew": 3,
   "max_crew": 4
 }

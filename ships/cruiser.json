@@ -4,6 +4,10 @@
   "description": "Heavy warship with strong hull and generous armament. Specialist stations (EW, Tactical) come into their own at this scale. Best with 9-10 players.",
   "max_hull": 140,
   "torpedo_ammo": 16,
+  "torpedo_loadout": {
+    "standard": 10, "homing": 6, "ion": 6, "piercing": 6,
+    "heavy": 4, "proximity": 6, "nuclear": 2, "experimental": 1
+  },
   "min_crew": 8,
   "max_crew": 11
 }

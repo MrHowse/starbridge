@@ -1,0 +1,69 @@
+{
+  "id": "outbreak",
+  "name": "Outbreak",
+  "briefing": "Research Post Seven has been overrun by a swarm entity. Scientists are barricaded in the lower levels. Reach the station, analyse the swarm using BIO scan, use electronic warfare to disperse it, then extract the research team before the station fails.",
+  "spawn": [
+    {"type": "station",  "id": "research_post_7", "x": 30000, "y": 30000},
+    {"type": "creature", "id": "swarm_1", "creature_type": "swarm", "x": 30000, "y": 30000}
+  ],
+  "nodes": [
+    {
+      "id": "approach_station",
+      "type": "objective",
+      "text": "Navigation: Reach Research Post Seven",
+      "trigger": {"type": "player_in_area", "x": 30000, "y": 30000, "r": 8000}
+    },
+    {
+      "id": "study_swarm",
+      "type": "objective",
+      "text": "Science: Analyse the swarm entity using BIO scan",
+      "trigger": {"type": "creature_study_complete", "creature_id": "swarm_1"}
+    },
+    {
+      "id": "disrupt_swarm",
+      "type": "objective",
+      "text": "EW: Use electronic warfare to disperse the swarm",
+      "trigger": {"type": "creature_state", "creature_id": "swarm_1", "state": "dispersed"}
+    },
+    {
+      "id": "evacuate_scientists",
+      "type": "objective",
+      "text": "Navigation: Extract the research team to the evacuation point",
+      "trigger": {"type": "player_in_area", "x": -10000, "y": -10000, "r": 8000}
+    },
+    {
+      "id": "scavengers_arrive",
+      "type": "conditional",
+      "text": "ALERT: Scavengers drawn to the distress beacon — defend the station",
+      "condition": {"type": "timer_elapsed", "seconds": 120},
+      "on_activate": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "scout",     "id": "scav_1", "x": -5000,  "y": 5000},
+          {"type": "scout",     "id": "scav_2", "x": -8000,  "y": -5000},
+          {"type": "destroyer", "id": "scav_3", "x": -12000, "y": 0}
+        ]
+      }
+    },
+    {
+      "id": "station_damage",
+      "type": "conditional",
+      "text": "CRITICAL: Research Post Seven is taking structural damage — crew in danger",
+      "condition": {"type": "station_hull_below", "station_id": "research_post_7", "threshold": 50}
+    }
+  ],
+  "edges": [
+    {"from": "approach_station", "to": "study_swarm",        "type": "sequence"},
+    {"from": "study_swarm",      "to": "disrupt_swarm",      "type": "sequence"},
+    {"from": "disrupt_swarm",    "to": "evacuate_scientists", "type": "sequence"}
+  ],
+  "start_node": "approach_station",
+  "victory_nodes": ["evacuate_scientists"],
+  "defeat_condition": {
+    "type": "any_of",
+    "triggers": [
+      {"type": "player_hull_zero"},
+      {"type": "station_hull_below", "station_id": "research_post_7", "threshold": 0}
+    ]
+  }
+}

@@ -32,16 +32,33 @@ SHIP_CLASS_ORDER: list[str] = [
 ]
 
 
+DEFAULT_TORPEDO_LOADOUT: dict[str, int] = {
+    "standard": 8, "homing": 4, "ion": 4, "piercing": 4,
+    "heavy": 2, "proximity": 4, "nuclear": 1, "experimental": 0,
+}
+
+
 class ShipClass(BaseModel):
     """Stat block for a ship class, loaded from ships/<id>.json."""
 
-    id:           str
-    name:         str
-    description:  str
-    max_hull:     float = 100.0
-    torpedo_ammo: int   = 12
-    min_crew:     int   = 1    # minimum players for a satisfying game
-    max_crew:     int   = 12   # maximum designed crew complement
+    id:               str
+    name:             str
+    description:      str
+    max_hull:         float = 100.0
+    torpedo_ammo:     int   = 12             # legacy field (kept for save-compat)
+    torpedo_loadout:  dict[str, int] | None = None  # per-type magazine (v0.05g)
+    min_crew:         int   = 1    # minimum players for a satisfying game
+    max_crew:         int   = 12   # maximum designed crew complement
+
+    def get_torpedo_loadout(self) -> dict[str, int]:
+        """Return the per-type torpedo loadout for this ship class.
+
+        Uses ``torpedo_loadout`` if defined; otherwise scales ``DEFAULT_TORPEDO_LOADOUT``
+        proportionally to ``torpedo_ammo`` (backward compat with legacy JSON).
+        """
+        if self.torpedo_loadout is not None:
+            return dict(self.torpedo_loadout)
+        return dict(DEFAULT_TORPEDO_LOADOUT)
 
 
 def load_ship_class(ship_class_id: str) -> ShipClass:

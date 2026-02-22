@@ -24,8 +24,16 @@ from pydantic import BaseModel
 from server.models.messages import (
     CaptainAddLogPayload,
     CaptainAuthorizePayload,
+    CaptainUndockPayload,
     CommsHailPayload,
     CommsTuneFrequencyPayload,
+    CreatureCommProgressPayload,
+    CreatureEWDisruptPayload,
+    CreatureLeeechRemovePayload,
+    CreatureSedatePayload,
+    DockingCancelServicePayload,
+    DockingRequestClearancePayload,
+    DockingStartServicePayload,
     CrewNotifyPayload,
     EWBeginIntrusionPayload,
     EWSetJamTargetPayload,
@@ -54,6 +62,9 @@ from server.models.messages import (
     PuzzleSubmitPayload,
     ScienceCancelScanPayload,
     ScienceStartScanPayload,
+    ScienceStartSectorScanPayload,
+    ScienceCancelSectorScanPayload,
+    ScienceScanInterruptResponsePayload,
     SecurityMoveSquadPayload,
     SecurityToggleDoorPayload,
     WeaponsFireBeamsPayload,
@@ -61,17 +72,22 @@ from server.models.messages import (
     WeaponsLoadTubePayload,
     WeaponsSelectTargetPayload,
     WeaponsSetShieldsPayload,
+    MapPlotRoutePayload,
+    MapClearRoutePayload,
 )
 from server.models.crew import CrewRoster
 from server.models.interior import make_default_interior
 from server.models.ship_class import load_ship_class
 from server.difficulty import get_preset
 from server.models.ship import Ship
-from server.models.world import World, spawn_enemy
+from server.models.world import (
+    World, spawn_enemy, spawn_creature, spawn_station_from_feature, STATION_FEATURE_TYPES,
+)
 from server.systems import physics, sensors
 from server.systems.ai import tick_enemies
 from server.systems.combat import regenerate_shields
 from server.systems import hazards as hazard_system
+from server.systems.station_ai import tick_station_ai
 import server.game_logger as gl
 import server.game_debrief as gdb
 import server.game_loop_weapons as glw
@@ -86,6 +102,10 @@ import server.game_loop_ew as glew
 import server.game_loop_tactical as gltac
 import server.game_loop_training as gltr
 import server.game_loop_sandbox as glsb
+import server.game_loop_navigation as gln
+import server.game_loop_science_scan as glss
+import server.game_loop_docking as gldo
+import server.game_loop_creatures as glc
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -160,6 +180,16 @@ _paused: bool = False
 
 # Performance: last serialised DC state — avoid redundant broadcasts when idle.
 _last_dc_state_json: str = ""
+
+# Sector tracking: ID of the sector the ship was in at the previous tick.
+# Used to fire on_sector_leave() when the ship crosses a sector boundary.
+_current_sector_id: str | None = None
+
+# Navigation: dirty flag triggers map.sector_grid broadcast on next tick.
+_sector_grid_dirty: bool = False
+
+# Performance: last serialised sector-grid payload — avoid redundant broadcasts.
+_last_sector_grid_json: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +306,42 @@ def _restore_game_state(data: dict) -> None:
     _applied_science_weapons_assists.update(data.get("applied_science_weapons_assists", []))
 
 
+def _spawn_stations_from_grid(world: "World") -> None:
+    """Populate world.stations from sector grid feature definitions (v0.05e)."""
+    if world.sector_grid is None:
+        return
+    world.stations.clear()
+    for sector in world.sector_grid.sectors.values():
+        for feature in sector.features:
+            if feature.type in STATION_FEATURE_TYPES:
+                st = spawn_station_from_feature(feature, sector.name)
+                world.stations.append(st)
+    logger.info("Spawned %d station entities from sector grid", len(world.stations))
+
+
+def _load_sector_grid_for_mission(mission_dict: dict, mission_id: str):  # type: ignore[return]
+    """Load and initialise the sector grid for the given mission.
+
+    Uses the mission's ``sector_layout`` key if present.  The sandbox mission
+    defaults to ``standard_grid``.  Returns ``None`` if no layout is specified
+    or the file is missing.
+    """
+    from server.models.sector import load_sector_grid
+    layout_id: str | None = mission_dict.get("sector_layout")
+    if not layout_id:
+        if mission_id == "sandbox":
+            layout_id = "standard_grid"
+        else:
+            return None
+    try:
+        grid = load_sector_grid(layout_id)
+        grid.apply_transponder_reveals()
+        return grid
+    except FileNotFoundError:
+        logger.warning("Sector layout %r not found — running without sector grid", layout_id)
+        return None
+
+
 async def start(mission_id: str, difficulty: str = "officer", ship_class: str = "frigate") -> None:
     """Begin the game loop. Called when the host launches a game."""
     global _task, _tick_count, _game_start_time, _training_last_hint_idx
@@ -294,10 +360,16 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
         logger.warning("Unknown ship class %r — using frigate defaults", ship_class)
         sc = load_ship_class("frigate")
 
-    global _paused, _last_dc_state_json
+    global _paused, _last_dc_state_json, _current_sector_id
+    global _sector_grid_dirty, _last_sector_grid_json
     _paused = False  # always start unpaused
     _last_dc_state_json = ""
-    glw.reset(initial_ammo=sc.torpedo_ammo)
+    _last_sector_grid_json = ""
+    _current_sector_id = None
+    _sector_grid_dirty = True  # broadcast on first tick
+    gln.reset()
+    glss.reset()
+    glw.reset(sc.get_torpedo_loadout())
     glmed.reset()
     gls.reset()
     glco.reset()
@@ -307,6 +379,8 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     glew.reset()
     gltac.reset()
     gltr.reset()
+    gldo.reset()
+    hazard_system.reset_state()
     glsb.reset(active=(mission_id == "sandbox"))
     _puzzle_engine.reset()
     _applied_sensor_assists.clear()
@@ -314,6 +388,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _applied_science_helm_assists.clear()
     _applied_science_weapons_assists.clear()
     sensors.reset()
+    glc.reset()
 
     if _task is not None and not _task.done():
         logger.warning("Game loop already running — stopping before restart")
@@ -325,18 +400,24 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.stations.clear()
     _world.asteroids.clear()
     _world.hazards.clear()
+    _world.creatures.clear()
     _world.ship.alert_level = "green"
     _world.ship.hull = sc.max_hull
+    _world.ship.hull_max = sc.max_hull
+    _world.ship.docked_at = None
     _world.ship.crew = CrewRoster()
     _world.ship.interior = make_default_interior()
     _world.ship.difficulty = get_preset(difficulty)
     logger.info(
         "Ship class: %s (hull=%.0f, ammo=%d), difficulty: %s",
-        sc.id, sc.max_hull, sc.torpedo_ammo, difficulty,
+        sc.id, sc.max_hull, sum(sc.get_torpedo_loadout().values()), difficulty,
     )
 
     glm.init_mission(mission_id, _world)
     gltr.init_training(glm.get_mission_dict())
+    _world.sector_grid = _load_sector_grid_for_mission(glm.get_mission_dict(), mission_id)
+    _spawn_stations_from_grid(_world)
+    glsb.setup_world(_world)  # no-op unless sandbox is active
 
     _task = asyncio.create_task(_loop(), name="game_loop")
     logger.info("Game loop started (mission: %s, %d Hz)", mission_id, TICK_RATE)
@@ -373,6 +454,7 @@ async def resume(
     """
     global _task, _tick_count, _game_start_time
     global _mission_id, _difficulty_preset, _ship_class_id
+    global _sector_grid_dirty, _last_sector_grid_json
 
     if _task is not None and not _task.done():
         logger.warning("Game loop already running — stopping before resume")
@@ -382,6 +464,12 @@ async def resume(
     _mission_id = mission_id
     _difficulty_preset = difficulty_preset
     _ship_class_id = ship_class
+    _last_sector_grid_json = ""
+    _sector_grid_dirty = True  # broadcast sector grid on first tick after resume
+    gln.reset()
+    glss.reset()
+    gldo.reset()
+    glc.reset()
 
     # Restore game_loop-level state (tick count, assist-tracking sets).
     if game_state:
@@ -391,6 +479,10 @@ async def resume(
 
     # Re-init training from the restored mission dict (reads already-restored gltr state).
     gltr.init_training(glm.get_mission_dict())
+
+    # Re-spawn station entities if the save pre-dates v0.05e station support.
+    if not _world.stations and _world.sector_grid is not None:
+        _spawn_stations_from_grid(_world)
 
     _task = asyncio.create_task(_loop(), name="game_loop")
     logger.info("Game loop resumed (mission: %s, tick: %d)", mission_id, _tick_count)
@@ -402,7 +494,7 @@ async def resume(
 
 
 async def _loop() -> None:
-    global _tick_count
+    global _tick_count, _current_sector_id, _sector_grid_dirty, _last_sector_grid_json, _last_dc_state_json
     assert _world is not None and _manager is not None and _queue is not None
 
     while True:
@@ -435,6 +527,15 @@ async def _loop() -> None:
             })
         glm.apply_asteroid_collisions(_world)
 
+        # 2.6 Sector visibility update.
+        if _world.sector_grid is not None:
+            _new_sid = _world.sector_grid.update_ship_position(_world.ship.x, _world.ship.y)
+            if _current_sector_id != _new_sid:
+                if _current_sector_id:
+                    _world.sector_grid.on_sector_leave(_current_sector_id)
+                _current_sector_id = _new_sid
+                _sector_grid_dirty = True
+
         # 3. Engineering. 3.5 Crew factors + medical + disease. 3.6 Security. 3.7 Comms.
         damaged_systems = _apply_engineering(_world.ship)
         # 3.1 Training auto-simulation (only active during training missions).
@@ -448,8 +549,19 @@ async def _loop() -> None:
         glmed.tick_treatments(_world.ship, TICK_DT)
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
         security_events = gls.tick_security(_world.ship.interior, _world.ship, TICK_DT)
+        station_boarding_events = gls.tick_station_boarding(_world.ship, TICK_DT)
         comms_responses = glco.tick_comms(TICK_DT)
         hazard_events = hazard_system.tick_hazards(_world, _world.ship, TICK_DT)
+        _hazard_sensor_mod = hazard_system.get_sensor_modifier()
+        _hazard_shield_mod = hazard_system.get_shield_regen_modifier()
+        # 3.8 Science sector scan.
+        glss_events = glss.tick(TICK_DT, _world)
+        # Advance creature study while BIO sector scan is active.
+        if glss.get_active_mode() == "bio":
+            glc.advance_bio_study(_world.creatures, TICK_DT)
+        for _glss_evt in glss_events:
+            if _glss_evt["type"] == "sector_visibility_changed":
+                _sector_grid_dirty = True
         # 3.7 Cross-station assists.
         # Engineering → Science (sensor boost widens frequency tolerance).
         sensor_assist_msg = _check_sensor_assist(_world.ship)
@@ -471,15 +583,64 @@ async def _loop() -> None:
         glw.tick_tube_loading(TICK_DT)
         torpedo_events = glw.tick_torpedoes(_world, _world.ship)
         stations = _world.stations if _world.stations else None
-        beam_hit_events = tick_enemies(_world.enemies, _world.ship, TICK_DT, stations)
+        beam_hit_events = tick_enemies(_world.enemies, _world.ship, TICK_DT, stations, sensor_modifier=_hazard_sensor_mod)
 
-        # 6. Enemy beam hits. 7. Shields. 7.5 Scan. 7.6 Docking. 8. Cooldowns.
+        # 5.5 Station AI — turrets, launchers, fighter bays, sensor arrays.
+        _station_attacked_ids = glw.pop_stations_attacked()
+        station_beam_hits, launched_fighters, reinforcement_calls = tick_station_ai(
+            _world.stations, _world.ship, _world, TICK_DT, _station_attacked_ids,
+        )
+        for fighter in launched_fighters:
+            _world.enemies.append(fighter)
+        for sid in reinforcement_calls:
+            await _manager.broadcast(
+                Message.build("station.reinforcement_call", {"station_id": sid})
+            )
+        # Component-destroyed events from player beam/torpedo hits.
+        for comp_ev in glw.pop_component_destroyed_events():
+            await _manager.broadcast(
+                Message.build("station.component_destroyed", comp_ev)
+            )
+        # Station outcomes (capture / destroyed).
+        for station in list(_world.stations):
+            if station.hull <= 0.0 and station.faction == "hostile":
+                await _manager.broadcast(
+                    Message.build("station.destroyed", {"station_id": station.id})
+                )
+                _world.stations = [s for s in _world.stations if s.id != station.id]
+            elif (not station.captured
+                  and station.defenses is not None
+                  and gls.check_station_capture(station.id)):
+                station.captured = True
+                await _manager.broadcast(
+                    Message.build("station.captured", {"station_id": station.id})
+                )
+                engine = glm.get_mission_engine()
+                if engine is not None:
+                    engine.notify_station_captured(station.id)
+
+        # 5.6 Creature AI tick.
+        creature_beam_hits, creature_events = glc.tick(_world, TICK_DT)
+        for _cevt in creature_events:
+            _ctype = _cevt["type"]
+            _cpayload = {k: v for k, v in _cevt.items() if k != "type"}
+            if _ctype == "creature.wake_started":
+                glss.cancel_scan()
+            elif _ctype == "creature.destroyed":
+                _cm_engine = glm.get_mission_engine()
+                if _cm_engine is not None:
+                    _cm_engine.notify_creature_destroyed(_cpayload.get("creature_id", ""))
+            await _manager.broadcast(Message.build(_ctype, _cpayload))
+
+        # 6. Enemy beam hits (ship AI + station turrets + creatures). 7. Shields. 7.5 Scan. 7.6 Docking. 8. Cooldowns.
         _hull_before_combat = _world.ship.hull
-        combat_damage_events = await glw.handle_enemy_beam_hits(beam_hit_events, _world, _manager)
+        combat_damage_events = await glw.handle_enemy_beam_hits(
+            list(beam_hit_events) + list(station_beam_hits) + creature_beam_hits, _world, _manager
+        )
         gldc.apply_hull_damage(_hull_before_combat - _world.ship.hull, _world.ship.interior)
-        regenerate_shields(_world.ship)
+        regenerate_shields(_world.ship, hazard_modifier=_hazard_shield_mod)
         scan_completed = sensors.tick(_world, _world.ship, TICK_DT)
-        await glm.tick_docking(_world, _manager, TICK_DT)
+        await gldo.tick(_world, _world.ship, _manager, TICK_DT)
         glw.tick_cooldowns(TICK_DT)
 
         # 8.5 Mission tick.
@@ -712,6 +873,74 @@ async def _loop() -> None:
                     gl.log_event("security", "sandbox_boarding_started", {
                         "intruder_count": len(sb_evt["intruders"]),
                     })
+            elif _sb_type == "incoming_transmission":
+                await _manager.broadcast_to_roles(
+                    ["comms"],
+                    Message.build("comms.incoming_transmission", {
+                        "faction":      sb_evt["faction"],
+                        "frequency":    sb_evt["frequency"],
+                        "message_hint": sb_evt["message_hint"],
+                    }),
+                )
+                gl.log_event("sandbox", "incoming_transmission", {"faction": sb_evt["faction"]})
+            elif _sb_type == "hull_micro_damage":
+                _world.ship.hull = max(0.0, _world.ship.hull - sb_evt["amount"])
+                await _manager.broadcast(Message.build(
+                    "ship.hull_hit",
+                    {"cause": "micrometeorite", "damage": sb_evt["amount"]},
+                ))
+                gl.log_event("sandbox", "hull_micro_damage", {"amount": sb_evt["amount"]})
+            elif _sb_type == "sensor_anomaly":
+                await _manager.broadcast_to_roles(
+                    ["science"],
+                    Message.build("science.sensor_anomaly", {
+                        "x":           sb_evt["x"],
+                        "y":           sb_evt["y"],
+                        "id":          sb_evt["id"],
+                        "anomaly_type": sb_evt["anomaly_type"],
+                    }),
+                )
+                gl.log_event("sandbox", "sensor_anomaly", {
+                    "id": sb_evt["id"], "type": sb_evt["anomaly_type"],
+                })
+            elif _sb_type == "drone_opportunity":
+                await _manager.broadcast_to_roles(
+                    ["flight_ops"],
+                    Message.build("flight_ops.scan_target", {
+                        "x":     sb_evt["x"],
+                        "y":     sb_evt["y"],
+                        "id":    sb_evt["id"],
+                        "label": sb_evt["label"],
+                    }),
+                )
+                gl.log_event("sandbox", "drone_opportunity", {
+                    "id": sb_evt["id"], "label": sb_evt["label"],
+                })
+            elif _sb_type == "enemy_jamming":
+                await _manager.broadcast_to_roles(
+                    ["electronic_warfare"],
+                    Message.build("ew.jamming_alert", {"strength": sb_evt["strength"]}),
+                )
+                gl.log_event("sandbox", "enemy_jamming", {"strength": sb_evt["strength"]})
+            elif _sb_type == "distress_signal":
+                await _manager.broadcast_to_roles(
+                    ["comms", "helm", "captain"],
+                    Message.build("comms.distress_signal", {
+                        "x":         sb_evt["x"],
+                        "y":         sb_evt["y"],
+                        "frequency": sb_evt["frequency"],
+                    }),
+                )
+                gl.log_event("sandbox", "distress_signal", {
+                    "x": sb_evt["x"], "y": sb_evt["y"],
+                })
+            elif _sb_type == "spawn_creature":
+                _world.creatures.append(
+                    spawn_creature(sb_evt["id"], sb_evt["creature_type"], sb_evt["x"], sb_evt["y"])
+                )
+                gl.log_event("sandbox", "creature_spawned", {
+                    "type": sb_evt["creature_type"], "id": sb_evt["id"],
+                })
 
         # 9. Hull check (safety net when no mission engine).
         if glm.get_mission_engine() is None and _world.ship.hull <= 0.0:
@@ -734,7 +963,7 @@ async def _loop() -> None:
         _detection_bubbles = glfo.get_detection_bubbles(_flight_deck_eff)
         await _manager.broadcast_to_roles(
             ["weapons", "science"],
-            glm.build_sensor_contacts(_world, _world.ship, extra_bubbles=_detection_bubbles),
+            glm.build_sensor_contacts(_world, _world.ship, extra_bubbles=_detection_bubbles, hazard_modifier=_hazard_sensor_mod),
         )
 
         # 11c. Scan progress.
@@ -747,6 +976,43 @@ async def _loop() -> None:
                     {"entity_id": entity_id, "progress": round(progress, 1)},
                 )
             )
+
+        # 11c2. Science sector scan progress + completion/interrupt events.
+        _glss_progress = glss.build_progress()
+        if _glss_progress.get("active"):
+            await _manager.broadcast_to_roles(
+                ["science"],
+                Message.build("science.sector_scan_progress", _glss_progress),
+            )
+            _scan_indicator = glss.get_scan_indicator()
+            if _scan_indicator:
+                await _manager.broadcast_to_roles(
+                    ["captain", "helm"],
+                    Message.build("map.scan_indicator", {"text": _scan_indicator}),
+                )
+        for _glss_evt in glss_events:
+            if _glss_evt["type"] == "complete":
+                await _manager.broadcast_to_roles(
+                    ["science", "captain", "helm"],
+                    Message.build("science.sector_scan_complete", {
+                        "scale": _glss_evt["scale"],
+                        "sector_id": _glss_evt["sector_id"],
+                        "mode": _glss_evt["mode"],
+                    }),
+                )
+                gl.log_event("science", "sector_scan_completed", {
+                    "scale": _glss_evt["scale"],
+                    "sector_id": _glss_evt["sector_id"],
+                    "mode": _glss_evt["mode"],
+                })
+            elif _glss_evt["type"] == "interrupted":
+                await _manager.broadcast_to_roles(
+                    ["science", "captain"],
+                    Message.build("science.scan_interrupted", {"reason": _glss_evt["reason"]}),
+                )
+                gl.log_event("science", "sector_scan_interrupted", {
+                    "reason": _glss_evt["reason"],
+                })
 
         # 11d. Scan complete.
         for cid in scan_completed:
@@ -763,6 +1029,18 @@ async def _loop() -> None:
             ["security"],
             Message.build("security.interior_state", gls.build_interior_state(_world.ship.interior, _world.ship)),
         )
+        # 11e2. Station interior state (when station boarding is active).
+        if gls.is_station_boarding_active():
+            _boarded_station_id = next(
+                (s.id for s in _world.stations if s.defenses is not None
+                 and s.defenses.station_interior is not None),
+                "station",
+            )
+            await _manager.broadcast_to_roles(
+                ["security"],
+                Message.build("security.station_interior",
+                              gls.build_station_interior_state(_boarded_station_id)),
+            )
 
         # 11f. Comms state + NPC responses.
         await _manager.broadcast_to_roles(
@@ -786,15 +1064,22 @@ async def _loop() -> None:
                 Message.build("medical.disease_spread", dev),
             )
 
-        # 11h. Hazard damage events → hull_hit broadcast.
+        # 11h. Hazard damage events → hull_hit broadcast + hazard status.
         for hev in hazard_events:
             await _manager.broadcast(
                 Message.build("ship.hull_hit", {"cause": hev["hazard_type"], "damage": hev["damage"]})
             )
+        _active_hazard_types = hazard_system.get_active_hazard_types()
+        if _active_hazard_types:
+            await _manager.broadcast(Message.build("hazard.status", {
+                "active_types": _active_hazard_types,
+                "sensor_modifier": round(_hazard_sensor_mod, 3),
+                "shield_regen_modifier": round(_hazard_shield_mod, 3),
+                "velocity_cap": hazard_system.get_velocity_cap(),
+            }))
 
         # 11i. Engineering damage-control state → Engineering + Damage Control stations.
         # Performance: only broadcast if state has changed since last tick.
-        global _last_dc_state_json
         _dc_state_msg = gldc.build_dc_state(_world.ship.interior)
         _dc_json = json.dumps(_dc_state_msg, separators=(",", ":"), sort_keys=True)
         if _dc_json != _last_dc_state_json:
@@ -873,10 +1158,81 @@ async def _loop() -> None:
             await _manager.broadcast(Message.build(evt[0], evt[1]))
         for evt_type, evt_data in security_events:
             await _manager.broadcast_to_roles(["security"], Message.build(evt_type, evt_data))
+        for evt_type, evt_data in station_boarding_events:
+            await _manager.broadcast_to_roles(["security"], Message.build(evt_type, evt_data))
+
+        # 11m. Navigation: sector grid broadcast (only when changed).
+        if _world.sector_grid is not None:
+            # Route pending broadcast also marks grid dirty.
+            if gln.pop_pending_broadcast():
+                _sector_grid_dirty = True
+            if _sector_grid_dirty:
+                _sg_payload = _build_sector_grid_payload(_world)
+                _sg_json = json.dumps(_sg_payload, separators=(",", ":"), sort_keys=True)
+                if _sg_json != _last_sector_grid_json:
+                    _last_sector_grid_json = _sg_json
+                    await _manager.broadcast_to_roles(
+                        gln.MAP_CAPABLE_ROLES,
+                        Message.build("map.sector_grid", _sg_payload),
+                    )
+                _sector_grid_dirty = False
 
         # 16. Sleep for remainder of tick budget.
         elapsed = asyncio.get_event_loop().time() - tick_start
         await asyncio.sleep(max(0.0, TICK_DT - elapsed))
+
+
+def _build_sector_grid_payload(world: World) -> dict:
+    """Serialise the sector grid for a map.sector_grid broadcast."""
+    grid = world.sector_grid
+    if grid is None:
+        return {}
+    sectors_out: dict[str, dict] = {}
+    for sid, s in grid.sectors.items():
+        sectors_out[sid] = {
+            "id": sid,
+            "name": s.name,
+            "grid_position": list(s.grid_position),
+            "visibility": s.visibility.value,
+            "properties": {
+                "type": s.properties.type,
+                "faction": s.properties.faction,
+                "threat_level": s.properties.threat_level,
+                "sensor_modifier": s.properties.sensor_modifier,
+                "navigation_hazard": s.properties.navigation_hazard,
+            },
+            "features": [
+                {
+                    "id": f.id,
+                    "type": f.type,
+                    "name": f.name,
+                    "position": list(f.position),
+                    "visible_without_scan": f.visible_without_scan,
+                }
+                for f in s.features
+            ],
+        }
+    return {
+        "grid_size": list(grid.grid_size),
+        "sectors": sectors_out,
+        "ship_sector_id": _current_sector_id,
+        "route": gln.get_route(),
+        "station_entities": [
+            {
+                "id": st.id,
+                "x": st.x,
+                "y": st.y,
+                "name": st.name,
+                "station_type": st.station_type,
+                "faction": st.faction,
+                "transponder_active": st.transponder_active,
+                "requires_scan": st.requires_scan,
+                "hull": st.hull,
+                "hull_max": st.hull_max,
+            }
+            for st in world.stations
+        ],
+    }
 
 
 def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict]]:
@@ -953,6 +1309,28 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             _set_training_flag(glm, "science_scan_started")
         elif msg_type == "science.cancel_scan" and isinstance(payload, ScienceCancelScanPayload):
             sensors.cancel_scan()
+        elif msg_type == "science.start_sector_scan" and isinstance(payload, ScienceStartSectorScanPayload):
+            if world is not None and world.sector_grid is not None:
+                _adj = world.sector_grid.adjacent_sectors(_current_sector_id or "")
+                _adj_ids = [s.id for s in _adj]
+                glss.start_scan(
+                    payload.scale,
+                    payload.mode,
+                    _current_sector_id or "",
+                    _adj_ids,
+                )
+                gl.log_event("science", "sector_scan_started", {
+                    "scale": payload.scale,
+                    "mode": payload.mode,
+                    "sector_id": _current_sector_id,
+                })
+                _set_training_flag(glm, "science_sector_scan_started")
+        elif msg_type == "science.cancel_sector_scan" and isinstance(payload, ScienceCancelSectorScanPayload):
+            glss.cancel_scan()
+            gl.log_event("science", "sector_scan_cancelled", {})
+        elif msg_type == "science.scan_interrupt_response" and isinstance(payload, ScienceScanInterruptResponsePayload):
+            glss.set_interrupt_response(payload.continue_scan)
+            gl.log_event("science", "scan_interrupt_response", {"continue": payload.continue_scan})
         elif msg_type == "medical.treat_crew" and isinstance(payload, MedicalTreatCrewPayload):
             glmed.start_treatment(payload.deck, payload.injury_type, ship)
             gl.log_event("medical", "treatment_started", {"deck": payload.deck, "injury_type": payload.injury_type})
@@ -1066,6 +1444,75 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             gl.log_event("tactical", "strike_plan_executed", {"plan_id": payload.plan_id, "found": ok})
         elif msg_type == "game.briefing_launch" and isinstance(payload, GameBriefingLaunchPayload):
             events.append(("game.all_ready", {}))
+        elif msg_type == "map.plot_route" and isinstance(payload, MapPlotRoutePayload):
+            if world is not None:
+                route = gln.calculate_route(
+                    ship.x, ship.y,
+                    payload.to_x, payload.to_y,
+                    grid=world.sector_grid,
+                    current_speed=max(ship.velocity, 50.0),
+                )
+                gln.set_route(route)
+                gl.log_event("navigation", "route_plotted", {
+                    "to_x": payload.to_x,
+                    "to_y": payload.to_y,
+                    "distance": route["total_distance"],
+                })
+        elif msg_type == "map.clear_route" and isinstance(payload, MapClearRoutePayload):
+            gln.clear_route()
+            gl.log_event("navigation", "route_cleared", {})
+        elif msg_type == "docking.request_clearance" and isinstance(payload, DockingRequestClearancePayload):
+            if world is not None:
+                err = gldo.request_clearance(payload.station_id, world, ship)
+                if err:
+                    events.append(("docking.clearance_denied", {
+                        "station_id": payload.station_id,
+                        "reason": err,
+                    }))
+                gl.log_event("comms", "docking_clearance_requested", {"station_id": payload.station_id})
+        elif msg_type == "docking.start_service" and isinstance(payload, DockingStartServicePayload):
+            err = gldo.start_service(payload.service)
+            if err:
+                logger.warning("docking.start_service error: %s", err)
+            else:
+                gl.log_event("captain", "docking_service_started", {"service": payload.service})
+        elif msg_type == "docking.cancel_service" and isinstance(payload, DockingCancelServicePayload):
+            gldo.cancel_service(payload.service)
+            gl.log_event("captain", "docking_service_cancelled", {"service": payload.service})
+        elif msg_type == "captain.undock" and isinstance(payload, CaptainUndockPayload):
+            err = gldo.captain_undock(payload.emergency)
+            if err:
+                logger.warning("captain.undock error: %s", err)
+            else:
+                gl.log_event("captain", "undock_ordered", {"emergency": payload.emergency})
+        elif msg_type == "creature.sedate" and isinstance(payload, CreatureSedatePayload):
+            if world is not None:
+                glc.sedate_creature(payload.creature_id, world)
+                gl.log_event("creature", "sedate", {"creature_id": payload.creature_id})
+        elif msg_type == "creature.ew_disrupt" and isinstance(payload, CreatureEWDisruptPayload):
+            if world is not None:
+                glc.ew_disrupt_swarm(payload.creature_id, world)
+                gl.log_event("creature", "ew_disrupt", {"creature_id": payload.creature_id})
+        elif msg_type == "creature.set_comm_progress" and isinstance(payload, CreatureCommProgressPayload):
+            if world is not None:
+                glc.set_comm_progress(payload.creature_id, payload.progress, world)
+                gl.log_event("creature", "comm_progress", {
+                    "creature_id": payload.creature_id,
+                    "progress": payload.progress,
+                })
+        elif msg_type == "creature.leech_remove" and isinstance(payload, CreatureLeeechRemovePayload):
+            if world is not None:
+                method = payload.method
+                if method == "depressurise":
+                    glc.remove_leech_depressurise(payload.creature_id, world)
+                elif method == "electrical":
+                    glc.remove_leech_electrical(payload.creature_id, world)
+                elif method == "eva":
+                    glc.remove_leech_eva(payload.creature_id, world)
+                gl.log_event("creature", "leech_removed", {
+                    "creature_id": payload.creature_id,
+                    "method": method,
+                })
         else:
             logger.warning("Unrecognised queued input type: %s", msg_type)
 
@@ -1133,7 +1580,9 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "alert_level": ship.alert_level,
             "target_id": glw.get_target(),
             "torpedo_ammo": glw.get_ammo(),
+            "torpedo_ammo_max": glw.get_ammo_max(),
             "tube_cooldowns": [round(c, 2) for c in glw.get_cooldowns()],
+            "tube_reload_times": [round(t, 2) for t in glw.get_tube_reload_times()],
             "tube_types": glw.get_tube_types(),
             "tube_loading": [round(t, 2) for t in glw.get_tube_loading()],
             "crew": {
@@ -1155,6 +1604,15 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
                 name: not s._captain_offline
                 for name, s in ship.systems.items()
             },
+            "hull_max": ship.hull_max,
+            "docked_at": ship.docked_at,
+            "docking_phase": gldo.get_state(),
+            "active_services": {
+                svc: round(t, 1)
+                for svc, t in gldo.get_active_services().items()
+            },
+            "active_hazard_types": hazard_system.get_active_hazard_types(),
+            "hazard_sensor_modifier": round(hazard_system.get_sensor_modifier(), 3),
         },
         tick=tick,
     )

@@ -26,6 +26,11 @@ Broadcast format for security events (returned from tick_security):
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # ShipInterior used below via string annotations
+
 from server.models.interior import ShipInterior
 from server.models.security import (
     MARINE_DAMAGE_PER_TICK,
@@ -43,12 +48,20 @@ from server.models.ship import Ship
 _boarding_active: bool = False
 _eliminated_reported: set[str] = set()   # squad IDs whose elimination was already emitted
 
+# v0.05i — station boarding state
+_station_boarding_active: bool = False
+_station_boarding_interior: "ShipInterior | None" = None
+_station_eliminated_reported: set[str] = set()
+
 
 def reset() -> None:
     """Clear all boarding state. Called at game start."""
-    global _boarding_active
+    global _boarding_active, _station_boarding_active, _station_boarding_interior
     _boarding_active = False
     _eliminated_reported.clear()
+    _station_boarding_active = False
+    _station_boarding_interior = None
+    _station_eliminated_reported.clear()
 
 
 
@@ -57,14 +70,20 @@ def serialise() -> dict:
     return {
         "boarding_active": _boarding_active,
         "eliminated_reported": list(_eliminated_reported),
+        "station_boarding_active": _station_boarding_active,
+        "station_eliminated_reported": list(_station_eliminated_reported),
     }
 
 
 def deserialise(data: dict) -> None:
-    global _boarding_active
+    global _boarding_active, _station_boarding_active, _station_boarding_interior
     _boarding_active = data.get("boarding_active", False)
     _eliminated_reported.clear()
     _eliminated_reported.update(data.get("eliminated_reported", []))
+    # Station boarding is not resumed from saves (transient combat state).
+    _station_boarding_active = False
+    _station_boarding_interior = None
+    _station_eliminated_reported.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +294,183 @@ def tick_security(
 
 def is_boarding_active() -> bool:
     return _boarding_active
+
+
+# ---------------------------------------------------------------------------
+# Station boarding (v0.05i)
+# ---------------------------------------------------------------------------
+
+
+def start_station_boarding(
+    station: "object",
+    squad_specs: list[dict],
+) -> None:
+    """Board an enemy station: place squads and activate garrison as intruders.
+
+    *station* must have a ``defenses`` attribute with a ``station_interior``
+    (ShipInterior) and ``garrison_count`` (int).
+    """
+    global _station_boarding_active, _station_boarding_interior
+
+    defenses = getattr(station, "defenses", None)
+    if defenses is None or defenses.station_interior is None:
+        return
+
+    interior: ShipInterior = defenses.station_interior
+    station_id: str = getattr(station, "id", "station")
+
+    # Place the boarding party (squads from squad_specs).
+    if squad_specs:
+        interior.marine_squads = [
+            MarineSquad(id=s["id"], room_id=s["room_id"])
+            for s in squad_specs
+        ]
+
+    # Garrison becomes intruders — distributed across non-command rooms.
+    garrison_count: int = defenses.garrison_count
+    room_ids = [
+        rid for rid in interior.rooms
+        if not rid.endswith("_command")
+    ]
+    interior.intruders = [
+        Intruder(
+            id=f"{station_id}_garrison_{i}",
+            room_id=room_ids[i % len(room_ids)] if room_ids else list(interior.rooms.keys())[0],
+            objective_id=f"{station_id}_command",   # garrison defends command centre
+        )
+        for i in range(garrison_count)
+    ]
+
+    _station_boarding_active = True
+    _station_boarding_interior = interior
+    _station_eliminated_reported.clear()
+
+
+def is_station_boarding_active() -> bool:
+    return _station_boarding_active
+
+
+def check_station_capture(station_id: str) -> bool:
+    """Return True if the station has been captured.
+
+    Capture condition: all garrison (intruders) defeated AND at least one
+    marine squad is in the command centre room.
+    """
+    if not _station_boarding_active or _station_boarding_interior is None:
+        return False
+    interior = _station_boarding_interior
+    if interior.intruders:
+        return False   # garrison not yet defeated
+    command_room_id = f"{station_id}_command"
+    return any(
+        sq.room_id == command_room_id and not sq.is_eliminated()
+        for sq in interior.marine_squads
+    )
+
+
+def tick_station_boarding(ship: Ship, dt: float) -> list[tuple[str, dict]]:
+    """Simulate one tick of station boarding. Returns events to broadcast to security."""
+    if not _station_boarding_active or _station_boarding_interior is None:
+        return []
+
+    interior = _station_boarding_interior
+    events: list[tuple[str, dict]] = []
+
+    # AP regen
+    for squad in interior.marine_squads:
+        if not squad.is_eliminated():
+            squad.regen_ap()
+
+    # Intruder movement
+    for intruder in interior.intruders:
+        intruder.tick_move_timer()
+        if not intruder.is_ready_to_move():
+            continue
+        if intruder.room_id == intruder.objective_id:
+            intruder.reset_move_timer()
+            events.append((
+                "security.intruder_reached_objective",
+                {"intruder_id": intruder.id, "room_id": intruder.room_id},
+            ))
+            continue
+        path = interior.find_path(intruder.room_id, intruder.objective_id)
+        if path and len(path) >= 2:
+            intruder.room_id = path[1]
+        intruder.reset_move_timer()
+        if intruder.room_id == intruder.objective_id:
+            events.append((
+                "security.intruder_reached_objective",
+                {"intruder_id": intruder.id, "room_id": intruder.room_id},
+            ))
+
+    # Combat
+    for squad in interior.marine_squads:
+        if squad.is_eliminated():
+            continue
+        room_intruders = [
+            i for i in interior.intruders
+            if i.room_id == squad.room_id and not i.is_defeated()
+        ]
+        for intruder in room_intruders:
+            intruder.take_damage(MARINE_DAMAGE_PER_TICK * squad.count)
+            casualty = squad.take_damage(INTRUDER_DAMAGE_PER_TICK)
+            if casualty:
+                events.append((
+                    "security.squad_casualty",
+                    {"squad_id": squad.id, "count": squad.count},
+                ))
+
+    # Remove defeated intruders
+    defeated = [i for i in interior.intruders if i.is_defeated()]
+    for d in defeated:
+        events.append(("security.intruder_defeated", {"intruder_id": d.id}))
+    interior.intruders = [i for i in interior.intruders if not i.is_defeated()]
+
+    # Elimination events
+    for squad in interior.marine_squads:
+        if squad.is_eliminated() and squad.id not in _station_eliminated_reported:
+            _station_eliminated_reported.add(squad.id)
+            events.append(("security.squad_eliminated", {"squad_id": squad.id}))
+
+    return events
+
+
+def build_station_interior_state(station_id: str) -> dict:
+    """Build the security.station_interior payload (no fog-of-war)."""
+    if not _station_boarding_active or _station_boarding_interior is None:
+        return {"is_boarding": False, "station_id": station_id, "squads": [], "intruders": [], "rooms": {}}
+
+    interior = _station_boarding_interior
+    squads = [
+        {
+            "id": sq.id,
+            "room_id": sq.room_id,
+            "health": round(sq.health, 1),
+            "action_points": round(sq.action_points, 1),
+            "count": sq.count,
+        }
+        for sq in interior.marine_squads
+    ]
+    intruders = [
+        {
+            "id": i.id,
+            "room_id": i.room_id,
+            "health": round(i.health, 1),
+            "objective_id": i.objective_id,
+        }
+        for i in interior.intruders
+    ]
+    rooms = {
+        rid: {"state": room.state, "door_sealed": room.door_sealed}
+        for rid, room in interior.rooms.items()
+    }
+    return {
+        "is_boarding": True,
+        "station_id": station_id,
+        "squads": squads,
+        "intruders": intruders,
+        "rooms": rooms,
+    }
 
 
 def build_interior_state(interior: ShipInterior, ship: Ship) -> dict:

@@ -1,0 +1,93 @@
+{
+  "id": "deep_space_rescue",
+  "name": "Deep Space Rescue",
+  "briefing": "A fragmented distress signal has been detected originating from deep space. Navigation will require crossing a hazardous radiation zone. Intelligence warns that scavengers are already moving on the source. Triangulate the signal, locate the wreck, clear any biological hazards, dock to evacuate survivors, then fight your way out.",
+  "spawn": [
+    {"type": "station",  "id": "derelict_nova", "x": 75000, "y": 25000},
+    {"type": "creature", "id": "leech_1",       "creature_type": "hull_leech", "x": 75000, "y": 25000},
+    {"type": "creature", "id": "leech_2",       "creature_type": "hull_leech", "x": 75000, "y": 25000}
+  ],
+  "nodes": [
+    {
+      "id": "intercept_signal",
+      "type": "objective",
+      "text": "Science/Comms: Triangulate the distress signal source",
+      "trigger": {"type": "signal_located"}
+    },
+    {
+      "id": "scan_derelict",
+      "type": "objective",
+      "text": "Science: Scan Derelict Nova — use BIO mode to detect biological hazards",
+      "trigger": {"type": "player_in_area", "x": 75000, "y": 25000, "r": 10000}
+    },
+    {
+      "id": "clear_leeches",
+      "type": "objective",
+      "text": "Engineering/EW: Remove all hull leeches from the derelict wreck",
+      "trigger": {"type": "no_creatures_type", "creature_type": "hull_leech"}
+    },
+    {
+      "id": "dock_evacuate",
+      "type": "objective",
+      "text": "Helm: Hold station alongside Derelict Nova to evacuate survivors",
+      "trigger": {
+        "type": "proximity_with_shields",
+        "x": 75000, "y": 25000, "r": 3000,
+        "min_shield": 0, "duration": 8
+      }
+    },
+    {
+      "id": "repel_scavengers",
+      "type": "objective",
+      "text": "Weapons: Destroy the scavenger ships",
+      "trigger": {"type": "wave_defeated", "prefix": "scav_"}
+    },
+    {
+      "id": "extract_survivors",
+      "type": "objective",
+      "text": "Navigation: Escape with the survivors to the safe zone",
+      "trigger": {"type": "player_in_area", "x": 15000, "y": 85000, "r": 8000}
+    },
+    {
+      "id": "leech_hull_warning",
+      "type": "conditional",
+      "text": "ALERT: Hull leeches are draining ship integrity — prioritise removal",
+      "condition": {"type": "ship_hull_below", "value": 60},
+      "deactivate_when": {"type": "ship_hull_above", "value": 75}
+    },
+    {
+      "id": "derelict_critical",
+      "type": "conditional",
+      "text": "CRITICAL: Derelict Nova is taking structural damage — survivors in danger",
+      "condition": {"type": "station_hull_below", "station_id": "derelict_nova", "threshold": 50}
+    }
+  ],
+  "edges": [
+    {"from": "intercept_signal", "to": "scan_derelict",   "type": "sequence"},
+    {"from": "scan_derelict",    "to": "clear_leeches",   "type": "sequence"},
+    {"from": "clear_leeches",    "to": "dock_evacuate",   "type": "sequence"},
+    {
+      "from": "dock_evacuate",
+      "to": "repel_scavengers",
+      "type": "sequence",
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "scout",     "id": "scav_1",      "x": 88000, "y": 15000},
+          {"type": "scout",     "id": "scav_2",      "x": 92000, "y": 30000},
+          {"type": "destroyer", "id": "scav_leader", "x": 95000, "y": 22000}
+        ]
+      }
+    },
+    {"from": "repel_scavengers", "to": "extract_survivors", "type": "sequence"}
+  ],
+  "start_node": "intercept_signal",
+  "victory_nodes": ["extract_survivors"],
+  "defeat_condition": {
+    "type": "any_of",
+    "triggers": [
+      {"type": "player_hull_zero"},
+      {"type": "station_hull_below", "station_id": "derelict_nova", "threshold": 0}
+    ]
+  }
+}

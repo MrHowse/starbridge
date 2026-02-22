@@ -23,6 +23,7 @@ import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
 import { MapRenderer } from '../shared/map_renderer.js';
+import { SectorMap, ZOOM_RANGES } from '../shared/sector_map.js';
 import {
   initViewports,
   updateViewportContacts,
@@ -91,6 +92,14 @@ const objectivesList = document.getElementById('objectives-list');
 const authPanel   = document.getElementById('auth-panel');
 const authContent = document.getElementById('auth-content');
 
+// Docking panel
+const dockingPanel       = document.getElementById('docking-panel');
+const dockingPanelTitle  = document.getElementById('docking-panel-title');
+const dockingStationName = document.getElementById('docking-station-name');
+const dockingServicesList = document.getElementById('docking-services-list');
+const undockBtn          = document.getElementById('undock-btn');
+const emergencyUndockBtn = document.getElementById('emergency-undock-btn');
+
 // Log
 const logList   = document.getElementById('log-list');
 const logInput  = document.getElementById('log-input');
@@ -113,8 +122,16 @@ let gameActive   = false;
 let currentAlert = 'green';
 let shipState    = null;
 let mapRenderer  = null;
+let _sectorMap   = null;
 let _pendingAuthId = null;
 const _logEntries  = [];
+
+// Science sector-scan status indicator (shown on tactical map).
+let _scanIndicatorText = null;
+
+// Zoom UI
+const _mapZoomLabel = document.getElementById('map-zoom-label');
+const _zoomBtns     = document.querySelectorAll('.zoom-btn');
 
 // ---------------------------------------------------------------------------
 // Init
@@ -168,6 +185,35 @@ function init() {
   on('captain.log_entry',             handleLogEntry);
   on('captain.override_changed',      handleOverrideChanged);
   on('game.over',                     handleGameOver);
+  on('map.sector_grid',               handleSectorGrid);
+  on('map.scan_indicator',            handleScanIndicator);
+  on('docking.complete',              handleDockingComplete);
+  on('docking.undocked',              handleDockingUndocked);
+  on('docking.service_complete',      handleDockingServiceComplete);
+
+  // Docking controls
+  if (undockBtn) {
+    undockBtn.addEventListener('click', () => send('captain.undock', { emergency: false }));
+  }
+  if (emergencyUndockBtn) {
+    emergencyUndockBtn.addEventListener('click', () => send('captain.undock', { emergency: true }));
+  }
+
+  // Zoom buttons
+  _zoomBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (_sectorMap) _setZoom(btn.dataset.zoom);
+    });
+  });
+
+  // Zoom keyboard shortcuts (Z cycle, 1/2/3 direct)
+  document.addEventListener('keydown', (e) => {
+    if (!gameActive || !_sectorMap) return;
+    if (_sectorMap.handleKey(e.key)) {
+      _updateZoomUI();
+      e.preventDefault();
+    }
+  });
 
   SoundBank.init();
   wireButtonSounds(SoundBank);
@@ -208,16 +254,25 @@ function handleGameStarted(payload) {
     );
   }
 
-  // Tactical map
+  // Tactical map + sector map
   if (mapCanvas) {
     mapRenderer = new MapRenderer(mapCanvas, {
-      range:         MAP_WORLD_RADIUS,
-      orientation:   'north-up',
-      showGrid:      true,
+      range:          MAP_WORLD_RADIUS,
+      orientation:    'north-up',
+      showGrid:       true,
       showRangeRings: false,
-      zoom:          { enabled: true, min: 0.3, max: 4.0 },
+      zoom:           { enabled: false },  // zoom handled by SectorMap
     });
+    _sectorMap = new SectorMap({
+      allowedLevels: ['tactical', 'sector', 'strategic'],
+      defaultZoom:   'sector',
+      onRoutePlot:   (wx, wy) => send('map.plot_route', { to_x: wx, to_y: wy }),
+      onZoomChange:  _updateZoomUI,
+    });
+    _sectorMap.setMapRenderer(mapRenderer);
+    _sectorMap.setupStrategicClick(mapCanvas);
     _buildDamageToggle();
+    _updateZoomUI();
   }
 
   _resizeTactical();
@@ -241,8 +296,13 @@ function handleShipState(payload) {
   // Update viewports
   updateViewportShip(payload);
 
-  // Update tactical map
+  // Update tactical map and sector map ship position
   if (mapRenderer) mapRenderer.updateShipState(payload);
+  if (_sectorMap && payload.position) {
+    _sectorMap.updateShipPosition(
+      payload.position.x, payload.position.y, payload.heading ?? 0,
+    );
+  }
 
   // Update silhouette + system controls
   if (payload.systems)         updateSystems(payload.systems);
@@ -251,6 +311,9 @@ function handleShipState(payload) {
 
   // Quick-status hull / shields
   _updateQuickStatus(payload);
+
+  // Docking panel visibility
+  _updateDockingPanel(payload);
 }
 
 function _updateQuickStatus(state) {
@@ -265,6 +328,62 @@ function _updateQuickStatus(state) {
   if (shieldFwdText) shieldFwdText.textContent  = Math.round(fwd);
   if (shieldAftFill) shieldAftFill.style.width  = `${aft}%`;
   if (shieldAftText) shieldAftText.textContent  = Math.round(aft);
+}
+
+// ---------------------------------------------------------------------------
+// Docking
+// ---------------------------------------------------------------------------
+
+let _dockedStationName = '';
+
+function _updateDockingPanel(state) {
+  if (!dockingPanel) return;
+  const phase = state.docking_phase || 'none';
+  const visible = phase === 'docked' || phase === 'sequencing' || phase === 'undocking';
+  dockingPanel.style.display = visible ? '' : 'none';
+
+  if (!visible) return;
+
+  if (dockingPanelTitle) {
+    dockingPanelTitle.textContent =
+      phase === 'sequencing' ? 'DOCKING…' :
+      phase === 'undocking'  ? 'UNDOCKING…' : 'DOCKED';
+  }
+  if (dockingStationName) {
+    dockingStationName.textContent = _dockedStationName;
+  }
+
+  // Active services
+  if (dockingServicesList) {
+    const svcs = state.active_services || {};
+    const entries = Object.entries(svcs);
+    if (entries.length === 0) {
+      dockingServicesList.textContent = 'No services running.';
+    } else {
+      dockingServicesList.innerHTML = entries
+        .map(([svc, t]) => `<div>${svc.replace(/_/g, ' ').toUpperCase()} — ${Math.ceil(t)}s</div>`)
+        .join('');
+    }
+  }
+}
+
+function handleDockingComplete({ station_name }) {
+  _dockedStationName = station_name || '';
+  if (dockingPanel) dockingPanel.style.display = '';
+  if (dockingPanelTitle) dockingPanelTitle.textContent = 'DOCKED';
+  if (dockingStationName) dockingStationName.textContent = _dockedStationName;
+}
+
+function handleDockingUndocked() {
+  _dockedStationName = '';
+  if (dockingPanel) dockingPanel.style.display = 'none';
+}
+
+function handleDockingServiceComplete({ service, effects }) {
+  // Log notable effects.
+  if (effects && effects.hull_restored > 0) {
+    console.log(`Hull repair complete: +${effects.hull_restored} HP`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +414,41 @@ function handleWorldEntities(payload) {
     mapRenderer.updateContacts(payload.enemies || [], payload.torpedoes || []);
     mapRenderer.updateHazards(payload.hazards || []);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Sector grid (map.sector_grid)
+// ---------------------------------------------------------------------------
+
+function handleSectorGrid(payload) {
+  if (_sectorMap) _sectorMap.updateSectorGrid(payload);
+}
+
+// ---------------------------------------------------------------------------
+// Science scan indicator (from map.scan_indicator)
+// ---------------------------------------------------------------------------
+
+function handleScanIndicator({ text }) {
+  _scanIndicatorText = text || null;
+}
+
+// ---------------------------------------------------------------------------
+// Zoom controls
+// ---------------------------------------------------------------------------
+
+function _setZoom(level) {
+  if (!_sectorMap) return;
+  _sectorMap.setZoomLevel(level);
+  _updateZoomUI();
+}
+
+function _updateZoomUI() {
+  if (!_sectorMap) return;
+  const level = _sectorMap.getZoomLevel();
+  if (_mapZoomLabel) _mapZoomLabel.textContent = _sectorMap.zoomLabel();
+  _zoomBtns.forEach(btn => {
+    btn.classList.toggle('zoom-btn--active', btn.dataset.zoom === level);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -507,9 +661,16 @@ function _resizeTactical() {
 function _tacticalLoop() {
   if (!gameActive) return;
   const now = performance.now();
-  if (mapRenderer) {
+  if (_sectorMap && _sectorMap.isStrategic()) {
+    // Strategic view: render sector grid directly on map canvas.
+    if (mapCanvas) _sectorMap.renderStrategic(mapCanvas, now);
+  } else if (mapRenderer) {
     mapRenderer.render(now);
-    // Heading label overlay
+    // Station icons overlay (tactical / sector modes only).
+    if (mapCtx && mapCanvas && _sectorMap) {
+      _sectorMap.renderStationOverlay(mapCtx, mapCanvas, mapRenderer);
+    }
+    // Heading label overlay (tactical / sector modes only).
     if (mapCtx && shipState) {
       const W   = mapCanvas.width;
       const H   = mapCanvas.height;
@@ -520,6 +681,18 @@ function _tacticalLoop() {
       mapCtx.textBaseline = 'top';
       mapCtx.fillText(`HDG ${hdg}°`, W / 2, H / 2 + 14);
     }
+  }
+  // Science scan indicator overlay.
+  if (mapCtx && _scanIndicatorText && mapCanvas) {
+    const W = mapCanvas.width;
+    const H = mapCanvas.height;
+    mapCtx.save();
+    mapCtx.font         = '9px "Share Tech Mono",monospace';
+    mapCtx.textAlign    = 'left';
+    mapCtx.textBaseline = 'bottom';
+    mapCtx.fillStyle    = 'rgba(255,176,0,0.85)';
+    mapCtx.fillText(_scanIndicatorText, 8, H - 6);
+    mapCtx.restore();
   }
   requestAnimationFrame(_tacticalLoop);
 }

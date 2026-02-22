@@ -157,3 +157,57 @@ def make_default_interior() -> ShipInterior:
                                  ["auxiliary_power"]),
     }
     return ShipInterior(rooms=rooms)
+
+
+def make_station_interior(station_id: str) -> ShipInterior:
+    """Return an 8-room interior layout for a hostile enemy station.
+
+    Layout (sid = station_id prefix):
+      {sid}_command   — Command Centre  (0,0) — capture objective
+      {sid}_bay       — Fighter Bay     (2,0)
+      {sid}_corridor  — Main Corridor   (1,1)
+      {sid}_reactor   — Reactor Room    (0,1)
+      {sid}_armoury   — Armoury         (2,1)
+      {sid}_gen_a     — Generator Room A (1,2)
+      {sid}_gen_b     — Generator Room B (2,2)
+      {sid}_quarters  — Crew Quarters   (0,2) — garrison start
+
+    Vertical spine: command ↔ corridor ↔ gen_a
+    Horizontal connections within each row.
+    """
+    s = station_id
+    rooms: dict[str, Room] = {
+        f"{s}_command": Room(
+            f"{s}_command", "Command Centre", "command", (0, 0),
+            [f"{s}_corridor", f"{s}_bay"],
+        ),
+        f"{s}_bay": Room(
+            f"{s}_bay", "Fighter Bay", "bay", (2, 0),
+            [f"{s}_command", f"{s}_armoury"],
+        ),
+        f"{s}_corridor": Room(
+            f"{s}_corridor", "Main Corridor", "corridor", (1, 1),
+            [f"{s}_command", f"{s}_reactor", f"{s}_armoury", f"{s}_gen_a"],
+        ),
+        f"{s}_reactor": Room(
+            f"{s}_reactor", "Reactor Room", "reactor", (0, 1),
+            [f"{s}_corridor", f"{s}_quarters"],
+        ),
+        f"{s}_armoury": Room(
+            f"{s}_armoury", "Armoury", "armoury", (2, 1),
+            [f"{s}_corridor", f"{s}_bay", f"{s}_gen_b"],
+        ),
+        f"{s}_gen_a": Room(
+            f"{s}_gen_a", "Generator Room A", "generator", (1, 2),
+            [f"{s}_corridor", f"{s}_gen_b", f"{s}_quarters"],
+        ),
+        f"{s}_gen_b": Room(
+            f"{s}_gen_b", "Generator Room B", "generator", (2, 2),
+            [f"{s}_gen_a", f"{s}_armoury"],
+        ),
+        f"{s}_quarters": Room(
+            f"{s}_quarters", "Crew Quarters", "quarters", (0, 2),
+            [f"{s}_reactor", f"{s}_gen_a"],
+        ),
+    }
+    return ShipInterior(rooms=rooms)

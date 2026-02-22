@@ -4,6 +4,10 @@
   "description": "Standard multi-role warship. Balanced in all respects. The default choice for 7-8 players — supports all core roles without specialist stations.",
   "max_hull": 100,
   "torpedo_ammo": 12,
+  "torpedo_loadout": {
+    "standard": 8, "homing": 4, "ion": 4, "piercing": 4,
+    "heavy": 2, "proximity": 4, "nuclear": 1, "experimental": 0
+  },
   "min_crew": 6,
   "max_crew": 9
 }

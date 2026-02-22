@@ -47,6 +47,21 @@
           </div>
           <span class="text-data" id="sensor-range-label">RANGE: 30km</span>
         </div>
+        <!-- Scan scale selector (Targeted / Sector sweep / Long-range) -->
+        <div class="scale-selector" id="scale-selector">
+          <button class="scale-btn scale-btn--active" id="scale-targeted" title="[T] Targeted entity scan">TARGETED</button>
+          <button class="scale-btn" id="scale-sector"   title="[S] Sector sweep (45 s)">SECTOR SWEEP</button>
+          <button class="scale-btn" id="scale-longrange" title="[L] Long-range scan (150 s)">LONG-RANGE</button>
+        </div>
+        <!-- Sector-scan interrupt warning -->
+        <div id="scan-interrupt-overlay" class="scan-interrupt-panel" style="display:none">
+          <p class="text-hostile text-label">SCAN INTERRUPTED — COMBAT DETECTED</p>
+          <p class="text-dim text-body">Continue sector scan or abort?</p>
+          <div class="scan-btn-row">
+            <button class="fire-btn" id="scan-continue-btn">CONTINUE SCAN</button>
+            <button class="fire-btn fire-btn--hostile" id="scan-abort-btn">ABORT SCAN</button>
+          </div>
+        </div>
         <div class="sensor-wrap">
           <canvas id="sensor-canvas"></canvas>
         </div>

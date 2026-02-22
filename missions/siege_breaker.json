@@ -1,0 +1,86 @@
+{
+  "id": "siege_breaker",
+  "name": "Siege Breaker",
+  "briefing": "Outpost Nova is under siege by an enemy fleet. A blockade of three ships holds the approach lane; their command station coordinates the assault from sector east. Break through the blockade, dock with Outpost Nova to resupply, then eliminate the threat at its source. EW: jam their sensor array before the assault — or deal with reinforcements.",
+  "spawn": [
+    {"type": "station",      "id": "outpost_nova",   "x": 25000, "y": 50000},
+    {"type": "enemy_station","id": "siege_command",  "x": 75000, "y": 50000, "variant": "outpost"},
+    {"type": "scout",        "id": "blockade_1",     "x": 38000, "y": 40000},
+    {"type": "scout",        "id": "blockade_2",     "x": 38000, "y": 60000},
+    {"type": "cruiser",      "id": "blockade_cmd",   "x": 32000, "y": 50000}
+  ],
+  "nodes": [
+    {
+      "id": "break_blockade",
+      "type": "objective",
+      "text": "Weapons: Destroy the enemy blockade fleet",
+      "trigger": {"type": "wave_defeated", "prefix": "blockade_"}
+    },
+    {
+      "id": "dock_with_outpost",
+      "type": "objective",
+      "text": "Helm: Dock with Outpost Nova for resupply and crew transfer",
+      "trigger": {"type": "player_in_area", "x": 25000, "y": 50000, "r": 5000}
+    },
+    {
+      "id": "assault_prep",
+      "type": "parallel",
+      "text": "Prepare the assault on the enemy command station",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "jam_sensor",
+          "type": "objective",
+          "text": "EW: Jam the enemy station's sensor array before the assault",
+          "trigger": {"type": "station_sensor_jammed", "station_id": "siege_command"}
+        },
+        {
+          "id": "destroy_shields",
+          "type": "objective",
+          "text": "Weapons: Destroy the primary shield generator",
+          "trigger": {"type": "component_destroyed", "component_id": "siege_command_gen_0"}
+        }
+      ]
+    },
+    {
+      "id": "capture_command",
+      "type": "objective",
+      "text": "Security: Board and capture the enemy command station",
+      "trigger": {"type": "station_captured", "station_id": "siege_command"}
+    },
+    {
+      "id": "reinforcements_wave",
+      "type": "conditional",
+      "text": "ALERT: Enemy distress beacon active — reinforcements inbound",
+      "condition": {"type": "station_reinforcements_called", "station_id": "siege_command"},
+      "max_activations": 1,
+      "on_activate": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "destroyer", "id": "relief_1", "x": 92000, "y": 45000},
+          {"type": "scout",     "id": "relief_2", "x": 95000, "y": 55000}
+        ]
+      }
+    },
+    {
+      "id": "outpost_under_fire",
+      "type": "conditional",
+      "text": "CRITICAL: Outpost Nova taking heavy fire — defend the station",
+      "condition": {"type": "station_hull_below", "station_id": "outpost_nova", "threshold": 50}
+    }
+  ],
+  "edges": [
+    {"from": "break_blockade",   "to": "dock_with_outpost", "type": "sequence"},
+    {"from": "dock_with_outpost","to": "assault_prep",      "type": "sequence"},
+    {"from": "assault_prep",     "to": "capture_command",   "type": "sequence"}
+  ],
+  "start_node": "break_blockade",
+  "victory_nodes": ["capture_command"],
+  "defeat_condition": {
+    "type": "any_of",
+    "triggers": [
+      {"type": "player_hull_zero"},
+      {"type": "station_hull_below", "station_id": "outpost_nova", "threshold": 0}
+    ]
+  }
+}

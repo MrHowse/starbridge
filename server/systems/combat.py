@@ -114,12 +114,16 @@ def apply_hit_to_enemy(
     attacker_x: float,
     attacker_y: float,
     beam_frequency: str = "",
+    shield_absorption_mult: float = 1.0,
 ) -> None:
     """Apply damage to an enemy ship (shields + hull; no system damage roll).
 
     If *beam_frequency* matches the enemy's shield_frequency the damage is
     multiplied by FREQ_MATCH_MULT (1.5×); a mismatch applies FREQ_MISMATCH_MULT
     (0.5×). No effect when either side has no frequency set.
+
+    *shield_absorption_mult* scales the shield absorption coefficient — 1.0 is
+    full absorption, 0.25 means shields only absorb 25% (piercing torpedoes).
     """
     # Apply beam frequency modifier before shield absorption.
     if beam_frequency and enemy.shield_frequency:
@@ -132,12 +136,15 @@ def apply_hit_to_enemy(
     diff = angle_diff(enemy.heading, brg)
     is_front = abs(diff) < 90.0
 
+    eff_coeff = SHIELD_ABSORPTION_COEFF * shield_absorption_mult
     if is_front:
-        absorbed = min(enemy.shield_front * SHIELD_ABSORPTION_COEFF, damage)
-        enemy.shield_front = max(0.0, enemy.shield_front - absorbed / SHIELD_ABSORPTION_COEFF)
+        absorbed = min(enemy.shield_front * eff_coeff, damage)
+        if eff_coeff > 0.0:
+            enemy.shield_front = max(0.0, enemy.shield_front - absorbed / eff_coeff)
     else:
-        absorbed = min(enemy.shield_rear * SHIELD_ABSORPTION_COEFF, damage)
-        enemy.shield_rear = max(0.0, enemy.shield_rear - absorbed / SHIELD_ABSORPTION_COEFF)
+        absorbed = min(enemy.shield_rear * eff_coeff, damage)
+        if eff_coeff > 0.0:
+            enemy.shield_rear = max(0.0, enemy.shield_rear - absorbed / eff_coeff)
 
     enemy.hull = max(0.0, enemy.hull - (damage - absorbed))
 
@@ -147,8 +154,12 @@ def apply_hit_to_enemy(
 # ---------------------------------------------------------------------------
 
 
-def regenerate_shields(ship: Ship) -> None:
-    """Regenerate player shields each tick, scaled by shield system efficiency."""
-    regen = SHIELD_REGEN_PER_TICK * ship.systems["shields"].efficiency
+def regenerate_shields(ship: Ship, hazard_modifier: float = 1.0) -> None:
+    """Regenerate player shields each tick, scaled by shield system efficiency.
+
+    *hazard_modifier* reduces the regen rate when inside a nebula (0.5 = 50%
+    slower).  Defaults to 1.0 (no reduction).
+    """
+    regen = SHIELD_REGEN_PER_TICK * ship.systems["shields"].efficiency * hazard_modifier
     ship.shields.front = min(100.0, ship.shields.front + regen)
     ship.shields.rear = min(100.0, ship.shields.rear + regen)

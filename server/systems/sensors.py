@@ -74,9 +74,13 @@ def get_scan_progress() -> tuple[str, float] | None:
     return (_active_scan.entity_id, _active_scan.progress)
 
 
-def sensor_range(ship: Ship) -> float:
-    """Effective sensor detection range based on sensor system efficiency."""
-    return BASE_SENSOR_RANGE * ship.systems["sensors"].efficiency
+def sensor_range(ship: Ship, hazard_modifier: float = 1.0) -> float:
+    """Effective sensor detection range based on sensor system efficiency.
+
+    *hazard_modifier* (0.0–1.0) further reduces range when environmental
+    hazards such as nebulae or radiation zones are active.
+    """
+    return BASE_SENSOR_RANGE * ship.systems["sensors"].efficiency * hazard_modifier
 
 
 def tick(world: World, ship: Ship, dt: float) -> list[str]:
@@ -111,6 +115,7 @@ def build_sensor_contacts(
     world: World,
     ship: Ship,
     extra_bubbles: list[tuple[float, float, float]] | None = None,
+    hazard_modifier: float = 1.0,
 ) -> list[dict]:
     """Build the sensor.contacts payload for Weapons / Science clients.
 
@@ -120,8 +125,10 @@ def build_sensor_contacts(
     the client sees a bearing and position but no identity.
     For scanned contacts, full details plus a computed weakness hint are
     included.
+
+    *hazard_modifier* reduces sensor range when environmental hazards are active.
     """
-    range_ = sensor_range(ship)
+    range_ = sensor_range(ship, hazard_modifier)
     contacts: list[dict] = []
 
     for enemy in world.enemies:
@@ -147,6 +154,31 @@ def build_sensor_contacts(
             contact.update(build_scan_result(enemy))
 
         contacts.append(contact)
+
+    # Creatures (v0.05k) — only include detected creatures within sensor range.
+    for creature in world.creatures:
+        if not creature.detected:
+            continue
+        dist = distance(ship.x, ship.y, creature.x, creature.y)
+        in_range = dist <= range_
+        if not in_range and extra_bubbles:
+            for bx, by, br in extra_bubbles:
+                if distance(bx, by, creature.x, creature.y) <= br:
+                    in_range = True
+                    break
+        if not in_range:
+            continue
+        contacts.append({
+            "id": creature.id,
+            "x": round(creature.x, 1),
+            "y": round(creature.y, 1),
+            "heading": round(creature.heading, 2),
+            "kind": "creature",
+            "creature_type": creature.creature_type,
+            "scan_state": "scanned",
+            "hull": round(creature.hull, 1),
+            "study_progress": round(creature.study_progress, 1),
+        })
 
     return contacts
 

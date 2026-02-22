@@ -74,10 +74,12 @@ class TestSandboxActive:
 
     def test_timers_populated_on_activate(self) -> None:
         glsb.reset(active=True)
-        assert "enemy_spawn"   in glsb._timers
-        assert "system_damage" in glsb._timers
-        assert "crew_casualty" in glsb._timers
-        assert "boarding"      in glsb._timers
+        for key in (
+            "enemy_spawn", "system_damage", "crew_casualty", "boarding",
+            "incoming_transmission", "hull_micro_damage", "sensor_anomaly",
+            "drone_opportunity", "enemy_jamming", "distress_signal",
+        ):
+            assert key in glsb._timers, f"timer '{key}' missing after activate"
 
     # --- enemy spawn ---
 
@@ -186,3 +188,146 @@ class TestSandboxActive:
                 if e["type"] == "spawn_enemy":
                     assert e["id"] not in seen_ids, f"Duplicate ID: {e['id']}"
                     seen_ids.add(e["id"])
+
+    # --- incoming_transmission ---
+
+    def test_incoming_transmission_fires_on_timer(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["incoming_transmission"] = 0.05
+        world = _make_world()
+        events = glsb.tick(world, 0.1)
+        txs = [e for e in events if e["type"] == "incoming_transmission"]
+        assert len(txs) == 1
+        tx = txs[0]
+        assert tx["faction"] in glsb.TRANSMISSION_FACTIONS
+        assert tx["frequency"] == glsb.TRANSMISSION_FACTIONS[tx["faction"]]
+        assert "message_hint" in tx
+
+    def test_incoming_transmission_timer_reset(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["incoming_transmission"] = 0.05
+        world = _make_world()
+        glsb.tick(world, 0.1)
+        assert glsb._timers["incoming_transmission"] > 10.0
+
+    # --- hull_micro_damage ---
+
+    def test_hull_micro_damage_fires_on_timer(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["hull_micro_damage"] = 0.05
+        world = _make_world()
+        events = glsb.tick(world, 0.1)
+        dmg = [e for e in events if e["type"] == "hull_micro_damage"]
+        assert len(dmg) == 1
+        assert 2.0 <= dmg[0]["amount"] <= 8.0
+
+    def test_hull_micro_damage_timer_reset(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["hull_micro_damage"] = 0.05
+        world = _make_world()
+        glsb.tick(world, 0.1)
+        assert glsb._timers["hull_micro_damage"] > 10.0
+
+    # --- sensor_anomaly ---
+
+    def test_sensor_anomaly_fires_on_timer(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["sensor_anomaly"] = 0.05
+        world = _make_world()
+        events = glsb.tick(world, 0.1)
+        anoms = [e for e in events if e["type"] == "sensor_anomaly"]
+        assert len(anoms) == 1
+        a = anoms[0]
+        assert a["anomaly_type"] in glsb.SENSOR_ANOMALY_TYPES
+        assert "x" in a and "y" in a and "id" in a
+        assert 0 <= a["x"] <= world.width
+        assert 0 <= a["y"] <= world.height
+
+    def test_sensor_anomaly_timer_reset(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["sensor_anomaly"] = 0.05
+        world = _make_world()
+        glsb.tick(world, 0.1)
+        assert glsb._timers["sensor_anomaly"] > 10.0
+
+    # --- drone_opportunity ---
+
+    def test_drone_opportunity_fires_on_timer(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["drone_opportunity"] = 0.05
+        world = _make_world()
+        events = glsb.tick(world, 0.1)
+        ops = [e for e in events if e["type"] == "drone_opportunity"]
+        assert len(ops) == 1
+        op = ops[0]
+        assert op["label"] in glsb.DRONE_OPPORTUNITY_LABELS
+        assert "x" in op and "y" in op and "id" in op
+        assert 0 <= op["x"] <= world.width
+        assert 0 <= op["y"] <= world.height
+
+    def test_drone_opportunity_timer_reset(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["drone_opportunity"] = 0.05
+        world = _make_world()
+        glsb.tick(world, 0.1)
+        assert glsb._timers["drone_opportunity"] > 10.0
+
+    # --- enemy_jamming ---
+
+    def test_enemy_jamming_fires_on_timer(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["enemy_jamming"] = 0.05
+        world = _make_world()
+        events = glsb.tick(world, 0.1)
+        jams = [e for e in events if e["type"] == "enemy_jamming"]
+        assert len(jams) == 1
+        assert 0.3 <= jams[0]["strength"] <= 0.7
+
+    def test_enemy_jamming_timer_reset(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["enemy_jamming"] = 0.05
+        world = _make_world()
+        glsb.tick(world, 0.1)
+        assert glsb._timers["enemy_jamming"] > 10.0
+
+    # --- distress_signal ---
+
+    def test_distress_signal_fires_on_timer(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["distress_signal"] = 0.05
+        world = _make_world()
+        events = glsb.tick(world, 0.1)
+        sigs = [e for e in events if e["type"] == "distress_signal"]
+        assert len(sigs) == 1
+        sig = sigs[0]
+        assert sig["frequency"] == 0.90
+        assert "x" in sig and "y" in sig
+        assert 0 <= sig["x"] <= world.width
+        assert 0 <= sig["y"] <= world.height
+
+    def test_distress_signal_timer_reset(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["distress_signal"] = 0.05
+        world = _make_world()
+        glsb.tick(world, 0.1)
+        assert glsb._timers["distress_signal"] > 10.0
+
+    # --- all 10 event types can fire in same tick ---
+
+    def test_all_ten_event_types_can_fire_same_tick(self) -> None:
+        glsb.reset(active=True)
+        for key in glsb._timers:
+            glsb._timers[key] = 0.05
+        world = _make_world()
+        events = glsb.tick(world, 0.1)
+        types = {e["type"] for e in events}
+        assert "spawn_enemy"            in types
+        assert "system_damage"          in types
+        assert "crew_casualty"          in types
+        assert "incoming_transmission"  in types
+        assert "hull_micro_damage"      in types
+        assert "sensor_anomaly"         in types
+        assert "drone_opportunity"      in types
+        assert "enemy_jamming"          in types
+        assert "distress_signal"        in types
+        # start_boarding may be suppressed if boarding already active; just check others

@@ -1,0 +1,86 @@
+{
+  "id": "migration",
+  "name": "Migration",
+  "briefing": "Three void whales are making their annual migration through sector 7. Poachers have intercepted the route. Protect the whales and study at least two of them for Federation records before escorting them clear of the danger zone.",
+  "spawn": [
+    {"type": "creature", "id": "whale_1", "creature_type": "void_whale", "x": 25000, "y": 30000},
+    {"type": "creature", "id": "whale_2", "creature_type": "void_whale", "x": 20000, "y": 45000},
+    {"type": "creature", "id": "whale_3", "creature_type": "void_whale", "x": 30000, "y": 40000},
+    {"type": "scout", "id": "poacher_1", "x": 5000, "y": 20000},
+    {"type": "scout", "id": "poacher_2", "x": 8000, "y": 15000}
+  ],
+  "nodes": [
+    {
+      "id": "intercept",
+      "type": "objective",
+      "text": "Navigation: Rendezvous with the whale migration at waypoint Zeta",
+      "trigger": {"type": "player_in_area", "x": 25000, "y": 38000, "r": 8000}
+    },
+    {
+      "id": "protect_and_study",
+      "type": "parallel",
+      "text": "Protect the whales and complete scientific survey",
+      "complete_when": {"all": true},
+      "children": [
+        {
+          "id": "neutralise_poachers",
+          "type": "objective",
+          "text": "Weapons: Destroy both poacher scouts",
+          "trigger": {"type": "wave_defeated", "prefix": "poacher_"}
+        },
+        {
+          "id": "survey_whales",
+          "type": "parallel",
+          "text": "Science: Complete BIO scan of at least 2 of the 3 whales",
+          "complete_when": {"count": 2},
+          "children": [
+            {
+              "id": "study_whale_1",
+              "type": "objective",
+              "text": "Science: Complete BIO scan of Whale Alpha",
+              "trigger": {"type": "creature_study_complete", "creature_id": "whale_1"}
+            },
+            {
+              "id": "study_whale_2",
+              "type": "objective",
+              "text": "Science: Complete BIO scan of Whale Beta",
+              "trigger": {"type": "creature_study_complete", "creature_id": "whale_2"}
+            },
+            {
+              "id": "study_whale_3",
+              "type": "objective",
+              "text": "Science: Complete BIO scan of Whale Gamma",
+              "trigger": {"type": "creature_study_complete", "creature_id": "whale_3"}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clear_zone",
+      "type": "objective",
+      "text": "Navigation: Guide the whales clear of the danger zone",
+      "trigger": {"type": "player_in_area", "x": 80000, "y": 38000, "r": 8000}
+    },
+    {
+      "id": "poacher_reinforcements",
+      "type": "conditional",
+      "text": "ALERT: Poacher reinforcements inbound — additional hostiles detected",
+      "condition": {"type": "timer_elapsed", "seconds": 90},
+      "on_activate": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "destroyer", "id": "poacher_3", "x": -5000, "y": 10000},
+          {"type": "scout",     "id": "poacher_4", "x": -8000, "y": 15000}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {"from": "intercept",         "to": "protect_and_study", "type": "sequence"},
+    {"from": "protect_and_study", "to": "clear_zone",        "type": "sequence"}
+  ],
+  "start_node": "intercept",
+  "victory_nodes": ["clear_zone"],
+  "defeat_condition": {"type": "player_hull_zero"}
+}

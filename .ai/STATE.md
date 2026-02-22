@@ -3,15 +3,15 @@
 > **LIVING DOCUMENT** — Update after every AI engineering session.
 > This is the single source of truth for what exists in the project.
 
-**Last updated**: 2026-02-21 (v0.04k COMPLETE — Final Integration Gate)
-**Current phase**: v0.04k COMPLETE ✓ — v0.04 CLOSED
-**Overall status**: 1987 tests passing. 12 stations (11 active + viewscreen passive).
-27 JSON missions (15 story + 12 training) + sandbox — all in graph format. 9 puzzle types.
+**Last updated**: 2026-02-22 (v0.05k COMPLETE — Space Creatures)
+**Current phase**: v0.05k COMPLETE ✓ — v0.05 in progress
+**Overall status**: 2558 tests passing. 12 stations (11 active + viewscreen passive).
+29 JSON missions (17 story + 12 training) + sandbox — all in graph format. 9 puzzle types.
 7 ship classes. 4 difficulty presets. Mission editor. Save/resume. Player profiles. Admin dashboard.
 Accessibility pass (colour-blind mode, reduced-motion, keyboard nav) across all 19 pages.
 Game event logger (JSONL) + Debrief Dashboard + Captain's Replay.
 MissionGraph engine (parallel/branch/conditional nodes) — all missions use graph format.
-Bug fix: MissionGraph.tick() now returns parallel parent IDs when they complete.
+5 space creature types (void_whale, rift_stalker, hull_leech, swarm, leviathan) with per-type AI.
 
 ---
 
@@ -31,11 +31,13 @@ Bug fix: MissionGraph.tick() now returns parallel parent IDs when they complete.
 - `server/main.py` — FastAPI app, `/ws` WebSocket endpoint, JSON envelope parsing, category-based message routing (all 11 active roles wired); debug endpoints: `POST /debug/damage`, `GET /debug/ship_status`, `POST /debug/spawn_enemy`, `POST /debug/start_game`; `game_loop.register_game_end_callback(lobby.on_game_end)` wired
 - `server/connections.py` — `ConnectionManager`: connect/disconnect, metadata tagging (player_name, role, session_id, is_host), individual send, full broadcast, role-filtered broadcast, `all_ids()`
 - `server/models/messages/` — Messages namespace package. `__init__.py` re-exports all symbols; `base.py` (Message, validate_payload, _PAYLOAD_SCHEMAS); one file per station domain. All existing imports unchanged.
-- `server/models/ship.py` — `ShipSystem` (name, power, health, `_crew_factor=1.0`, `efficiency = (power/100)*(health/100)*_crew_factor`), `Shields` (front, rear), `Ship` dataclass (position, heading, target_heading, velocity, throttle, hull, shields, 8 systems: engines/beams/torpedoes/shields/sensors/manoeuvring/flight_deck/ecm_suite, alert_level, crew, medical_supplies=20, `interior: ShipInterior = make_default_interior()`). `Ship.update_crew_factors()` propagates deck crew factors to systems each tick.
+- `server/models/ship.py` — `ShipSystem` (name, power, health, `_crew_factor=1.0`, `efficiency = (power/100)*(health/100)*_crew_factor`), `Shields` (front, rear), `Ship` dataclass (position, heading, target_heading, velocity, throttle, `hull`, **[v0.05f]** `hull_max=100.0` set from ship class, `docked_at: str|None=None`, shields, 9 systems, alert_level, crew, medical_supplies=20, `interior`). `Ship.update_crew_factors()` propagates deck crew factors to systems each tick.
 - `server/models/crew.py` — `DeckCrew` (deck_name, total, active, injured, critical, dead, `crew_factor` property). `CrewRoster` (decks dict, `apply_casualties`, `treat_injured`, `treat_critical`, `get_deck_for_system`). `DECK_SYSTEM_MAP`. `DECK_DEFAULT_CREW`.
 - `server/models/interior.py` — `Room` (id, name, deck, position, connections, state, door_sealed). `ShipInterior` (rooms dict, `find_path()` BFS pathfinding, `marine_squads: list[MarineSquad]`, `intruders: list[Intruder]`). `make_default_interior()` — 5 decks, 20 rooms.
 - `server/models/security.py` — `MarineSquad`, `Intruder`, constants. `is_intruder_visible()` fog-of-war filter.
-- `server/models/world.py` — `World` dataclass (width, height, ship, enemies, torpedoes, stations, asteroids). `Enemy`, `Torpedo`, `Station`, `Asteroid` dataclasses. `ENEMY_TYPE_PARAMS` dict. `spawn_enemy()` factory.
+- `server/models/world.py` — `World` dataclass **[v0.05i]** + `StationComponent`, `ShieldArc`, `Turret`, `TorpedoLauncher`, `FighterBay`, `SensorArray`, `StationReactor`, `EnemyStationDefenses`; `_arc_covers()`; `Station.defenses: EnemyStationDefenses|None`; `spawn_enemy_station(id, x, y, variant)` outpost(2gen/4turr/1launcher/1bay/10garrison/800hp) or fortress(4/8/2/2/20/1200hp); `Enemy.type` includes "fighter"; "fighter" in `ENEMY_TYPE_PARAMS` (20hp, 400u/s, no shields, flee_threshold=0).
+- `server/models/interior.py` — `make_station_interior(station_id)` 8-room layout (command, bay, corridor, reactor, armoury, gen_a, gen_b, quarters); prefixed by station_id.
+- `server/models/world.py` — `World` dataclass (width, height, ship, enemies, torpedoes, stations, asteroids, hazards, sector_grid). `Enemy`, `Torpedo`, `Station`, `Asteroid`, `Hazard` dataclasses. `ENEMY_TYPE_PARAMS` dict. `spawn_enemy()` factory. **[v0.05e]** `Station` expanded with `name`, `station_type`, `faction`, `services`, `docking_range/ports`, `transponder_active`, `shields/max`, `hull/max`, `inventory`, `requires_scan`. Constants: `STATION_TYPE_SERVICES`, `STATION_TYPE_HULL`, `STATION_TYPE_SHIELDS`, `STATION_FEATURE_TYPES`, `_FEATURE_TO_STATION`. Factories: `spawn_station()`, `spawn_station_from_feature(feature, sector_name)`, `spawn_station_from_grid(station_id, x, y)`, `spawn_hazard()`.
 - `server/models/ship_class.py` — **[v0.03o]** `ShipClass` Pydantic model (id, name, description, max_hull, torpedo_ammo, min_crew, max_crew). `load_ship_class(id)` reads `ships/<id>.json`; raises FileNotFoundError if missing. `list_ship_classes()` returns all 7 in canonical order. `SHIP_CLASS_ORDER = ["scout","corvette","frigate","cruiser","battleship","medical_ship","carrier"]`.
 - `server/models/mission.py` — Pydantic schema documentation models (not used at runtime).
 - `server/utils/math_helpers.py` — `wrap_angle`, `angle_diff`, `distance`, `lerp`, `bearing_to`
@@ -45,9 +47,11 @@ Bug fix: MissionGraph.tick() now returns parallel parent IDs when they complete.
 
 #### Systems
 - `server/systems/physics.py` — `tick(ship, dt, w, h)`: turn + thrust + move + boundary clamp
-- `server/systems/combat.py` — `beam_in_arc`, `apply_hit_to_player` (crew casualties: `int(hull_damage/5)` via rng.choice), `apply_hit_to_enemy`, `regenerate_shields`. `CREW_CASUALTY_PER_HULL_DAMAGE=5.0`.
-- `server/systems/ai.py` — `tick_enemies(enemies, ship, dt)`. State machine (idle→chase→attack→flee). Type-differentiated movement. `AI_TURN_RATE=90°/s`.
-- `server/systems/sensors.py` — `ActiveScan` dataclass. Scan lifecycle, range calculations, contact filtering, weakness computation.
+- `server/systems/combat.py` — `beam_in_arc`, `apply_hit_to_player` (crew casualties: `int(hull_damage/5)` via rng.choice), `apply_hit_to_enemy`, `regenerate_shields(ship, hazard_modifier=1.0)`. `CREW_CASUALTY_PER_HULL_DAMAGE=5.0`. **[v0.05h]** `hazard_modifier` scales shield regen rate.
+- `server/systems/ai.py` — `tick_enemies(enemies, ship, dt, sensor_modifier=1.0)`. State machine (idle→chase→attack→flee). Type-differentiated movement. `AI_TURN_RATE=90°/s`. **[v0.05h]** `sensor_modifier` scales enemy detect_range for nebula concealment.
+- `server/systems/sensors.py` — `ActiveScan` dataclass. Scan lifecycle, range calculations, contact filtering, weakness computation. **[v0.05h]** `sensor_range(ship, hazard_modifier=1.0)` and `build_sensor_contacts(..., hazard_modifier=1.0)`.
+- `server/systems/station_ai.py` — **[v0.05i]** Enemy station defensive AI. `tick_station_ai(stations, ship, world, dt, station_attacked_ids)` → `(beam_hits, launched_fighters, reinforcement_calls)`. Turrets auto-fire at ship in range+arc scaled by reactor_factor. Launchers fire standard torpedoes. Fighter bays launch fighters (spawn_enemy("fighter",...)). Sensor array emits distress_call when attacked+active+not-jammed. `jam_station_sensor()` / `unjam_station_sensor()`. `STATION_TORPEDO_VELOCITY=400`.
+- `server/systems/hazards.py` — **[v0.05h]** Full environmental hazard system. Entity hazards (minefield, radiation_zone, gravity_well, nebula) + sector-type hazards (nebula, asteroid_field, gravity_well, radiation_zone). Module-level modifier state: `_sensor_modifier`, `_shield_regen_modifier`, `_velocity_cap`, `_active_hazard_types`. Public API: `reset_state()`, `get_sensor_modifier()`, `get_shield_regen_modifier()`, `get_velocity_cap()`, `get_active_hazard_types()`. `tick_hazards(world, ship, dt)` applies entity + sector effects and stores modifiers. Constants: `NEBULA_ENTITY_SENSOR_MODIFIER=0.5`, `NEBULA_SHIELD_REGEN_MODIFIER=0.5`, `ASTEROID_THROTTLE_THRESHOLD=30.0`, `ASTEROID_DAMAGE_PER_SEC=2.0`, `GRAVITY_WELL_SECTOR_VEL_CAP=200.0`, `RADIATION_SECTOR_DAMAGE_PER_SEC=1.5`, `RADIATION_SHIELD_THRESHOLD=50.0`, `RADIATION_SHIELD_ABSORPTION_FRAC=0.6`, `RADIATION_SENSOR_MODIFIER=0.75`.
 - `server/puzzles/` — Puzzle engine package:
   - `base.py` — `PuzzleInstance` ABC with `**_kwargs` forwarding
   - `engine.py` — `PuzzleEngine` class (create/tick/submit/apply_assist/cancel/pop/reset). Registry via `register_puzzle_type()`
@@ -78,8 +82,12 @@ Bug fix: MissionGraph.tick() now returns parallel parent IDs when they complete.
 #### Game Loop (split into 13 files)
 - `server/game_loop.py` — Orchestrator. `start()` resets all sub-modules. `_loop()` runs all tick functions; broadcasts station-specific state. Includes signal scan interception, `start_boarding`, Comms→Science relay chain, `_check_sensor_assist()`. Game-over path: capture log path → `stop_logging()` → `compute_from_log()` → `game.over` with debrief payload. **[v0.03n]** tick_summary includes x/y.
 - `server/game_loop_physics.py` — `TICK_RATE=10`, `TICK_DT=0.1`
-- `server/game_loop_weapons.py` — stateful weapons: target, ammo, cooldowns, fire, torpedo management
-- `server/game_loop_mission.py` — stateful mission: `init_mission()`, `tick_mission()`, pending actions queue, `get_mission_dict()` returns deep copy
+- `server/game_loop_weapons.py` — **[v0.05g]** stateful weapons: **[v0.05i]** component targeting: `fire_player_beams` handles component IDs and station hull IDs in addition to enemy IDs. Shield-arc absorption (80%) on station hull hits. Component hit: reduces `component.hp`, adds to `_stations_attacked_this_tick`, emits `_pending_component_destroyed` on hp→0. `pop_stations_attacked()→set`, `pop_component_destroyed_events()→list`. `tick_torpedoes` now hits hostile station hulls (500-unit radius, shield arc absorption).
+- `server/game_loop_security.py` — **[v0.05i]** station boarding: `start_station_boarding(station, squad_specs)` populates garrison as intruders in station interior; `tick_station_boarding(ship, dt)→events`; `is_station_boarding_active()`; `check_station_capture(station_id)→bool` (all intruders defeated + squad in command room); `build_station_interior_state(station_id)→dict`.
+- `server/game_loop_ew.py` — **[v0.05i]** EW tick also jams station sensor arrays: if `_jam_target_id` ends with `_sensor` and matches a station component, sets `jammed=True` when in range; clears when untargeted.
+- `server/game_loop.py` — **[v0.05i]** imports `tick_station_ai`; after enemy tick: pops `station_attacked_ids`, calls `tick_station_ai`, appends fighters to `world.enemies`, broadcasts `station.reinforcement_call`, `station.component_destroyed`, `station.captured`, `station.destroyed`; calls `tick_station_boarding`; broadcasts `security.station_interior` when station boarding active. **[v0.05j]** Station capture: sets `station.captured = True` on first detection, calls `glm.get_mission_engine().notify_station_captured(station.id)` to notify mission graph. Guard prevents repeated broadcast/notification each tick.
+- `server/game_loop_weapons.py` — **[v0.05g]** stateful weapons: 8 torpedo types (standard/homing/ion/piercing/heavy/proximity/nuclear/experimental); per-type magazine dict (`_torpedo_ammo: dict[str,int]`); `TORPEDO_DAMAGE/VELOCITY/RELOAD_BY_TYPE` dicts; homing guidance (HOMING_TURN_RATE=90°/s); ion drain+stun (ION_STUN_TICKS=100); piercing (shield_absorption_mult=0.25); proximity AOE (PROXIMITY_BLAST_RADIUS=2000u); per-tube reload times (`_tube_reload_times: list[float]`); `reset(initial_loadout)`, `get_ammo()→dict`, `get_ammo_max()→dict`, `get_ammo_for_type(t)`, `set_ammo_for_type(t,n)`, `get_tube_reload_times()→list`; backward compat deserialise for int saves
+- `server/game_loop_mission.py` — stateful mission: `init_mission()`, `tick_mission()`, pending actions queue, `get_mission_dict()` returns deep copy. **[v0.05h]** `build_sensor_contacts(..., hazard_modifier=1.0)`. **[v0.05i]** `build_world_entities` station payload includes `defenses` dict (shield_arcs/turrets/launchers/fighter_bays/sensor_array/reactor/garrison_count).
 - `server/game_loop_medical.py` — treatment state: `start_treatment()` (costs 2 supplies), `tick_treatments()` (heals 1/deck/2s), `cancel_treatment()`, `get_active_treatments()`
 - `server/game_loop_security.py` — boarding state: `deploy_squads()`, `start_boarding()`, `move_squad()`, `toggle_door()`, `tick_security()`, fog-of-war filtered `build_interior_state()`
 - `server/game_loop_comms.py` — comms state: frequency tuning, hailing, NPC responses, passive interception fragments. `FACTION_BANDS` dict.
@@ -89,11 +97,18 @@ Bug fix: MissionGraph.tick() now returns parallel parent IDs when they complete.
 - `server/game_loop_ew.py` — **[v0.03k]** electronic warfare state: jamming targets, decoy deployment, network scan results, ECM effectiveness
 - `server/game_loop_tactical.py` — **[v0.03l]** tactical state: strike plan management, coordinated fire solutions, mark-target tracking
 - `server/game_loop_training.py` — **[v0.03m]** training state: `is_training_active()`, `set_training_flag(flag)`, `reset()`. Station handlers call `set_training_flag()` when training-relevant actions occur (e.g. `helm_heading_set`, `weapons_beam_fired`).
+- `server/models/sector.py` — **[v0.05b]** `SectorVisibility` enum (6 levels), `Rect`, `SectorProperties`, `SectorFeature`, `PatrolRoute`, `Sector`, `SectorGrid` dataclasses. `SectorGrid` methods: `sector_at_position()`, `adjacent_sectors()`, `set_visibility()`, `update_ship_position()`, `on_sector_leave()`, `apply_transponder_reveals()`, `serialise()`, `deserialise_visibility()`. `load_sector_grid(layout_id)` reads `sectors/<id>.json`. `_sector_grid_from_dict()` parser.
+- `sectors/standard_grid.json` — **[v0.05b]** 5×5 grid (25 sectors, each 100k×100k). A1 is the default gameplay sector; has friendly_station transponder feature. Includes nebula, asteroid_field, radiation_zone, gravity_well, hostile, friendly, contested types.
+- `sectors/exploration_grid.json` — **[v0.05b]** 8×8 grid (64 sectors, each 100k×100k).
+- `sectors/sector_schema.json` — **[v0.05b]** JSON Schema for sector layout files.
+- `server/game_loop_science_scan.py` — **[v0.05d]** sector-scale scan state machine: `reset()`, `is_active()`, `start_scan(scale, mode, sector_id, adjacent_ids)`, `cancel_scan()`, `set_interrupt_response(continue_scan)`, `build_progress() → dict`, `get_scan_indicator() → str|None`, `tick(dt, world) → list[dict]`. Constants: `SECTOR_SWEEP_DURATION=45.0`, `LONG_RANGE_DURATION=150.0`, `PHASE_THRESHOLDS=[0,25,50,75]`, `COMBAT_INTERRUPT_RANGE=15_000`, `MODE_FEATURE_AFFINITY` dict. Events: `progress`, `sector_visibility_changed`, `interrupted`, `complete`. Partial reveals at each phase; SectorVisibility progression (Unknown→Scanned/Surveyed); ACTIVE sectors not downgraded.
+- `server/game_loop_docking.py` — **[v0.05f]** docking state machine: `reset()`, `serialise()/deserialise()`, `is_docked()`, `get_state()`, `get_active_services()`, `request_clearance()`, `start_service()`, `cancel_service()`, `captain_undock(emergency)`, `tick(world, ship, manager, dt)`. States: none→clearance_pending→sequencing→docked→undocking→none. Constants: `DOCK_APPROACH_MAX_THROTTLE=10%`, `DOCKING_SEQUENCE_DURATION=10s`, `UNDOCKING_DURATION=5s`, `SHIELDS_DOCKED_CAP=50%`. 10 services with durations (hull_repair 60s → full hull restore; system_repair 20s → all systems 100%; medical_transfer 45s → +10 supplies + stabilise critical; torpedo_resupply 30s → **[v0.05g]** refills all 8 types to max; ew_database_update 30s → +5 charges; others placeholder). Proximity approach_info emitted to Helm when near station (2× docking_range). Physics: velocity/throttle=0, shields capped while docked/sequencing.
+- `server/game_loop_sandbox.py` — **[v0.05a]** sandbox activity generator: `reset(active)`, `is_active()`, `tick(world, dt)`. 10 event types covering all 12 stations: `spawn_enemy` (60-90s, Weapons/Helm/Tactical/Science), `system_damage` (45-75s, Engineering/DC), `crew_casualty` (60-100s, Medical), `start_boarding` (120-180s, Security/DC), `incoming_transmission` (90-120s, Comms), `hull_micro_damage` (120-180s, DC), `sensor_anomaly` (90-150s, Science), `drone_opportunity` (120-180s, Flight Ops), `enemy_jamming` (180-240s, EW), `distress_signal` (180-300s, Comms/Helm/Captain). Initial stagger timers ensure all 10 fire within 5 minutes.
 
 #### Mission System (`server/missions/`)
 - `server/missions/loader.py` — `load_mission(id)`: reads `missions/<id>.json`; sandbox returns synthetic graph-format dict. **[v0.04b]** Sandbox dict uses graph format: `{nodes:[], edges:[], start_node:None, victory_nodes:[], defeat_condition:None}`.
 - `server/missions/engine.py` — `MissionEngine` class. Sequential objectives. **Still used in tests with inline dicts (do not remove).** Trigger types: all standard triggers + `training_flag`.
-- `server/mission_graph.py` — **[v0.04a]** `MissionGraph` class. Drop-in replacement for `MissionEngine` with parallel/branch/conditional/checkpoint nodes. Same public interface: `tick(world, ship, dt)`, `pop_pending_actions()`, `notify_puzzle_result(label, success)`, `set_training_flag(flag)`, `record_signal_scan()`, `is_over()`, `get_objectives()`, `get_active_node_ids()`. Mission format: `nodes` (with nested `children` for parallel), `edges`, `start_node`, `victory_nodes`, `defeat_condition` dict. Trigger format: `{"type": "name", ...args}` (flat merge). **[v0.04c]** Bug fix: `_tick_completions` accumulator in `_do_complete_node` ensures parallel parent IDs appear in `tick()` return list when they complete via child completion.
+- `server/mission_graph.py` — **[v0.04a]** `MissionGraph` class. Drop-in replacement for `MissionEngine` with parallel/branch/conditional/checkpoint nodes. Same public interface: `tick(world, ship, dt)`, `pop_pending_actions()`, `notify_puzzle_result(label, success)`, `set_training_flag(flag)`, `record_signal_scan()`, `is_over()`, `get_objectives()`, `get_active_node_ids()`. Mission format: `nodes` (with nested `children` for parallel), `edges`, `start_node`, `victory_nodes`, `defeat_condition` dict. Trigger format: `{"type": "name", ...args}` (flat merge). **[v0.04c]** Bug fix: `_tick_completions` accumulator in `_do_complete_node` ensures parallel parent IDs appear in `tick()` return list when they complete via child completion. **[v0.05j]** New triggers: `station_destroyed`, `station_captured`, `component_destroyed`, `station_sensor_jammed`, `station_reinforcements_called`. Conditional `max_activations: N` (0=unlimited) prevents re-firing after N activations; tracked in `_conditional_activation_count`. `notify_station_captured(station_id)` method adds to `_captured_station_ids`. All new state serialised/deserialised.
 - `tools/migrate_missions.py` — **[v0.04b]** Migration script: converts missions from old sequential format (objectives array + string triggers) to graph format. Handles `defeat_condition_alt` via `any_of`. Skips already-migrated files.
 
 ### Ships
@@ -126,6 +141,8 @@ Bug fix: MissionGraph.tick() now returns parallel parent IDs when they complete.
 - **[v0.04c]** `missions/first_contact_remastered.json` — 3-way branch: scan (diplomatic any-of), destroy (combat), flee
 - **[v0.04c]** `missions/the_convoy.json` — parallel count=2/3 attack groups; compound defeat condition; 3 station spawns
 - **[v0.04c]** `missions/pandemic.json` — 3-way pathogen branch; two nested parallel "all" outcome paths
+- **[v0.05j]** `missions/fortress.json` — enemy outpost assault; branch: stealth (jam sensor → dock) vs direct assault (destroy gen_0 → gen_1 → hull < 50% → dock); reinforcement conditional (max_activations=1); victory: station_captured
+- **[v0.05j]** `missions/supply_line.json` — parallel: destroy depot + intercept all supply_ ships; conditional resupply waves at t=60/120 (guard: depot alive, max_activations=1); reinforcement conditional; victory: extract
 
 #### Training Missions (12 JSON files — one per role)
 All training missions carry `"is_training": true` and `"target_role"`. Objectives use `training_flag` triggers. All have hints. All have `≥3` objectives.
@@ -182,7 +199,7 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 
 #### Science (`client/science/`)
 - `index.html`, `science.js`, `science.css`
-- Long-range sensor canvas (North-up), contact list with scan progress, bearing lines for signal triangulation, `initPuzzleRenderer(send)` wired. **[v0.03h]** Multiple scan modes: EM / GRAV / BIO / SUB — each reveals different contact properties.
+- Long-range sensor canvas (North-up), contact list with scan progress, bearing lines for signal triangulation, `initPuzzleRenderer(send)` wired. **[v0.03h]** Multiple scan modes: EM / GRAV / BIO / SUB — each reveals different contact properties. **[v0.05d]** Scan scale selector (TARGETED / SECTOR SWEEP / LONG-RANGE); sector scan sends `science.start_sector_scan {scale, mode}`; sweep progress mirrored in scan bar + radial sweep canvas overlay with phase boundary arcs; combat interrupt overlay (CONTINUE / ABORT); cancel button handles both entity and sector scans; mode buttons locked during sector sweep; `map.scan_indicator` received for Captain/Helm status.
 
 #### Captain (`client/captain/`)
 - `index.html`, `captain.js`, `captain.css`
@@ -278,7 +295,16 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 | `test_mission_graph.py` | 118 | v0.04a |
 | `test_graph_missions.py` | 60 | v0.04c |
 
+| `test_sector_scan.py` | 52 | v0.05d |
+| `test_space_stations.py` | 24 | v0.05e |
+| `test_docking.py` | 44 | v0.05f |
+| `test_torpedo_expansion.py` | ~80 | v0.05g |
+| `test_environmental_hazards.py` | 69 | v0.05h |
+| `test_enemy_stations.py` | 77 | v0.05i |
+| `test_station_assault_missions.py` | 57 | v0.05j |
+
 **Total at v0.04c: 1781 tests** ✓
+**Total at v0.05j: 2483 tests** ✓
 
 ### v0.04 Additions (tests/test_gate_v004.py + more)
 

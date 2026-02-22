@@ -1,0 +1,114 @@
+{
+  "id": "long_patrol",
+  "name": "The Long Patrol",
+  "briefing": "Patrol the three outer sectors of our territory and rendezvous with Patrol Outpost for resupply. Intelligence suggests raider activity near the northern station — expect contact after docking. A void whale migration has also been reported in the eastern sectors; Science may find an opportunity to study one.",
+  "spawn": [
+    {"type": "station",  "id": "patrol_outpost", "x": 50000, "y": 15000},
+    {"type": "creature", "id": "patrol_whale",   "creature_type": "void_whale", "x": 75000, "y": 65000}
+  ],
+  "nodes": [
+    {
+      "id": "patrol_begin",
+      "type": "checkpoint",
+      "text": "Patrol underway — sweep the three outer sectors"
+    },
+    {
+      "id": "sweep_sectors",
+      "type": "parallel",
+      "text": "Survey all three patrol sectors",
+      "complete_when": "all",
+      "children": [
+        {
+          "id": "sector_west",
+          "type": "objective",
+          "text": "Navigation: Reach the western patrol sector",
+          "trigger": {"type": "player_in_area", "x": 15000, "y": 50000, "r": 10000}
+        },
+        {
+          "id": "sector_north",
+          "type": "objective",
+          "text": "Navigation: Reach the northern patrol sector",
+          "trigger": {"type": "player_in_area", "x": 50000, "y": 15000, "r": 10000}
+        },
+        {
+          "id": "sector_east",
+          "type": "objective",
+          "text": "Navigation: Reach the eastern patrol sector",
+          "trigger": {"type": "player_in_area", "x": 85000, "y": 50000, "r": 10000}
+        }
+      ]
+    },
+    {
+      "id": "dock_resupply",
+      "type": "objective",
+      "text": "Helm: Dock with Patrol Outpost for resupply",
+      "trigger": {"type": "player_in_area", "x": 50000, "y": 15000, "r": 5000}
+    },
+    {
+      "id": "repel_raiders",
+      "type": "objective",
+      "text": "Weapons: Destroy all raider ships",
+      "trigger": {"type": "wave_defeated", "prefix": "raider_"}
+    },
+    {
+      "id": "extract_south",
+      "type": "objective",
+      "text": "Navigation: Return to southern base",
+      "trigger": {"type": "player_in_area", "x": 50000, "y": 85000, "r": 8000}
+    },
+    {
+      "id": "whale_study_bonus",
+      "type": "conditional",
+      "text": "BONUS: Void whale detected — Science: complete BIO scan while on patrol",
+      "condition": {"type": "creature_study_complete", "creature_id": "patrol_whale"}
+    },
+    {
+      "id": "patrol_hull_critical",
+      "type": "conditional",
+      "text": "EMERGENCY: Hull integrity critical — effect immediate repairs",
+      "condition": {"type": "ship_hull_below", "value": 25},
+      "deactivate_when": {"type": "ship_hull_above", "value": 45},
+      "on_activate": {
+        "action": "start_puzzle",
+        "puzzle_type": "circuit_routing",
+        "station": "engineering",
+        "label": "patrol_hull_repair",
+        "difficulty": 2,
+        "time_limit": 90.0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "patrol_begin",
+      "to": "sweep_sectors",
+      "type": "sequence"
+    },
+    {
+      "from": "sweep_sectors",
+      "to": "dock_resupply",
+      "type": "sequence"
+    },
+    {
+      "from": "dock_resupply",
+      "to": "repel_raiders",
+      "type": "sequence",
+      "on_complete": {
+        "action": "spawn_wave",
+        "enemies": [
+          {"type": "scout",     "id": "raider_1",   "x": 35000, "y": 10000},
+          {"type": "scout",     "id": "raider_2",   "x": 62000, "y":  8000},
+          {"type": "destroyer", "id": "raider_cmd", "x": 48000, "y":  5000}
+        ]
+      }
+    },
+    {
+      "from": "repel_raiders",
+      "to": "extract_south",
+      "type": "sequence"
+    }
+  ],
+  "start_node": "patrol_begin",
+  "victory_nodes": ["extract_south"],
+  "defeat_condition": {"type": "player_hull_zero"}
+}

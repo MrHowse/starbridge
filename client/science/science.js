@@ -5,21 +5,28 @@
  * Canvas is North-up — ship at centre with actual heading shown on chevron.
  *
  * Server messages received:
- *   game.started             — show science UI, init canvas; payload includes
- *                              optional signal_location for Mission 3
- *   ship.state               — position, heading, sensor system state
- *   sensor.contacts          — range-filtered, scan-state-aware contact list
- *   science.scan_progress    — { entity_id, progress } — updates progress bar
- *   science.scan_complete    — { entity_id, results }  — shows results panel
- *   mission.signal_bearing   — { bearing, scan_count, ship_x, ship_y } —
- *                              triangulation bearing line from a scan position
- *   ship.hull_hit            — hit-flash border
- *   game.over                — defeat/victory overlay
+ *   game.started                  — show science UI, init canvas; payload includes
+ *                                   optional signal_location for Mission 3
+ *   ship.state                    — position, heading, sensor system state
+ *   sensor.contacts               — range-filtered, scan-state-aware contact list
+ *   science.scan_progress         — { entity_id, progress } — updates progress bar
+ *   science.scan_complete         — { entity_id, results }  — shows results panel
+ *   science.sector_scan_progress  — { active, scale, mode, progress, phase, elapsed,
+ *                                     duration } — sector/long-range sweep progress
+ *   science.sector_scan_complete  — { scale, mode, sector_id } — sweep finished
+ *   science.scan_interrupted      — { reason } — combat interrupt, awaiting response
+ *   mission.signal_bearing        — { bearing, scan_count, ship_x, ship_y } —
+ *                                   triangulation bearing line from a scan position
+ *   ship.hull_hit                 — hit-flash border
+ *   game.over                     — defeat/victory overlay
  *
  * Server messages sent:
- *   lobby.claim_role         { role: 'science', player_name }
- *   science.start_scan       { entity_id }
- *   science.cancel_scan      {}
+ *   lobby.claim_role              { role: 'science', player_name }
+ *   science.start_scan            { entity_id }
+ *   science.cancel_scan           {}
+ *   science.start_sector_scan     { scale, mode }
+ *   science.cancel_sector_scan    {}
+ *   science.scan_interrupt_response { continue_scan }
  */
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
@@ -133,6 +140,16 @@ const modeBtnEls = {
   sub:  document.getElementById('mode-sub'),
 };
 
+const scaleBtns = {
+  targeted:  document.getElementById('scale-targeted'),
+  sector:    document.getElementById('scale-sector'),
+  longrange: document.getElementById('scale-longrange'),
+};
+
+const interruptOverlayEl = document.getElementById('scan-interrupt-overlay');
+const scanContinueBtn    = document.getElementById('scan-continue-btn');
+const scanAbortBtn       = document.getElementById('scan-abort-btn');
+
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
@@ -156,6 +173,13 @@ let scanMode         = 'em';   // active mode: 'em' | 'grav' | 'bio' | 'sub'
 let modeSwitchTarget = null;   // mode we're recalibrating to, or null
 let modeSwitchStart  = 0;      // performance.now() when recalibration began
 
+// Sector scan state (v0.05d)
+let scanScale          = 'targeted'; // 'targeted' | 'sector' | 'long_range'
+let sectorScanActive   = false;
+let sectorScanProgress = 0;          // 0–100
+let sectorScanPhase    = 0;          // 0–3
+let sectorScanDuration = 45;         // seconds (from server)
+
 // ---------------------------------------------------------------------------
 // Initialisation
 // ---------------------------------------------------------------------------
@@ -172,19 +196,23 @@ function init() {
     }
   });
 
-  on('game.started',             handleGameStarted);
-  on('ship.state',               handleShipState);
-  on('ship.alert_changed',       ({ level }) => setAlertLevel(level));
-  on('sensor.contacts',          handleSensorContacts);
-  on('science.scan_progress',    handleScanProgress);
-  on('science.scan_complete',    handleScanComplete);
-  on('mission.signal_bearing',   handleSignalBearing);
-  on('ship.hull_hit',            handleHullHit);
-  on('game.over',                handleGameOver);
+  on('game.started',                   handleGameStarted);
+  on('ship.state',                     handleShipState);
+  on('ship.alert_changed',             ({ level }) => setAlertLevel(level));
+  on('sensor.contacts',                handleSensorContacts);
+  on('science.scan_progress',          handleScanProgress);
+  on('science.scan_complete',          handleScanComplete);
+  on('science.sector_scan_progress',   handleSectorScanProgress);
+  on('science.sector_scan_complete',   handleSectorScanComplete);
+  on('science.scan_interrupted',       handleScanInterrupted);
+  on('mission.signal_bearing',         handleSignalBearing);
+  on('ship.hull_hit',                  handleHullHit);
+  on('game.over',                      handleGameOver);
 
   initPuzzleRenderer(send);
   setupControls();
   setupModeButtons();
+  setupScaleButtons();
   document.addEventListener('keydown', (e) => {
     if (!gameActive) return;
     const modeByKey = { '1': 'em', '2': 'grav', '3': 'bio', '4': 'sub' };
@@ -218,6 +246,14 @@ function handleGameStarted(payload) {
   scanMode         = 'em';
   modeSwitchTarget = null;
   updateModeSelectorUI();
+
+  // Reset sector scan state.
+  sectorScanActive   = false;
+  sectorScanProgress = 0;
+  sectorScanPhase    = 0;
+  scanScale          = 'targeted';
+  updateScaleSelectorUI();
+  if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
 
   requestAnimationFrame(() => {
     sensorRenderer = new MapRenderer(sensorCanvas, {
@@ -347,6 +383,56 @@ function handleScanComplete(payload) {
   console.log(`[science] Scan complete: ${payload.entity_id}`);
 }
 
+function handleSectorScanProgress(payload) {
+  if (!gameActive) return;
+  sectorScanActive   = payload.active ?? true;
+  sectorScanProgress = payload.progress ?? 0;
+  sectorScanPhase    = payload.phase ?? 0;
+  sectorScanDuration = payload.duration ?? 45;
+
+  // Mirror progress into the existing scan bar.
+  const pct = Math.min(100, Math.max(0, sectorScanProgress));
+  scanProgressFill.style.width = `${pct}%`;
+  scanProgressPct.textContent  = `${Math.round(pct)}%`;
+  cancelBtn.disabled           = false;
+
+  const scaleLabel = payload.scale === 'sector' ? 'SECTOR SWEEP' : 'LONG-RANGE SCAN';
+  scanTargetLabel.textContent = `${scaleLabel}: ${Math.round(pct)}%`;
+}
+
+function handleSectorScanComplete(payload) {
+  if (!gameActive) return;
+  SoundBank.play('scan_complete');
+  sectorScanActive   = false;
+  sectorScanProgress = 100;
+
+  // Show 100% briefly, then reset.
+  scanProgressFill.style.width = '100%';
+  scanProgressPct.textContent  = '100%';
+  const scaleLabel = payload.scale === 'sector' ? 'SECTOR SWEEP' : 'LONG-RANGE SCAN';
+  scanTargetLabel.textContent = `${scaleLabel}: COMPLETE`;
+
+  if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
+
+  setTimeout(() => {
+    sectorScanProgress = 0;
+    sectorScanPhase    = 0;
+    scanScale          = 'targeted';
+    updateScaleSelectorUI();
+    resetScanProgress();
+  }, 1500);
+
+  console.log(`[science] Sector scan complete: ${payload.scale} mode=${payload.mode}`);
+}
+
+function handleScanInterrupted(_payload) {
+  if (!gameActive) return;
+  sectorScanActive = false;
+  cancelBtn.disabled = true;
+  if (interruptOverlayEl) interruptOverlayEl.style.display = '';
+  console.log('[science] Scan interrupted — awaiting response');
+}
+
 function handleSignalBearing(payload) {
   if (!gameActive) return;
   bearingLines.push({ bearing: payload.bearing, ship_x: payload.ship_x, ship_y: payload.ship_y });
@@ -385,7 +471,24 @@ function handleGameOver(payload) {
 
 function setupControls() {
   scanBtn.addEventListener('click', () => {
-    if (!gameActive || !selectedId) return;
+    if (!gameActive) return;
+
+    // Sector-scale scans don't require a selected contact.
+    if (scanScale === 'sector' || scanScale === 'long_range') {
+      send('science.start_sector_scan', { scale: scanScale, mode: scanMode });
+      sectorScanActive   = true;
+      sectorScanProgress = 0;
+      sectorScanPhase    = 0;
+      const scaleLabel = scanScale === 'sector' ? 'SECTOR SWEEP' : 'LONG-RANGE SCAN';
+      scanTargetLabel.textContent = `${scaleLabel}: 0%`;
+      scanBtn.disabled   = true;
+      cancelBtn.disabled = false;
+      updateScaleSelectorUI();
+      return;
+    }
+
+    // Targeted entity scan (existing behaviour).
+    if (!selectedId) return;
     send('science.start_scan', { entity_id: selectedId });
     if (selectedId === 'signal') {
       // Signal scan is instant — server replies with mission.signal_bearing, no progress.
@@ -395,17 +498,54 @@ function setupControls() {
     } else {
       scanningId = selectedId;
       scanTargetLabel.textContent = `SCANNING: ${selectedId.toUpperCase()}`;
-      scanBtn.disabled  = true;
+      scanBtn.disabled   = true;
       cancelBtn.disabled = false;
     }
   });
 
   cancelBtn.addEventListener('click', () => {
     if (!gameActive) return;
-    send('science.cancel_scan', {});
-    scanningId = null;
-    resetScanProgress();
+    if (sectorScanActive) {
+      send('science.cancel_sector_scan', {});
+      sectorScanActive   = false;
+      sectorScanProgress = 0;
+      sectorScanPhase    = 0;
+      scanScale          = 'targeted';
+      if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
+      updateScaleSelectorUI();
+      resetScanProgress();
+    } else {
+      send('science.cancel_scan', {});
+      scanningId = null;
+      resetScanProgress();
+    }
   });
+
+  // Interrupt overlay — player chooses to continue or abort after combat interrupt.
+  if (scanContinueBtn) {
+    scanContinueBtn.addEventListener('click', () => {
+      if (!gameActive) return;
+      send('science.scan_interrupt_response', { continue_scan: true });
+      sectorScanActive   = true;
+      cancelBtn.disabled = false;
+      if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
+    });
+  }
+
+  if (scanAbortBtn) {
+    scanAbortBtn.addEventListener('click', () => {
+      if (!gameActive) return;
+      send('science.scan_interrupt_response', { continue_scan: false });
+      send('science.cancel_sector_scan', {});
+      sectorScanActive   = false;
+      sectorScanProgress = 0;
+      sectorScanPhase    = 0;
+      scanScale          = 'targeted';
+      if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
+      updateScaleSelectorUI();
+      resetScanProgress();
+    });
+  }
 }
 
 function selectContact(id) {
@@ -484,7 +624,25 @@ function renderContactList() {
 }
 
 function updateScanUI() {
-  // Check real contacts first; then signal pseudo-contact.
+  // During sector scan, targeted controls are locked.
+  if (sectorScanActive) {
+    scanBtn.disabled = true;
+    return;
+  }
+
+  // Sector or long-range scale selected — no contact needed.
+  if (scanScale === 'sector') {
+    scanTargetLabel.textContent = 'CURRENT SECTOR';
+    scanBtn.disabled = false;
+    return;
+  }
+  if (scanScale === 'long_range') {
+    scanTargetLabel.textContent = 'ALL ADJACENT SECTORS';
+    scanBtn.disabled = false;
+    return;
+  }
+
+  // Targeted scan — check real contacts first; then signal pseudo-contact.
   const target = contacts.find(c => c.id === selectedId)
     ?? (selectedId === 'signal' && signalLocation ? { id: 'signal', _isSignal: true } : null);
 
@@ -558,6 +716,9 @@ function renderLoop(now) {
     drawBearingLines(ctx, sensorCanvas.width, sensorCanvas.height);
   }
   drawModeOverlay(ctx, sensorCanvas.width, sensorCanvas.height);
+  if (sectorScanActive) {
+    drawSectorSweepOverlay(ctx, sensorCanvas.width, sensorCanvas.height);
+  }
 
   requestAnimationFrame(renderLoop);
 }
@@ -699,6 +860,36 @@ function setupModeButtons() {
   }
 }
 
+/** Wire click handlers for the 3 scan scale buttons. */
+function setupScaleButtons() {
+  const scaleMap = { targeted: 'targeted', sector: 'sector', longrange: 'long_range' };
+  for (const [btnKey, scaleKey] of Object.entries(scaleMap)) {
+    const btn = scaleBtns[btnKey];
+    if (!btn) continue;
+    btn.addEventListener('click', () => {
+      if (!gameActive || sectorScanActive) return;
+      scanScale = scaleKey;
+      updateScaleSelectorUI();
+    });
+  }
+}
+
+/** Refresh scale selector button appearance. Locks buttons during active sector scan. */
+function updateScaleSelectorUI() {
+  const locked = sectorScanActive;
+  for (const [btnKey, btn] of Object.entries(scaleBtns)) {
+    if (!btn) continue;
+    const scaleKey = btnKey === 'longrange' ? 'long_range' : btnKey;
+    btn.classList.toggle('scale-btn--active', scaleKey === scanScale && !locked);
+    btn.disabled = locked;
+  }
+  // Lock mode buttons during sector scan too.
+  for (const btn of Object.values(modeBtnEls)) {
+    if (btn) btn.disabled = locked;
+  }
+  updateScanUI();
+}
+
 /**
  * Draw the recalibration animation that plays during a mode switch.
  * progress ∈ [0, 1] — how far through the 3-second delay we are.
@@ -743,6 +934,82 @@ function drawRecalibrationOverlay(progress) {
   ctx.fillStyle = col + '88';
   ctx.font      = '9px "Share Tech Mono", monospace';
   ctx.fillText(`${Math.round(progress * 100)}%`, cw / 2, ch / 2 + 10);
+}
+
+/**
+ * Radar sweep animation drawn during sector-scale scans.
+ * A wedge expands from North clockwise as progress 0→100%.
+ * Phase boundaries are marked with faint arcs.
+ */
+function drawSectorSweepOverlay(ctx, cw, ch) {
+  const cx = cw / 2;
+  const cy = ch / 2;
+  const maxR = Math.hypot(cx, cy);
+  const progress = Math.min(100, sectorScanProgress) / 100;
+  const sweepAngle = progress * Math.PI * 2;
+  const modeColor = SCAN_MODES[scanMode].color;
+
+  // Filled wedge — scanned arc.
+  ctx.save();
+  ctx.globalAlpha = 0.07;
+  ctx.fillStyle   = modeColor;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  // North-up: start angle at -π/2, sweep clockwise.
+  ctx.arc(cx, cy, maxR, -Math.PI / 2, -Math.PI / 2 + sweepAngle);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Leading sweep line.
+  if (progress > 0 && progress < 1) {
+    const lineAngle = -Math.PI / 2 + sweepAngle;
+    const grad = ctx.createLinearGradient(cx, cy,
+      cx + Math.cos(lineAngle) * maxR,
+      cy + Math.sin(lineAngle) * maxR);
+    grad.addColorStop(0, modeColor + '00');
+    grad.addColorStop(1, modeColor + 'cc');
+    ctx.save();
+    ctx.strokeStyle = grad;
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(lineAngle) * maxR, cy + Math.sin(lineAngle) * maxR);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Phase boundary arcs at 25 / 50 / 75%.
+  const PHASES = [0.25, 0.5, 0.75];
+  for (const phaseFrac of PHASES) {
+    if (progress <= phaseFrac) break;
+    const pAngle = -Math.PI / 2 + phaseFrac * Math.PI * 2;
+    ctx.save();
+    ctx.strokeStyle = modeColor + '44';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(pAngle) * maxR, cy + Math.sin(pAngle) * maxR);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // Progress bar at canvas bottom.
+  ctx.fillStyle = modeColor + '55';
+  ctx.fillRect(0, ch - 3, cw * progress, 3);
+
+  // Status text.
+  const scaleText = scanScale === 'sector' ? 'SECTOR SWEEP' : 'LONG-RANGE SCAN';
+  const phaseText = `PHASE ${sectorScanPhase + 1}/4`;
+  ctx.save();
+  ctx.font         = '9px "Share Tech Mono", monospace';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle    = modeColor + 'cc';
+  ctx.fillText(`${scaleText} — ${phaseText} — ${Math.round(sectorScanProgress)}%`, cw / 2, 24);
+  ctx.restore();
 }
 
 /**

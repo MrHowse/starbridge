@@ -100,7 +100,11 @@ class Ship:
     throttle: float = 0.0        # desired speed fraction, 0-100 (%)
 
     # --- Hull ---
-    hull: float = 100.0  # 0-100 HP; 0 = destroyed
+    hull: float = 100.0      # current HP; 0 = destroyed
+    hull_max: float = 100.0  # maximum HP (set from ship class at game start)
+
+    # --- Docking ---
+    docked_at: str | None = None  # station ID while docked, None otherwise
 
     # --- Shields ---
     shields: Shields = field(default_factory=Shields)

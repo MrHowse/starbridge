@@ -4,6 +4,10 @@
   "description": "Massive capital ship. Formidable hull and firepower; sluggish but near-unstoppable. Requires a full complement of 10-12 to operate effectively.",
   "max_hull": 200,
   "torpedo_ammo": 20,
+  "torpedo_loadout": {
+    "standard": 12, "homing": 8, "ion": 8, "piercing": 8,
+    "heavy": 6, "proximity": 8, "nuclear": 2, "experimental": 2
+  },
   "min_crew": 10,
   "max_crew": 12
 }

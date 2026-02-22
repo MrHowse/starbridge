@@ -41,10 +41,12 @@ const BAND_TOLERANCE = 0.05;
 let activeFrequency = 0.15;
 let tunedFaction    = null;
 let transmissions   = [];
+let _approachStation = null;  // current approach-zone station info
 
 let canvas, ctx;
 let sliderEl, freqReadoutEl, factionBadgeEl, hailStatusEl;
 let hailPanelEl, hailControlsEl, logEl, assistPanelEl, assistInstructionsEl;
+let dockingPromptEl = null;   // dynamically created approach prompt
 
 // ── Initialisation ────────────────────────────────────────────────────────────
 
@@ -95,6 +97,14 @@ function init() {
   on("ship.hull_hit",  () => { SoundBank.play('hull_hit'); document.getElementById("station-container")?.classList.add("hit"); });
   on("ship.state",     () => document.getElementById("station-container")?.classList.remove("hit"));
   on("ship.alert_changed", ({ level }) => setAlertLevel(level));
+
+  // Docking
+  on("docking.approach_info",    handleDockingApproachInfo);
+  on("docking.clearance_request", ({ station_name }) => addLogEntry(`Clearance requested from ${station_name}…`, "outgoing"));
+  on("docking.clearance_granted", ({ station_name }) => { addLogEntry(`CLEARANCE GRANTED — ${station_name}`, "incoming"); _hideDockingPrompt(); });
+  on("docking.clearance_denied",  ({ reason }) => { addLogEntry(`CLEARANCE DENIED: ${reason}`, "incoming"); _hideDockingPrompt(); });
+  on("docking.complete",          ({ station_name }) => addLogEntry(`DOCKED AT ${station_name.toUpperCase()}`, "incoming"));
+  on("docking.undocked",          () => addLogEntry("Undocking complete — engines online.", "incoming"));
 
   // Connection
   on("statusChange", status => setStatusDot(document.getElementById("conn-status"), status));
@@ -203,6 +213,57 @@ function renderLog() {
     .reverse()
     .map(t => `<div class="log-entry log-entry--${t.type}">${t.text}</div>`)
     .join("");
+}
+
+// ── Docking helpers ───────────────────────────────────────────────────────────
+
+function handleDockingApproachInfo(info) {
+  _approachStation = info;
+  _renderDockingPrompt();
+}
+
+function _renderDockingPrompt() {
+  if (!_approachStation) return;
+
+  // Lazily create the prompt element inside the hail-panel section.
+  if (!dockingPromptEl) {
+    dockingPromptEl = document.createElement("div");
+    dockingPromptEl.id = "docking-prompt";
+    dockingPromptEl.style.cssText =
+      "border:1px solid var(--border-primary);padding:8px;margin-top:8px;font-size:.7rem";
+    const sidebar = document.querySelector(".comms-sidebar");
+    if (sidebar) sidebar.prepend(dockingPromptEl);
+  }
+
+  const { station_name, distance, docking_range, in_range, speed_ok } = _approachStation;
+  const rangeText = `${Math.round(distance)} / ${Math.round(docking_range)} u`;
+  const canDock   = in_range && speed_ok;
+
+  dockingPromptEl.innerHTML = `
+    <div style="color:var(--primary);letter-spacing:.1em">STATION IN RANGE</div>
+    <div>${station_name}</div>
+    <div style="color:var(--text-dim)">${rangeText}</div>
+    ${!speed_ok ? '<div style="color:var(--danger)">REDUCE SPEED &lt;10%</div>' : ''}
+    ${canDock
+      ? `<button id="request-clearance-btn" style="margin-top:4px;width:100%" class="btn btn--primary">
+           REQUEST CLEARANCE
+         </button>`
+      : ''}
+  `;
+
+  if (canDock) {
+    document.getElementById("request-clearance-btn")?.addEventListener("click", () => {
+      send("docking.request_clearance", { station_id: _approachStation.station_id });
+    });
+  }
+}
+
+function _hideDockingPrompt() {
+  if (dockingPromptEl) {
+    dockingPromptEl.innerHTML = "";
+    dockingPromptEl.style.display = "none";
+  }
+  _approachStation = null;
 }
 
 // ── Canvas draw ───────────────────────────────────────────────────────────────

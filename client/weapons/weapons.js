@@ -48,10 +48,16 @@ registerHelp([
 const RADAR_WORLD_RADIUS  = 15_000;  // world units shown at radar edge
 const BEAM_FLASH_MS       = 300;     // beam fire line animation duration
 const HIT_FLASH_MS        = 500;     // hull-hit border flash duration
-const TORP_RELOAD_TIME    = 5.0;     // must match server TORPEDO_RELOAD_TIME
 const TUBE_LOAD_TIME      = 3.0;     // must match server TUBE_LOAD_TIME
-const TORPEDO_TYPES       = ['standard', 'emp', 'probe', 'nuclear'];
-const TYPE_COLORS         = { standard: '#00ff41', emp: '#00c8ff', probe: '#ffcc00', nuclear: '#ff4040' };
+const TORPEDO_TYPES       = ['standard', 'homing', 'ion', 'piercing', 'heavy', 'proximity', 'nuclear', 'experimental'];
+const TYPE_ABBREV         = { standard: 'STD', homing: 'HOM', ion: 'ION', piercing: 'PRC',
+                               heavy: 'HVY', proximity: 'PRX', nuclear: 'NUC', experimental: 'EXP' };
+const TYPE_COLORS         = { standard: '#00ff41', homing: '#00ffcc', ion:  '#00c8ff',
+                               piercing: '#44aaff', heavy:  '#ff8800', proximity: '#ffcc00',
+                               nuclear:  '#ff4040', experimental: '#cc44ff' };
+// Per-type reload times (must mirror TORPEDO_RELOAD_BY_TYPE on server).
+const TYPE_RELOAD_TIMES   = { standard: 3.0, homing: 4.0, ion: 5.0, piercing: 4.0,
+                               heavy: 8.0, proximity: 4.0, nuclear: 10.0, experimental: 6.0 };
 const TRAIL_LENGTH        = 5;       // torpedo trail positions to store
 const EXPLOSION_DURATION  = 500;     // explosion ring animation duration ms
 
@@ -122,8 +128,13 @@ let selectedId  = null;   // selected enemy entity_id or null
 let suggestedId = null;   // cadet hint: nearest/lowest-hull contact
 
 // Tube state (from ship.state).
-let tubeTypes   = ['standard', 'standard'];
-let tubeLoading = [0.0, 0.0];
+let tubeTypes       = ['standard', 'standard'];
+let tubeLoading     = [0.0, 0.0];
+let tubeReloadTimes = [3.0, 3.0];  // reference reload time per tube (set when fired)
+
+// Per-type ammo (from ship.state.torpedo_ammo dict).
+let torpedoAmmo    = {};   // type → current count
+let torpedoAmmoMax = {};   // type → max count
 
 // Pending nuclear auth: request_id for each tube (or null).
 let pendingAuth = [null, null];
@@ -246,9 +257,15 @@ function handleShipState(payload) {
   if (!gameActive) return;
   shipState = payload;
   if (radarRenderer) radarRenderer.updateShipState(payload);
-  if (payload.tube_types)   tubeTypes   = payload.tube_types;
-  if (payload.tube_loading) tubeLoading = payload.tube_loading;
+  if (payload.tube_types)        tubeTypes       = payload.tube_types;
+  if (payload.tube_loading)      tubeLoading     = payload.tube_loading;
+  if (payload.tube_reload_times) tubeReloadTimes = payload.tube_reload_times;
+  if (payload.torpedo_ammo && typeof payload.torpedo_ammo === 'object')
+    torpedoAmmo = payload.torpedo_ammo;
+  if (payload.torpedo_ammo_max && typeof payload.torpedo_ammo_max === 'object')
+    torpedoAmmoMax = payload.torpedo_ammo_max;
   updateTubeUI(payload);
+  updateMagazinePanel();
 }
 
 function handleSensorContacts(payload) {
@@ -429,7 +446,7 @@ function setupControls() {
 }
 
 function _buildLoadControls() {
-  // Find the torpedo tubes section and append type-badge elements + load controls.
+  // Find the torpedo tubes section.
   const torpSection = document.querySelector('.ctrl-section:nth-of-type(3)');
   if (!torpSection) return;
 
@@ -443,6 +460,12 @@ function _buildLoadControls() {
     row.insertBefore(badge, row.querySelector('.fire-btn'));
   });
 
+  // Magazine panel (per-type ammo display).
+  const magSection = document.createElement('div');
+  magSection.id = 'magazine-panel';
+  magSection.className = 'magazine-panel';
+  torpSection.appendChild(magSection);
+
   // Load selector for each tube.
   const loadSection = document.createElement('div');
   loadSection.className = 'tube-load-section';
@@ -451,8 +474,8 @@ function _buildLoadControls() {
     <div class="tube-load-row" id="tube-load-btns">
       ${TORPEDO_TYPES.map(t => `
         <button class="load-btn" data-type="${t}" style="border-color:${TYPE_COLORS[t]}"
-                title="Load ${t.toUpperCase()} torpedo">
-          ${t === 'standard' ? 'STD' : t.toUpperCase()}
+                title="Load ${TYPE_ABBREV[t] || t.toUpperCase()} torpedo">
+          ${TYPE_ABBREV[t] || t.toUpperCase()}
         </button>
       `).join('')}
       <select class="load-tube-select text-data" id="load-tube-sel">
@@ -571,18 +594,20 @@ function updateTargetPanel() {
 }
 
 function updateTubeUI(state) {
-  const ammo      = state.torpedo_ammo  ?? 0;
-  const cooldowns = state.tube_cooldowns ?? [0, 0];
-  const serverTypes   = state.tube_types   || tubeTypes;
-  const serverLoading = state.tube_loading || tubeLoading;
+  const cooldowns     = state.tube_cooldowns   ?? [0, 0];
+  const serverTypes   = state.tube_types       || tubeTypes;
+  const serverLoading = state.tube_loading     || tubeLoading;
+  const reloadRefs    = state.tube_reload_times || tubeReloadTimes;
 
-  ammoLabel.textContent = `AMMO: ${ammo}`;
+  // Header ammo label: total ammo across all types.
+  const totalAmmo = Object.values(torpedoAmmo).reduce((s, v) => s + v, 0);
+  ammoLabel.textContent = `AMMO: ${totalAmmo}`;
 
-  _updateSingleTube(1, cooldowns[0] ?? 0, serverTypes[0], serverLoading[0] ?? 0, ammo);
-  _updateSingleTube(2, cooldowns[1] ?? 0, serverTypes[1], serverLoading[1] ?? 0, ammo);
+  _updateSingleTube(1, cooldowns[0] ?? 0, serverTypes[0], serverLoading[0] ?? 0, reloadRefs[0] ?? 3.0);
+  _updateSingleTube(2, cooldowns[1] ?? 0, serverTypes[1], serverLoading[1] ?? 0, reloadRefs[1] ?? 3.0);
 }
 
-function _updateSingleTube(tubeNum, cooldown, tType, loadTimer, ammo) {
+function _updateSingleTube(tubeNum, cooldown, tType, loadTimer, reloadRef) {
   const reloadFill = document.getElementById(`tube${tubeNum}-reload-fill`);
   const statusEl   = document.getElementById(`tube${tubeNum}-status`);
   const fireBtn    = document.getElementById(`tube${tubeNum}-fire-btn`);
@@ -591,15 +616,17 @@ function _updateSingleTube(tubeNum, cooldown, tType, loadTimer, ammo) {
   const isLoading    = loadTimer > 0;
   const isReloading  = cooldown  > 0;
   const authPending  = pendingAuth[tubeNum - 1] !== null;
+  const typeAmmo     = torpedoAmmo[tType] ?? 0;
 
   let pct, statusText, disabled;
 
   if (isLoading) {
     pct        = Math.max(0, (1 - loadTimer / TUBE_LOAD_TIME) * 100);
-    statusText = `LOADING ${(tType || '').toUpperCase()}`;
+    statusText = `LOADING ${TYPE_ABBREV[tType] || (tType || '').toUpperCase()}`;
     disabled   = true;
   } else if (isReloading) {
-    pct        = Math.max(0, (1 - cooldown / TORP_RELOAD_TIME) * 100);
+    const refTime = reloadRef > 0 ? reloadRef : (TYPE_RELOAD_TIMES[tType] ?? 5.0);
+    pct        = Math.max(0, (1 - cooldown / refTime) * 100);
     statusText = 'RELOADING';
     disabled   = true;
   } else if (authPending) {
@@ -609,7 +636,7 @@ function _updateSingleTube(tubeNum, cooldown, tType, loadTimer, ammo) {
   } else {
     pct        = 100;
     statusText = 'READY';
-    disabled   = ammo <= 0;
+    disabled   = typeAmmo <= 0;
   }
 
   reloadFill.style.width = `${pct}%`;
@@ -623,9 +650,27 @@ function _updateSingleTube(tubeNum, cooldown, tType, loadTimer, ammo) {
   // Show type badge next to tube label.
   const typeEl = document.getElementById(`tube${tubeNum}-type`);
   if (typeEl) {
-    typeEl.textContent  = (tType || 'STD').toUpperCase();
+    typeEl.textContent  = TYPE_ABBREV[tType] || (tType || 'STD').toUpperCase();
     typeEl.style.color  = col;
   }
+}
+
+function updateMagazinePanel() {
+  const panelEl = document.getElementById('magazine-panel');
+  if (!panelEl) return;
+  panelEl.innerHTML = TORPEDO_TYPES.map(t => {
+    const cur = torpedoAmmo[t] ?? 0;
+    const max = torpedoAmmoMax[t] ?? 0;
+    if (max === 0) return '';
+    const col  = TYPE_COLORS[t] || '#888';
+    const abbr = TYPE_ABBREV[t] || t.toUpperCase();
+    const pct  = max > 0 ? Math.round((cur / max) * 100) : 0;
+    return `<div class="mag-type" style="border-color:${col}">
+      <span class="mag-abbr" style="color:${col}">${abbr}</span>
+      <span class="mag-count">${cur}/${max}</span>
+      <div class="mag-bar"><div class="mag-fill" style="width:${pct}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
 }
 
 // ---------------------------------------------------------------------------

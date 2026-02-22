@@ -122,6 +122,25 @@ def tick(world: World, ship: Ship, dt: float) -> None:
             # Not targeted (or ECM offline) — decay toward 0.
             enemy.jam_factor = max(0.0, enemy.jam_factor - JAM_DECAY_RATE * dt)
 
+    # v0.05i — station sensor array jamming.
+    # If the jam target is a station sensor component ("*_sensor"), mark it jammed.
+    if _jam_target_id and _jam_target_id.endswith("_sensor") and effective_range > 0.0:
+        for station in world.stations:
+            if station.defenses is None:
+                continue
+            sa = station.defenses.sensor_array
+            if sa.id == _jam_target_id:
+                dist = distance(ship.x, ship.y, station.x, station.y)
+                sa.jammed = dist <= effective_range
+                break
+    else:
+        # Clear jammed flag when the sensor is no longer actively targeted.
+        for station in world.stations:
+            if station.defenses is not None:
+                sa = station.defenses.sensor_array
+                if sa.jammed and (_jam_target_id is None or sa.id != _jam_target_id):
+                    sa.jammed = False
+
 
 def build_state(world: World, ship: Ship) -> dict:
     """Serialise EW state for broadcast to the electronic_warfare role."""
