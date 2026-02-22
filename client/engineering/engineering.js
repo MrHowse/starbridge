@@ -1,20 +1,30 @@
 /**
- * Starbridge — Engineering Station
+ * Starbridge — Engineering Station (v0.06.2)
  *
- * Displays a top-down ship schematic with 6 system nodes and a right-side
- * panel for power allocation sliders, health bars, and repair control.
+ * Three-column command centre with power management, ship interior map,
+ * repair team dispatch, and component-level diagnostics.
  *
  * Server messages received:
- *   ship.state         — full system snapshot (power, health, efficiency per system)
- *   ship.system_damaged — brief red flash + immediate health update for a system
+ *   ship.state              — full system snapshot (power, health, efficiency)
+ *   engineering.state        — components, repair teams, power grid, battery, orders
+ *   engineering.dc_state     — room hazard states for interior map
+ *   ship.system_damaged      — immediate health update flash
+ *   ship.hull_hit            — red flash on station border
+ *   captain.override_changed — system taken offline by Captain
+ *   game.started             — mission begins
+ *   game.over                — mission ends
  *
  * Server messages sent:
- *   engineering.set_power  { system, level } — adjust a system's power (0–150)
- *   engineering.set_repair { system }        — set repair focus to one system
- *
- * Render loop:
- *   rAF at ~60 fps drives the schematic canvas only (damage flash + repair pulse).
- *   DOM readouts (sliders, bars, text) are updated directly in the ship.state handler.
+ *   engineering.set_power       { system, level }
+ *   engineering.set_repair      { system }
+ *   engineering.dispatch_team   { team_id, system }
+ *   engineering.recall_team     { team_id }
+ *   engineering.set_battery_mode { mode }
+ *   engineering.start_reroute   { target_bus }
+ *   engineering.request_escort  { team_id }
+ *   engineering.cancel_repair_order { order_id }
+ *   engineering.dispatch_dct    { room_id }
+ *   engineering.cancel_dct      { room_id }
  */
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
@@ -30,134 +40,111 @@ import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
 
 registerHelp([
-  { selector: '#schematic',         text: 'Ship schematic — click a system node to set repair focus.', position: 'right' },
-  { selector: '#systems-container', text: 'System sliders — drag to allocate power (0–150%). Budget is 700 total.', position: 'left' },
-  { selector: '#budget-readout',    text: 'Power budget — stay under 700 to avoid overload.', position: 'below' },
+  { selector: '#systems-container', text: 'Power sliders — drag to allocate power (0–150%). Keys 1-9 select system.', position: 'right' },
+  { selector: '#interior-map',      text: 'Ship interior — shows damage, repair teams, and hazards.', position: 'left' },
+  { selector: '#components-container', text: 'Component detail — shows sub-component health for selected system.', position: 'left' },
+  { selector: '#budget-readout',    text: 'Power budget — total demand vs reactor output.', position: 'below' },
 ]);
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const POWER_BUDGET        = 700;    // total budget for all 7 systems combined
-const OVERCLOCK_THRESHOLD = 100;    // power above this is "overclocked"
-const DAMAGE_FLASH_MS     = 500;    // duration of the red damage flash on a node
+const POWER_BUDGET        = 900;    // 9 systems × 100
+const OVERCLOCK_THRESHOLD = 100;
+const DAMAGE_FLASH_MS     = 500;
 
-// System health colour thresholds (match STYLE_GUIDE.md --system-* variables)
 const C_HEALTHY  = '#00ff41';
 const C_WARNING  = '#ffb000';
 const C_CRITICAL = '#ff2020';
 const C_OFFLINE  = '#444444';
 
+// Interior map canvas constants (matching Security station geometry)
+const ROOM_W   = 120;
+const ROOM_H   = 70;
+const ROOM_GAP = 8;
+const ROOM_MARGIN = 40;
+
 // ---------------------------------------------------------------------------
-// System definitions
+// System definitions — all 9 systems
 // ---------------------------------------------------------------------------
 
-/**
- * All 6 ship systems with their normalised positions on the schematic canvas.
- * nx/ny are in the range [-0.5, 0.5]; multiplied by `scale` at render time.
- * labelDir controls where the text label appears relative to the node circle.
- */
 const SYSTEM_DEFS = [
-  { key: 'sensors',     label: 'SENSORS',    nx:  0.00, ny: -0.36, labelDir: 'below' },
-  { key: 'shields',     label: 'SHIELDS',    nx:  0.00, ny: -0.12, labelDir: 'right' },
-  { key: 'beams',       label: 'BEAMS',      nx: -0.28, ny:  0.04, labelDir: 'left'  },
-  { key: 'torpedoes',   label: 'TORPEDOES',  nx:  0.28, ny:  0.04, labelDir: 'right' },
-  { key: 'manoeuvring', label: 'MANOEUV.',   nx:  0.00, ny:  0.20, labelDir: 'left'  },
-  { key: 'engines',     label: 'ENGINES',    nx:  0.00, ny:  0.37, labelDir: 'above' },
-  { key: 'flight_deck', label: 'FLT DECK',   nx:  0.28, ny: -0.20, labelDir: 'right' },
+  { key: 'sensors',       label: 'SENSORS',     shortKey: '1' },
+  { key: 'shields',       label: 'SHIELDS',     shortKey: '2' },
+  { key: 'beams',         label: 'BEAMS',       shortKey: '3' },
+  { key: 'torpedoes',     label: 'TORPEDOES',   shortKey: '4' },
+  { key: 'manoeuvring',   label: 'MANOEUV.',    shortKey: '5' },
+  { key: 'engines',       label: 'ENGINES',     shortKey: '6' },
+  { key: 'flight_deck',   label: 'FLT DECK',    shortKey: '7' },
+  { key: 'ecm_suite',     label: 'ECM',         shortKey: '8' },
+  { key: 'point_defence', label: 'PT DEFENCE',  shortKey: '9' },
 ];
 
-/**
- * Ship hull outline — top-down view, nose pointing up (negative Y).
- * Points are normalised; multiply by scale for canvas pixels.
- */
-const HULL_POINTS = [
-  [ 0.00, -0.44],   // nose tip
-  [-0.16, -0.30],   // fore port
-  [-0.36, -0.08],   // port widest
-  [-0.36,  0.18],   // port mid-aft
-  [-0.26,  0.32],   // port nacelle outer
-  [-0.22,  0.43],   // port engine tip
-  [-0.14,  0.36],   // port nacelle inner
-  [-0.06,  0.38],   // stern port
-  [ 0.00,  0.44],   // stern centre
-  [ 0.06,  0.38],   // stern starboard
-  [ 0.14,  0.36],   // stbd nacelle inner
-  [ 0.22,  0.43],   // stbd engine tip
-  [ 0.26,  0.32],   // stbd nacelle outer
-  [ 0.36,  0.18],   // stbd mid-aft
-  [ 0.36, -0.08],   // stbd widest
-  [ 0.16, -0.30],   // fore starboard
-];
+const BATTERY_MODES = ['charging', 'standby', 'discharging', 'auto'];
 
-/**
- * Interior structural detail lines — bulkheads, spinal corridor, nacelle dividers.
- * Each entry is [[ax, ay], [bx, by]] in normalised coordinates.
- */
-const STRUCTURE_LINES = [
-  // Centre spine
-  [[ 0.00, -0.44], [ 0.00,  0.38]],
-  // Fore bulkhead (sensors ↔ shields zone)
-  [[-0.14, -0.22], [ 0.14, -0.22]],
-  // Mid bulkhead (beams/torpedoes zone)
-  [[-0.34,  0.06], [ 0.34,  0.06]],
-  // Aft bulkhead (manoeuvring zone)
-  [[-0.26,  0.26], [ 0.26,  0.26]],
-  // Port nacelle divider
-  [[-0.14,  0.36], [-0.06,  0.38]],
-  // Starboard nacelle divider
-  [[ 0.14,  0.36], [ 0.06,  0.38]],
-];
+const OVERLAY_MODES = ['damage', 'teams', 'hazards', 'all'];
 
 // ---------------------------------------------------------------------------
 // DOM references
 // ---------------------------------------------------------------------------
 
-const statusDotEl     = document.querySelector('[data-status-dot]');
-const statusLabelEl   = document.querySelector('[data-status-label]');
-const standbyEl       = document.querySelector('[data-standby]');
-const engMainEl       = document.querySelector('[data-eng-main]');
-const missionLabelEl  = document.getElementById('mission-label');
-const schematicCanvas = document.getElementById('schematic');
-const budgetReadoutEl = document.getElementById('budget-readout');
-const budgetGaugeFill = document.getElementById('budget-gauge-fill');
-const repairStatusEl  = document.getElementById('repair-status-label');
-const systemsContainer = document.getElementById('systems-container');
+const statusDotEl        = document.querySelector('[data-status-dot]');
+const statusLabelEl      = document.querySelector('[data-status-label]');
+const standbyEl          = document.querySelector('[data-standby]');
+const engMainEl          = document.querySelector('[data-eng-main]');
+const statusBarEl        = document.querySelector('[data-statusbar]');
+const missionLabelEl     = document.getElementById('mission-label');
+const reactorReadoutEl   = document.getElementById('reactor-readout');
+const reactorGaugeFill   = document.getElementById('reactor-gauge-fill');
+const batteryReadoutEl   = document.getElementById('battery-readout');
+const batteryGaugeFill   = document.getElementById('battery-gauge-fill');
+const batteryModesEl     = document.getElementById('battery-modes');
+const budgetReadoutEl    = document.getElementById('budget-readout');
+const budgetGaugeFill    = document.getElementById('budget-gauge-fill');
+const systemsContainer   = document.getElementById('systems-container');
+const repairQueueCountEl = document.getElementById('repair-queue-count');
+const repairQueueListEl  = document.getElementById('repair-queue-list');
+const interiorCanvas     = document.getElementById('interior-map');
+const overlaySelectorEl  = document.getElementById('overlay-selector');
+const teamCardsEl        = document.getElementById('team-cards');
+const detailTitleEl      = document.getElementById('detail-title');
+const componentsEl       = document.getElementById('components-container');
+const dispatchControlsEl = document.getElementById('dispatch-controls');
+const dispatchTeamListEl = document.getElementById('dispatch-team-list');
+const damageLogListEl    = document.getElementById('damage-log-list');
+
+// Status bar
+const sbPowerVal     = document.getElementById('sb-power-val');
+const sbBatteryVal   = document.getElementById('sb-battery-val');
+const sbTeamsVal     = document.getElementById('sb-teams-val');
+const sbBusVal       = document.getElementById('sb-bus-val');
+const sbEmergencyVal = document.getElementById('sb-emergency-val');
+const sbEmergencyEl  = document.getElementById('sb-emergency');
 
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
 
-let gameActive    = false;
-let hintsEnabled  = false;  // true when difficulty === 'cadet'
-let currState     = null;   // most recent ship.state payload
-let repairFocus   = null;   // key of the system currently being repaired (or null)
+let gameActive     = false;
+let hintsEnabled   = false;
+let currShipState  = null;    // most recent ship.state payload
+let currEngState   = null;    // most recent engineering.state payload
+let selectedSystem = null;    // key of the system selected in detail panel
+let repairFocus    = null;    // key of the system currently being repaired
+let activeOverlay  = 'damage';
 
-/**
- * Timestamp (performance.now()) of the most recent damage event per system.
- * Used to drive the red flash animation in the schematic render loop.
- */
-const flashSystems = {};
+// Interior map
+let interiorLayout = {};      // room_id → {name, deck, col, row, connections}
+let roomStates     = {};      // room_id → {state, door_sealed}
+let activeDcts     = {};      // room_id → progress 0..1
+let ictx           = null;    // interior canvas context
+let canvasW        = 584;
+let canvasH        = 462;
 
-/** Canvas rendering context — set on first game start after layout is ready. */
-let sctx = null;
+const flashSystems = {};      // system_key → timestamp of last damage flash
 
-/**
- * Per-system DOM element cache, keyed by system name.
- * Populated by buildSystemRows() at game start.
- *
- * @type {Record<string, {
- *   row: HTMLElement,
- *   slider: HTMLInputElement,
- *   healthFill: HTMLElement,
- *   healthText: HTMLElement,
- *   pwrText: HTMLElement,
- *   effText: HTMLElement,
- *   repairBtn: HTMLButtonElement,
- *   hintBadge: HTMLElement,
- * }>}
- */
+/** Per-system DOM element cache. */
 const sysEls = {};
 
 // ---------------------------------------------------------------------------
@@ -174,19 +161,23 @@ function init() {
     console.log('[engineering] Connected as', payload.connection_id);
   });
 
-  on('game.started',           handleGameStarted);
-  on('ship.state',             handleShipState);
-  on('ship.system_damaged',    handleSystemDamaged);
-  on('ship.hull_hit',          handleHullHit);
-  on('ship.alert_changed',     ({ level }) => setAlertLevel(level));
-  on('game.over',              handleGameOver);
-  on('puzzle.assist_available', handleAssistAvailable);
-  on('puzzle.assist_sent',      handleAssistSent);
-  on('engineering.dc_state',   handleDCState);
+  on('game.started',             handleGameStarted);
+  on('ship.state',               handleShipState);
+  on('engineering.state',        handleEngState);
+  on('engineering.dc_state',     handleDCState);
+  on('ship.system_damaged',      handleSystemDamaged);
+  on('ship.hull_hit',            handleHullHit);
+  on('ship.alert_changed',       ({ level }) => setAlertLevel(level));
+  on('game.over',                handleGameOver);
+  on('puzzle.assist_available',  handleAssistAvailable);
+  on('puzzle.assist_sent',       handleAssistSent);
   on('captain.override_changed', handleCaptainOverride);
 
+  setupBatteryModeButtons();
+  setupOverlayButtons();
+  setupKeyboard();
+
   initPuzzleRenderer(send);
-  setupSchematicClick();
   SoundBank.init();
   wireButtonSounds(SoundBank);
   initHelpOverlay();
@@ -203,18 +194,23 @@ function handleGameStarted(payload) {
   missionLabelEl.textContent = payload.mission_name.toUpperCase();
   standbyEl.style.display    = 'none';
   engMainEl.style.display    = 'grid';
+  statusBarEl.style.display  = 'flex';
 
-  // Build the system rows synchronously so they are ready before the first
-  // ship.state tick arrives (the game loop starts broadcasting immediately).
+  // Store interior layout for the map
+  interiorLayout = payload.interior_layout || {};
+
+  // Compute canvas size from layout
+  computeCanvasSize();
+
+  // Build system rows
   buildSystemRows();
   gameActive = true;
 
-  // Defer canvas setup one frame so the grid layout is fully computed
-  // before we read clientWidth/clientHeight for sizing.
+  // Setup interior canvas
   requestAnimationFrame(() => {
-    sctx = schematicCanvas.getContext('2d');
-    resizeSchematic();
-    window.addEventListener('resize', resizeSchematic);
+    ictx = interiorCanvas.getContext('2d');
+    interiorCanvas.width  = canvasW;
+    interiorCanvas.height = canvasH;
     requestAnimationFrame(renderLoop);
   });
 
@@ -237,15 +233,37 @@ function handleGameOver(payload) {
 
 function handleShipState(payload) {
   if (!gameActive) return;
-  currState = payload;
-  applyState(payload);
+  currShipState = payload;
+  applyShipState(payload);
   const totalPwr = Object.values(payload.systems || {}).reduce((s, sys) => s + (sys.power || 0), 0);
   SoundBank.setAmbient('reactor_drone', { powerLoad: totalPwr / POWER_BUDGET });
 }
 
-/**
- * Hull took damage from an incoming hit — flash the station border red.
- */
+function handleEngState(payload) {
+  if (!gameActive) return;
+  currEngState = payload;
+  applyEngState(payload);
+}
+
+function handleDCState(payload) {
+  if (!gameActive) return;
+  roomStates  = payload.rooms || {};
+  activeDcts  = payload.active_dcts || {};
+}
+
+function handleSystemDamaged(payload) {
+  SoundBank.play('system_damage');
+  flashSystems[payload.system] = performance.now();
+
+  if (currShipState?.systems?.[payload.system] != null) {
+    currShipState.systems[payload.system].health = payload.new_health;
+  }
+  const els = sysEls[payload.system];
+  if (els) {
+    updateHealthDOM(payload.system, payload.new_health, els);
+  }
+}
+
 function handleHullHit() {
   SoundBank.play('hull_hit');
   const el = document.querySelector('.station-container') || document.body;
@@ -254,37 +272,49 @@ function handleHullHit() {
   setTimeout(() => { el.style.outline = ''; }, 500);
 }
 
+function handleCaptainOverride({ system, online }) {
+  const els = sysEls[system];
+  if (!els) return;
+
+  els.row.classList.toggle('sys-row--override', !online);
+
+  let badge = els.row.querySelector('.sys-row__override-badge');
+  if (!online) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className   = 'sys-row__override-badge';
+      badge.textContent = 'OFFLINE';
+      els.row.appendChild(badge);
+    }
+    if (els.slider) els.slider.disabled = true;
+  } else {
+    if (badge) badge.remove();
+    if (els.slider) els.slider.disabled = false;
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Cross-station assist notification panel
+// Cross-station assist notification
 // ---------------------------------------------------------------------------
 
-/** The floating assist notification element, or null when not shown. */
 let _assistPanel = null;
 
-/**
- * Science has an active frequency puzzle that Engineering can assist.
- * Show a notification panel instructing the engineer to boost sensor power.
- */
 function handleAssistAvailable(payload) {
-  // Remove any previous notification.
   if (_assistPanel) _assistPanel.remove();
 
   const panel = document.createElement('div');
   panel.className = 'assist-panel panel';
   panel.innerHTML = `
     <div class="panel__header">
-      <span class="text-label">⚡ SENSOR ASSIST AVAILABLE</span>
+      <span class="text-label">SENSOR ASSIST AVAILABLE</span>
     </div>
-    <p class="assist-panel__msg text-data">${payload.instructions}</p>
+    <p class="assist-panel__msg text-data">${escapeHtml(payload.instructions)}</p>
   `;
   const container = document.querySelector('.station-container');
   if (container) container.appendChild(panel);
   _assistPanel = panel;
 }
 
-/**
- * The sensor assist was applied — update the notification to confirm relay.
- */
 function handleAssistSent(payload) {
   if (!_assistPanel) return;
   const msgEl = _assistPanel.querySelector('.assist-panel__msg');
@@ -292,46 +322,18 @@ function handleAssistSent(payload) {
     msgEl.textContent = payload.message || 'Calibration data relayed to Science.';
     msgEl.classList.add('assist-panel__msg--sent');
   }
-  // Auto-dismiss after 4 s.
   setTimeout(() => {
-    if (_assistPanel) {
-      _assistPanel.remove();
-      _assistPanel = null;
-    }
+    if (_assistPanel) { _assistPanel.remove(); _assistPanel = null; }
   }, 4000);
 }
 
-/**
- * A system took damage (from overclock or combat). Flash the node on the
- * schematic and update the health bar immediately without waiting for the
- * next ship.state tick.
- */
-function handleSystemDamaged(payload) {
-  SoundBank.play('system_damage');
-  flashSystems[payload.system] = performance.now();
-
-  // Optimistically update health so the bar reflects damage instantly.
-  if (currState?.systems?.[payload.system] != null) {
-    currState.systems[payload.system].health = payload.new_health;
-  }
-  const els = sysEls[payload.system];
-  if (els) {
-    updateHealthDOM(payload.system, payload.new_health, els);
-  }
-}
-
 // ---------------------------------------------------------------------------
-// State → DOM
+// Ship state → DOM (left panel system sliders)
 // ---------------------------------------------------------------------------
 
-/**
- * Apply a full ship.state payload to all DOM elements in the controls panel.
- * Called on every server tick (10 Hz); canvas is updated separately via rAF.
- */
-function applyState(state) {
+function applyShipState(state) {
   if (state.alert_level) setAlertLevel(state.alert_level);
 
-  // Repair focus may have changed (e.g. server corrected our optimistic update).
   if (state.repair_focus !== repairFocus) {
     repairFocus = state.repair_focus ?? null;
     updateRepairFocusDOM();
@@ -348,7 +350,6 @@ function applyState(state) {
 
     updateHealthDOM(def.key, sys.health, els);
 
-    // Reflect server-clamped power on slider (user may have dragged beyond budget).
     const serverPwr = Math.round(sys.power);
     if (parseInt(els.slider.value, 10) !== serverPwr) {
       els.slider.value = serverPwr;
@@ -358,11 +359,9 @@ function applyState(state) {
     els.pwrText.textContent = `${Math.round(sys.power)}%`;
     els.effText.textContent = sys.efficiency.toFixed(2);
 
-    // Overclock indicator on row + slider thumb colour.
     els.row.classList.toggle('sys-row--overclocked', sys.power > OVERCLOCK_THRESHOLD);
     els.row.classList.toggle('sys-row--offline',     sys.health <= 0);
 
-    // Cadet hint: flag critical systems (health < 50%) that are underpowered (< 75%).
     const needsHint = hintsEnabled && sys.health < 50 && sys.power < 75;
     els.hintBadge.style.display = needsHint ? '' : 'none';
   }
@@ -371,70 +370,108 @@ function applyState(state) {
   const budgetPct = Math.min(100, (totalPower / POWER_BUDGET) * 100);
   budgetReadoutEl.textContent    = `${Math.round(totalPower)} / ${POWER_BUDGET}`;
   budgetGaugeFill.style.width    = `${budgetPct}%`;
-
-  // Budget bar is informational only — always green.
-  // 600/600 is the comfortable starting equilibrium, not a warning state.
-  // Per-system overclock warnings (amber slider thumb, sys-row--overclocked) handle alerts.
   budgetGaugeFill.style.background = 'var(--primary)';
-  budgetReadoutEl.style.color       = 'var(--text-bright)';
+  budgetReadoutEl.style.color      = 'var(--text-bright)';
 }
 
-/** Update a system's health bar and readout text. */
-function updateHealthDOM(key, health, els) {
-  const color = systemColor(health);
-  els.healthFill.style.width      = `${Math.max(0, health)}%`;
-  els.healthFill.style.background = color;
-  els.healthText.textContent      = `${Math.round(health)}%`;
-  els.healthText.style.color      = color;
-}
+// ---------------------------------------------------------------------------
+// Engineering state → DOM (reactor, battery, teams, components, log)
+// ---------------------------------------------------------------------------
 
-/** Refresh all repair-focus indicators across the controls panel. */
-function updateRepairFocusDOM() {
-  for (const def of SYSTEM_DEFS) {
-    const els = sysEls[def.key];
-    if (!els) continue;
-    const active = repairFocus === def.key;
-    els.row.classList.toggle('sys-row--repair-focus', active);
-    els.repairBtn.classList.toggle('sys-row__repair-btn--active', active);
-    els.repairBtn.textContent = active ? 'REPAIRING' : 'REPAIR';
+function applyEngState(state) {
+  // --- Reactor ---
+  const pg = state.power_grid || {};
+  const reactorOut = Math.round(pg.reactor_output || 0);
+  const reactorMax = Math.round(pg.reactor_max || 700);
+  reactorReadoutEl.textContent = `${reactorOut} / ${reactorMax}`;
+  const reactorPct = reactorMax > 0 ? Math.min(100, (reactorOut / reactorMax) * 100) : 0;
+  reactorGaugeFill.style.width = `${reactorPct}%`;
+  const reactorHealth = pg.reactor_health ?? 1;
+  reactorGaugeFill.style.background = reactorHealth < 0.5 ? 'var(--system-warning)' : 'var(--primary)';
+
+  // --- Battery ---
+  const batCharge = Math.round(pg.battery_charge || 0);
+  const batCap    = Math.round(pg.battery_capacity || 500);
+  batteryReadoutEl.textContent = `${batCharge} / ${batCap}`;
+  const batPct = batCap > 0 ? Math.min(100, (batCharge / batCap) * 100) : 0;
+  batteryGaugeFill.style.width = `${batPct}%`;
+  batteryGaugeFill.style.background = batPct < 20 ? 'var(--system-warning)' : 'var(--friendly)';
+
+  // Battery mode buttons
+  updateBatteryModeButtons(pg.battery_mode || 'standby');
+
+  // --- Repair teams ---
+  const teams = state.repair_teams || [];
+  renderTeamCards(teams);
+
+  // --- Repair orders queue ---
+  const orders = state.repair_orders || [];
+  renderRepairQueue(orders);
+
+  // --- Component detail (if system selected) ---
+  if (selectedSystem && state.systems?.[selectedSystem]) {
+    renderComponentDetail(selectedSystem, state.systems[selectedSystem]);
   }
-  repairStatusEl.textContent = repairFocus
-    ? `REPAIRING: ${repairFocus.toUpperCase()}`
-    : 'NO REPAIR ACTIVE';
+
+  // --- Damage log ---
+  const events = state.recent_damage_events || [];
+  renderDamageLog(events);
+
+  // --- Status bar ---
+  sbPowerVal.textContent   = `${reactorOut}W`;
+  sbBatteryVal.textContent = `${Math.round(batPct)}%`;
+
+  const activeTeams = teams.filter(t => t.status !== 'idle').length;
+  sbTeamsVal.textContent = `${activeTeams}/${teams.length}`;
+
+  const pri = pg.primary_bus_online !== false;
+  const sec = pg.secondary_bus_online !== false;
+  sbBusVal.textContent = pri && sec ? 'PRI+SEC' : pri ? 'PRI' : sec ? 'SEC' : 'NONE';
+  if (!pri || !sec) sbBusVal.style.color = 'var(--system-warning)';
+  else sbBusVal.style.color = '';
+
+  const isEmergency = pg.emergency_active || false;
+  sbEmergencyVal.textContent = isEmergency ? 'ACTIVE' : 'NOMINAL';
+  if (sbEmergencyEl) {
+    sbEmergencyEl.classList.toggle('eng-statusbar__item--emergency', isEmergency);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Build system control rows
 // ---------------------------------------------------------------------------
 
-/**
- * Dynamically create all 6 system rows and append them to systemsContainer.
- * Called once at game start (synchronously, before gameActive = true).
- */
 function buildSystemRows() {
   systemsContainer.innerHTML = '';
 
   for (const def of SYSTEM_DEFS) {
-
-    // ── Row container ────────────────────────────────────────────────────
     const row = document.createElement('div');
     row.className      = 'sys-row';
     row.dataset.system = def.key;
 
-    // ── Header: name + repair button ────────────────────────────────────
+    // Click row to select system for detail
+    row.addEventListener('click', (e) => {
+      // Don't trigger when clicking slider or button
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+      selectSystem(def.key);
+    });
+
+    // Header
     const header = document.createElement('div');
     header.className = 'sys-row__header';
 
     const nameEl = document.createElement('span');
     nameEl.className   = 'sys-row__name';
-    nameEl.textContent = def.label;
+    nameEl.textContent = `${def.shortKey}. ${def.label}`;
 
     const repairBtn = document.createElement('button');
     repairBtn.className   = 'sys-row__repair-btn';
     repairBtn.textContent = 'REPAIR';
-    repairBtn.addEventListener('click', () => selectRepair(def.key));
+    repairBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectRepair(def.key);
+    });
 
-    // Cadet hint badge — shown when system is damaged and underpowered.
     const hintBadge = document.createElement('span');
     hintBadge.className   = 'sys-row__hint-badge';
     hintBadge.textContent = 'RECOMMENDED';
@@ -444,7 +481,7 @@ function buildSystemRows() {
     header.appendChild(hintBadge);
     header.appendChild(repairBtn);
 
-    // ── Power slider ─────────────────────────────────────────────────────
+    // Power slider
     const sliderWrap = document.createElement('div');
     sliderWrap.className = 'sys-row__slider-wrap';
 
@@ -462,17 +499,15 @@ function buildSystemRows() {
       const level = parseInt(slider.value, 10);
       send('engineering.set_power', { system: def.key, level });
       updateSliderBackground(slider, level);
-      // Optimistic overclock class — server will confirm next tick.
       row.classList.toggle('sys-row--overclocked', level > OVERCLOCK_THRESHOLD);
     });
 
     sliderWrap.appendChild(slider);
 
-    // ── Status row: health bar + stat columns ────────────────────────────
+    // Status row
     const statusRow = document.createElement('div');
     statusRow.className = 'sys-row__status';
 
-    // Health bar
     const healthWrap = document.createElement('div');
     healthWrap.className = 'sys-row__health-wrap';
 
@@ -487,7 +522,6 @@ function buildSystemRows() {
     healthBar.appendChild(healthFill);
     healthWrap.appendChild(healthBar);
 
-    // Stat columns — HP / PWR / EFF
     const statsEl = document.createElement('div');
     statsEl.className = 'sys-row__stats';
 
@@ -511,29 +545,23 @@ function buildSystemRows() {
     statusRow.appendChild(healthWrap);
     statusRow.appendChild(statsEl);
 
-    // ── Assemble row ─────────────────────────────────────────────────────
+    // Assemble
     row.appendChild(header);
     row.appendChild(sliderWrap);
     row.appendChild(statusRow);
     systemsContainer.appendChild(row);
 
-    // Cache element refs for fast access in update loops.
     sysEls[def.key] = { row, slider, healthFill, healthText, pwrText, effText, repairBtn, hintBadge };
-
-    // Set initial slider gradient.
     updateSliderBackground(slider, 100);
   }
 }
 
-/** Helper — make a labelled stat column (label above, value below). */
 function makeStatCol(label, valueEl) {
   const col = document.createElement('div');
   col.className = 'sys-row__stat';
-
   const lbl = document.createElement('span');
   lbl.className   = 'text-label';
   lbl.textContent = label;
-
   col.appendChild(lbl);
   col.appendChild(valueEl);
   return col;
@@ -543,19 +571,12 @@ function makeStatCol(label, valueEl) {
 // Power slider visual
 // ---------------------------------------------------------------------------
 
-/**
- * Set the slider's track gradient to show:
- *   0 → value     : primary-dim fill (or amber if overclocked)
- *   100% threshold : amber warning marker zone (subtle when normal, bright when OC)
- *   value → 150%   : dark unfilled track
- */
 function updateSliderBackground(slider, value) {
-  const vPct   = (value / 150) * 100;      // slider value as % of full range
-  const oc100  = (100   / 150) * 100;      // 66.67% — the overclock threshold
+  const vPct  = (value / 150) * 100;
+  const oc100 = (100   / 150) * 100;
 
   let bg;
   if (value <= OVERCLOCK_THRESHOLD) {
-    // Normal range: green fill up to value, then a subtle amber hint beyond.
     bg = [
       `var(--primary-dim) 0%`,
       `var(--primary-dim) ${vPct}%`,
@@ -565,7 +586,6 @@ function updateSliderBackground(slider, value) {
       `rgba(255,176,0,0.10) 100%`,
     ].join(', ');
   } else {
-    // Overclocked: green fill to 100%, amber from 100% to value, dark beyond.
     bg = [
       `var(--primary-dim) 0%`,
       `var(--primary-dim) ${oc100}%`,
@@ -580,262 +600,28 @@ function updateSliderBackground(slider, value) {
 }
 
 // ---------------------------------------------------------------------------
-// Repair selection
+// Health helpers
 // ---------------------------------------------------------------------------
 
-/** Send an engineering.set_repair message and optimistically update the UI. */
-function selectRepair(systemKey) {
-  if (!gameActive) return;
-  send('engineering.set_repair', { system: systemKey });
-  repairFocus = systemKey;
-  updateRepairFocusDOM();
+function updateHealthDOM(key, health, els) {
+  const color = systemColor(health);
+  els.healthFill.style.width      = `${Math.max(0, health)}%`;
+  els.healthFill.style.background = color;
+  els.healthText.textContent      = `${Math.round(health)}%`;
+  els.healthText.style.color      = color;
 }
 
-// ---------------------------------------------------------------------------
-// Schematic canvas
-// ---------------------------------------------------------------------------
-
-/**
- * Schematic click — hit-test each system node and select it as repair target.
- * Registered once in init(); gameActive guard prevents premature activation.
- */
-function setupSchematicClick() {
-  schematicCanvas.addEventListener('click', (e) => {
-    if (!gameActive || !sctx) return;
-
-    const rect   = schematicCanvas.getBoundingClientRect();
-    const scaleX = schematicCanvas.width  / rect.width;
-    const scaleY = schematicCanvas.height / rect.height;
-    const mx     = (e.clientX - rect.left) * scaleX;
-    const my     = (e.clientY - rect.top)  * scaleY;
-
-    const { cx, cy, scale } = schematicMetrics();
-    const nodeR  = computeNodeRadius(scale);
-    const hitR   = nodeR * 1.8;   // slightly generous hit area
-
-    for (const def of SYSTEM_DEFS) {
-      const sx = cx + def.nx * scale;
-      const sy = cy + def.ny * scale;
-      const dx = mx - sx;
-      const dy = my - sy;
-      if (dx * dx + dy * dy <= hitR * hitR) {
-        selectRepair(def.key);
-        return;
-      }
-    }
-  });
-}
-
-/**
- * Resize the schematic canvas pixel buffer to match its CSS layout size.
- * Called on game start and on window resize.
- */
-function resizeSchematic() {
-  const wrap = schematicCanvas.parentElement;
-  schematicCanvas.width  = wrap.clientWidth;
-  schematicCanvas.height = wrap.clientHeight;
-}
-
-/** rAF-driven render loop — only runs while game is active. */
-function renderLoop(now) {
-  if (!gameActive) return;
-  drawSchematic(now);
-  requestAnimationFrame(renderLoop);
-}
-
-/**
- * Compute the shared centre + scale values used by both the renderer and the
- * click handler (so they stay in sync as canvas size changes).
- */
-function schematicMetrics() {
-  const w  = schematicCanvas.width;
-  const h  = schematicCanvas.height;
-  // Scale so the ship fills ~88% of the smaller dimension with equal padding.
-  const scale = Math.min(w * 0.40, h * 0.44);
-  return { cx: w / 2, cy: h / 2, scale, w, h };
-}
-
-/** Node radius scaled to the canvas. */
-function computeNodeRadius(scale) {
-  return Math.max(13, Math.round(scale * 0.095));
-}
-
-// ---------------------------------------------------------------------------
-// Schematic drawing
-// ---------------------------------------------------------------------------
-
-/**
- * Draw the full ship schematic for one frame.
- *
- * Render order:
- *   1. Background fill
- *   2. Grid
- *   3. Hull wireframe outline
- *   4. Interior structural lines
- *   5. System nodes (health-coloured, with damage flashes + repair pulse)
- *   6. Ship ID label
- */
-function drawSchematic(now) {
-  if (!sctx) return;
-
-  const ctx  = sctx;
-  const { cx, cy, scale, w, h } = schematicMetrics();
-
-  drawBackground(ctx, w, h);
-  drawSchematicGrid(ctx, w, h);
-  drawHull(ctx, cx, cy, scale);
-  drawStructure(ctx, cx, cy, scale);
-  drawSystemNodes(ctx, cx, cy, scale, now);
-
-  // Faint identifier in corner
-  ctx.fillStyle    = 'rgba(0, 255, 65, 0.18)';
-  ctx.font         = '9px "Share Tech Mono", monospace';
-  ctx.textAlign    = 'right';
-  ctx.textBaseline = 'top';
-  ctx.fillText('TSS ENDEAVOUR — ENGINEERING DIAGNOSTIC', w - 8, 6);
-}
-
-/** Draw a faint orthographic grid on the schematic background. */
-function drawSchematicGrid(ctx, w, h) {
-  const spacing = Math.round(Math.min(w, h) / 14);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-  ctx.lineWidth   = 0.5;
-  for (let x = spacing; x < w; x += spacing) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
-  for (let y = spacing; y < h; y += spacing) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-}
-
-/** Draw the ship hull wireframe polygon. */
-function drawHull(ctx, cx, cy, scale) {
-  ctx.strokeStyle = 'rgba(0, 255, 65, 0.38)';
-  ctx.lineWidth   = 1.5;
-  ctx.beginPath();
-  HULL_POINTS.forEach(([nx, ny], i) => {
-    const px = cx + nx * scale;
-    const py = cy + ny * scale;
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-  });
-  ctx.closePath();
-  ctx.stroke();
-}
-
-/** Draw interior structural lines (bulkheads, spine, nacelle dividers). */
-function drawStructure(ctx, cx, cy, scale) {
-  ctx.strokeStyle = 'rgba(0, 255, 65, 0.11)';
-  ctx.lineWidth   = 0.75;
-  for (const [[ax, ay], [bx, by]] of STRUCTURE_LINES) {
-    ctx.beginPath();
-    ctx.moveTo(cx + ax * scale, cy + ay * scale);
-    ctx.lineTo(cx + bx * scale, cy + by * scale);
-    ctx.stroke();
-  }
-}
-
-/**
- * Draw all 6 system nodes, applying:
- *   - Health-based colour (healthy/warning/critical/offline)
- *   - Damage flash: expanding red halo that fades over DAMAGE_FLASH_MS
- *   - Repair glow: pulsing green ring around the active repair target
- *   - Health percentage label inside the node
- *   - System name label positioned to avoid overlaps
- */
-function drawSystemNodes(ctx, cx, cy, scale, now) {
-  const nodeR = computeNodeRadius(scale);
-
+function updateRepairFocusDOM() {
   for (const def of SYSTEM_DEFS) {
-    const sx = cx + def.nx * scale;
-    const sy = cy + def.ny * scale;
-
-    const sys      = currState?.systems?.[def.key];
-    const health   = sys?.health  ?? 100;
-    const color    = systemColor(health);
-    const isRepair = repairFocus === def.key;
-
-    // ── Damage flash ──────────────────────────────────────────────────────
-    const flashAge = now - (flashSystems[def.key] ?? -Infinity);
-    if (flashAge >= 0 && flashAge < DAMAGE_FLASH_MS) {
-      const alpha = (1 - flashAge / DAMAGE_FLASH_MS) * 0.65;
-      ctx.fillStyle = `rgba(255, 32, 32, ${alpha})`;
-      ctx.beginPath();
-      ctx.arc(sx, sy, nodeR * 2.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // ── Repair glow pulse ─────────────────────────────────────────────────
-    if (isRepair) {
-      const pulse     = 0.5 + 0.5 * Math.sin(now / 280);
-      const glowR     = nodeR + 5 + pulse * 5;
-      const glowAlpha = 0.25 + pulse * 0.40;
-      ctx.strokeStyle = `rgba(0, 255, 65, ${glowAlpha})`;
-      ctx.lineWidth   = 2.5;
-      ctx.beginPath();
-      ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // ── Node background fill ──────────────────────────────────────────────
-    const [r, g, b]  = hexToRgb(color);
-    const fillAlpha  = health <= 0 ? 0.04 : 0.12;
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${fillAlpha})`;
-    ctx.beginPath();
-    ctx.arc(sx, sy, nodeR, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ── Node border ───────────────────────────────────────────────────────
-    ctx.strokeStyle = color;
-    ctx.lineWidth   = isRepair ? 2.5 : 1.5;
-    ctx.beginPath();
-    ctx.arc(sx, sy, nodeR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // ── Health value inside node ──────────────────────────────────────────
-    const innerFont = Math.max(8, Math.round(nodeR * 0.60));
-    ctx.fillStyle    = color;
-    ctx.font         = `${innerFont}px "Share Tech Mono", monospace`;
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(health <= 0 ? 'OFF' : `${Math.round(health)}`, sx, sy);
-
-    // ── System name label ─────────────────────────────────────────────────
-    const labelFont  = Math.max(7, Math.round(nodeR * 0.50));
-    const labelAlpha = isRepair ? 0.95 : 0.60;
-    ctx.font         = `${labelFont}px "Share Tech Mono", monospace`;
-    ctx.fillStyle    = `rgba(0, 255, 65, ${labelAlpha})`;
-
-    const gap = nodeR + 7;
-    switch (def.labelDir) {
-      case 'above':
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(def.label, sx, sy - gap);
-        break;
-      case 'below':
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'top';
-        ctx.fillText(def.label, sx, sy + gap);
-        break;
-      case 'left':
-        ctx.textAlign    = 'right';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(def.label, sx - gap, sy);
-        break;
-      case 'right':
-        ctx.textAlign    = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(def.label, sx + gap, sy);
-        break;
-    }
+    const els = sysEls[def.key];
+    if (!els) continue;
+    const active = repairFocus === def.key;
+    els.row.classList.toggle('sys-row--repair-focus', active);
+    els.repairBtn.classList.toggle('sys-row__repair-btn--active', active);
+    els.repairBtn.textContent = active ? 'REPAIRING' : 'REPAIR';
   }
 }
 
-// ---------------------------------------------------------------------------
-// Colour helpers
-// ---------------------------------------------------------------------------
-
-/** Map a system health value to a CSS colour constant. */
 function systemColor(health) {
   if (health <= 0)  return C_OFFLINE;
   if (health < 30)  return C_CRITICAL;
@@ -843,10 +629,6 @@ function systemColor(health) {
   return C_HEALTHY;
 }
 
-/**
- * Convert a #rrggbb hex colour to an [r, g, b] number array.
- * Only called with the four C_* constants above, all of which are 6-digit hex.
- */
 function hexToRgb(hex) {
   return [
     parseInt(hex.slice(1, 3), 16),
@@ -856,118 +638,616 @@ function hexToRgb(hex) {
 }
 
 // ---------------------------------------------------------------------------
-// Damage Control panel
+// Repair selection
 // ---------------------------------------------------------------------------
 
-const dcRoomListEl = document.getElementById('dc-room-list');
-const dcStatusEl   = document.getElementById('dc-status');
-
-/**
- * Handle an engineering.dc_state broadcast from the server.
- * Payload: { rooms: {room_id: {name, state, deck}}, active_dcts: {room_id: 0..1} }
- */
-function handleDCState(payload) {
+function selectRepair(systemKey) {
   if (!gameActive) return;
-  renderDCPanel(payload.rooms || {}, payload.active_dcts || {});
+  send('engineering.set_repair', { system: systemKey });
+  repairFocus = systemKey;
+  updateRepairFocusDOM();
 }
 
-/**
- * Captain system override — highlight the affected system row with a lock
- * badge so the engineering officer knows the Captain has taken it offline.
- */
-function handleCaptainOverride({ system, online }) {
-  const els = sysEls[system];
-  if (!els) return;
+// ---------------------------------------------------------------------------
+// System selection (for detail panel)
+// ---------------------------------------------------------------------------
 
-  els.row.classList.toggle('sys-row--override', !online);
+function selectSystem(systemKey) {
+  if (!gameActive) return;
 
-  // Add or remove the lock badge
-  let badge = els.row.querySelector('.sys-row__override-badge');
-  if (!online) {
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className   = 'sys-row__override-badge';
-      badge.textContent = '🔒 OFFLINE';
-      els.row.appendChild(badge);
-    }
-    if (els.slider) els.slider.disabled = true;
-  } else {
-    if (badge) badge.remove();
-    if (els.slider) els.slider.disabled = false;
-  }
-}
-
-/**
- * Rebuild the damage-control room list.
- *
- * Each non-normal room gets a row with: name | state badge | [progress bar] | DISPATCH/CANCEL
- * Decompressed rooms are shown without a button (cannot be repaired by DCT).
- */
-function renderDCPanel(rooms, activeDcts) {
-  if (!dcRoomListEl || !dcStatusEl) return;
-
-  const roomIds = Object.keys(rooms);
-  const alertCount = roomIds.length;
-
-  if (alertCount === 0) {
-    dcStatusEl.textContent = 'ALL CLEAR';
-    dcStatusEl.style.color = '';
-    dcRoomListEl.innerHTML = '<p class="text-dim dc-all-clear">All compartments nominal.</p>';
+  // Toggle off if already selected
+  if (selectedSystem === systemKey) {
+    selectedSystem = null;
+    clearDetailPanel();
+    updateSelectedSystemDOM();
     return;
   }
 
-  dcStatusEl.textContent = `${alertCount} ALERT${alertCount > 1 ? 'S' : ''}`;
-  dcStatusEl.style.color = alertCount > 0 ? '#ff5500' : '';
+  selectedSystem = systemKey;
+  updateSelectedSystemDOM();
 
-  dcRoomListEl.innerHTML = '';
-  for (const [roomId, info] of Object.entries(rooms)) {
-    const isActive = roomId in activeDcts;
-    const progress = isActive ? activeDcts[roomId] : 0;
-    const canRepair = info.state !== 'decompressed';
+  // On narrow screens, show the detail panel
+  const detailEl = document.querySelector('.eng-detail');
+  if (detailEl) detailEl.classList.add('eng-detail--visible');
 
+  // Render component detail from latest eng state
+  if (currEngState?.systems?.[systemKey]) {
+    renderComponentDetail(systemKey, currEngState.systems[systemKey]);
+  } else {
+    detailTitleEl.textContent = systemKey.replace(/_/g, ' ').toUpperCase();
+    componentsEl.innerHTML = '<p class="text-dim eng-detail__empty">Awaiting engineering data...</p>';
+  }
+
+  // Show dispatch controls
+  renderDispatchControls(systemKey);
+}
+
+function updateSelectedSystemDOM() {
+  for (const def of SYSTEM_DEFS) {
+    const els = sysEls[def.key];
+    if (!els) continue;
+    els.row.classList.toggle('sys-row--selected', selectedSystem === def.key);
+  }
+}
+
+function clearDetailPanel() {
+  detailTitleEl.textContent = 'SELECT A SYSTEM';
+  componentsEl.innerHTML = '<p class="text-dim eng-detail__empty">Click a system or press 1-9 to select.</p>';
+  dispatchControlsEl.style.display = 'none';
+
+  const detailEl = document.querySelector('.eng-detail');
+  if (detailEl) detailEl.classList.remove('eng-detail--visible');
+}
+
+// ---------------------------------------------------------------------------
+// Component detail panel (right column)
+// ---------------------------------------------------------------------------
+
+function renderComponentDetail(systemKey, sysData) {
+  const label = SYSTEM_DEFS.find(d => d.key === systemKey)?.label || systemKey.toUpperCase();
+  detailTitleEl.textContent = label;
+
+  const components = sysData.components || [];
+  if (components.length === 0) {
+    componentsEl.innerHTML = '<p class="text-dim eng-detail__empty">No component data available.</p>';
+    return;
+  }
+
+  componentsEl.innerHTML = '';
+  for (const comp of components) {
     const row = document.createElement('div');
-    row.className = 'dc-room-row';
+    row.className = 'comp-row';
+
+    const header = document.createElement('div');
+    header.className = 'comp-row__header';
+
+    const nameEl = document.createElement('span');
+    nameEl.className   = 'comp-row__name';
+    nameEl.textContent = comp.name;
+
+    const healthVal = document.createElement('span');
+    healthVal.className = 'comp-row__health-val';
+    const hp = Math.round(comp.health);
+    healthVal.textContent = `${hp}%`;
+    healthVal.style.color = systemColor(comp.health);
+
+    header.appendChild(nameEl);
+    header.appendChild(healthVal);
+
+    const bar = document.createElement('div');
+    bar.className = 'gauge comp-row__bar';
+    const fill = document.createElement('div');
+    fill.className = 'gauge__fill';
+    fill.style.width      = `${Math.max(0, comp.health)}%`;
+    fill.style.background = systemColor(comp.health);
+    bar.appendChild(fill);
+
+    const effectEl = document.createElement('span');
+    effectEl.className   = 'comp-row__effect';
+    effectEl.textContent = comp.effect || '';
+
+    row.appendChild(header);
+    row.appendChild(bar);
+    if (comp.effect) row.appendChild(effectEl);
+    componentsEl.appendChild(row);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch controls (right column, below components)
+// ---------------------------------------------------------------------------
+
+function renderDispatchControls(systemKey) {
+  if (!currEngState?.repair_teams) {
+    dispatchControlsEl.style.display = 'none';
+    return;
+  }
+
+  const teams = currEngState.repair_teams;
+  const idleTeams = teams.filter(t => t.status === 'idle');
+
+  dispatchControlsEl.style.display = '';
+  dispatchTeamListEl.innerHTML = '';
+
+  if (idleTeams.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'text-dim';
+    p.textContent = 'No idle teams available.';
+    p.style.fontSize = '0.68rem';
+    p.style.padding = '0.2rem 0';
+    dispatchTeamListEl.appendChild(p);
+    return;
+  }
+
+  for (const team of idleTeams) {
+    const item = document.createElement('div');
+    item.className = 'eng-dispatch__item';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'text-data';
+    nameEl.textContent = team.name;
+
+    const btn = document.createElement('button');
+    btn.className = 'eng-dispatch__btn';
+    btn.textContent = 'DISPATCH';
+    btn.addEventListener('click', () => {
+      send('engineering.dispatch_team', { team_id: team.id, system: systemKey });
+    });
+
+    item.appendChild(nameEl);
+    item.appendChild(btn);
+    dispatchTeamListEl.appendChild(item);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Repair team cards (centre column, below map)
+// ---------------------------------------------------------------------------
+
+function renderTeamCards(teams) {
+  teamCardsEl.innerHTML = '';
+
+  if (teams.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'text-dim';
+    p.textContent = 'No repair teams assigned.';
+    p.style.fontSize = '0.72rem';
+    p.style.padding = '0.3rem 0';
+    teamCardsEl.appendChild(p);
+    return;
+  }
+
+  for (const team of teams) {
+    const card = document.createElement('div');
+    card.className = `team-card team-card--${team.status}`;
+
+    const nameEl = document.createElement('div');
+    nameEl.className   = 'team-card__name';
+    nameEl.textContent = team.name;
+
+    const statusEl = document.createElement('div');
+    statusEl.className = 'team-card__status';
+    let statusText = team.status.toUpperCase();
+    if (team.target_system) statusText += ` → ${team.target_system.replace(/_/g, ' ').toUpperCase()}`;
+    statusEl.textContent = statusText;
+
+    card.appendChild(nameEl);
+    card.appendChild(statusEl);
+
+    // Progress bar for travelling/repairing
+    if (team.status === 'travelling' || team.status === 'repairing') {
+      const progress = team.status === 'travelling' ? team.travel_progress : team.repair_progress;
+      const progWrap = document.createElement('div');
+      progWrap.className = 'team-card__progress';
+      const progFill = document.createElement('div');
+      progFill.className = 'team-card__progress-fill';
+      progFill.style.width = `${Math.round((progress || 0) * 100)}%`;
+      progWrap.appendChild(progFill);
+      card.appendChild(progWrap);
+    }
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'team-card__actions';
+
+    if (team.status === 'idle') {
+      // Dispatch button (to selected system)
+      if (selectedSystem) {
+        const dispBtn = document.createElement('button');
+        dispBtn.className = 'team-card__btn';
+        dispBtn.textContent = 'DISPATCH';
+        dispBtn.addEventListener('click', () => {
+          send('engineering.dispatch_team', { team_id: team.id, system: selectedSystem });
+        });
+        actions.appendChild(dispBtn);
+      }
+    } else {
+      // Recall button
+      const recallBtn = document.createElement('button');
+      recallBtn.className = 'team-card__btn team-card__btn--recall';
+      recallBtn.textContent = 'RECALL';
+      recallBtn.addEventListener('click', () => {
+        send('engineering.recall_team', { team_id: team.id });
+      });
+      actions.appendChild(recallBtn);
+
+      // Escort request button (if no escort already)
+      if (!team.escort_squad_id) {
+        const escortBtn = document.createElement('button');
+        escortBtn.className = 'team-card__btn';
+        escortBtn.textContent = 'ESCORT';
+        escortBtn.addEventListener('click', () => {
+          send('engineering.request_escort', { team_id: team.id });
+        });
+        actions.appendChild(escortBtn);
+      }
+    }
+
+    if (actions.children.length > 0) card.appendChild(actions);
+    teamCardsEl.appendChild(card);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Repair queue (left column, bottom)
+// ---------------------------------------------------------------------------
+
+function renderRepairQueue(orders) {
+  repairQueueCountEl.textContent = orders.length;
+
+  if (orders.length === 0) {
+    repairQueueListEl.innerHTML = '<p class="text-dim eng-repair-queue__empty">No repair orders queued.</p>';
+    return;
+  }
+
+  repairQueueListEl.innerHTML = '';
+  for (const orderId of orders) {
+    const item = document.createElement('div');
+    item.className = 'eng-repair-queue__item';
+
+    const label = document.createElement('span');
+    label.className = 'text-data';
+    label.textContent = orderId;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'eng-repair-queue__cancel';
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.addEventListener('click', () => {
+      send('engineering.cancel_repair_order', { order_id: orderId });
+    });
+
+    item.appendChild(label);
+    item.appendChild(cancelBtn);
+    repairQueueListEl.appendChild(item);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Damage log (right column, bottom)
+// ---------------------------------------------------------------------------
+
+function renderDamageLog(events) {
+  if (events.length === 0) {
+    damageLogListEl.innerHTML = '<p class="text-dim" style="font-size:0.62rem;padding:0.2rem 0">No recent damage events.</p>';
+    return;
+  }
+
+  damageLogListEl.innerHTML = '';
+  for (const evt of events) {
+    const item = document.createElement('div');
+    item.className = 'eng-damage-log__item';
+    const sysLabel = (evt.system || '').replace(/_/g, ' ').toUpperCase();
+    const compLabel = evt.component_id || '';
+    const dmg = Math.round(evt.damage || 0);
+    item.textContent = `${sysLabel} / ${compLabel}: -${dmg} (${evt.cause || 'unknown'})`;
+    damageLogListEl.appendChild(item);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Battery mode buttons
+// ---------------------------------------------------------------------------
+
+function setupBatteryModeButtons() {
+  if (!batteryModesEl) return;
+  batteryModesEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-mode]');
+    if (!btn || !gameActive) return;
+    const mode = btn.dataset.mode;
+    send('engineering.set_battery_mode', { mode });
+  });
+}
+
+function updateBatteryModeButtons(activeMode) {
+  if (!batteryModesEl) return;
+  for (const btn of batteryModesEl.querySelectorAll('[data-mode]')) {
+    btn.classList.toggle('eng-battery__mode-btn--active', btn.dataset.mode === activeMode);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Overlay selector
+// ---------------------------------------------------------------------------
+
+function setupOverlayButtons() {
+  if (!overlaySelectorEl) return;
+  overlaySelectorEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-overlay]');
+    if (!btn) return;
+    setOverlay(btn.dataset.overlay);
+  });
+}
+
+function setOverlay(mode) {
+  activeOverlay = mode;
+  if (!overlaySelectorEl) return;
+  for (const btn of overlaySelectorEl.querySelectorAll('[data-overlay]')) {
+    btn.classList.toggle('eng-overlay-btn--active', btn.dataset.overlay === mode);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+function setupKeyboard() {
+  document.addEventListener('keydown', (e) => {
+    if (!gameActive) return;
+    // Don't capture when typing in inputs
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    // 1-9: select system
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && num <= 9) {
+      const def = SYSTEM_DEFS[num - 1];
+      if (def) selectSystem(def.key);
+      return;
+    }
+
+    switch (e.key.toLowerCase()) {
+      case 'd': // Dispatch first idle team to selected system
+        if (selectedSystem && currEngState?.repair_teams) {
+          const idle = currEngState.repair_teams.find(t => t.status === 'idle');
+          if (idle) send('engineering.dispatch_team', { team_id: idle.id, system: selectedSystem });
+        }
+        break;
+      case 'r': // Recall all active teams
+        if (currEngState?.repair_teams) {
+          for (const t of currEngState.repair_teams) {
+            if (t.status !== 'idle') send('engineering.recall_team', { team_id: t.id });
+          }
+        }
+        break;
+      case 'b': // Cycle battery mode
+        if (currEngState?.power_grid) {
+          const curr = currEngState.power_grid.battery_mode || 'standby';
+          const idx = BATTERY_MODES.indexOf(curr);
+          const next = BATTERY_MODES[(idx + 1) % BATTERY_MODES.length];
+          send('engineering.set_battery_mode', { mode: next });
+        }
+        break;
+      case 'tab': // Cycle overlay
+        e.preventDefault();
+        {
+          const idx = OVERLAY_MODES.indexOf(activeOverlay);
+          setOverlay(OVERLAY_MODES[(idx + 1) % OVERLAY_MODES.length]);
+        }
+        break;
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Interior map canvas
+// ---------------------------------------------------------------------------
+
+function computeCanvasSize() {
+  let maxCol = 3, maxRow = 4;
+  for (const room of Object.values(interiorLayout)) {
+    if (room.col > maxCol) maxCol = room.col;
+    if (room.row > maxRow) maxRow = room.row;
+  }
+  const cols = maxCol + 1;
+  const rows = maxRow + 1;
+  canvasW = ROOM_MARGIN * 2 + cols * (ROOM_W + ROOM_GAP) - ROOM_GAP;
+  canvasH = ROOM_MARGIN * 2 + rows * (ROOM_H + ROOM_GAP) - ROOM_GAP;
+}
+
+function roomPixel(col, row) {
+  return {
+    x: ROOM_MARGIN + col * (ROOM_W + ROOM_GAP),
+    y: ROOM_MARGIN + row * (ROOM_H + ROOM_GAP),
+  };
+}
+
+function roomCenter(col, row) {
+  const { x, y } = roomPixel(col, row);
+  return { x: x + ROOM_W / 2, y: y + ROOM_H / 2 };
+}
+
+function renderLoop(now) {
+  if (!gameActive) return;
+  drawInteriorMap(now);
+  requestAnimationFrame(renderLoop);
+}
+
+function drawInteriorMap(now) {
+  if (!ictx) return;
+  const ctx = ictx;
+
+  // Background
+  drawBackground(ctx, canvasW, canvasH);
+
+  // Draw connections between rooms
+  ctx.strokeStyle = 'rgba(0, 255, 65, 0.12)';
+  ctx.lineWidth = 1;
+  for (const [roomId, room] of Object.entries(interiorLayout)) {
+    const from = roomCenter(room.col, room.row);
+    for (const connId of (room.connections || [])) {
+      const conn = interiorLayout[connId];
+      if (!conn) continue;
+      // Only draw each connection once (from lower to higher id)
+      if (connId < roomId) continue;
+      const to = roomCenter(conn.col, conn.row);
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    }
+  }
+
+  // Draw rooms
+  for (const [roomId, room] of Object.entries(interiorLayout)) {
+    const { x, y } = roomPixel(room.col, room.row);
+    const rs = roomStates[roomId];
+    const roomState = rs?.state || 'normal';
+
+    // Room fill based on overlay
+    drawRoomFill(ctx, x, y, roomId, roomState, now);
+
+    // Room border
+    const borderColor = roomBorderColor(roomState);
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth   = 1;
+    ctx.strokeRect(x, y, ROOM_W, ROOM_H);
 
     // Room name
-    const nameEl = document.createElement('span');
-    nameEl.className = 'dc-room-name';
-    nameEl.textContent = info.name;
-    row.appendChild(nameEl);
+    ctx.fillStyle    = 'rgba(0, 255, 65, 0.65)';
+    ctx.font         = '9px "Share Tech Mono", monospace';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'top';
+    const label = room.name.length > 15 ? room.name.slice(0, 14) + '\u2026' : room.name;
+    ctx.fillText(label, x + ROOM_W / 2, y + 5);
 
-    // State badge
-    const badge = document.createElement('span');
-    badge.className = `dc-state-badge dc-state-badge--${info.state}`;
-    badge.textContent = info.state.toUpperCase();
-    row.appendChild(badge);
+    // Deck sub-label
+    ctx.fillStyle = 'rgba(0, 255, 65, 0.35)';
+    ctx.font      = '8px "Share Tech Mono", monospace';
+    ctx.fillText(room.deck.toUpperCase(), x + ROOM_W / 2, y + 17);
 
-    // Progress bar (only when DCT is active)
-    if (isActive) {
-      const wrap = document.createElement('div');
-      wrap.className = 'dc-progress-wrap';
-      const fill = document.createElement('div');
-      fill.className = 'dc-progress-fill';
-      fill.style.width = `${Math.round(progress * 100)}%`;
-      wrap.appendChild(fill);
-      row.appendChild(wrap);
+    // DCT progress indicator
+    if (roomId in activeDcts) {
+      const progress = activeDcts[roomId];
+      ctx.fillStyle = 'rgba(0, 255, 65, 0.25)';
+      ctx.fillRect(x + 2, y + ROOM_H - 6, (ROOM_W - 4) * progress, 4);
+      ctx.strokeStyle = 'rgba(0, 255, 65, 0.4)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x + 2, y + ROOM_H - 6, ROOM_W - 4, 4);
     }
-
-    // DISPATCH / CANCEL button (not for decompressed rooms)
-    if (canRepair) {
-      const btn = document.createElement('button');
-      btn.className = `dc-btn${isActive ? ' dc-btn--active' : ''}`;
-      btn.textContent = isActive ? 'CANCEL' : 'DISPATCH';
-      btn.addEventListener('click', () => {
-        if (isActive) {
-          send('engineering.cancel_dct', { room_id: roomId });
-        } else {
-          send('engineering.dispatch_dct', { room_id: roomId });
-        }
-      });
-      row.appendChild(btn);
-    }
-
-    dcRoomListEl.appendChild(row);
   }
+
+  // Draw repair team overlays
+  if (activeOverlay === 'teams' || activeOverlay === 'all') {
+    drawTeamOverlays(ctx, now);
+  }
+}
+
+function drawRoomFill(ctx, x, y, roomId, roomState, now) {
+  const showDamage  = activeOverlay === 'damage'  || activeOverlay === 'all';
+  const showHazards = activeOverlay === 'hazards' || activeOverlay === 'all';
+
+  // Default fill
+  ctx.fillStyle = 'rgba(0, 255, 65, 0.02)';
+
+  if (showHazards) {
+    if (roomState === 'fire') {
+      const pulse = 0.08 + 0.06 * Math.sin(now / 200);
+      ctx.fillStyle = `rgba(255, 85, 0, ${pulse})`;
+    } else if (roomState === 'decompressed') {
+      ctx.fillStyle = 'rgba(0, 100, 200, 0.08)';
+    }
+  }
+
+  if (showDamage && roomState === 'damaged') {
+    ctx.fillStyle = 'rgba(255, 170, 0, 0.06)';
+  }
+
+  // Fire always overrides in damage mode too
+  if (showDamage && roomState === 'fire') {
+    const pulse = 0.08 + 0.06 * Math.sin(now / 200);
+    ctx.fillStyle = `rgba(255, 85, 0, ${pulse})`;
+  }
+
+  ctx.fillRect(x, y, ROOM_W, ROOM_H);
+}
+
+function drawTeamOverlays(ctx, _now) {
+  if (!currEngState?.repair_teams) return;
+
+  for (const team of currEngState.repair_teams) {
+    if (team.status === 'idle') continue;
+
+    // Find the room where the team currently is
+    const roomId = team.room_id;
+    const room = roomId ? interiorLayout[roomId] : null;
+    if (!room) continue;
+
+    const center = roomCenter(room.col, room.row);
+
+    // Team icon
+    const iconR = 8;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y + 20, iconR, 0, Math.PI * 2);
+
+    if (team.status === 'repairing') {
+      ctx.fillStyle = 'rgba(0, 255, 65, 0.3)';
+      ctx.fill();
+      ctx.strokeStyle = C_HEALTHY;
+    } else if (team.status === 'travelling') {
+      ctx.fillStyle = 'rgba(255, 176, 0, 0.3)';
+      ctx.fill();
+      ctx.strokeStyle = C_WARNING;
+    } else {
+      ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+      ctx.fill();
+      ctx.strokeStyle = C_OFFLINE;
+    }
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Team label
+    ctx.fillStyle    = 'rgba(255, 255, 255, 0.7)';
+    ctx.font         = '7px "Share Tech Mono", monospace';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(team.name.slice(0, 3).toUpperCase(), center.x, center.y + 20);
+
+    // Draw path line if travelling
+    if (team.status === 'travelling' && team.path?.length > 0) {
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = 'rgba(255, 176, 0, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(center.x, center.y + 20);
+      for (const pathRoomId of team.path) {
+        const pathRoom = interiorLayout[pathRoomId];
+        if (pathRoom) {
+          const pathCenter = roomCenter(pathRoom.col, pathRoom.row);
+          ctx.lineTo(pathCenter.x, pathCenter.y + 20);
+        }
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+function roomBorderColor(state) {
+  switch (state) {
+    case 'fire':         return 'rgba(255, 85, 0, 0.6)';
+    case 'decompressed': return 'rgba(100, 150, 200, 0.5)';
+    case 'damaged':      return 'rgba(255, 170, 0, 0.5)';
+    default:             return 'rgba(0, 255, 65, 0.25)';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Utility
+// ---------------------------------------------------------------------------
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 // ---------------------------------------------------------------------------

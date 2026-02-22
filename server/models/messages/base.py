@@ -39,9 +39,15 @@ from server.models.messages.tactical import (
 )
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
+    EngineeringCancelRepairOrderPayload,
     EngineeringDispatchDCTPayload,
+    EngineeringDispatchTeamPayload,
+    EngineeringRecallTeamPayload,
+    EngineeringRequestEscortPayload,
+    EngineeringSetBatteryModePayload,
     EngineeringSetPowerPayload,
     EngineeringSetRepairPayload,
+    EngineeringStartReroutePayload,
 )
 from server.models.messages.helm import HelmSetHeadingPayload, HelmSetThrottlePayload
 from server.models.messages.lobby import LobbyClaimRolePayload, LobbyReleaseRolePayload, LobbyStartGamePayload
@@ -103,10 +109,16 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "helm.set_heading": HelmSetHeadingPayload,
     "helm.set_throttle": HelmSetThrottlePayload,
     # Engineering
-    "engineering.set_power":    EngineeringSetPowerPayload,
-    "engineering.set_repair":   EngineeringSetRepairPayload,
-    "engineering.dispatch_dct": EngineeringDispatchDCTPayload,
-    "engineering.cancel_dct":   EngineeringCancelDCTPayload,
+    "engineering.set_power":            EngineeringSetPowerPayload,
+    "engineering.set_repair":           EngineeringSetRepairPayload,
+    "engineering.dispatch_dct":         EngineeringDispatchDCTPayload,
+    "engineering.cancel_dct":           EngineeringCancelDCTPayload,
+    "engineering.dispatch_team":        EngineeringDispatchTeamPayload,
+    "engineering.recall_team":          EngineeringRecallTeamPayload,
+    "engineering.set_battery_mode":     EngineeringSetBatteryModePayload,
+    "engineering.start_reroute":        EngineeringStartReroutePayload,
+    "engineering.request_escort":       EngineeringRequestEscortPayload,
+    "engineering.cancel_repair_order":  EngineeringCancelRepairOrderPayload,
     # Weapons
     "weapons.select_target": WeaponsSelectTargetPayload,
     "weapons.fire_beams": WeaponsFireBeamsPayload,

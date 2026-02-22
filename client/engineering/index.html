@@ -35,52 +35,145 @@
     <!-- ─── Main engineering layout (hidden until game.started) ─────────── -->
     <main class="eng-main" data-eng-main style="display:none">
 
-      <!-- Left: ship schematic diagnostic display -->
-      <section class="eng-schematic panel" aria-label="Ship systems schematic">
+      <!-- Left column: Power Management -->
+      <section class="eng-power panel" aria-label="Power management">
         <div class="panel__header">
-          <span class="text-header">SHIP SYSTEMS — ENGINEERING DIAGNOSTIC</span>
-          <span class="text-label" id="repair-status-label">NO REPAIR ACTIVE</span>
-        </div>
-        <div class="eng-schematic__canvas-wrap">
-          <canvas id="schematic"></canvas>
-        </div>
-      </section>
-
-      <!-- Right: power allocation + system controls -->
-      <aside class="eng-controls panel" aria-label="Power allocation">
-
-        <div class="panel__header">
-          <span class="text-header">POWER ALLOCATION</span>
+          <span class="text-header">POWER MANAGEMENT</span>
         </div>
 
-        <!-- Power budget indicator -->
+        <!-- Reactor gauge -->
+        <div class="eng-reactor">
+          <div class="eng-reactor__row">
+            <span class="text-label">REACTOR OUTPUT</span>
+            <span class="text-data" id="reactor-readout">700 / 700</span>
+          </div>
+          <div class="gauge eng-reactor__gauge">
+            <div class="gauge__fill" id="reactor-gauge-fill" style="width:100%; background:var(--primary)"></div>
+          </div>
+        </div>
+
+        <!-- Battery bar + mode buttons -->
+        <div class="eng-battery">
+          <div class="eng-battery__row">
+            <span class="text-label">BATTERY</span>
+            <span class="text-data" id="battery-readout">500 / 500</span>
+          </div>
+          <div class="gauge eng-battery__gauge">
+            <div class="gauge__fill" id="battery-gauge-fill" style="width:100%; background:var(--friendly)"></div>
+          </div>
+          <div class="eng-battery__modes" id="battery-modes">
+            <button class="eng-battery__mode-btn" data-mode="charging">CHARGE</button>
+            <button class="eng-battery__mode-btn eng-battery__mode-btn--active" data-mode="standby">STANDBY</button>
+            <button class="eng-battery__mode-btn" data-mode="discharging">DISCHARGE</button>
+            <button class="eng-battery__mode-btn" data-mode="auto">AUTO</button>
+          </div>
+        </div>
+
+        <!-- Power budget summary -->
         <div class="eng-budget">
           <div class="eng-budget__row">
             <span class="text-label">POWER BUDGET</span>
-            <span class="text-data" id="budget-readout">000 / 700</span>
+            <span class="text-data" id="budget-readout">000 / 900</span>
           </div>
           <div class="gauge eng-budget__gauge">
             <div class="gauge__fill" id="budget-gauge-fill" style="width:0%; background:var(--primary)"></div>
           </div>
         </div>
 
-        <!-- System rows — populated by engineering.js at game start -->
+        <!-- 9 system power sliders -->
         <div class="eng-systems" id="systems-container"></div>
 
-        <!-- Damage Control panel — populated by engineering.dc_state broadcasts -->
-        <div class="eng-dc-section">
+        <!-- Repair queue -->
+        <div class="eng-repair-queue">
           <div class="panel__header">
-            <span class="text-label">DAMAGE CONTROL</span>
-            <span class="text-data text-dim" id="dc-status">ALL CLEAR</span>
+            <span class="text-label">REPAIR QUEUE</span>
+            <span class="text-data text-dim" id="repair-queue-count">0</span>
           </div>
-          <div id="dc-room-list" class="dc-room-list">
-            <p class="text-dim dc-all-clear">All compartments nominal.</p>
+          <div id="repair-queue-list" class="eng-repair-queue__list">
+            <p class="text-dim eng-repair-queue__empty">No repair orders queued.</p>
           </div>
         </div>
+      </section>
 
+      <!-- Centre column: Ship Interior Map + Repair Teams -->
+      <section class="eng-interior panel" aria-label="Ship interior map">
+        <div class="panel__header eng-interior__header">
+          <span class="text-header">SHIP INTERIOR</span>
+          <div class="eng-overlay-selector" id="overlay-selector">
+            <button class="eng-overlay-btn eng-overlay-btn--active" data-overlay="damage">DAMAGE</button>
+            <button class="eng-overlay-btn" data-overlay="teams">TEAMS</button>
+            <button class="eng-overlay-btn" data-overlay="hazards">HAZARDS</button>
+            <button class="eng-overlay-btn" data-overlay="all">ALL</button>
+          </div>
+        </div>
+        <div class="eng-interior__canvas-wrap">
+          <canvas id="interior-map"></canvas>
+        </div>
+
+        <!-- Repair team cards -->
+        <div class="eng-teams" id="teams-container">
+          <div class="panel__header">
+            <span class="text-label">REPAIR TEAMS</span>
+          </div>
+          <div id="team-cards" class="eng-teams__cards"></div>
+        </div>
+      </section>
+
+      <!-- Right column: System Detail -->
+      <aside class="eng-detail panel" aria-label="System detail">
+        <div class="panel__header">
+          <span class="text-header" id="detail-title">SELECT A SYSTEM</span>
+        </div>
+
+        <!-- Component breakdown -->
+        <div class="eng-components" id="components-container">
+          <p class="text-dim eng-detail__empty">Click a system or press 1-9 to select.</p>
+        </div>
+
+        <!-- Dispatch controls -->
+        <div class="eng-dispatch" id="dispatch-controls" style="display:none">
+          <div class="panel__header">
+            <span class="text-label">DISPATCH TEAM</span>
+          </div>
+          <div id="dispatch-team-list" class="eng-dispatch__list"></div>
+        </div>
+
+        <!-- Damage log -->
+        <div class="eng-damage-log">
+          <div class="panel__header">
+            <span class="text-label">DAMAGE LOG</span>
+          </div>
+          <div id="damage-log-list" class="eng-damage-log__list">
+            <p class="text-dim">No recent damage events.</p>
+          </div>
+        </div>
       </aside>
 
     </main>
+
+    <!-- ─── Bottom status bar ──────────────────────────────────────────── -->
+    <footer class="eng-statusbar panel" data-statusbar style="display:none">
+      <span class="eng-statusbar__item" id="sb-power">
+        <span class="text-label">PWR</span>
+        <span class="text-data" id="sb-power-val">700W</span>
+      </span>
+      <span class="eng-statusbar__item" id="sb-battery">
+        <span class="text-label">BAT</span>
+        <span class="text-data" id="sb-battery-val">100%</span>
+      </span>
+      <span class="eng-statusbar__item" id="sb-teams">
+        <span class="text-label">TEAMS</span>
+        <span class="text-data" id="sb-teams-val">0/3</span>
+      </span>
+      <span class="eng-statusbar__item" id="sb-bus">
+        <span class="text-label">BUS</span>
+        <span class="text-data" id="sb-bus-val">PRI+SEC</span>
+      </span>
+      <span class="eng-statusbar__item" id="sb-emergency">
+        <span class="text-label">EMRG</span>
+        <span class="text-data" id="sb-emergency-val">NOMINAL</span>
+      </span>
+    </footer>
 
   </div>
   <script type="module" src="engineering.js"></script>

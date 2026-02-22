@@ -1,10 +1,11 @@
 /*
- * Engineering Station Styles
+ * Engineering Station Styles — v0.06.2
  *
  * Layout:
- *   - Left panel (flex 1): ship schematic diagnostic canvas — the centrepiece
- *   - Right panel (370px fixed): power budget + 6 system control rows
- *   - Responsive at 768px: stacks vertically (schematic top, controls bottom)
+ *   Three-column grid: Power Management (320px) | Ship Interior Map (flex) | System Detail (300px)
+ *   Bottom status bar
+ *   Responsive at 1024px: right panel slides over interior map
+ *   Responsive at 768px: stacks vertically with tab navigation
  *
  * Power slider uses a dynamically-updated gradient background (set via JS)
  * to show fill level and the overclock threshold at 100/150 = 66.67%.
@@ -73,72 +74,106 @@
 }
 
 /* =========================================================================
-   Main engineering grid
+   Main engineering grid — three columns
    ========================================================================= */
 
 .eng-main {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 370px;
+  grid-template-columns: 320px 1fr 300px;
   gap: 0.4rem;
-  min-height: 0;    /* critical — lets flex children shrink below content size */
+  min-height: 0;
   overflow: hidden;
 }
 
 /* =========================================================================
-   Schematic panel (left)
+   Left column: Power Management
    ========================================================================= */
 
-.eng-schematic {
+.eng-power {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
 
-.eng-schematic .panel__header {
+.eng-power > .panel__header {
+  flex-shrink: 0;
+}
+
+/* --- Reactor gauge --- */
+
+.eng-reactor {
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.eng-reactor__row {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.eng-reactor__gauge {
+  height: 6px;
+}
+
+/* --- Battery bar + mode buttons --- */
+
+.eng-battery {
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid var(--border-primary);
   flex-shrink: 0;
 }
 
-/* The canvas fill — must have explicit height for JS resize to work */
-.eng-schematic__canvas-wrap {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  min-height: 0;
-  cursor: crosshair;  /* clicking nodes selects repair target */
-}
-
-.eng-schematic__canvas-wrap canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-/* =========================================================================
-   Controls panel (right)
-   ========================================================================= */
-
-.eng-controls {
+.eng-battery__row {
   display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
 }
 
-.eng-controls > .panel__header {
-  flex-shrink: 0;
+.eng-battery__gauge {
+  height: 6px;
+  margin-bottom: 0.35rem;
 }
 
-/* =========================================================================
-   Power budget indicator
-   ========================================================================= */
+.eng-battery__modes {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.eng-battery__mode-btn {
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.3rem;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.eng-battery__mode-btn:hover {
+  border-color: var(--primary);
+  color: var(--text-bright);
+}
+
+.eng-battery__mode-btn--active {
+  border-color: var(--friendly);
+  color: var(--friendly);
+  box-shadow: 0 0 4px rgba(0, 170, 255, 0.25);
+}
+
+/* --- Power budget --- */
 
 .eng-budget {
-  padding: 0.45rem 1rem;
+  padding: 0.4rem 0.8rem;
   border-bottom: 1px solid var(--border-primary);
   flex-shrink: 0;
 }
@@ -147,16 +182,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.25rem;
 }
 
 .eng-budget__gauge {
   height: 6px;
 }
 
-/* =========================================================================
-   System list
-   ========================================================================= */
+/* --- System list --- */
 
 .eng-systems {
   flex: 1;
@@ -165,38 +198,86 @@
   scrollbar-color: var(--primary-dim) var(--bg-secondary);
 }
 
-.eng-systems::-webkit-scrollbar {
-  width: 4px;
+.eng-systems::-webkit-scrollbar { width: 4px; }
+.eng-systems::-webkit-scrollbar-track { background: var(--bg-secondary); }
+.eng-systems::-webkit-scrollbar-thumb { background: var(--primary-dim); }
+
+/* --- Repair queue --- */
+
+.eng-repair-queue {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-primary);
+  max-height: 120px;
 }
-.eng-systems::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+
+.eng-repair-queue__list {
+  max-height: 80px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dim) var(--bg-secondary);
+  padding: 0 0.8rem;
 }
-.eng-systems::-webkit-scrollbar-thumb {
-  background: var(--primary-dim);
+
+.eng-repair-queue__empty {
+  padding: 0.3rem 0;
+  font-size: 0.72rem;
+}
+
+.eng-repair-queue__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.72rem;
+}
+
+.eng-repair-queue__cancel {
+  font-family: inherit;
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.3rem;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.eng-repair-queue__cancel:hover {
+  border-color: var(--hostile);
+  color: var(--hostile);
 }
 
 /* =========================================================================
-   Individual system row
+   Individual system row (kept from v0.06.1)
    ========================================================================= */
 
 .sys-row {
-  padding: 0.45rem 1rem;
+  padding: 0.4rem 0.8rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   transition: background 0.25s;
+  cursor: pointer;
 }
 
-/* Active repair target gets a subtle green tint */
+.sys-row:hover {
+  background: rgba(0, 255, 65, 0.02);
+}
+
+.sys-row--selected {
+  background: rgba(0, 170, 255, 0.06);
+  border-left: 2px solid var(--friendly);
+}
+
 .sys-row--repair-focus {
   background: rgba(0, 255, 65, 0.04);
   border-bottom-color: var(--border-primary);
 }
 
-/* System offline — dim the entire row */
 .sys-row--offline {
   opacity: 0.55;
 }
 
-/* Captain override — system taken offline by Captain */
 .sys-row--override {
   background: rgba(255, 32, 32, 0.06);
   border-left: 2px solid var(--alert-red);
@@ -211,22 +292,20 @@
   flex-shrink: 0;
 }
 
-/* Header: system name + repair button */
 .sys-row__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
 }
 
 .sys-row__name {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--text-normal);
 }
 
-/* Cadet hint badge */
 .sys-row__hint-badge {
   font-size: 0.58rem;
   padding: 0.1rem 0.4rem;
@@ -243,10 +322,9 @@
   50%       { opacity: 0.4; }
 }
 
-/* Repair button */
 .sys-row__repair-btn {
-  font-size: 0.62rem;
-  padding: 0.15rem 0.55rem;
+  font-size: 0.58rem;
+  padding: 0.12rem 0.45rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-family: inherit;
@@ -254,14 +332,13 @@
   border: 1px solid var(--border-primary);
   color: var(--text-dim);
   cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, color 0.2s;
   white-space: nowrap;
 }
 
 .sys-row__repair-btn:hover {
   border-color: var(--primary);
   color: var(--text-bright);
-  box-shadow: 0 0 5px var(--primary-glow);
 }
 
 .sys-row__repair-btn--active {
@@ -274,19 +351,11 @@
    Power slider
    ========================================================================= */
 
-/*
- * The slider track uses a dynamically-set gradient background (via JS) that
- * shows the current power level as a filled region, and the overclock zone
- * (above 100%) as an amber tint. The ::after pseudo-element renders the
- * threshold marker line at exactly the 100% position (66.67% of slider width).
- */
-
 .sys-row__slider-wrap {
   position: relative;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.25rem;
 }
 
-/* Threshold marker at power=100 (= 66.67% of the 0–150 range) */
 .sys-row__slider-wrap::after {
   content: '';
   position: absolute;
@@ -300,25 +369,22 @@
   z-index: 1;
 }
 
-/* Range input — base */
 .sys-row__slider {
   -webkit-appearance: none;
   appearance: none;
   display: block;
   width: 100%;
-  height: 6px;
-  /* Background set dynamically per-system in JS */
+  height: 5px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
   outline: none;
   cursor: pointer;
 }
 
-/* Thumb — default (normal power) */
 .sys-row__slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px;
-  height: 18px;
+  width: 10px;
+  height: 16px;
   background: var(--primary);
   border: 1px solid var(--primary);
   border-radius: 1px;
@@ -328,8 +394,8 @@
 }
 
 .sys-row__slider::-moz-range-thumb {
-  width: 12px;
-  height: 18px;
+  width: 10px;
+  height: 16px;
   background: var(--primary);
   border: 1px solid var(--primary);
   border-radius: 1px;
@@ -338,7 +404,6 @@
   transition: background 0.2s, border-color 0.2s;
 }
 
-/* Thumb — overclocked (power > 100) */
 .sys-row--overclocked .sys-row__slider::-webkit-slider-thumb {
   background: var(--system-warning);
   border-color: var(--system-warning);
@@ -352,23 +417,22 @@
 }
 
 /* =========================================================================
-   System status row (health bar + stat readouts)
+   System status row (health bar + stats)
    ========================================================================= */
 
 .sys-row__status {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
-/* Health bar fills the remaining horizontal space */
 .sys-row__health-wrap {
   flex: 1;
   min-width: 0;
 }
 
 .sys-row__health-bar {
-  height: 5px;
+  height: 4px;
   margin-bottom: 0;
 }
 
@@ -376,10 +440,9 @@
   transition: width 0.3s, background 0.5s;
 }
 
-/* Three stat columns: HP / PWR / EFF */
 .sys-row__stats {
   display: flex;
-  gap: 0.65rem;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
@@ -387,24 +450,365 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 36px;
+  min-width: 32px;
 }
 
 .sys-row__stat .text-label {
-  font-size: 0.58rem;
+  font-size: 0.55rem;
   letter-spacing: 0.04em;
   line-height: 1;
   margin-bottom: 1px;
 }
 
 .sys-row__stat .text-data {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   transition: color 0.4s;
 }
 
 /* =========================================================================
+   Centre column: Ship Interior Map
+   ========================================================================= */
+
+.eng-interior {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.eng-interior__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.eng-interior__canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eng-interior__canvas-wrap canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* --- Overlay selector --- */
+
+.eng-overlay-selector {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.eng-overlay-btn {
+  font-family: inherit;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.eng-overlay-btn:hover {
+  border-color: var(--primary);
+  color: var(--text-bright);
+}
+
+.eng-overlay-btn--active {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 4px var(--primary-glow);
+}
+
+/* --- Repair team cards --- */
+
+.eng-teams {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-primary);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.eng-teams__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.3rem 0.8rem;
+}
+
+.team-card {
+  flex: 1 1 140px;
+  max-width: 200px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  font-size: 0.68rem;
+}
+
+.team-card--idle {
+  border-color: var(--primary-dim);
+}
+
+.team-card--travelling {
+  border-color: var(--system-warning);
+}
+
+.team-card--repairing {
+  border-color: var(--primary);
+  box-shadow: 0 0 4px var(--primary-glow);
+}
+
+.team-card__name {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-normal);
+  margin-bottom: 0.15rem;
+}
+
+.team-card__status {
+  font-size: 0.58rem;
+  color: var(--text-dim);
+  margin-bottom: 0.2rem;
+}
+
+.team-card__progress {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.2rem;
+}
+
+.team-card__progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.25s linear;
+}
+
+.team-card__actions {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.team-card__btn {
+  font-family: inherit;
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.3rem;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.team-card__btn:hover {
+  border-color: var(--primary);
+  color: var(--text-bright);
+}
+
+.team-card__btn--recall {
+  border-color: var(--system-warning);
+  color: var(--system-warning);
+}
+
+.team-card__btn--recall:hover {
+  border-color: var(--hostile);
+  color: var(--hostile);
+}
+
+/* =========================================================================
+   Right column: System Detail
+   ========================================================================= */
+
+.eng-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.eng-detail > .panel__header {
+  flex-shrink: 0;
+}
+
+.eng-detail__empty {
+  padding: 0.8rem;
+  font-size: 0.75rem;
+}
+
+/* --- Component list --- */
+
+.eng-components {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dim) var(--bg-secondary);
+}
+
+.eng-components::-webkit-scrollbar { width: 4px; }
+.eng-components::-webkit-scrollbar-track { background: var(--bg-secondary); }
+.eng-components::-webkit-scrollbar-thumb { background: var(--primary-dim); }
+
+.comp-row {
+  padding: 0.35rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.comp-row__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.2rem;
+}
+
+.comp-row__name {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-normal);
+}
+
+.comp-row__health-val {
+  font-size: 0.68rem;
+  transition: color 0.4s;
+}
+
+.comp-row__bar {
+  height: 4px;
+  margin-bottom: 0.15rem;
+}
+
+.comp-row__bar .gauge__fill {
+  transition: width 0.3s, background 0.5s;
+}
+
+.comp-row__effect {
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+/* --- Dispatch controls --- */
+
+.eng-dispatch {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-primary);
+}
+
+.eng-dispatch__list {
+  padding: 0.3rem 0.8rem;
+}
+
+.eng-dispatch__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+  font-size: 0.68rem;
+}
+
+.eng-dispatch__btn {
+  font-family: inherit;
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.35rem;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.eng-dispatch__btn:hover {
+  border-color: var(--primary);
+  color: var(--text-bright);
+}
+
+.eng-dispatch__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Damage log --- */
+
+.eng-damage-log {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-primary);
+  max-height: 160px;
+}
+
+.eng-damage-log__list {
+  max-height: 120px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dim) var(--bg-secondary);
+  padding: 0 0.8rem;
+}
+
+.eng-damage-log__item {
+  padding: 0.15rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.62rem;
+  color: var(--text-dim);
+}
+
+.eng-damage-log__item--recent {
+  color: var(--hostile);
+}
+
+/* =========================================================================
+   Bottom status bar
+   ========================================================================= */
+
+.eng-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex-shrink: 0;
+  padding: 0.25rem 1rem;
+  gap: 1.5rem;
+}
+
+.eng-statusbar__item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.eng-statusbar__item .text-label {
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+}
+
+.eng-statusbar__item .text-data {
+  font-size: 0.68rem;
+}
+
+/* Emergency indicator flash */
+.eng-statusbar__item--emergency .text-data {
+  color: var(--hostile);
+  animation: emergency-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes emergency-pulse {
+  from { opacity: 0.5; }
+  to   { opacity: 1.0; }
+}
+
+/* =========================================================================
    Cross-station assist notification panel
-   Appears as a floating banner when a Science puzzle can be assisted.
    ========================================================================= */
 
 .assist-panel {
@@ -438,14 +842,8 @@
 }
 
 /* =========================================================================
-   Damage Control panel
-   Compact list of non-normal rooms with DISPATCH / CANCEL DCT buttons.
+   Damage Control panel (legacy, kept for DC room list in left column)
    ========================================================================= */
-
-.eng-dc-section {
-  flex-shrink: 0;
-  border-top: 1px solid var(--border-primary);
-}
 
 .dc-room-list {
   max-height: 180px;
@@ -458,103 +856,51 @@
 .dc-room-list::-webkit-scrollbar-track { background: var(--bg-secondary); }
 .dc-room-list::-webkit-scrollbar-thumb { background: var(--primary-dim); }
 
-.dc-all-clear {
-  padding: 0.4rem 1rem;
-  font-size: 0.75rem;
+/* =========================================================================
+   Responsive — medium (1024–1440px): right panel overlays interior
+   ========================================================================= */
+
+@media (max-width: 1440px) {
+  .eng-main {
+    grid-template-columns: 280px 1fr 260px;
+  }
 }
 
-.dc-room-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.28rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
+@media (max-width: 1024px) {
+  .eng-main {
+    grid-template-columns: 280px 1fr;
+  }
 
-.dc-room-name {
-  flex: 1;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-normal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  .eng-detail {
+    position: absolute;
+    right: 0.4rem;
+    top: 3.5rem;
+    bottom: 2.5rem;
+    width: 280px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-primary);
+    z-index: 100;
+    display: none;
+  }
 
-.dc-state-badge {
-  font-size: 0.58rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.1rem 0.3rem;
-  border: 1px solid currentColor;
-  flex-shrink: 0;
-}
-
-.dc-state-badge--damaged      { color: #ffaa00; border-color: rgba(255, 170, 0, 0.4); }
-.dc-state-badge--decompressed { color: var(--text-dim); border-color: rgba(128, 128, 128, 0.35); }
-.dc-state-badge--fire {
-  color: #ff5500;
-  border-color: rgba(255, 85, 0, 0.45);
-  animation: dc-fire-pulse 0.65s ease-in-out infinite alternate;
-}
-
-@keyframes dc-fire-pulse {
-  from { opacity: 0.55; }
-  to   { opacity: 1.0; }
-}
-
-/* Thin progress bar beside the badge when a DCT is active */
-.dc-progress-wrap {
-  width: 28px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-}
-
-.dc-progress-fill {
-  height: 100%;
-  background: var(--primary);
-  transition: width 0.25s linear;
-}
-
-/* DISPATCH / CANCEL button */
-.dc-btn {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.58rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  padding: 0.14rem 0.38rem;
-  border: 1px solid var(--border-primary);
-  color: var(--text-dim);
-  background: transparent;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-
-.dc-btn:hover {
-  border-color: var(--primary);
-  color: var(--text-bright);
-}
-
-.dc-btn--active {
-  border-color: #ffaa00;
-  color: #ffaa00;
-}
-
-.dc-btn--active:hover {
-  border-color: var(--hostile, #ff3333);
-  color: var(--hostile, #ff3333);
+  .eng-detail--visible {
+    display: flex;
+  }
 }
 
 /* =========================================================================
-   Responsive — tablet portrait (768 px and below, stack vertically)
+   Responsive — narrow (768px and below): stack vertically
    ========================================================================= */
 
 @media (max-width: 768px) {
   .eng-main {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
+  }
+
+  .eng-detail {
+    position: static;
+    width: auto;
+    display: flex;
   }
 }

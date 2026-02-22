@@ -49,9 +49,15 @@ from server.models.messages import (
     FlightOpsRecallDronePayload,
     GameBriefingLaunchPayload,
     EngineeringCancelDCTPayload,
+    EngineeringCancelRepairOrderPayload,
     EngineeringDispatchDCTPayload,
+    EngineeringDispatchTeamPayload,
+    EngineeringRecallTeamPayload,
+    EngineeringRequestEscortPayload,
+    EngineeringSetBatteryModePayload,
     EngineeringSetPowerPayload,
     EngineeringSetRepairPayload,
+    EngineeringStartReroutePayload,
     HelmSetHeadingPayload,
     HelmSetThrottlePayload,
     MedicalAdmitPayload,
@@ -111,6 +117,7 @@ import server.game_loop_navigation as gln
 import server.game_loop_science_scan as glss
 import server.game_loop_docking as gldo
 import server.game_loop_creatures as glc
+import server.game_loop_engineering as gle
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -394,6 +401,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _applied_science_weapons_assists.clear()
     sensors.reset()
     glc.reset()
+    gle.reset()
 
     if _task is not None and not _task.done():
         logger.warning("Game loop already running — stopping before restart")
@@ -423,6 +431,10 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.sector_grid = _load_sector_grid_for_mission(glm.get_mission_dict(), mission_id)
     _spawn_stations_from_grid(_world)
     glsb.setup_world(_world)  # no-op unless sandbox is active
+
+    # v0.06.2 Engineering subsystems (power grid, repair teams, damage model).
+    # Runs in data-only mode for now — old engineering still controls power/health.
+    gle.init(_world.ship)
 
     _task = asyncio.create_task(_loop(), name="game_loop")
     logger.info("Game loop started (mission: %s, %d Hz)", mission_id, TICK_RATE)
@@ -1133,6 +1145,12 @@ async def _loop() -> None:
                 Message.build("damage_control.state", _dc_state_msg),
             )
 
+        # 11i-b. Engineering system state → Engineering station.
+        await _manager.broadcast_to_roles(
+            ["engineering"],
+            Message.build("engineering.state", gle.build_state(_world.ship)),
+        )
+
         # 11j. Flight ops state → Flight Ops station.
         await _manager.broadcast_to_roles(
             ["flight_ops"],
@@ -1313,6 +1331,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "engineering.set_power" and isinstance(payload, EngineeringSetPowerPayload):
             _prev_power = ship.systems[payload.system].power
             _apply_power(ship, payload.system, payload.level)
+            gle.set_power(payload.system, payload.level)
             _new_power = ship.systems[payload.system].power
             if _new_power != _prev_power:
                 gl.log_event("engineering", "power_changed", {"system": payload.system, "from": _prev_power, "to": _new_power})
@@ -1328,6 +1347,23 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type in ("engineering.cancel_dct", "damage_control.cancel_dct") and isinstance(payload, EngineeringCancelDCTPayload):
             gldc.cancel_dct(payload.room_id)
             gl.log_event("engineering", "dct_cancelled", {"room_id": payload.room_id})
+        elif msg_type == "engineering.dispatch_team" and isinstance(payload, EngineeringDispatchTeamPayload):
+            gle.dispatch_team(payload.team_id, payload.system, ship.interior)
+            gl.log_event("engineering", "team_dispatched", {"team_id": payload.team_id, "system": payload.system})
+        elif msg_type == "engineering.recall_team" and isinstance(payload, EngineeringRecallTeamPayload):
+            gle.recall_team(payload.team_id, ship.interior)
+            gl.log_event("engineering", "team_recalled", {"team_id": payload.team_id})
+        elif msg_type == "engineering.set_battery_mode" and isinstance(payload, EngineeringSetBatteryModePayload):
+            gle.set_battery_mode(payload.mode)
+            gl.log_event("engineering", "battery_mode_changed", {"mode": payload.mode})
+        elif msg_type == "engineering.start_reroute" and isinstance(payload, EngineeringStartReroutePayload):
+            gle.start_reroute(payload.target_bus)
+            gl.log_event("engineering", "reroute_started", {"target_bus": payload.target_bus})
+        elif msg_type == "engineering.request_escort" and isinstance(payload, EngineeringRequestEscortPayload):
+            gl.log_event("engineering", "escort_requested", {"team_id": payload.team_id})
+        elif msg_type == "engineering.cancel_repair_order" and isinstance(payload, EngineeringCancelRepairOrderPayload):
+            gle.cancel_repair_order(payload.order_id)
+            gl.log_event("engineering", "repair_order_cancelled", {"order_id": payload.order_id})
         elif msg_type == "weapons.select_target" and isinstance(payload, WeaponsSelectTargetPayload):
             if world is not None:
                 denial = glw.try_select_target(payload.entity_id, world)

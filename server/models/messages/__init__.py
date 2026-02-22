@@ -31,9 +31,15 @@ from server.models.messages.helm import HelmSetHeadingPayload, HelmSetThrottlePa
 from server.models.messages.engineering import (
     VALID_SYSTEMS,
     EngineeringCancelDCTPayload,
+    EngineeringCancelRepairOrderPayload,
     EngineeringDispatchDCTPayload,
+    EngineeringDispatchTeamPayload,
+    EngineeringRecallTeamPayload,
+    EngineeringRequestEscortPayload,
+    EngineeringSetBatteryModePayload,
     EngineeringSetPowerPayload,
     EngineeringSetRepairPayload,
+    EngineeringStartReroutePayload,
 )
 
 # Weapons
@@ -156,6 +162,14 @@ __all__ = [
     "VALID_SYSTEMS",
     "EngineeringSetPowerPayload",
     "EngineeringSetRepairPayload",
+    "EngineeringDispatchDCTPayload",
+    "EngineeringCancelDCTPayload",
+    "EngineeringDispatchTeamPayload",
+    "EngineeringRecallTeamPayload",
+    "EngineeringSetBatteryModePayload",
+    "EngineeringStartReroutePayload",
+    "EngineeringRequestEscortPayload",
+    "EngineeringCancelRepairOrderPayload",
     # weapons
     "WeaponsSelectTargetPayload",
     "WeaponsFireBeamsPayload",

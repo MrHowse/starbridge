@@ -3,7 +3,9 @@
 Covers:
   Handler:    validate payload, reject unknown systems, reject out-of-range levels,
               enqueue valid commands, return error.validation on bad input.
-  Drain queue: apply set_power (with and without budget clamping), set_repair.
+  Drain queue: apply set_power (with and without budget clamping), set_repair,
+               dispatch_team, recall_team, set_battery_mode, start_reroute,
+               cancel_repair_order.
   Engineering tick: repair healing per tick, overclock damage (mocked random),
                     edge cases (no focus, full health, offline system).
 """
@@ -15,9 +17,16 @@ from unittest.mock import patch
 import pytest
 
 from server import engineering, game_loop
+import server.game_loop_engineering as gle
 from server.models.messages import (
+    EngineeringCancelRepairOrderPayload,
+    EngineeringDispatchTeamPayload,
+    EngineeringRecallTeamPayload,
+    EngineeringRequestEscortPayload,
+    EngineeringSetBatteryModePayload,
     EngineeringSetPowerPayload,
     EngineeringSetRepairPayload,
+    EngineeringStartReroutePayload,
     Message,
 )
 from server.models.world import World
@@ -275,3 +284,228 @@ async def test_apply_engineering_overclock_skips_offline_system():
         damaged = game_loop._apply_engineering(ship)
     assert ship.systems["engines"].health == 0.0  # unchanged
     assert damaged == []
+
+
+# ---------------------------------------------------------------------------
+# _drain_queue — new v0.06.2 engineering message types
+# ---------------------------------------------------------------------------
+
+
+_TEST_CREW_IDS = [f"crew_{i}" for i in range(6)]
+
+
+def _init_gle_for_test(world: World) -> None:
+    """Initialise the gle module with enough crew to form repair teams."""
+    gle.reset()
+    gle.init(world.ship, crew_member_ids=_TEST_CREW_IDS)
+
+
+async def test_drain_queue_dispatch_team():
+    """engineering.dispatch_team calls gle.dispatch_team."""
+    _, world, queue = fresh_loop()
+    _init_gle_for_test(world)
+    ship = world.ship
+
+    state = gle.build_state(ship)
+    teams = state.get("repair_teams", [])
+    assert len(teams) > 0, "Expected at least one repair team"
+    team = teams[0]
+
+    payload = EngineeringDispatchTeamPayload(team_id=team["id"], system="engines")
+    await queue.put(("engineering.dispatch_team", payload))
+    game_loop._drain_queue(ship)
+
+    new_state = gle.build_state(ship)
+    updated_team = [t for t in new_state["repair_teams"] if t["id"] == team["id"]]
+    assert len(updated_team) == 1
+    assert updated_team[0]["status"] in ("travelling", "repairing")
+
+
+async def test_drain_queue_recall_team():
+    """engineering.recall_team calls gle.recall_team."""
+    _, world, queue = fresh_loop()
+    _init_gle_for_test(world)
+    ship = world.ship
+
+    state = gle.build_state(ship)
+    teams = state.get("repair_teams", [])
+    assert len(teams) > 0, "Expected at least one repair team"
+    team = teams[0]
+
+    # First dispatch the team
+    gle.dispatch_team(team["id"], "engines", ship.interior)
+    dispatched = [t for t in gle.build_state(ship)["repair_teams"] if t["id"] == team["id"]][0]
+    assert dispatched["status"] != "idle"
+
+    # Now recall via drain_queue
+    payload = EngineeringRecallTeamPayload(team_id=team["id"])
+    await queue.put(("engineering.recall_team", payload))
+    game_loop._drain_queue(ship)
+
+    recalled = [t for t in gle.build_state(ship)["repair_teams"] if t["id"] == team["id"]][0]
+    assert recalled["status"] in ("idle", "travelling")
+
+
+async def test_drain_queue_set_battery_mode():
+    """engineering.set_battery_mode calls gle.set_battery_mode."""
+    _, world, queue = fresh_loop()
+    _init_gle_for_test(world)
+    ship = world.ship
+
+    payload = EngineeringSetBatteryModePayload(mode="charging")
+    await queue.put(("engineering.set_battery_mode", payload))
+    game_loop._drain_queue(ship)
+
+    state = gle.build_state(ship)
+    assert state["power_grid"]["battery_mode"] == "charging"
+
+
+async def test_drain_queue_start_reroute():
+    """engineering.start_reroute calls gle.start_reroute."""
+    _, world, queue = fresh_loop()
+    _init_gle_for_test(world)
+    ship = world.ship
+
+    payload = EngineeringStartReroutePayload(target_bus="secondary")
+    await queue.put(("engineering.start_reroute", payload))
+    game_loop._drain_queue(ship)
+
+    state = gle.build_state(ship)
+    assert state["power_grid"]["reroute_active"] is True
+    assert state["power_grid"]["reroute_target_bus"] == "secondary"
+
+
+async def test_drain_queue_cancel_repair_order():
+    """engineering.cancel_repair_order calls gle.cancel_repair_order."""
+    _, world, queue = fresh_loop()
+    _init_gle_for_test(world)
+    ship = world.ship
+
+    # Add an order — returns auto-generated order ID
+    order_id = gle.add_repair_order("engines")
+    assert order_id is not None
+    state = gle.build_state(ship)
+    order_ids = [o["id"] for o in state.get("repair_orders", [])]
+    assert order_id in order_ids
+
+    payload = EngineeringCancelRepairOrderPayload(order_id=order_id)
+    await queue.put(("engineering.cancel_repair_order", payload))
+    game_loop._drain_queue(ship)
+
+    state = gle.build_state(ship)
+    order_ids = [o["id"] for o in state.get("repair_orders", [])]
+    assert order_id not in order_ids
+
+
+async def test_drain_queue_set_power_also_calls_gle():
+    """engineering.set_power should update both old system and gle requested power."""
+    _, world, queue = fresh_loop()
+    _init_gle_for_test(world)
+    ship = world.ship
+
+    ship.systems["beams"].power = 50.0
+    ship.systems["point_defence"].power = 50.0
+    await queue.put(("engineering.set_power", EngineeringSetPowerPayload(system="engines", level=130.0)))
+    game_loop._drain_queue(ship)
+
+    # Old system updated
+    assert ship.systems["engines"].power == 130.0
+
+    # gle should also have the requested power tracked
+    state = gle.build_state(ship)
+    assert state["systems"]["engines"]["requested_power"] == 130.0
+
+
+async def test_handler_dispatch_team_valid_enqueues():
+    """Handler should validate and enqueue engineering.dispatch_team."""
+    _, queue = fresh_handler()
+    msg = Message.build("engineering.dispatch_team", {"team_id": "alpha", "system": "engines"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.qsize() == 1
+    msg_type, payload = await queue.get()
+    assert msg_type == "engineering.dispatch_team"
+    assert payload.team_id == "alpha"
+    assert payload.system == "engines"
+
+
+async def test_handler_dispatch_team_invalid_system_returns_error():
+    """Handler should reject dispatch_team with unknown system."""
+    sender, queue = fresh_handler()
+    msg = Message.build("engineering.dispatch_team", {"team_id": "alpha", "system": "warpcore"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.empty()
+    assert len(sender.sent) == 1
+    assert sender.sent[0].type == "error.validation"
+
+
+async def test_handler_set_battery_mode_valid_enqueues():
+    """Handler should validate and enqueue engineering.set_battery_mode."""
+    _, queue = fresh_handler()
+    msg = Message.build("engineering.set_battery_mode", {"mode": "discharging"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.qsize() == 1
+    msg_type, payload = await queue.get()
+    assert msg_type == "engineering.set_battery_mode"
+    assert payload.mode == "discharging"
+
+
+async def test_handler_set_battery_mode_invalid_returns_error():
+    """Handler should reject unknown battery mode."""
+    sender, queue = fresh_handler()
+    msg = Message.build("engineering.set_battery_mode", {"mode": "turbo"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.empty()
+    assert sender.sent[0].type == "error.validation"
+
+
+async def test_handler_start_reroute_valid_enqueues():
+    """Handler should validate and enqueue engineering.start_reroute."""
+    _, queue = fresh_handler()
+    msg = Message.build("engineering.start_reroute", {"target_bus": "primary"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.qsize() == 1
+    msg_type, payload = await queue.get()
+    assert msg_type == "engineering.start_reroute"
+    assert payload.target_bus == "primary"
+
+
+async def test_handler_start_reroute_invalid_bus_returns_error():
+    """Handler should reject unknown bus name."""
+    sender, queue = fresh_handler()
+    msg = Message.build("engineering.start_reroute", {"target_bus": "tertiary"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.empty()
+    assert sender.sent[0].type == "error.validation"
+
+
+async def test_handler_recall_team_valid_enqueues():
+    """Handler should validate and enqueue engineering.recall_team."""
+    _, queue = fresh_handler()
+    msg = Message.build("engineering.recall_team", {"team_id": "bravo"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.qsize() == 1
+    msg_type, payload = await queue.get()
+    assert msg_type == "engineering.recall_team"
+    assert payload.team_id == "bravo"
+
+
+async def test_handler_request_escort_valid_enqueues():
+    """Handler should validate and enqueue engineering.request_escort."""
+    _, queue = fresh_handler()
+    msg = Message.build("engineering.request_escort", {"team_id": "alpha"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.qsize() == 1
+    msg_type, payload = await queue.get()
+    assert msg_type == "engineering.request_escort"
+    assert payload.team_id == "alpha"
+
+
+async def test_handler_cancel_repair_order_valid_enqueues():
+    """Handler should validate and enqueue engineering.cancel_repair_order."""
+    _, queue = fresh_handler()
+    msg = Message.build("engineering.cancel_repair_order", {"order_id": "ord_1"})
+    await engineering.handle_engineering_message("conn1", msg)
+    assert queue.qsize() == 1
+    msg_type, payload = await queue.get()
+    assert msg_type == "engineering.cancel_repair_order"
+    assert payload.order_id == "ord_1"
