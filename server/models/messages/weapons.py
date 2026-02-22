@@ -5,7 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-VALID_TORPEDO_TYPES = ("standard", "emp", "probe", "nuclear")
+VALID_TORPEDO_TYPES = (
+    "standard", "homing", "ion", "piercing",
+    "heavy", "proximity", "nuclear", "experimental",
+)
 
 
 class WeaponsSelectTargetPayload(BaseModel):
@@ -22,7 +25,10 @@ class WeaponsFireTorpedoPayload(BaseModel):
 
 class WeaponsLoadTubePayload(BaseModel):
     tube: int = Field(ge=1, le=2, default=1)
-    torpedo_type: Literal["standard", "emp", "probe", "nuclear"] = "standard"
+    torpedo_type: Literal[
+        "standard", "homing", "ion", "piercing",
+        "heavy", "proximity", "nuclear", "experimental",
+    ] = "standard"
 
 
 class WeaponsSetShieldFocusPayload(BaseModel):
