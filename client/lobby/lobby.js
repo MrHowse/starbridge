@@ -71,6 +71,7 @@ const sessionLabelEl    = document.querySelector('[data-session-label]');
 
 function init() {
   buildRoleCards();
+  _loadMissions();
 
   onStatusChange((status) => {
     setStatusDot(statusDotEl, status);
@@ -333,6 +334,46 @@ async function _resumeGame(saveId) {
   } catch (err) {
     if (resumeStatus) resumeStatus.textContent = `Network error: ${err.message}`;
     if (resumeBtn) resumeBtn.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mission list (dynamic)
+// ---------------------------------------------------------------------------
+
+async function _loadMissions() {
+  if (!missionSelectEl) return;
+  try {
+    const r = await fetch('/editor/missions');
+    const data = await r.json();
+    const missions = data.missions || [];
+    if (missions.length === 0) return;
+
+    // Keep the default SANDBOX option, add the rest.
+    // Group: regular missions first, then training.
+    const regular  = missions.filter(m => m.id !== 'sandbox' && !m.id.startsWith('train_'));
+    const training = missions.filter(m => m.id.startsWith('train_'));
+
+    for (const m of regular) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = (m.name || m.id).toUpperCase();
+      missionSelectEl.appendChild(opt);
+    }
+
+    if (training.length > 0) {
+      const group = document.createElement('optgroup');
+      group.label = 'TRAINING';
+      for (const m of training) {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = (m.name || m.id).toUpperCase();
+        group.appendChild(opt);
+      }
+      missionSelectEl.appendChild(group);
+    }
+  } catch (_err) {
+    // Fetch failed — keep the static SANDBOX fallback.
   }
 }
 
