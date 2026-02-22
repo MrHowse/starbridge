@@ -433,8 +433,11 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     glsb.setup_world(_world)  # no-op unless sandbox is active
 
     # v0.06.2 Engineering subsystems (power grid, repair teams, damage model).
-    # Runs in data-only mode for now — old engineering still controls power/health.
-    gle.init(_world.ship)
+    _crew_ids: list[str] = []
+    for _dk_name, _dk in _world.ship.crew.decks.items():
+        for _ci in range(_dk.total):
+            _crew_ids.append(f"{_dk_name}_{_ci}")
+    gle.init(_world.ship, crew_member_ids=_crew_ids)
 
     _task = asyncio.create_task(_loop(), name="game_loop")
     logger.info("Game loop started (mission: %s, %d Hz)", mission_id, TICK_RATE)
@@ -556,7 +559,7 @@ async def _loop() -> None:
                 _sector_grid_dirty = True
 
         # 3. Engineering. 3.5 Crew factors + medical + disease. 3.6 Security. 3.7 Comms.
-        damaged_systems = _apply_engineering(_world.ship)
+        _eng_result = gle.tick(_world.ship, _world.ship.interior, TICK_DT)
         # 3.1 Training auto-simulation (only active during training missions).
         gltr.auto_helm_tick(_world.ship, TICK_DT)
         gltr.auto_engineering_tick(_world.ship, TICK_DT)
@@ -886,12 +889,13 @@ async def _loop() -> None:
             elif _sb_type == "system_damage":
                 _sb_sys = _world.ship.systems.get(sb_evt["system"])
                 if _sb_sys is not None:
-                    _sb_sys.health = max(0.0, _sb_sys.health - sb_evt["amount"])
                     gle.apply_system_damage(sb_evt["system"], sb_evt["amount"], "environment", tick=_tick_count)
+                    _sb_dm = gle.get_damage_model()
+                    _sb_new_health = _sb_dm.get_system_health(sb_evt["system"]) if _sb_dm else max(0.0, _sb_sys.health - sb_evt["amount"])
                     await _manager.broadcast(Message.build(
                         "ship.system_damaged",
                         {"system": sb_evt["system"],
-                         "new_health": round(_sb_sys.health, 1),
+                         "new_health": round(_sb_new_health, 1),
                          "cause": "environment"},
                     ))
                     gl.log_event("sandbox", "system_damaged", {
@@ -1186,11 +1190,21 @@ async def _loop() -> None:
             )
 
         # 12–15. Damage events, torpedo hits, action events, security events.
-        for s, h in damaged_systems:
-            gle.apply_system_damage(s, OVERCLOCK_DAMAGE_HP, "overclock", tick=_tick_count)
+        # 12a. Overclock damage events (from gle.tick).
+        for _oc_evt in _eng_result.overclock_events:
+            _oc_sys = _oc_evt["system"]
+            _oc_health = _world.ship.systems[_oc_sys].health
             await _manager.broadcast(Message.build(
-                "ship.system_damaged", {"system": s, "new_health": h, "cause": "overclock"}))
-            gl.log_event("engineering", "overclock_damage", {"system": s, "new_health": round(h, 1)})
+                "ship.system_damaged", {"system": _oc_sys, "new_health": round(_oc_health, 1), "cause": "overclock"}))
+            gl.log_event("engineering", "overclock_damage", {"system": _oc_sys, "new_health": round(_oc_health, 1)})
+        # 12b. Repair team notable events.
+        _NOTABLE_TEAM_EVENTS = {"team_arrived", "team_returned", "casualty", "team_eliminated"}
+        for _rt_evt in _eng_result.repair_team_events:
+            if _rt_evt.get("type") in _NOTABLE_TEAM_EVENTS:
+                await _manager.broadcast_to_roles(
+                    ["engineering"],
+                    Message.build("engineering.repair_team_event", _rt_evt),
+                )
         for s, h in combat_damage_events:
             _combat_delta = _combat_health_snapshot.get(s, 100.0) - h
             if _combat_delta > 0:
@@ -1336,14 +1350,13 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             _set_training_flag(glm, "helm_throttle_set")
         elif msg_type == "engineering.set_power" and isinstance(payload, EngineeringSetPowerPayload):
             _prev_power = ship.systems[payload.system].power
-            _apply_power(ship, payload.system, payload.level)
             gle.set_power(payload.system, payload.level)
-            _new_power = ship.systems[payload.system].power
-            if _new_power != _prev_power:
-                gl.log_event("engineering", "power_changed", {"system": payload.system, "from": _prev_power, "to": _new_power})
+            if payload.level != _prev_power:
+                gl.log_event("engineering", "power_changed", {"system": payload.system, "from": _prev_power, "to": payload.level})
             _set_training_flag(glm, "engineering_power_set")
         elif msg_type == "engineering.set_repair" and isinstance(payload, EngineeringSetRepairPayload):
             ship.repair_focus = payload.system
+            gle.add_repair_order(payload.system)
             gl.log_event("engineering", "repair_started", {"system": payload.system})
             _set_training_flag(glm, "engineering_repair_set")
         elif msg_type in ("engineering.dispatch_dct", "damage_control.dispatch_dct") and isinstance(payload, EngineeringDispatchDCTPayload):
