@@ -101,6 +101,9 @@ export class MapRenderer {
     this._hazards      = [];
     this._torpedoTrails = new Map();
 
+    // Camera override (for sector-centred view — ship drawn at world position).
+    this._camOverride = null;
+
     // Overlays
     this._damageEvents = [];   // { x, y, time }
     this._overlayDamage = false;
@@ -166,6 +169,27 @@ export class MapRenderer {
     this._beamFlash = null;
   }
 
+  // ── Camera override (sector mode) ──────────────────────────────────────────
+
+  /**
+   * Override the camera origin. When set, worldToCanvas() uses (x,y) as the
+   * map centre instead of the ship position, and the ship is drawn as a small
+   * icon at its actual world location rather than at the canvas centre.
+   */
+  setCameraOverride(x, y) { this._camOverride = { x, y }; }
+
+  /** Restore default ship-centred camera. */
+  clearCameraOverride()    { this._camOverride = null; }
+
+  /** @private Return the current camera world position. */
+  _getCamPos() {
+    if (this._camOverride) return this._camOverride;
+    return {
+      x: this._shipState?.position?.x ?? 50_000,
+      y: this._shipState?.position?.y ?? 50_000,
+    };
+  }
+
   // ── Selection ──────────────────────────────────────────────────────────────
 
   selectContact(id) {
@@ -180,18 +204,17 @@ export class MapRenderer {
 
   /**
    * Convert a world position to canvas pixel coordinates.
-   * Uses the current ship position as camera origin.
+   * Uses the camera origin (ship position, or override if set).
    */
   worldToCanvas(wx, wy) {
     if (!this._shipState) return { x: 0, y: 0 };
-    const cw   = this._canvas.width;
-    const ch   = this._canvas.height;
-    const camX = this._shipState.position?.x ?? 50_000;
-    const camY = this._shipState.position?.y ?? 50_000;
+    const cw  = this._canvas.width;
+    const ch  = this._canvas.height;
+    const cam = this._getCamPos();
     const zoom = this._effectiveZoom(cw, ch);
     return {
-      x: cw / 2 + (wx - camX) / zoom,
-      y: ch / 2 + (wy - camY) / zoom,
+      x: cw / 2 + (wx - cam.x) / zoom,
+      y: ch / 2 + (wy - cam.y) / zoom,
     };
   }
 
@@ -224,8 +247,9 @@ export class MapRenderer {
 
     if (!this._shipState) return;
 
-    const camX    = this._shipState.position?.x ?? 50_000;
-    const camY    = this._shipState.position?.y ?? 50_000;
+    const cam     = this._getCamPos();
+    const camX    = cam.x;
+    const camY    = cam.y;
     const heading = this._shipState.heading ?? 0;
     const zoom    = this._effectiveZoom(cw, ch);
 
@@ -247,10 +271,26 @@ export class MapRenderer {
 
     if (isHeadingUp) ctx.restore();
 
-    // Ship chevron (always at canvas centre, pointing toward current heading on north-up).
+    // Ship position in canvas coords.
+    const shipWX = this._shipState.position?.x ?? 50_000;
+    const shipWY = this._shipState.position?.y ?? 50_000;
     const headRad = heading * Math.PI / 180;
-    const chevRot = isHeadingUp ? 0 : headRad;
-    _drawShipChevron(ctx, cw / 2, ch / 2, chevRot, 8, C_PRIMARY);
+
+    if (this._camOverride) {
+      // Camera-override mode (e.g. sector view): draw ship as small icon at world position.
+      const sp = this.worldToCanvas(shipWX, shipWY);
+      if (sp.x >= -10 && sp.x <= cw + 10 && sp.y >= -10 && sp.y <= ch + 10) {
+        _drawShipChevron(ctx, sp.x, sp.y, headRad, 5, C_PRIMARY);
+      }
+    } else {
+      // Default: ship chevron at canvas centre.
+      const chevRot = isHeadingUp ? 0 : headRad;
+      _drawShipChevron(ctx, cw / 2, ch / 2, chevRot, 8, C_PRIMARY);
+    }
+
+    // Ship screen position for beam flash origin.
+    const shipSx = this._camOverride ? this.worldToCanvas(shipWX, shipWY).x : cw / 2;
+    const shipSy = this._camOverride ? this.worldToCanvas(shipWX, shipWY).y : ch / 2;
 
     // Beam flash (world coords).
     if (this._beamFlash) {
@@ -262,7 +302,7 @@ export class MapRenderer {
         ctx.strokeStyle = `rgba(0, 255, 65, ${alpha})`;
         ctx.lineWidth   = 2;
         ctx.beginPath();
-        ctx.moveTo(cw / 2, ch / 2);
+        ctx.moveTo(shipSx, shipSy);
         ctx.lineTo(sp.x, sp.y);
         ctx.stroke();
       } else {
@@ -440,8 +480,9 @@ export class MapRenderer {
 
       const cw   = this._canvas.width;
       const ch   = this._canvas.height;
-      const camX = this._shipState.position?.x ?? 50_000;
-      const camY = this._shipState.position?.y ?? 50_000;
+      const cam  = this._getCamPos();
+      const camX = cam.x;
+      const camY = cam.y;
       const zoom = this._effectiveZoom(cw, ch);
 
       const HIT_R = 18;

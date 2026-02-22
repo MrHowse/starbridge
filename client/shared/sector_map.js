@@ -119,6 +119,8 @@ export class SectorMap {
   updateSectorGrid(payload) {
     this._gridData        = payload;
     this._stationEntities = payload.station_entities || [];
+    // Re-apply sector range in case we were waiting for grid data.
+    if (this._zoom === 'sector') this._applyRangeToRenderer();
   }
 
   /** Update the ship world position (for strategic ship marker). */
@@ -264,8 +266,47 @@ export class SectorMap {
 
   _applyRangeToRenderer() {
     if (!this._mapRenderer) return;
-    const range = ZOOM_RANGES[this._zoom];
-    if (range != null) this._mapRenderer._range = range;
+    if (this._zoom === 'sector') {
+      this._applySectorRange();
+    } else {
+      const range = ZOOM_RANGES[this._zoom];
+      if (range != null) {
+        this._mapRenderer._range = range;
+        this._mapRenderer.clearCameraOverride();
+      }
+    }
+  }
+
+  /**
+   * Compute the active sector's world bounds and configure the MapRenderer
+   * to show the entire sector centred, with a 10% margin.
+   * Falls back to the old fixed 75k range (ship-centred) if no sector data.
+   */
+  _applySectorRange() {
+    if (!this._gridData) {
+      this._mapRenderer._range = ZOOM_RANGES.sector;
+      this._mapRenderer.clearCameraOverride();
+      return;
+    }
+    // Find the sector the ship is currently in.
+    const sectors = this._gridData.sectors;
+    let activeSector = null;
+    for (const s of Object.values(sectors)) {
+      if (s.visibility === 'active') { activeSector = s; break; }
+    }
+    if (!activeSector) {
+      this._mapRenderer._range = ZOOM_RANGES.sector;
+      this._mapRenderer.clearCameraOverride();
+      return;
+    }
+    // Each sector is 100,000 × 100,000 world units.
+    const [col, row] = activeSector.grid_position;
+    const SECTOR_SIZE = 100_000;
+    const cxWorld = (col + 0.5) * SECTOR_SIZE;
+    const cyWorld = (row + 0.5) * SECTOR_SIZE;
+    const range   = SECTOR_SIZE / 2 * 1.1;   // 55,000 — sector radius + 10% margin
+    this._mapRenderer._range = range;
+    this._mapRenderer.setCameraOverride(cxWorld, cyWorld);
   }
 
   _drawCell(ctx, x, y, w, h, sector, now) {
@@ -429,6 +470,103 @@ export class SectorMap {
     for (let r = 0; r < rows; r++) {
       ctx.fillText(String(r + 1), PAD - 1, PAD + (r + 0.5) * cellH);
     }
+  }
+
+  /**
+   * Draw sector boundary lines and adjacent sector name labels on the map
+   * canvas when in sector mode. Must be called after mapRenderer.render().
+   *
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {HTMLCanvasElement}        canvas
+   * @param {MapRenderer}              mapRenderer
+   */
+  renderSectorBoundaryOverlay(ctx, canvas, mapRenderer) {
+    if (this._zoom !== 'sector' || !this._gridData || !mapRenderer) return;
+
+    // Find the active sector.
+    const sectors = this._gridData.sectors;
+    let activeSector = null;
+    for (const s of Object.values(sectors)) {
+      if (s.visibility === 'active') { activeSector = s; break; }
+    }
+    if (!activeSector) return;
+
+    const [col, row] = activeSector.grid_position;
+    const SECTOR_SIZE = 100_000;
+    const minX = col * SECTOR_SIZE;
+    const minY = row * SECTOR_SIZE;
+    const maxX = (col + 1) * SECTOR_SIZE;
+    const maxY = (row + 1) * SECTOR_SIZE;
+
+    const cw = canvas.width;
+    const ch = canvas.height;
+
+    // Sector corners in canvas coordinates.
+    const tl = mapRenderer.worldToCanvas(minX, minY);
+    const tr = mapRenderer.worldToCanvas(maxX, minY);
+    const br = mapRenderer.worldToCanvas(maxX, maxY);
+    const bl = mapRenderer.worldToCanvas(minX, maxY);
+
+    ctx.save();
+
+    // Dashed sector boundary rectangle.
+    ctx.strokeStyle = 'rgba(0, 255, 65, 0.35)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(tl.x, tl.y);
+    ctx.lineTo(tr.x, tr.y);
+    ctx.lineTo(br.x, br.y);
+    ctx.lineTo(bl.x, bl.y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Active sector label (top-left corner of sector boundary).
+    ctx.fillStyle    = 'rgba(0, 255, 65, 0.55)';
+    ctx.font         = '9px "Share Tech Mono", monospace';
+    ctx.textAlign    = 'left';
+    ctx.textBaseline = 'top';
+    const sectorLabel = activeSector.name
+      ? `${activeSector.id} — ${activeSector.name}`
+      : activeSector.id;
+    ctx.fillText(sectorLabel.slice(0, 24), tl.x + 4, tl.y + 4);
+
+    // Adjacent sector labels at each edge midpoint.
+    const [cols, rows] = this._gridData.grid_size;
+    const neighbors = [
+      { dc: 0, dr: -1, ex: (minX + maxX) / 2, ey: minY, align: 'center', base: 'bottom', dx: 0, dy: -4 },
+      { dc: 0, dr:  1, ex: (minX + maxX) / 2, ey: maxY, align: 'center', base: 'top',    dx: 0, dy:  4 },
+      { dc: -1, dr: 0, ex: minX, ey: (minY + maxY) / 2, align: 'right',  base: 'middle', dx: -4, dy: 0 },
+      { dc:  1, dr: 0, ex: maxX, ey: (minY + maxY) / 2, align: 'left',   base: 'middle', dx:  4, dy: 0 },
+    ];
+
+    for (const n of neighbors) {
+      const nc = col + n.dc;
+      const nr = row + n.dr;
+      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+      const neighbor = Object.values(sectors).find(
+        s => s.grid_position[0] === nc && s.grid_position[1] === nr,
+      );
+      if (!neighbor || neighbor.visibility === 'unknown') continue;
+
+      const ep = mapRenderer.worldToCanvas(n.ex, n.ey);
+      ctx.fillStyle    = 'rgba(0, 255, 65, 0.35)';
+      ctx.font         = '8px "Share Tech Mono", monospace';
+      ctx.textAlign    = n.align;
+      ctx.textBaseline = n.base;
+      const tag = neighbor.name ? `${neighbor.id}: ${neighbor.name}` : neighbor.id;
+      ctx.fillText(tag.slice(0, 18), ep.x + n.dx, ep.y + n.dy);
+    }
+
+    // Sector zoom label (bottom-right corner of canvas).
+    ctx.fillStyle    = 'rgba(0, 255, 65, 0.45)';
+    ctx.font         = '8px "Share Tech Mono", monospace';
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('SECTOR', cw - 4, ch - 4);
+
+    ctx.restore();
   }
 
   /**

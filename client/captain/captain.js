@@ -670,6 +670,10 @@ function _tacticalLoop() {
     if (mapCtx && mapCanvas && _sectorMap) {
       _sectorMap.renderStationOverlay(mapCtx, mapCanvas, mapRenderer);
     }
+    // Sector boundary + adjacent sector labels.
+    if (mapCtx && mapCanvas && _sectorMap && _sectorMap.getZoomLevel() === 'sector') {
+      _sectorMap.renderSectorBoundaryOverlay(mapCtx, mapCanvas, mapRenderer);
+    }
     // Heading label overlay (tactical / sector modes only).
     if (mapCtx && shipState) {
       const W   = mapCanvas.width;
