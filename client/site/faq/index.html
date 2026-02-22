@@ -41,6 +41,8 @@
   <a href="#q-docking"     class="toc-link">Docking at stations</a>
   <a href="#q-creatures"   class="toc-link">Space creatures</a>
   <a href="#q-scan-modes"  class="toc-link">Scan modes</a>
+  <a href="#q-shields"     class="toc-link">Shield focus</a>
+  <a href="#q-medical"     class="toc-link">Medical / triage</a>
 </aside>
 
 <main class="docs-main" role="main">
@@ -334,6 +336,51 @@
         <p>For a sector sweep, choose the mode that matches your current objective.
         All entities are eventually revealed regardless of mode — mode only affects
         which ones appear first in the 30-second sweep cycle.</p>
+      </div>
+    </div>
+
+    <div id="q-shields" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How does shield focus work?
+      </div>
+      <div class="faq-a">
+        <p>Shields are split into four facings: <strong>Fore</strong> (front),
+        <strong>Aft</strong> (rear), <strong>Port</strong> (left), and
+        <strong>Starboard</strong> (right). The total shield capacity (200 HP) is
+        distributed across all four facings based on a <em>focus point</em>.</p>
+        <p>On the Engineering station, drag the focus point on the shield canvas toward
+        the threat direction. Shield energy shifts to the nearest facing — for example,
+        dragging forward concentrates shields on the fore arc. The Captain's display
+        shows a four-bar readout of current shield distribution.</p>
+        <p>Use the <strong>LOCK</strong> button to freeze the focus point. Use
+        <strong>CENTRE</strong> to reset to an even 50/50/50/50 split. When incoming fire
+        hits a specific facing, only that facing's shield pool absorbs the damage — if
+        it runs out, hull takes the remainder.</p>
+      </div>
+    </div>
+
+    <div id="q-medical" class="faq-item">
+      <div class="faq-q" role="button" tabindex="0" aria-expanded="false">
+        How does the Medical station work?
+      </div>
+      <div class="faq-a">
+        <p>Medical tracks individual crew members, not just deck totals. Each crew
+        member can sustain injuries to specific body regions (head, torso, arms, legs)
+        at four severity levels: minor, moderate, serious, and critical.</p>
+        <p>Injuries <strong>degrade over time</strong> if untreated — a moderate wound
+        becomes serious, serious becomes critical, and critical injuries are fatal.
+        Your job is triage: prioritise the most urgent cases.</p>
+        <p><strong>Treatment types:</strong></p>
+        <ul>
+          <li><strong>First Aid</strong> — fast, for minor/moderate injuries.</li>
+          <li><strong>Stabilise</strong> — pauses degradation; buys time when beds are full.</li>
+          <li><strong>Surgery</strong> — for serious injuries; triggers a triage puzzle.</li>
+          <li><strong>Intensive Care</strong> — for critical injuries; harder puzzle, higher supply cost.</li>
+          <li><strong>Quarantine</strong> — isolates contagious crew to prevent outbreaks.</li>
+        </ul>
+        <p>The body diagram shows injury locations colour-coded by severity. Crew factor
+        (the ratio of healthy crew to total crew on a deck) directly affects that deck's
+        system efficiency — keeping crew healthy keeps the entire ship running.</p>
       </div>
     </div>
 

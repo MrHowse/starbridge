@@ -99,8 +99,11 @@
         <li><strong>Hull:</strong> Hull points represent overall ship integrity. Hull damage
         is permanent within a mission (no passive regeneration). When hull reaches zero, the
         mission fails.</li>
-        <li><strong>Shields:</strong> The shield system regenerates automatically when
-        powered. Shields absorb incoming fire before hull is damaged.</li>
+        <li><strong>Shields:</strong> Shields are split into four facings — fore, aft,
+        port, and starboard — sharing a total capacity of 200 HP. Shield distribution
+        shifts based on a focus point set from Engineering. Shields regenerate
+        automatically when powered and absorb incoming fire before hull is damaged;
+        each facing absorbs hits independently.</li>
         <li><strong>Alert levels:</strong> GREEN (routine), YELLOW (enemy detected),
         RED (combat). Alert level is set by the Captain and affects ambient sound across
         all stations.</li>
@@ -138,8 +141,9 @@
             radius is 80,000 units.</li>
             <li><strong>Science summary panel:</strong> Condensed view of current sensor
             contacts from the Science station.</li>
-            <li><strong>Hull / Shield readout:</strong> Real-time hull and shield
-            percentages.</li>
+            <li><strong>Hull / Shield readout:</strong> Real-time hull percentage and
+            four-bar shield display (fore, aft, port, starboard) showing current HP per
+            facing.</li>
             <li><strong>Captain's log:</strong> Type entries; they are timestamped and
             included verbatim in the post-mission debrief.</li>
             <li><strong>Nuclear authorisation panel:</strong> Appears when Weapons
@@ -214,6 +218,10 @@
             <li><strong>System health indicators:</strong> Each system shows current
             health (0–100 HP). Damaged systems operate at reduced efficiency even with
             full power.</li>
+            <li><strong>Shield focus canvas:</strong> Drag the focus point toward the
+            threat direction. Shield energy redistributes across four facings (fore, aft,
+            port, starboard) based on the focus point. Use <strong>LOCK</strong> to freeze
+            the focus and <strong>CENTRE</strong> to reset to an even split.</li>
             <li><strong>Circuit Routing puzzle:</strong> Triggered by mission events.
             Requires routing power through a grid to reconnect severed conduits.</li>
           </ul>
@@ -222,7 +230,9 @@
           <div class="tip"><strong>Tips:</strong> The power budget is strict — if you give
           Shields 150, something else must give up 50. Life Support below 50 power starts
           reducing crew health over time. In heavy combat: raise Shields and Weapons, lower
-          Flight Deck and ECM. After combat: raise Sensors and Life Support for recovery.</div>
+          Flight Deck and ECM. After combat: raise Sensors and Life Support for recovery.
+          Drag shield focus toward the enemy bearing — concentrating shields on one facing
+          is far more effective than spreading them evenly when under directional fire.</div>
         </div>
       </div>
 
