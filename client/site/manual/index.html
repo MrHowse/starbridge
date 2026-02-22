@@ -323,32 +323,95 @@
       <div id="s-medical" class="station">
         <h3 class="station__heading">MEDICAL</h3>
         <div class="station-body">
-          <p><em>Role summary:</em> You manage crew health across all six ship decks.
-          Injured crew reduce system efficiency on their deck; dead crew are permanent
-          losses. You also track and respond to disease outbreaks, which spread between
-          connected rooms if untreated.</p>
+          <p><em>Role summary:</em> You manage individual crew members, not just
+          deck-level statistics. Every crew member has a name, a deck assignment, and
+          can sustain specific injuries to body regions. Injuries degrade over time if
+          untreated — a moderate wound becomes serious, serious becomes critical, and
+          critical injuries are fatal. Dead crew are permanent losses. Your job is
+          triage: decide who to treat first, what treatment to use, and when to
+          quarantine contagious crew.</p>
 
-          <p><strong>Controls</strong></p>
+          <p><strong>Casualty List (left panel)</strong></p>
           <ul>
-            <li><strong>Deck list:</strong> Shows all six decks (Bridge, Sensors,
-            Weapons, Shields, Engineering, Medical) with crew counts — Active, Injured,
-            Critical, KIA — and a crew efficiency gauge.</li>
-            <li><strong>Treat Injured / Treat Critical buttons:</strong> Start a
-            treatment session on the selected deck. Each treatment costs 2 medical
-            supplies and heals 1 crew member per 2 seconds.</li>
-            <li><strong>Cancel Treatment:</strong> Halts the active treatment and frees
-            the medical team for another deck.</li>
-            <li><strong>Disease panel:</strong> Lists active outbreaks by deck and
-            pathogen type. Outbreaks spread every 30 seconds through unsealed doors.</li>
-            <li><strong>Triage puzzle:</strong> Triggered by mass-casualty events.
-            Diagnose patients by symptom pattern and prescribe correct treatment steps.</li>
+            <li>Lists every crew member who has at least one injury, sorted by urgency
+            (critical first) by default.</li>
+            <li>Each card shows: <strong>name</strong>, <strong>deck</strong>,
+            <strong>worst severity</strong> (colour-coded), and <strong>injury
+            count</strong>.</li>
+            <li>Severity colours: <span style="color:#ff4040">■</span> Critical (red
+            pulse) · <span style="color:#ff8800">■</span> Serious (amber) ·
+            <span style="color:#ffcc00">■</span> Moderate (yellow) ·
+            <span style="color:#888">■</span> Minor (dim).</li>
+            <li>Sort buttons along the top let you reorder by urgency, deck, name,
+            or arrival time. Filter by severity level or deck assignment.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
-          <div class="tip"><strong>Tips:</strong> Treat critical crew before injured —
-          critical crew contribute zero efficiency and are at risk of dying. Medical
-          supplies cap at 20; you cannot stockpile beyond this. Seal connecting doors
-          immediately when an outbreak is detected to prevent spread.</div>
+          <p><strong>Body Diagram (right panel)</strong></p>
+          <ul>
+            <li>When you select a crew member, a wireframe body diagram highlights
+            injured regions. Colour matches the injury's severity.</li>
+            <li>Regions: Head, Torso, Left Arm, Right Arm, Left Leg, Right Leg.
+            Click a region to filter the injury list to that area.</li>
+            <li>Below the diagram, each injury is listed with its type, severity,
+            body region, and a treatment progress bar (if being treated).</li>
+          </ul>
+
+          <p><strong>Treatment Types</strong></p>
+          <ul>
+            <li><strong>First Aid</strong> — fast, low cost. Suitable for minor and
+            moderate injuries. No puzzle required.</li>
+            <li><strong>Stabilise</strong> — buys time by pausing degradation on a
+            critical or serious injury. Use this when beds are full to prevent
+            death while you treat others. No puzzle required.</li>
+            <li><strong>Surgery</strong> — required for serious injuries. Triggers a
+            triage puzzle; success heals the injury, failure leaves it unchanged.</li>
+            <li><strong>Intensive Care</strong> — required for critical injuries.
+            Triggers a harder triage puzzle. High supply cost but saves lives.</li>
+            <li><strong>Quarantine</strong> — isolates a contagious crew member in a
+            quarantine slot. Prevents disease spread but does not heal — you must
+            still treat the underlying injury.</li>
+          </ul>
+
+          <p><strong>Triage Prioritisation</strong></p>
+          <ul>
+            <li>Critical injuries degrade fastest and kill the crew member if
+            untreated. Always stabilise or treat critical cases first.</li>
+            <li>Serious injuries degrade to critical over time — treat before they
+            escalate.</li>
+            <li>When beds are full, stabilise the worst cases, then discharge healed
+            crew to free beds for new patients.</li>
+            <li>Contagious crew should be quarantined immediately to stop the spread,
+            then treated when a bed opens.</li>
+          </ul>
+
+          <p><strong>Crew Factor</strong></p>
+          <p>Every deck has a <em>crew factor</em> — the ratio of effective crew to
+          total crew. Active crew count fully; injured crew count at half. When crew
+          factor drops, that deck's systems lose efficiency. An Engineering deck at 50%
+          crew factor means slower repairs and weaker power output. Keeping crew healthy
+          directly affects every other station's performance.</p>
+
+          <p><strong>Status Bar</strong></p>
+          <ul>
+            <li><strong>Beds:</strong> occupied / total treatment beds.</li>
+            <li><strong>Queue:</strong> patients waiting for a free bed.</li>
+            <li><strong>Supplies:</strong> remaining medical supplies (consumed by
+            treatments; replenished at stations).</li>
+            <li><strong>Quarantine:</strong> occupied / total isolation slots.</li>
+            <li><strong>Morgue:</strong> total crew deaths this mission.</li>
+            <li><strong>Crew:</strong> overall ship crew factor percentage.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> ↑/↓ — navigate casualty list ·
+          A — admit · D — discharge · Q — quarantine · S — stabilise ·
+          T — treat · 0–5 — deck filter · F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Stabilise critical crew immediately —
+          it costs nothing and stops the death timer. Treat critical before serious,
+          serious before moderate. Discharge healed patients promptly to free beds.
+          Quarantine contagious crew even if you cannot treat them yet — one infected
+          crew member can cascade into a ship-wide outbreak. Watch the crew factor
+          percentage: if Engineering drops below 70%, your ship's repair capability is
+          severely impaired.</div>
         </div>
       </div>
 
@@ -1015,6 +1078,22 @@
           <tr><td class="hi">Escape</td><td>Dismiss puzzle overlay / help overlay</td><td>Yes</td></tr>
           <tr><td class="hi">Tab</td><td>Focus next interactive element</td><td>Yes</td></tr>
           <tr><td class="hi">Enter / Space</td><td>Activate focused button</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Medical station shortcuts:</strong></p>
+      <table class="docs-table">
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="hi">↑ / ↓</td><td>Navigate casualty list</td></tr>
+          <tr><td class="hi">A</td><td>Admit selected crew member</td></tr>
+          <tr><td class="hi">D</td><td>Discharge selected crew member</td></tr>
+          <tr><td class="hi">Q</td><td>Quarantine selected crew member</td></tr>
+          <tr><td class="hi">S</td><td>Stabilise worst injury on selected crew</td></tr>
+          <tr><td class="hi">T</td><td>Treat worst injury on selected crew</td></tr>
+          <tr><td class="hi">0 – 5</td><td>Filter casualty list by deck (0 = show all)</td></tr>
         </tbody>
       </table>
 
