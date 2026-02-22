@@ -148,6 +148,9 @@ def build_sensor_contacts(
             "y": round(enemy.y, 1),
             "heading": round(enemy.heading, 2),
             "scan_state": enemy.scan_state,
+            "kind": "enemy",
+            # Enemies are "unknown" until Science scans them; then confirmed "hostile".
+            "classification": "hostile" if enemy.scan_state == "scanned" else "unknown",
         }
 
         if enemy.scan_state == "scanned":
@@ -178,6 +181,42 @@ def build_sensor_contacts(
             "scan_state": "scanned",
             "hull": round(creature.hull, 1),
             "study_progress": round(creature.study_progress, 1),
+            "classification": "unknown",
+        })
+
+    # Stations (v0.06) — hostile stations always detectable; others require transponder.
+    for station in world.stations:
+        if station.faction != "hostile" and not station.transponder_active:
+            continue
+        dist = distance(ship.x, ship.y, station.x, station.y)
+        in_range = dist <= range_
+        if not in_range and extra_bubbles:
+            for bx, by, br in extra_bubbles:
+                if distance(bx, by, station.x, station.y) <= br:
+                    in_range = True
+                    break
+        if not in_range:
+            continue
+        faction = station.faction
+        if faction == "hostile":
+            cls = "hostile"
+        elif faction == "friendly":
+            cls = "friendly"
+        else:   # neutral, none (derelict)
+            cls = "neutral"
+        contacts.append({
+            "id": station.id,
+            "x": round(station.x, 1),
+            "y": round(station.y, 1),
+            "heading": 0.0,
+            "kind": "station",
+            "scan_state": "scanned",
+            "classification": cls,
+            "station_type": station.station_type,
+            "faction": station.faction,
+            "name": station.name,
+            "hull": round(station.hull, 1),
+            "hull_max": round(station.hull_max, 1),
         })
 
     return contacts

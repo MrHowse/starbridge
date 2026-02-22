@@ -118,6 +118,13 @@ let _hitFlash = { active: false, timer: 0, viewport: null };
 let _beamFlash = { active: false, timer: 0 };
 let _animHandle = null;
 
+// View mode + overlay toggles
+let _viewMode = 'quad';         // 'quad' | 'fore' | 'aft' | 'port' | 'starboard'
+let _singleCanvas = null;       // canvas element for single-viewport mode
+let _singleCtx    = null;
+let _highlightsEnabled = false;
+let _labelsEnabled     = false;
+
 const VIEWPORT_DIRS = {
   forward:   0,    // degrees offset from heading
   aft:     180,
@@ -130,6 +137,22 @@ const VIEWPORT_LABELS = {
   aft:     'AFT',
   port:    'PORT',
   starboard: 'STBD',
+};
+
+// Map view-mode key → viewport direction key
+const VIEW_MODE_VP = {
+  fore:      'forward',
+  aft:       'aft',
+  port:      'port',
+  starboard: 'starboard',
+};
+
+// Full labels for single-viewport corner text
+const VIEWPORT_FULL_LABELS = {
+  forward:   'FORWARD VIEW',
+  aft:       'AFT VIEW',
+  port:      'PORT VIEW',
+  starboard: 'STARBOARD VIEW',
 };
 
 const FOV = 220;   // perspective focal length in px
@@ -176,10 +199,26 @@ export function triggerBeamFlash() {
   _beamFlash.timer  = 200;
 }
 
+export function setViewMode(mode) {
+  _viewMode = mode;
+}
+
+export function setSingleCanvas(canvas) {
+  _singleCanvas = canvas;
+  _singleCtx    = canvas ? canvas.getContext('2d') : null;
+}
+
+export function setHighlights(on) { _highlightsEnabled = on; }
+export function setLabels(on)     { _labelsEnabled     = on; }
+
 export function resizeViewports() {
   for (const [key, canvas] of Object.entries(_canvases)) {
     canvas.width  = canvas.parentElement?.clientWidth  || 200;
     canvas.height = canvas.parentElement?.clientHeight || 150;
+  }
+  if (_singleCanvas) {
+    _singleCanvas.width  = _singleCanvas.parentElement?.clientWidth  || 400;
+    _singleCanvas.height = _singleCanvas.parentElement?.clientHeight || 300;
   }
 }
 
@@ -207,8 +246,11 @@ function _updateFlash(dt) {
 }
 
 function _drawAll() {
-  for (const vp of Object.keys(_canvases)) {
-    _drawViewport(vp);
+  if (_viewMode === 'quad') {
+    for (const vp of Object.keys(_canvases)) _drawViewport(vp);
+  } else {
+    const vpKey = VIEW_MODE_VP[_viewMode];
+    if (_singleCanvas && vpKey) _drawViewport(vpKey, _singleCanvas, _singleCtx);
   }
 }
 
@@ -216,9 +258,9 @@ function _drawAll() {
 // Per-viewport rendering
 // ---------------------------------------------------------------------------
 
-function _drawViewport(vp) {
-  const canvas = _canvases[vp];
-  const ctx    = _ctxs[vp];
+function _drawViewport(vp, canvasOverride = null, ctxOverride = null) {
+  const canvas = canvasOverride || _canvases[vp];
+  const ctx    = ctxOverride    || _ctxs[vp];
   if (!canvas || !ctx) return;
 
   const W = canvas.width;
@@ -238,8 +280,9 @@ function _drawViewport(vp) {
   ctx.beginPath(); ctx.moveTo(0, H/2); ctx.lineTo(W, H/2); ctx.stroke();
 
   // Contacts
+  const inQuad = !canvasOverride;
   if (_ship) {
-    _drawContacts(ctx, W, H, vp);
+    _drawContacts(ctx, W, H, vp, inQuad);
     _drawTorpedoes(ctx, W, H, vp);
   }
 
@@ -258,11 +301,6 @@ function _drawViewport(vp) {
   }
 
   // Viewport border — alert-level tint
-  const borderColor = {
-    green:  '#003300',
-    yellow: '#332200',
-    red:    '#330000',
-  }[_alertLevel] || '#001122';
   const activeBorder = {
     green:  '#00ff41',
     yellow: '#ffb000',
@@ -274,15 +312,22 @@ function _drawViewport(vp) {
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 
   // Viewport label
-  ctx.fillStyle = activeBorder;
-  ctx.font      = `bold 10px 'Courier New'`;
-  ctx.textAlign = 'left';
+  ctx.fillStyle    = activeBorder;
+  ctx.textAlign    = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(VIEWPORT_LABELS[vp], 5, 4);
+  if (canvasOverride) {
+    // Single-view mode: larger, more prominent label
+    ctx.font = `bold 13px 'Courier New'`;
+    ctx.fillText(VIEWPORT_FULL_LABELS[vp], 8, 18);
+  } else {
+    ctx.font = `bold 10px 'Courier New'`;
+    ctx.fillText(VIEWPORT_LABELS[vp], 5, 4);
+  }
 
   // Bearing indicator
   if (_ship) {
     const hdg = Math.round((_ship.heading + VIEWPORT_DIRS[vp] + 360) % 360);
+    ctx.font      = `bold 10px 'Courier New'`;
     ctx.textAlign = 'right';
     ctx.fillText(`${String(hdg).padStart(3,'0')}°`, W - 5, 4);
   }
@@ -314,10 +359,11 @@ function _drawStars(ctx, W, H, vp) {
 // Contacts
 // ---------------------------------------------------------------------------
 
-function _drawContacts(ctx, W, H, vp) {
+function _drawContacts(ctx, W, H, vp, inQuad = false) {
   const shipX = _ship.position?.x ?? 0;
   const shipY = _ship.position?.y ?? 0;
   const headingRad = (_ship.heading + VIEWPORT_DIRS[vp]) * Math.PI / 180;
+  const arcLimit = (HALF_ARC + (inQuad ? 5 : 0)) * Math.PI / 180;
 
   for (const contact of _contacts) {
     const wx = (contact.x ?? 0) - shipX;
@@ -326,14 +372,15 @@ function _drawContacts(ctx, W, H, vp) {
     const { cx, cy } = _worldToCamera(wx, wy, headingRad);
     if (cx <= 100) continue; // too close / behind camera
 
-    // Arc check ±45°
+    // Arc check
     const bearingAngle = Math.atan2(cy, cx);
-    if (Math.abs(bearingAngle) > HALF_ARC * Math.PI / 180) continue;
+    if (Math.abs(bearingAngle) > arcLimit) continue;
 
     const dist = Math.hypot(wx, wy);
-    const modelKey = _contactModelKey(contact);
-    const model = WIREFRAME_MODELS[modelKey] || WIREFRAME_MODELS.scout;
-    const modelScale = model.scale;
+
+    // Center screen position (used for highlights/labels regardless of wireframe/cross)
+    const centerSX = W/2 + cy/cx * FOV;
+    const centerSY = H/2;
 
     const color = _contactColor(contact);
     ctx.strokeStyle = color;
@@ -341,16 +388,19 @@ function _drawContacts(ctx, W, H, vp) {
 
     // If very distant, draw simple cross instead of full model
     if (dist > 45_000) {
-      const sx = W/2 + cy/cx * FOV;
-      const sy = H/2;
       ctx.beginPath();
-      ctx.moveTo(sx-4, sy); ctx.lineTo(sx+4, sy);
-      ctx.moveTo(sx, sy-4); ctx.lineTo(sx, sy+4);
+      ctx.moveTo(centerSX-4, centerSY); ctx.lineTo(centerSX+4, centerSY);
+      ctx.moveTo(centerSX, centerSY-4); ctx.lineTo(centerSX, centerSY+4);
       ctx.stroke();
+      if (_highlightsEnabled) _drawContactHighlight(ctx, centerSX, centerSY, dist, contact);
+      if (_labelsEnabled)     _drawContactLabel(ctx, centerSX, centerSY, dist, contact);
       continue;
     }
 
     // Project each edge of the wireframe model
+    const modelKey = _contactModelKey(contact);
+    const model = WIREFRAME_MODELS[modelKey] || WIREFRAME_MODELS.scout;
+    const modelScale = model.scale;
     const { verts, edges } = model;
     const projected = verts.map(([vl, vd, vv]) => {
       const depth   = cx + vd * modelScale / 3000;
@@ -371,7 +421,7 @@ function _drawContacts(ctx, W, H, vp) {
     }
     ctx.stroke();
 
-    // Contact label at nose vertex
+    // Contact label at nose vertex (existing behaviour)
     const p0 = projected[0];
     if (p0) {
       ctx.fillStyle = color;
@@ -380,6 +430,9 @@ function _drawContacts(ctx, W, H, vp) {
       ctx.textBaseline = 'bottom';
       ctx.fillText(contact.entity_id || '?', p0.sx, p0.sy - 3);
     }
+
+    if (_highlightsEnabled) _drawContactHighlight(ctx, centerSX, centerSY, dist, contact);
+    if (_labelsEnabled)     _drawContactLabel(ctx, centerSX, centerSY, dist, contact);
   }
 }
 
@@ -403,7 +456,6 @@ function _drawTorpedoes(ctx, W, H, vp) {
     ctx.arc(sx, sy, 3, 0, Math.PI * 2);
     ctx.fill();
     // Trail
-    const trailLen = 8;
     const tv = _worldToCamera(wx - Math.sin(torp.heading ?? 0) * 500,
                                wy + Math.cos(torp.heading ?? 0) * 500, headingRad);
     if (tv.cx > 100) {
@@ -417,6 +469,76 @@ function _drawTorpedoes(ctx, W, H, vp) {
       ctx.stroke();
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Contact highlight + label overlays
+// ---------------------------------------------------------------------------
+
+function _highlightStyle(contact) {
+  if (contact.type === 'station') {
+    return contact.is_friendly
+      ? { color: '#40a0ff', lineWidth: 1.5, shape: 'double-circle' }
+      : { color: '#ff2020', lineWidth: 1.5, shape: 'double-circle' };
+  }
+  if (contact.is_friendly) return { color: '#40a0ff', lineWidth: 1.5, shape: 'circle' };
+  return                          { color: '#ff4040', lineWidth: 1.5, shape: 'circle' };
+}
+
+function _drawContactHighlight(ctx, sx, sy, dist, contact) {
+  const r = Math.max(10, 14 + (1 - Math.min(dist, 45_000) / 45_000) * 18);
+  const style = _highlightStyle(contact);
+
+  // Pulse alpha for unknown contacts
+  let alpha = 1;
+  if (contact.classification === 'unknown') {
+    alpha = 0.5 + 0.5 * Math.sin(performance.now() / 400);
+  }
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = style.color;
+  ctx.lineWidth   = style.lineWidth;
+  ctx.beginPath();
+  ctx.arc(sx, sy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (style.shape === 'double-circle') {
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r + 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function _drawContactLabel(ctx, sx, sy, dist, contact) {
+  const r = Math.max(10, 14 + (1 - Math.min(dist, 45_000) / 45_000) * 18);
+  const style = _highlightStyle(contact);
+
+  let line1;
+  if (contact.classification === 'unknown') {
+    line1 = 'UNKNOWN';
+  } else if (contact.type === 'station') {
+    line1 = 'STATION';
+  } else if (contact.is_friendly) {
+    line1 = 'FRIENDLY';
+  } else {
+    line1 = 'HOSTILE';
+  }
+
+  const distKm = (dist / 1000).toFixed(1);
+  const line2 = `${distKm}km${contact.type ? ' · ' + contact.type.toUpperCase() : ''}`;
+
+  ctx.save();
+  ctx.font = '8px "Share Tech Mono",monospace';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = style.color;
+  ctx.fillText(line1, sx, sy + r + 2);
+  ctx.fillStyle = 'rgba(200,220,255,0.6)';
+  ctx.fillText(line2, sx, sy + r + 11);
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------
