@@ -1,0 +1,21 @@
+{
+  "id": "unnamed",
+  "name": "Unnamed Mission",
+  "briefing": "Destroy Daniel",
+  "nodes": [
+    {
+      "id": "objective_1",
+      "type": "objective",
+      "text": "Destroy Daniel",
+      "trigger": {
+        "type": "entity_destroyed",
+        "target": "daniel"
+      }
+    }
+  ],
+  "edges": [],
+  "start_node": "objective_1",
+  "victory_nodes": [
+    "objective_1"
+  ]
+}
