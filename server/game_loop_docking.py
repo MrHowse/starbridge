@@ -160,10 +160,12 @@ def _apply_service(service: str, world, ship) -> dict:
         effects["crew_stabilised"] = True
 
     elif service == "system_repair":
+        import server.game_loop_engineering as gle
         repaired = []
         for name, sys_obj in ship.systems.items():
             if sys_obj.health < 100.0:
                 sys_obj.health = 100.0
+                gle.repair_all_components(name)
                 repaired.append(name)
         effects["systems_repaired"] = repaired
 

@@ -37,6 +37,7 @@ import server.game_loop_ew as glew
 import server.game_loop_tactical as gltac
 import server.game_loop_mission as glm
 import server.game_loop_docking as gldo
+import server.game_loop_engineering as gle
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -410,6 +411,7 @@ def save_game(
             "tactical": gltac.serialise(),
             "mission": glm.serialise_mission(),
             "docking": gldo.serialise(),
+            "engineering": gle.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -499,6 +501,8 @@ def restore_game(save_id: str, world: World) -> dict:
         glm.deserialise_mission(mods["mission"], mission_id)
     if mods.get("docking"):
         gldo.deserialise(mods["docking"])
+    if mods.get("engineering"):
+        gle.deserialise(mods["engineering"], world.ship)
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")

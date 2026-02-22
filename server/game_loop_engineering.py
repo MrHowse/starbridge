@@ -170,6 +170,17 @@ def apply_system_damage(system: str, damage: float, cause: str,
         component_id=component_id, rng=_rng)
 
 
+def repair_all_components(system: str) -> None:
+    """Reset all components of a system to full health (used by docking repair)."""
+    if _damage_model is None:
+        return
+    sys_comps = _damage_model.components.get(system)
+    if sys_comps is None:
+        return
+    for comp in sys_comps.values():
+        comp.health = 100.0
+
+
 # ---------------------------------------------------------------------------
 # Tick
 # ---------------------------------------------------------------------------

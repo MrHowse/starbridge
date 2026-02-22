@@ -667,6 +667,7 @@ async def _loop() -> None:
 
         # 6. Enemy beam hits (ship AI + station turrets + creatures). 7. Shields. 7.5 Scan. 7.6 Docking. 8. Cooldowns.
         _hull_before_combat = _world.ship.hull
+        _combat_health_snapshot = {n: s.health for n, s in _world.ship.systems.items()}
         combat_damage_events = await glw.handle_enemy_beam_hits(
             list(beam_hit_events) + list(station_beam_hits) + creature_beam_hits, _world, _manager
         )
@@ -886,6 +887,7 @@ async def _loop() -> None:
                 _sb_sys = _world.ship.systems.get(sb_evt["system"])
                 if _sb_sys is not None:
                     _sb_sys.health = max(0.0, _sb_sys.health - sb_evt["amount"])
+                    gle.apply_system_damage(sb_evt["system"], sb_evt["amount"], "environment", tick=_tick_count)
                     await _manager.broadcast(Message.build(
                         "ship.system_damaged",
                         {"system": sb_evt["system"],
@@ -1185,10 +1187,14 @@ async def _loop() -> None:
 
         # 12–15. Damage events, torpedo hits, action events, security events.
         for s, h in damaged_systems:
+            gle.apply_system_damage(s, OVERCLOCK_DAMAGE_HP, "overclock", tick=_tick_count)
             await _manager.broadcast(Message.build(
                 "ship.system_damaged", {"system": s, "new_health": h, "cause": "overclock"}))
             gl.log_event("engineering", "overclock_damage", {"system": s, "new_health": round(h, 1)})
         for s, h in combat_damage_events:
+            _combat_delta = _combat_health_snapshot.get(s, 100.0) - h
+            if _combat_delta > 0:
+                gle.apply_system_damage(s, _combat_delta, "combat", tick=_tick_count)
             await _manager.broadcast(Message.build(
                 "ship.system_damaged", {"system": s, "new_health": h, "cause": "combat"}))
             gl.log_event("combat", "system_damaged", {"system": s, "new_health": round(h, 1)})
@@ -1360,6 +1366,13 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             gle.start_reroute(payload.target_bus)
             gl.log_event("engineering", "reroute_started", {"target_bus": payload.target_bus})
         elif msg_type == "engineering.request_escort" and isinstance(payload, EngineeringRequestEscortPayload):
+            # Find first available marine squad for escort duty.
+            _escort_squad = next(
+                (sq for sq in ship.interior.marine_squads if sq.health > 0),
+                None,
+            )
+            if _escort_squad is not None:
+                gle.request_escort(payload.team_id, _escort_squad.id)
             gl.log_event("engineering", "escort_requested", {"team_id": payload.team_id})
         elif msg_type == "engineering.cancel_repair_order" and isinstance(payload, EngineeringCancelRepairOrderPayload):
             gle.cancel_repair_order(payload.order_id)
