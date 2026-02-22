@@ -289,7 +289,7 @@ def test_apply_assist_difficulty_1_no_reveal_when_all_prediagnosed_after_one():
 
 
 def test_reset_clears_disease_state():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.start_outbreak("engineering", "Kessler Plague")
     glmed.reset()
     state = glmed.get_disease_state()
@@ -298,7 +298,7 @@ def test_reset_clears_disease_state():
 
 
 def test_start_outbreak_sets_deck_infected():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     glmed.start_outbreak("engineering", "Kessler Plague")
     state = glmed.get_disease_state()
@@ -306,7 +306,7 @@ def test_start_outbreak_sets_deck_infected():
 
 
 def test_start_outbreak_idempotent():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     glmed.start_outbreak("medical", "Velorian Flu")
     glmed.start_outbreak("medical", "Kessler Plague")  # different pathogen
@@ -316,7 +316,7 @@ def test_start_outbreak_idempotent():
 
 
 def test_tick_disease_no_outbreak_returns_empty():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     from server.models.interior import make_default_interior
     interior = make_default_interior()
@@ -325,7 +325,7 @@ def test_tick_disease_no_outbreak_returns_empty():
 
 
 def test_tick_disease_no_spread_before_interval():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     glmed.start_outbreak("medical", "Kessler Plague")
     from server.models.interior import make_default_interior
@@ -335,7 +335,7 @@ def test_tick_disease_no_spread_before_interval():
 
 
 def test_tick_disease_spread_after_interval():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     # Medical deck connects to engineering (surgery ↔ engine_room in default interior)
     glmed.start_outbreak("medical", "Kessler Plague")
@@ -350,7 +350,7 @@ def test_tick_disease_spread_after_interval():
 
 
 def test_tick_disease_no_spread_with_sealed_door():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     glmed.start_outbreak("medical", "Kessler Plague")
     from server.models.interior import make_default_interior
@@ -368,7 +368,7 @@ def test_tick_disease_no_spread_with_sealed_door():
 
 
 def test_tick_disease_spread_event_has_correct_fields():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     glmed.start_outbreak("medical", "Kessler Plague")
     from server.models.interior import make_default_interior
@@ -382,7 +382,7 @@ def test_tick_disease_spread_event_has_correct_fields():
 
 
 def test_tick_disease_resets_timer_after_spread():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     glmed.start_outbreak("medical", "Void Rot")
     from server.models.interior import make_default_interior
@@ -393,7 +393,7 @@ def test_tick_disease_resets_timer_after_spread():
 
 
 def test_get_disease_state_includes_interval():
-    import server.game_loop_medical as glmed
+    import server.game_loop_medical_v2 as glmed
     glmed.reset()
     state = glmed.get_disease_state()
     assert state["spread_interval"] == glmed.SPREAD_INTERVAL

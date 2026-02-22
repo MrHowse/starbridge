@@ -65,6 +65,8 @@ from server.models.ship import Ship
 TREATMENT_COST: int = 2
 HEAL_INTERVAL: float = 2.0
 SPREAD_INTERVAL: float = 30.0
+RESUPPLY_AMOUNT: int = 5
+RESUPPLY_MAX: int = 20
 
 # New constants
 MAX_MEDICAL_SUPPLIES: float = 100.0

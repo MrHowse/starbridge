@@ -248,7 +248,7 @@ async def tick_docking(world: World, manager: object, dt: float) -> None:
             world.ship.hull = min(100.0, world.ship.hull + RESUPPLY_HULL)
             new_ammo = min(RESUPPLY_AMMO_MAX, glw.get_ammo() + RESUPPLY_AMMO)
             glw.set_ammo(new_ammo)
-            from server.game_loop_medical import RESUPPLY_AMOUNT as MED_AMOUNT, RESUPPLY_MAX as MED_MAX
+            from server.game_loop_medical_v2 import RESUPPLY_AMOUNT as MED_AMOUNT, RESUPPLY_MAX as MED_MAX
             world.ship.medical_supplies = min(MED_MAX, world.ship.medical_supplies + MED_AMOUNT)
             await manager.broadcast(  # type: ignore[union-attr]
                 Message.build(

@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-import server.game_loop_medical as glmed
+import server.game_loop_medical_v2 as glmed
 from server import medical
 from server.models.crew import DECK_DEFAULT_CREW
 from server.models.messages import Message

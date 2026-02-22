@@ -31,7 +31,7 @@ import server.game_debrief as gdb
 import server.game_loop_training as gltr
 import server.game_loop_mission as glm
 import server.game_loop_weapons as glw
-import server.game_loop_medical as glmed
+import server.game_loop_medical_v2 as glmed
 import server.game_loop_security as gls
 import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
