@@ -82,19 +82,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-cm-toggle').addEventListener('click', () => {
     if (!_ewState) return;
     const newActive = !_ewState.countermeasures_active;
-    send({ type: 'ew.toggle_countermeasures', payload: { active: newActive } });
+    send('ew.toggle_countermeasures', { active: newActive });
   });
 
   // Begin intrusion
   document.getElementById('btn-intrusion').addEventListener('click', () => {
     if (!_ewState || !_ewState.jam_target_id) return;
     const targetSystem = document.getElementById('intrusion-system').value;
-    send({
-      type: 'ew.begin_intrusion',
-      payload: {
-        entity_id: _ewState.jam_target_id,
-        target_system: targetSystem,
-      },
+    send('ew.begin_intrusion', {
+      entity_id: _ewState.jam_target_id,
+      target_system: targetSystem,
     });
   });
 
@@ -255,7 +252,7 @@ function updateEnemyList() {
     card.addEventListener('click', () => {
       if (!_send) return;
       const newTarget = isSelected ? null : e.id;
-      _send({ type: 'ew.set_jam_target', payload: { entity_id: newTarget } });
+      _send('ew.set_jam_target', { entity_id: newTarget });
     });
 
     list.appendChild(card);
@@ -296,7 +293,7 @@ function handleCanvasClick(relX, relY) {
 
   if (nearest) {
     const newTarget = (nearest.id === _ewState.jam_target_id) ? null : nearest.id;
-    _send({ type: 'ew.set_jam_target', payload: { entity_id: newTarget } });
+    _send('ew.set_jam_target', { entity_id: newTarget });
   }
 }
 

@@ -206,10 +206,10 @@ function updateThreatList() {
         const prio = btn.dataset.prio;
         if (prio === 'intercept') {
           const newTarget = (_tacState.intercept_target_id === e.id) ? null : e.id;
-          _send({ type: 'tactical.set_intercept_target', payload: { entity_id: newTarget } });
+          _send('tactical.set_intercept_target', { entity_id: newTarget });
         } else {
           const newPrio = (priority === prio) ? null : prio;
-          _send({ type: 'tactical.set_engagement_priority', payload: { entity_id: e.id, priority: newPrio } });
+          _send('tactical.set_engagement_priority', { entity_id: e.id, priority: newPrio });
         }
       });
     });
@@ -250,7 +250,7 @@ function updateAnnotationList() {
       <button class="tac-annotation-item__remove" data-ann-id="${a.id}">\u2715</button>
     `;
     item.querySelector('[data-ann-id]').addEventListener('click', () => {
-      _send({ type: 'tactical.remove_annotation', payload: { annotation_id: a.id } });
+      _send('tactical.remove_annotation', { annotation_id: a.id });
     });
     list.appendChild(item);
   }
@@ -277,7 +277,7 @@ function updateStrikePlans() {
     const btn = card.querySelector('[data-execute]');
     if (btn) {
       btn.addEventListener('click', () => {
-        _send({ type: 'tactical.execute_strike_plan', payload: { plan_id: p.plan_id } });
+        _send('tactical.execute_strike_plan', { plan_id: p.plan_id });
       });
     }
     planList.appendChild(card);
@@ -314,11 +314,8 @@ function renderPendingSteps() {
 
 function createStrikePlan() {
   if (_pendingSteps.length === 0) return;
-  _send({
-    type: 'tactical.create_strike_plan',
-    payload: {
-      steps: _pendingSteps.map(s => ({ role: s.role, action: s.action, offset_s: s.offset_s })),
-    },
+  _send('tactical.create_strike_plan', {
+    steps: _pendingSteps.map(s => ({ role: s.role, action: s.action, offset_s: s.offset_s })),
   });
   _pendingSteps = [];
   renderPendingSteps();
@@ -341,10 +338,7 @@ function handleCanvasClick(relX, relY) {
   const wy = sy + (relY - h / 2) / scale;
 
   if (_activeTool === 'waypoint') {
-    _send({
-      type: 'tactical.add_annotation',
-      payload: { annotation_type: 'waypoint', x: wx, y: wy, label: 'WPT', text: '' },
-    });
+    _send('tactical.add_annotation', { annotation_type: 'waypoint', x: wx, y: wy, label: 'WPT', text: '' });
     setTool(null);
     return;
   }
@@ -352,10 +346,7 @@ function handleCanvasClick(relX, relY) {
   if (_activeTool === 'note') {
     const text = window.prompt('Enter note text:');
     if (text) {
-      _send({
-        type: 'tactical.add_annotation',
-        payload: { annotation_type: 'note', x: wx, y: wy, label: text, text },
-      });
+      _send('tactical.add_annotation', { annotation_type: 'note', x: wx, y: wy, label: text, text });
     }
     setTool(null);
     return;
@@ -374,7 +365,7 @@ function handleCanvasClick(relX, relY) {
   }
   if (nearest) {
     const newTarget = (nearest.id === _tacState.intercept_target_id) ? null : nearest.id;
-    _send({ type: 'tactical.set_intercept_target', payload: { entity_id: newTarget } });
+    _send('tactical.set_intercept_target', { entity_id: newTarget });
   }
 }
 
