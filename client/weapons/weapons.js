@@ -45,7 +45,7 @@ registerHelp([
 // Constants
 // ---------------------------------------------------------------------------
 
-const RADAR_WORLD_RADIUS  = 15_000;  // world units shown at radar edge
+const RADAR_WORLD_RADIUS  = 50_000;  // world units shown at radar edge
 const BEAM_FLASH_MS       = 300;     // beam fire line animation duration
 const HIT_FLASH_MS        = 500;     // hull-hit border flash duration
 const TUBE_LOAD_TIME      = 3.0;     // must match server TUBE_LOAD_TIME
@@ -238,7 +238,7 @@ function handleGameStarted(payload) {
       showGrid: false,
       showRangeRings: true,
       interactive: true,
-      zoom: { enabled: false },
+      zoom: { enabled: true },
       drawContact: (ctx, sx, sy, contact, selected, now) => {
         const cls  = contact.classification || 'hostile';
         const kind = contact.kind || 'enemy';

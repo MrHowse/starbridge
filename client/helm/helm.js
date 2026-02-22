@@ -188,14 +188,14 @@ function handleGameStarted(payload) {
   gameActive = true;
 
   // Navigation map on the viewscreen canvas.
-  const NAV_MAP_RANGE = 30_000;
+  const NAV_MAP_RANGE = 100_000;
   if (viewscreenCanvas) {
     _mapRenderer = new MapRenderer(viewscreenCanvas, {
       range:          NAV_MAP_RANGE,
       orientation:    'north-up',
       showGrid:       true,
       showRangeRings: true,
-      zoom:           { enabled: false },  // zoom handled by SectorMap
+      zoom:           { enabled: true },
     });
   }
 

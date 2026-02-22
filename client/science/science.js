@@ -53,7 +53,7 @@ import { MapRenderer } from '../shared/map_renderer.js';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BASE_SENSOR_RANGE = 30_000;  // world units; must match server sensors.py
+const BASE_SENSOR_RANGE = 100_000;  // world units; full sector view
 const HIT_FLASH_MS      = 500;
 
 // Contact rendering sizes (half-size in pixels at max sensor zoom)
@@ -262,6 +262,7 @@ function handleGameStarted(payload) {
       showGrid:      false,
       showRangeRings: true,
       interactive:   true,
+      zoom:          { enabled: true },
       drawContact:   (ctx, sx, sy, contact, selected, _now) => {
         // Callback references module-level scanMode, so mode colour updates live.
         const modeColor = SCAN_MODES[scanMode].color;

@@ -54,7 +54,7 @@ registerHelp([
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAP_WORLD_RADIUS = 80_000;
+const MAP_WORLD_RADIUS = 100_000;
 const HIT_FLASH_MS     = 400;
 
 // ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ function handleGameStarted(payload) {
       orientation:    'north-up',
       showGrid:       true,
       showRangeRings: false,
-      zoom:           { enabled: false },  // zoom handled by SectorMap
+      zoom:           { enabled: true },
     });
     _sectorMap = new SectorMap({
       allowedLevels: ['tactical', 'sector', 'strategic'],

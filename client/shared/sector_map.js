@@ -70,7 +70,7 @@ const SM_TYPE_ACCENT = {
 
 // MapRenderer ranges for each zoom level.
 export const ZOOM_RANGES = {
-  tactical: 30_000,
+  tactical: 100_000,
   sector:   75_000,
   strategic: null,   // strategic uses its own renderer
 };

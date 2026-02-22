@@ -26,7 +26,7 @@ import { wireButtonSounds } from '../shared/audio_ui.js';
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAP_WORLD_RADIUS = 50_000;
+const MAP_WORLD_RADIUS = 100_000;
 
 const THREAT_COLOURS = {
   critical: '#ff5050',
