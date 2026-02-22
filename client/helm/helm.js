@@ -26,23 +26,20 @@ import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
 import { SectorMap } from '../shared/sector_map.js';
+import { MapRenderer } from '../shared/map_renderer.js';
 
 registerHelp([
   { selector: '#compass',          text: 'Heading dial — click to set target heading. Ship turns toward it.', position: 'right' },
   { selector: '#throttle-slider',  text: 'Throttle — ship speed 0–100%. W/S or ↑↓ to adjust.', position: 'right' },
   { selector: '#minimap',          text: 'Sector minimap — green chevron = you, red = enemies.', position: 'left' },
-  { selector: '#viewscreen',       text: 'Forward view — rotates with your heading.', position: 'below' },
+  { selector: '#viewscreen',       text: 'Navigation map — Z to cycle zoom (tactical/sector/strategic).', position: 'below' },
 ]);
 import {
   lerp,
   lerpAngle,
-  createStarfield,
-  drawBackground,
-  drawStarfield,
   drawCompass,
   drawMinimap,
   drawShipChevron,
-  worldToScreen,
 } from '../shared/renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -52,7 +49,6 @@ import {
 const TICK_MS        = 100;    // server tick interval — must match game_loop.py
 const HEADING_STEP   = 5;      // degrees per key press
 const THROTTLE_STEP  = 5;      // % per key press
-const STAR_COUNT     = 180;
 const HIT_FLASH_MS   = 400;
 const BEAM_FLASH_MS  = 300;
 
@@ -121,15 +117,14 @@ let throttle      = 0;
 const heldKeys = new Set();
 let   lastControlSend = 0;
 
-// Starfield data (generated once).
-const stars = createStarfield(STAR_COUNT);
-
 // Canvas contexts (obtained after game start when canvases are visible).
-let vsCtx  = null; // viewscreen
 let cmpCtx = null; // compass
 let mmCtx  = null; // minimap
 
-// Sector map (handles minimap zoom levels: tactical/sector/strategic).
+// Navigation map renderer (viewscreen canvas).
+let _mapRenderer     = null;
+
+// Sector map (handles zoom levels: tactical/sector/strategic).
 let _sectorMap       = null;
 let _routeData       = null;   // current route from map.route_updated
 let _stationEntities = [];     // station entities from map.sector_grid (v0.05e)
@@ -192,23 +187,35 @@ function handleGameStarted(payload) {
   helmMainEl.style.display   = 'grid';
   gameActive = true;
 
-  // Sector map for minimap zoom (tactical/sector/strategic).
+  // Navigation map on the viewscreen canvas.
+  const NAV_MAP_RANGE = 30_000;
+  if (viewscreenCanvas) {
+    _mapRenderer = new MapRenderer(viewscreenCanvas, {
+      range:          NAV_MAP_RANGE,
+      orientation:    'north-up',
+      showGrid:       true,
+      showRangeRings: true,
+      zoom:           { enabled: false },  // zoom handled by SectorMap
+    });
+  }
+
+  // Sector map for zoom control (tactical/sector/strategic).
   _sectorMap = new SectorMap({
     allowedLevels: ['tactical', 'sector', 'strategic'],
     defaultZoom:   'tactical',
     onRoutePlot:   (wx, wy) => send('map.plot_route', { to_x: wx, to_y: wy }),
+    onZoomChange:  _updateZoomLabel,
   });
+  if (_mapRenderer) _sectorMap.setMapRenderer(_mapRenderer);
   if (minimapCanvas) _sectorMap.setupStrategicClick(minimapCanvas);
+  if (viewscreenCanvas) _sectorMap.setupStrategicClick(viewscreenCanvas);
+  _updateZoomLabel();
 
   // Defer canvas setup to the next frame so the grid layout is fully
   // computed before we read clientWidth/clientHeight for sizing.
   requestAnimationFrame(() => {
-    vsCtx  = viewscreenCanvas.getContext('2d');
     cmpCtx = compassCanvas.getContext('2d');
     mmCtx  = minimapCanvas.getContext('2d');
-
-    resizeViewscreen();
-    window.addEventListener('resize', resizeViewscreen);
 
     requestAnimationFrame(renderLoop);
   });
@@ -232,6 +239,7 @@ function handleShipState(payload) {
   // Clear approach info once docked — it's no longer relevant.
   if (_dockedAt) _approachInfo = null;
   SoundBank.setAmbient('engine_hum', { throttle: payload.throttle ?? 0, enginePower: payload.systems?.engines?.efficiency ?? 1 });
+  if (_mapRenderer) _mapRenderer.updateShipState(payload);
   if (_sectorMap && payload.position) {
     _sectorMap.updateShipPosition(payload.position.x, payload.position.y, payload.heading ?? 0);
   }
@@ -241,6 +249,10 @@ function handleWorldEntities(payload) {
   if (!gameActive) return;
   contacts = payload.enemies  || [];
   hazards  = payload.hazards  || [];
+  if (_mapRenderer) {
+    _mapRenderer.updateContacts(payload.enemies || [], payload.torpedoes || []);
+    _mapRenderer.updateHazards(payload.hazards || []);
+  }
 }
 
 function handleHullHit() {
@@ -303,7 +315,7 @@ function renderLoop(now) {
 
   const state = getInterpolatedState();
   if (state) {
-    drawViewscreen(state);
+    drawNavMap(now);
     drawCompassPanel(state);
     drawMinimapPanel(state);
     updateTelemetry(state);
@@ -316,11 +328,22 @@ function renderLoop(now) {
 // Canvas draws
 // ---------------------------------------------------------------------------
 
-function drawViewscreen(state) {
-  const w = viewscreenCanvas.width;
-  const h = viewscreenCanvas.height;
-  drawBackground(vsCtx, w, h);
-  drawStarfield(vsCtx, w, h, state.heading, state.position.x, state.position.y, stars);
+function drawNavMap(now) {
+  if (_sectorMap && _sectorMap.isStrategic()) {
+    // Strategic zoom: render sector grid on the main canvas.
+    _sectorMap.renderStrategic(viewscreenCanvas, now);
+  } else if (_mapRenderer) {
+    _mapRenderer.render(now);
+    // Station icons overlay.
+    const ctx = viewscreenCanvas.getContext('2d');
+    if (_sectorMap) {
+      _sectorMap.renderStationOverlay(ctx, viewscreenCanvas, _mapRenderer);
+    }
+    // Sector boundary overlay in sector mode.
+    if (_sectorMap && _sectorMap.getZoomLevel() === 'sector') {
+      _sectorMap.renderSectorBoundaryOverlay(ctx, viewscreenCanvas, _mapRenderer);
+    }
+  }
 }
 
 function drawCompassPanel(state) {
@@ -573,13 +596,12 @@ function updateTelemetry(state) {
 }
 
 // ---------------------------------------------------------------------------
-// Viewscreen canvas resize
+// Zoom label
 // ---------------------------------------------------------------------------
 
-function resizeViewscreen() {
-  const wrap = viewscreenCanvas.parentElement;
-  viewscreenCanvas.width  = wrap.clientWidth;
-  viewscreenCanvas.height = wrap.clientHeight;
+function _updateZoomLabel() {
+  const el = document.getElementById('zoom-label');
+  if (el && _sectorMap) el.textContent = _sectorMap.zoomLabel();
 }
 
 // ---------------------------------------------------------------------------

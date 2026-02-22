@@ -38,10 +38,11 @@
     <!-- ─── Main game layout (hidden until game.started) ──────────────── -->
     <main class="helm-main" data-helm-main style="display:none">
 
-      <!-- Left: forward viewscreen canvas -->
-      <section class="helm-view panel" aria-label="Forward view">
+      <!-- Left: navigation map canvas -->
+      <section class="helm-view panel" aria-label="Navigation map">
         <div class="panel__header">
-          <span class="text-header">FORWARD VIEW</span>
+          <span class="text-header">NAVIGATION</span>
+          <span class="text-label" id="zoom-label">TACTICAL</span>
           <span class="text-label helm-speed-badge" id="speed-badge">0.0 u/s</span>
         </div>
         <div class="helm-view__canvas-wrap">
