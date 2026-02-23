@@ -54,19 +54,19 @@
   --system-healthy:  #00ff41;
   --system-warning:  #ffb000;
   --system-critical: #ff2020;
-  --system-offline:  #444444;
+  --system-offline:  #666666;
   --hull-damage:     #ff6600;
 
   /* --- Text --- */
   --text-bright:  var(--primary);
-  --text-normal:  color-mix(in srgb, var(--primary) 70%, transparent);
-  --text-dim:     color-mix(in srgb, var(--primary) 40%, transparent);
-  --text-muted:   #555555;
+  --text-normal:  color-mix(in srgb, var(--primary) 80%, transparent);
+  --text-dim:     color-mix(in srgb, var(--primary) 55%, transparent);
+  --text-muted:   #777777;
 
   /* --- Borders and lines --- */
   --border-primary: var(--primary-dim);
   --border-bright:  var(--primary);
-  --grid-line:      rgba(255, 255, 255, 0.05);
+  --grid-line:      rgba(255, 255, 255, 0.08);
 }
 
 /* =========================================================================
@@ -121,7 +121,7 @@ body::after {
 }
 
 .text-header {
-  font-size: 0.85rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.2em;
   color: var(--text-normal);
@@ -133,21 +133,21 @@ body::after {
 }
 
 .text-label {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-dim);
 }
 
 .text-body {
-  font-size: 0.85rem;
+  font-size: 1rem;
   color: var(--text-normal);
   line-height: 1.5;
 }
 
 .text-muted {
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
 }
 
 /* =========================================================================
@@ -193,8 +193,9 @@ body::after {
   border: 1px solid var(--border-primary);
   color: var(--text-normal);
   padding: 0.5rem 1.5rem;
+  min-height: 36px;
   font-family: inherit;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   cursor: pointer;
@@ -316,7 +317,7 @@ body::after {
 .briefing-mission  { margin-bottom: 0.5rem; }
 .briefing-title    { margin-bottom: 1.25rem; }
 .briefing-body     { margin-bottom: 1.5rem; line-height: 1.6; max-width: 480px; }
-.briefing-dismiss  { margin-top: 0.75rem; font-size: 0.7rem; color: var(--text-muted); }
+.briefing-dismiss  { margin-top: 0.75rem; font-size: 0.875rem; color: var(--text-muted); }
 
 /* =========================================================================
    Shared game-over overlay (used by helm, engineering, science, weapons,
@@ -439,7 +440,7 @@ body::after {
   background: transparent;
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   transition: background 0.1s;
@@ -482,7 +483,7 @@ body::after {
 }
 
 .seq-answer-label {
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   text-align: center;
 }
@@ -502,7 +503,7 @@ body::after {
   display: flex;
   justify-content: space-between;
   margin-top: 0.4rem;
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   font-family: var(--font-mono);
   color: var(--text-muted);
 }
@@ -558,7 +559,7 @@ body::after {
 .freq-meter__label {
   display: flex;
   justify-content: space-between;
-  font-size: 0.6rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   margin-top: 0.2rem;
 }
@@ -571,7 +572,7 @@ body::after {
 }
 
 .freq-component__header {
-  font-size: 0.6rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   margin-bottom: 0.3rem;
 }
@@ -581,7 +582,7 @@ body::after {
   grid-template-columns: 3rem 1fr 2.5rem 3rem 1fr 2.5rem;
   align-items: center;
   gap: 0.25rem 0.4rem;
-  font-size: 0.6rem;
+  font-size: 0.875rem;
   font-family: var(--font-mono);
 }
 
@@ -594,23 +595,23 @@ body::after {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 4px;
+  height: 6px;
   background: var(--border);
   cursor: pointer;
 }
 
 .freq-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--primary);
   cursor: pointer;
 }
 
 .freq-slider::-moz-range-thumb {
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--primary);
   cursor: pointer;
@@ -654,7 +655,7 @@ body::after {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.78rem;
+  font-size: 0.875rem;
 }
 
 .cipher-code {
@@ -690,9 +691,9 @@ body::after {
 .eq-row {
   display: flex;
   justify-content: space-between;
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   padding: 0.2rem 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
 .eq-symbols {
@@ -729,7 +730,7 @@ body::after {
 
 .triage-card__header {
   color: var(--primary);
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   letter-spacing: 0.1em;
   margin-bottom: 0.4rem;
 }
@@ -742,8 +743,8 @@ body::after {
 }
 
 .triage-symptom {
-  font-size: 0.65rem;
-  padding: 0.1rem 0.4rem;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.4rem;
   background: rgba(0,255,65,0.06);
   border: 1px solid rgba(0,255,65,0.2);
   border-radius: 2px;
@@ -767,7 +768,7 @@ body::after {
 .triage-field-row .text-label {
   flex-shrink: 0;
   min-width: 5rem;
-  font-size: 0.65rem;
+  font-size: 0.875rem;
 }
 
 .triage-pathogen-select,
@@ -777,7 +778,7 @@ body::after {
   border: 1px solid var(--border-primary);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   padding: 0.2rem 0.4rem;
   border-radius: 2px;
 }
@@ -789,9 +790,9 @@ body::after {
 }
 
 .triage-treatment-label {
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   margin-top: 0.2rem;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 .triage-step-row {
@@ -803,8 +804,8 @@ body::after {
 .triage-step-num {
   flex-shrink: 0;
   min-width: 5rem;
-  font-size: 0.60rem;
-  opacity: 0.6;
+  font-size: 0.8rem;
+  opacity: 0.7;
 }
 
 /* ── Medical disease state panel ─────────────────────────────────────────── */
@@ -819,14 +820,14 @@ body::after {
 
 .disease-panel__header {
   color: var(--system-warning);
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   letter-spacing: 0.1em;
   margin-bottom: 0.4rem;
 }
 
 .disease-clean {
   color: var(--text-dim);
-  font-size: 0.68rem;
+  font-size: 0.875rem;
 }
 
 .disease-deck-row {
@@ -834,8 +835,8 @@ body::after {
   justify-content: space-between;
   align-items: center;
   padding: 0.15rem 0;
-  font-size: 0.68rem;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 0.875rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
 .disease-deck-name {
@@ -845,7 +846,7 @@ body::after {
 
 .disease-pathogen {
   color: var(--system-warning);
-  font-size: 0.62rem;
+  font-size: 0.8rem;
 }
 
 /* ── Route Calculation puzzle ─────────────────────────────────────────────── */
@@ -859,10 +860,10 @@ body::after {
 }
 
 .rc-instructions {
-  font-size: 0.62rem;
+  font-size: 0.875rem;
   text-align: center;
-  max-width: 320px;
-  opacity: 0.7;
+  max-width: 360px;
+  opacity: 0.8;
 }
 
 .rc-canvas {
@@ -884,7 +885,7 @@ body::after {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.58rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
   letter-spacing: 0.05em;
 }
@@ -928,13 +929,13 @@ body::after {
 }
 
 .fs-label {
-  font-size: 0.62rem;
+  font-size: 0.875rem;
   color: var(--text-dim);
   letter-spacing: 0.08em;
 }
 
 .fs-value {
-  font-size: 0.72rem;
+  font-size: 1rem;
   color: var(--text-data);
 }
 
@@ -965,7 +966,7 @@ body::after {
 /* ── Weapons tube type badge & load controls ──────────────────────────────── */
 
 .tube-type-badge {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.06em;
   min-width: 3.2rem;
   text-align: center;
@@ -986,7 +987,7 @@ body::after {
 
 .load-btn {
   font-family: inherit;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.06em;
   background: var(--bg-secondary);
   color: var(--text-dim);
@@ -1004,7 +1005,7 @@ body::after {
 
 .load-tube-select {
   font-family: inherit;
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   background: var(--bg-panel);
   color: var(--text-data);
   border: 1px solid var(--border-secondary);
@@ -1032,8 +1033,9 @@ body::after {
 }
 
 .btn--small {
-  padding: 0.15rem 0.4rem;
-  font-size: 0.65rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  min-height: 28px;
 }
 
 /* ── Captain's log panel ─────────────────────────────────────────────────── */
@@ -1051,14 +1053,14 @@ body::after {
   display: flex;
   gap: 0.4rem;
   align-items: flex-start;
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   border-bottom: 1px solid var(--border-primary);
   padding-bottom: 0.15rem;
 }
 
 .log-ts {
-  min-width: 2.5rem;
-  font-size: 0.58rem;
+  min-width: 3rem;
+  font-size: 0.8rem;
 }
 
 .log-text {
@@ -1075,7 +1077,7 @@ body::after {
 .log-input {
   flex: 1;
   font-family: inherit;
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   background: var(--bg-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border-secondary);

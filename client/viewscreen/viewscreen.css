@@ -47,7 +47,7 @@ body {
 .vs-hud__mission {
   letter-spacing: 0.15em;
   color: var(--primary-dim, rgba(0, 255, 65, 0.4));
-  font-size: 0.7rem;
+  font-size: 0.875rem;
 }
 
 .vs-hud__status {
@@ -70,7 +70,7 @@ body {
 }
 
 .vs-hud__gauge-label {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   width: 2.5ch;
   text-align: right;
@@ -100,13 +100,13 @@ body {
 }
 
 .vs-hud__gauge-val {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   width: 3ch;
   color: var(--text-dim);
 }
 
 .vs-hud__hdg {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--text-dim);
   letter-spacing: 0.1em;
   margin-left: auto;

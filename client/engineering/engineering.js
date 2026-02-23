@@ -928,7 +928,7 @@ function renderRepairQueue(orders) {
 
 function renderDamageLog(events) {
   if (events.length === 0) {
-    damageLogListEl.innerHTML = '<p class="text-dim" style="font-size:0.62rem;padding:0.2rem 0">No recent damage events.</p>';
+    damageLogListEl.innerHTML = '<p class="text-dim" style="font-size:0.8rem;padding:0.2rem 0">No recent damage events.</p>';
     return;
   }
 
@@ -1113,7 +1113,7 @@ function drawInteriorMap(now) {
 
     // Room name
     ctx.fillStyle    = 'rgba(0, 255, 65, 0.65)';
-    ctx.font         = '9px "Share Tech Mono", monospace';
+    ctx.font         = '11px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
     const label = room.name.length > 15 ? room.name.slice(0, 14) + '\u2026' : room.name;
@@ -1121,7 +1121,7 @@ function drawInteriorMap(now) {
 
     // Deck sub-label
     ctx.fillStyle = 'rgba(0, 255, 65, 0.35)';
-    ctx.font      = '8px "Share Tech Mono", monospace';
+    ctx.font      = '10px "Share Tech Mono", monospace';
     ctx.fillText(room.deck.toUpperCase(), x + ROOM_W / 2, y + 17);
 
     // DCT progress indicator
@@ -1206,7 +1206,7 @@ function drawTeamOverlays(ctx, _now) {
 
     // Team label
     ctx.fillStyle    = 'rgba(255, 255, 255, 0.7)';
-    ctx.font         = '7px "Share Tech Mono", monospace';
+    ctx.font         = '10px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(team.name.slice(0, 3).toUpperCase(), center.x, center.y + 20);

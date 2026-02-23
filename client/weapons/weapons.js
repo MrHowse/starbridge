@@ -265,7 +265,7 @@ function handleGameStarted(payload) {
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.fillStyle    = `rgba(255, 176, 0, ${0.6 + 0.3 * pulse})`;
-          ctx.font         = '8px "Share Tech Mono", monospace';
+          ctx.font         = '10px "Share Tech Mono", monospace';
           ctx.textAlign    = 'center';
           ctx.textBaseline = 'bottom';
           ctx.fillText('SUGGESTED TARGET', sx, sy - hintR - 4);

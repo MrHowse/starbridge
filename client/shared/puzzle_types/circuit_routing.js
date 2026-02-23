@@ -376,7 +376,7 @@ function _drawNode(ctx, node) {
     ctx.fillStyle = 'rgba(0,255,65,0.15)';
     ctx.fill();
     ctx.fillStyle = C_PRIMARY;
-    ctx.font = 'bold 8px monospace';
+    ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('SRC', node.x, node.y);
@@ -391,7 +391,7 @@ function _drawNode(ctx, node) {
     ctx.fillStyle = onPath ? 'rgba(0,255,65,0.15)' : 'rgba(255,176,0,0.15)';
     ctx.fill();
     ctx.fillStyle = colour;
-    ctx.font = 'bold 8px monospace';
+    ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('TGT', node.x, node.y);

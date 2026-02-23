@@ -102,7 +102,7 @@
   border-radius: 2px;
   cursor: pointer;
   transition: border-color 0.2s;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
 }
 
 .tac-threat-card:hover {
@@ -118,7 +118,7 @@
 
 .tac-threat-card__dist {
   color: var(--text-dim, #888);
-  font-size: 0.7rem;
+  font-size: 0.875rem;
 }
 
 .tac-threat-card__body {
@@ -128,7 +128,7 @@
 }
 
 .tac-threat-badge {
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   padding: 1px 4px;
   border-radius: 2px;
   text-transform: uppercase;
@@ -141,7 +141,7 @@
 .tac-threat-badge--low      { background: rgba(80,160,80,0.15);  color: #50a050; border: 1px solid #50a050; }
 
 .tac-priority-badge {
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   padding: 1px 4px;
   border-radius: 2px;
   text-transform: uppercase;
@@ -161,7 +161,7 @@
   flex: 1;
   padding: 2px 4px;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -189,7 +189,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   padding: 2px 4px;
   border: 1px solid var(--border);
   border-radius: 2px;
@@ -200,7 +200,7 @@
   border: none;
   color: var(--warning);
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   padding: 0 4px;
 }
 
@@ -231,7 +231,7 @@
   border: 1px solid var(--border);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   padding: 3px 5px;
 }
 
@@ -252,7 +252,7 @@
 }
 
 .tac-step-item {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   display: flex;
   justify-content: space-between;
   padding: 2px 4px;
@@ -274,7 +274,7 @@
   border: 1px solid var(--border);
   padding: 5px 8px;
   border-radius: 2px;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
 }
 
 .tac-plan-card__header {
@@ -298,7 +298,7 @@
   border: 1px solid var(--primary);
   color: var(--primary);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   letter-spacing: 0.08em;
   cursor: pointer;
   text-transform: uppercase;
@@ -321,7 +321,7 @@
   border: 1px solid var(--border);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   cursor: pointer;
   text-transform: uppercase;
   transition: background 0.15s, color 0.15s;

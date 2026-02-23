@@ -242,7 +242,7 @@ function drawStructure() {
   ctx.setLineDash([]);
 
   // Orientation labels
-  ctx.font         = '7px "Share Tech Mono", monospace';
+  ctx.font         = '10px "Share Tech Mono", monospace';
   ctx.fillStyle    = 'rgba(0,255,65,0.28)';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
@@ -251,7 +251,7 @@ function drawStructure() {
   ctx.fillText('STERN', HULL_CX, 448);
 
   // PORT / STBD side labels (rotated)
-  ctx.font      = '6px "Share Tech Mono", monospace';
+  ctx.font      = '9px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(0,255,65,0.16)';
   ctx.textBaseline = 'middle';
 
@@ -369,7 +369,7 @@ function draw() {
 
     // 3. Room name label
     ctx.fillStyle    = isSelectedRoom ? C_FRIENDLY : color;
-    ctx.font         = '9px "Share Tech Mono", monospace';
+    ctx.font         = '11px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
     const label = r.name.length > 15 ? r.name.slice(0, 14) + '…' : r.name;
@@ -377,7 +377,7 @@ function draw() {
 
     // Deck sub-label (dimmer, smaller)
     ctx.fillStyle = 'rgba(0,255,65,0.35)';
-    ctx.font      = '8px "Share Tech Mono", monospace';
+    ctx.font      = '10px "Share Tech Mono", monospace';
     ctx.fillText(r.deck.toUpperCase(), x + ROOM_W / 2, y + 17);
   }
 
@@ -396,7 +396,7 @@ function draw() {
         ctx.strokeRect(x + 1, y + 1, ROOM_W - 2, ROOM_H - 2);
         ctx.setLineDash([]);
         ctx.fillStyle = C_WARN;
-        ctx.font = 'bold 8px "Share Tech Mono", monospace';
+        ctx.font = 'bold 10px "Share Tech Mono", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillText('THREAT', x + ROOM_W / 2, y + ROOM_H - 4);
@@ -416,7 +416,7 @@ function draw() {
         ctx.lineTo(x + 6, y + ROOM_H - 6);
         ctx.stroke();
         ctx.fillStyle = C_HOSTILE;
-        ctx.font = 'bold 8px "Share Tech Mono", monospace';
+        ctx.font = 'bold 10px "Share Tech Mono", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillText('OBJ', x + ROOM_W / 2, y + ROOM_H - 4);

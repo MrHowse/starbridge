@@ -204,17 +204,17 @@
 }
 
 .footer-profile-name {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   letter-spacing: 0.08em;
 }
 
 .footer-profile-wins {
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   opacity: 0.6;
 }
 
 .footer-profile-lb-btn {
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   padding: 3px 10px;
 }
 
@@ -252,7 +252,7 @@
 .lb-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-family: var(--font-mono, monospace);
 }
 

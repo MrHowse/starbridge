@@ -98,7 +98,7 @@ function _drawEntities() {
     ctx.arc(cx, cy, 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#e8f4f8";
-    ctx.font = "10px 'Courier New'";
+    ctx.font = "12px 'Courier New'";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(entity.id || entity.type, cx + 9, cy);

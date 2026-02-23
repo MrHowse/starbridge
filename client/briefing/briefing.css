@@ -40,7 +40,7 @@
   bottom: 0.6rem;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.14em;
   color: rgba(0, 255, 65, 0.35);
   text-transform: uppercase;
@@ -68,7 +68,7 @@
 }
 
 .briefing-header__tag {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.16em;
   color: rgba(0, 255, 65, 0.5);
   display: block;
@@ -104,7 +104,7 @@
 }
 
 .briefing-text {
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   line-height: 1.7;
   margin: 0.4rem 0 0;
   color: var(--text-normal);
@@ -124,7 +124,7 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   padding: 0.15rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
@@ -134,7 +134,7 @@
 .briefing-roster__role {
   width: 90px;
   color: rgba(0, 255, 65, 0.6);
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   flex-shrink: 0;
@@ -156,7 +156,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 0.3rem 0.8rem;
   margin-top: 0.35rem;
-  font-size: 0.72rem;
+  font-size: 0.875rem;
 }
 
 .briefing-stat {
@@ -169,7 +169,7 @@
 
 .briefing-stat__label {
   color: rgba(255, 255, 255, 0.4);
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
 }
 
@@ -218,7 +218,7 @@
 }
 
 .briefing-ready-status {
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   color: rgba(0, 255, 65, 0.6);
   min-height: 1.2em;
   letter-spacing: 0.08em;

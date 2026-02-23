@@ -409,7 +409,7 @@ function drawEnemy(ctx, enemy, shipX, shipY, zoom, now) {
   const dist = Math.hypot(enemy.x - shipX, enemy.y - shipY);
   const distKm = (dist / 1000).toFixed(1);
   ctx.fillStyle    = 'rgba(255, 64, 64, 0.5)';
-  ctx.font         = '9px "Share Tech Mono", monospace';
+  ctx.font         = '11px "Share Tech Mono", monospace';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(`${distKm}k`, p.x, p.y + s + 3);

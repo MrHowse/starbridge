@@ -933,7 +933,7 @@ function drawRecalibrationOverlay(progress) {
   ctx.fillText(`RECALIBRATING — ${mode.fullName}`, cw / 2, ch / 2 - 13);
 
   ctx.fillStyle = col + '88';
-  ctx.font      = '9px "Share Tech Mono", monospace';
+  ctx.font      = '11px "Share Tech Mono", monospace';
   ctx.fillText(`${Math.round(progress * 100)}%`, cw / 2, ch / 2 + 10);
 }
 
@@ -1005,7 +1005,7 @@ function drawSectorSweepOverlay(ctx, cw, ch) {
   const scaleText = scanScale === 'sector' ? 'SECTOR SWEEP' : 'LONG-RANGE SCAN';
   const phaseText = `PHASE ${sectorScanPhase + 1}/4`;
   ctx.save();
-  ctx.font         = '9px "Share Tech Mono", monospace';
+  ctx.font         = '11px "Share Tech Mono", monospace';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle    = modeColor + 'cc';
@@ -1020,7 +1020,7 @@ function drawSectorSweepOverlay(ctx, cw, ch) {
 function drawModeOverlay(ctx, cw, _ch) {
   const mode = SCAN_MODES[scanMode];
   ctx.save();
-  ctx.font         = '9px "Share Tech Mono", monospace';
+  ctx.font         = '11px "Share Tech Mono", monospace';
   ctx.textAlign    = 'left';
   ctx.textBaseline = 'top';
   ctx.fillStyle    = mode.color + '88';
@@ -1073,7 +1073,7 @@ function drawBearingLines(ctx, cw, ch) {
 
     // Bearing label near origin.
     ctx.fillStyle    = C_BEARING;
-    ctx.font         = '9px "Share Tech Mono", monospace';
+    ctx.font         = '11px "Share Tech Mono", monospace';
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(`BRG ${bearing.toFixed(1)}°`, origin.x + 6, origin.y + 2);
@@ -1094,7 +1094,7 @@ function drawBearingLines(ctx, cw, ch) {
     ctx.stroke();
 
     ctx.fillStyle    = C_BEARING;
-    ctx.font         = '9px "Share Tech Mono", monospace';
+    ctx.font         = '11px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText('SIGNAL', sp.x, sp.y - R * 1.5 - 3);

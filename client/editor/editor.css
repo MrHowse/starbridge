@@ -61,7 +61,7 @@ html, body {
   align-items: center;
   gap: 4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -125,7 +125,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
   padding: 0 12px;
   flex-shrink: 0;
 }
-.palette-btn { font-size: 11px; padding: 4px 8px; }
+.palette-btn { font-size: 13px; padding: 4px 8px; }
 
 /* ── Main Area ────────────────────────────────────────────────────────────── */
 #main-area {
@@ -152,7 +152,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
   left: 50%;
   transform: translateX(-50%);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   pointer-events: none;
   white-space: nowrap;
 }
@@ -174,7 +174,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
 }
 
 .panel-section h3 {
-  font-size: 11px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--muted);
@@ -186,7 +186,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
 }
 .field-group label {
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   margin-bottom: 3px;
 }
@@ -219,7 +219,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
 }
 .trigger-type-select { margin-bottom: 6px; }
 .trigger-args { display: flex; flex-direction: column; gap: 4px; }
-.trigger-args label { font-size: 11px; color: var(--muted); }
+.trigger-args label { font-size: 13px; color: var(--muted); }
 .trigger-args input, .trigger-args select { width: 100%; }
 .compound-triggers { margin-top: 8px; }
 .compound-trigger-item {
@@ -240,7 +240,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
   padding: 0;
 }
 .add-compound-btn {
-  font-size: 11px;
+  font-size: 13px;
   padding: 3px 6px;
   margin-top: 4px;
   width: 100%;
@@ -249,7 +249,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
 /* ── Validation Panel ─────────────────────────────────────────────────────── */
 #validation-results .error {
   color: var(--red);
-  font-size: 11px;
+  font-size: 13px;
   padding: 3px 0;
   border-bottom: 1px solid rgba(255,32,32,0.2);
 }
@@ -280,7 +280,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   flex-shrink: 0;
 }
@@ -329,12 +329,12 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
   font-family: inherit;
   font-size: 12px;
 }
-#entity-coords { color: var(--muted); font-size: 11px; margin-left: 8px; }
+#entity-coords { color: var(--muted); font-size: 13px; margin-left: 8px; }
 #entity-list {
   padding: 6px 12px;
   max-height: 80px;
   overflow-y: auto;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   border-top: 1px solid var(--border);
 }
@@ -345,7 +345,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
   padding: 2px 0;
 }
 .entity-list-item button {
-  font-size: 10px;
+  font-size: 12px;
   padding: 1px 4px;
   border-color: var(--red);
   color: var(--red);
@@ -353,7 +353,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
 
 /* ── Node type colour pills ───────────────────────────────────────────────── */
 .type-badge {
-  font-size: 9px;
+  font-size: 12px;
   padding: 1px 4px;
   border-radius: 2px;
   text-transform: uppercase;
@@ -374,7 +374,7 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
   margin-top: 6px;
 }
 .checkbox-row input[type="checkbox"] { accent-color: var(--primary); }
-.checkbox-row label { color: var(--muted); font-size: 11px; cursor: pointer; }
+.checkbox-row label { color: var(--muted); font-size: 13px; cursor: pointer; }
 
 /* ── Action builder ───────────────────────────────────────────────────────── */
 .action-builder {
@@ -385,5 +385,5 @@ button.danger:hover:not(:disabled) { background: rgba(255,32,32,0.15); }
 }
 .action-type-select { margin-bottom: 6px; }
 .action-args { display: flex; flex-direction: column; gap: 4px; }
-.action-args label { font-size: 11px; color: var(--muted); }
+.action-args label { font-size: 13px; color: var(--muted); }
 .action-args input, .action-args select { width: 100%; }

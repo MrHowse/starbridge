@@ -449,7 +449,7 @@ function drawMinimapThreatArrow(ctx, size, state) {
 
   // Label below the arrow tip.
   ctx.fillStyle    = `rgba(255, 176, 0, ${alpha})`;
-  ctx.font         = '7px "Share Tech Mono", monospace';
+  ctx.font         = '10px "Share Tech Mono", monospace';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   const labelX = cx + Math.cos(angle) * (R + 10);

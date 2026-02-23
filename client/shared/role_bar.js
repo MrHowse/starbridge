@@ -213,7 +213,7 @@ function _injectCSS() {
   background: rgba(8, 8, 8, 0.95);
   border-top: 1px solid rgba(0, 255, 65, 0.15);
   font-family: "Share Tech Mono", monospace;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   height: 2rem;
   box-sizing: border-box;
@@ -237,12 +237,12 @@ function _injectCSS() {
 }
 
 .role-bar__pill-role {
-  font-size: 0.56rem;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.3);
 }
 
 .role-bar__pill-player {
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

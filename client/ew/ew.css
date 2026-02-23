@@ -150,7 +150,7 @@
 .ew-enemy-card__header {
   display: flex;
   justify-content: space-between;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   margin-bottom: 3px;
 }
 
@@ -185,7 +185,7 @@
   border: 1px solid var(--primary);
   color: var(--primary);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   letter-spacing: 0.08em;
   cursor: pointer;
   text-transform: uppercase;
@@ -220,7 +220,7 @@
   border: 1px solid var(--border);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   padding: 4px 6px;
 }
 

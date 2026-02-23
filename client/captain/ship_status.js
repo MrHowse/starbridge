@@ -177,7 +177,7 @@ function _drawZone(ctx, W, H, zone, sys) {
   ctx.stroke();
 
   ctx.fillStyle    = color;
-  ctx.font         = `bold ${Math.max(7, rh * 0.8)}px "Courier New"`;
+  ctx.font         = `bold ${Math.max(10, rh * 0.8)}px "Courier New"`;
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   ctx.globalAlpha  = 1;
@@ -200,7 +200,7 @@ function _drawZone(ctx, W, H, zone, sys) {
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#ff2020';
-    ctx.font = `bold ${Math.max(7, rh * 0.7)}px "Courier New"`;
+    ctx.font = `bold ${Math.max(10, rh * 0.7)}px "Courier New"`;
     ctx.textAlign = 'center';
     ctx.fillText('OVERRIDE', x, y + rh * 0.5);
     ctx.restore();
@@ -231,7 +231,7 @@ function _drawCrewZone(ctx, W, H, deck, crew) {
   ctx.stroke();
 
   ctx.fillStyle    = color;
-  ctx.font         = `${Math.max(7, rh * 0.75)}px "Courier New"`;
+  ctx.font         = `${Math.max(10, rh * 0.75)}px "Courier New"`;
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   ctx.globalAlpha  = 1;

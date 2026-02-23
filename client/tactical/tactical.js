@@ -190,7 +190,7 @@ function updateThreatList() {
       <div class="tac-threat-card__body">
         <span class="tac-threat-badge tac-threat-badge--${threat}">${threat.toUpperCase()}</span>
         ${priority ? `<span class="tac-priority-badge tac-priority-badge--${priority}">${priority.toUpperCase()}</span>` : ''}
-        <span class="text-dim" style="font-size:0.7rem">${e.type} · ${e.ai_state}</span>
+        <span class="text-dim" style="font-size:0.875rem">${e.type} · ${e.ai_state}</span>
       </div>
       <div class="tac-threat-card__actions">
         <button class="tac-prio-btn ${priority === 'primary'   ? 'tac-prio-btn--active' : ''}" data-prio="primary">PRIMARY</button>
@@ -445,7 +445,7 @@ function drawMap() {
     ctx.beginPath();
     ctx.arc(ax, ay, 5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.font      = '9px monospace';
+    ctx.font      = '11px monospace';
     ctx.textAlign = 'center';
     ctx.fillText((a.label || a.type).toUpperCase(), ax, ay - 8);
   }
@@ -497,7 +497,7 @@ function drawMap() {
     ctx.font      = '10px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(e.id.toUpperCase(), ex, ey + s + 13);
-    ctx.font = '8px monospace';
+    ctx.font = '10px monospace';
     ctx.fillText(`[${threat[0].toUpperCase()}]`, ex, ey + s + 22);
   }
 

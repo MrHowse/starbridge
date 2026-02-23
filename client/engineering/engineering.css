@@ -148,7 +148,7 @@
 .eng-battery__mode-btn {
   flex: 1;
   font-family: inherit;
-  font-size: 0.58rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 0.18rem 0.3rem;
@@ -220,7 +220,7 @@
 
 .eng-repair-queue__empty {
   padding: 0.3rem 0;
-  font-size: 0.72rem;
+  font-size: 0.875rem;
 }
 
 .eng-repair-queue__item {
@@ -229,12 +229,12 @@
   justify-content: space-between;
   padding: 0.2rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  font-size: 0.72rem;
+  font-size: 0.875rem;
 }
 
 .eng-repair-queue__cancel {
   font-family: inherit;
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 0.1rem 0.3rem;
@@ -284,7 +284,7 @@
 }
 
 .sys-row__override-badge {
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   color: var(--alert-red);
   letter-spacing: 0.06em;
   margin-left: auto;
@@ -300,14 +300,14 @@
 }
 
 .sys-row__name {
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--text-normal);
 }
 
 .sys-row__hint-badge {
-  font-size: 0.58rem;
+  font-size: 0.8rem;
   padding: 0.1rem 0.4rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -323,7 +323,7 @@
 }
 
 .sys-row__repair-btn {
-  font-size: 0.58rem;
+  font-size: 0.8rem;
   padding: 0.12rem 0.45rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -454,14 +454,14 @@
 }
 
 .sys-row__stat .text-label {
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   letter-spacing: 0.04em;
   line-height: 1;
   margin-bottom: 1px;
 }
 
 .sys-row__stat .text-data {
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   transition: color 0.4s;
 }
 
@@ -508,7 +508,7 @@
 
 .eng-overlay-btn {
   font-family: inherit;
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 0.15rem 0.4rem;
@@ -552,7 +552,7 @@
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--border-primary);
   background: var(--bg-secondary);
-  font-size: 0.68rem;
+  font-size: 0.875rem;
 }
 
 .team-card--idle {
@@ -569,7 +569,7 @@
 }
 
 .team-card__name {
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-normal);
@@ -577,7 +577,7 @@
 }
 
 .team-card__status {
-  font-size: 0.58rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
   margin-bottom: 0.2rem;
 }
@@ -601,7 +601,7 @@
 
 .team-card__btn {
   font-family: inherit;
-  font-size: 0.52rem;
+  font-size: 0.8rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 0.1rem 0.3rem;
@@ -644,7 +644,7 @@
 
 .eng-detail__empty {
   padding: 0.8rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
 }
 
 /* --- Component list --- */
@@ -673,14 +673,14 @@
 }
 
 .comp-row__name {
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-normal);
 }
 
 .comp-row__health-val {
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   transition: color 0.4s;
 }
 
@@ -694,7 +694,7 @@
 }
 
 .comp-row__effect {
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
   letter-spacing: 0.04em;
 }
@@ -715,12 +715,12 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.2rem 0;
-  font-size: 0.68rem;
+  font-size: 0.875rem;
 }
 
 .eng-dispatch__btn {
   font-family: inherit;
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 0.1rem 0.35rem;
@@ -760,7 +760,7 @@
 .eng-damage-log__item {
   padding: 0.15rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
 }
 
@@ -788,12 +788,12 @@
 }
 
 .eng-statusbar__item .text-label {
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
 }
 
 .eng-statusbar__item .text-data {
-  font-size: 0.68rem;
+  font-size: 0.875rem;
 }
 
 /* Emergency indicator flash */
@@ -833,7 +833,7 @@
 
 .assist-panel__msg {
   margin: 0.4rem 0 0.2rem;
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   line-height: 1.4;
 }
 

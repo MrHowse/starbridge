@@ -289,7 +289,7 @@ function _mountVolumeUI() {
             .sb-vol-label {
                 width: 58px;
                 flex-shrink: 0;
-                font-size: 0.7rem;
+                font-size: 0.875rem;
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
                 color: var(--text-dim, rgba(0,255,65,0.4));
@@ -307,7 +307,7 @@ function _mountVolumeUI() {
                 border: 1px solid var(--border-primary, rgba(0,255,65,0.3));
                 color: var(--text-normal, rgba(0,255,65,0.7));
                 font-family: inherit;
-                font-size: 0.7rem;
+                font-size: 0.875rem;
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
                 padding: 3px 0;

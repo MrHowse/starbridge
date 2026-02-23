@@ -212,7 +212,7 @@ function renderMap() {
     ctx.restore();
     // Label
     ctx.fillStyle = colour;
-    ctx.font = '9px monospace';
+    ctx.font = '11px monospace';
     ctx.fillText(d.id, cx + 6, cy - 2);
     // Target line in transit mode
     if (d.state === 'transit') {

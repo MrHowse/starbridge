@@ -141,7 +141,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.35rem 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
   transition: background 0.15s;
   gap: 0.5rem;
@@ -158,7 +158,7 @@
 
 .contact-row__id {
   flex: 1;
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   color: var(--text-normal);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -168,7 +168,7 @@
 }
 
 .contact-row__range {
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -176,7 +176,7 @@
 /* Scan state badges */
 
 .contact-scan-badge {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   padding: 0.1rem 0.35rem;
@@ -310,7 +310,7 @@
 
 .fire-btn--small {
   padding: 0.35rem 0.75rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   flex: 0 0 auto;
 }
 
@@ -327,7 +327,7 @@
   border: 1px solid rgba(0, 255, 65, 0.22);
   color: rgba(0, 255, 65, 0.4);
   font-family: 'Share Tech Mono', monospace;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.1em;
   padding: 0.12rem 0.4rem;
   cursor: pointer;
@@ -398,7 +398,7 @@
   border: 1px solid rgba(0, 255, 65, 0.22);
   color: rgba(0, 255, 65, 0.4);
   font-family: 'Share Tech Mono', monospace;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   padding: 0.15rem 0.4rem;
   cursor: pointer;

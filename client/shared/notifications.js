@@ -287,7 +287,7 @@ function _injectCSS() {
   border: 1px solid rgba(0, 255, 65, 0.5);
   padding: 0.4rem 0.7rem;
   font-family: "Share Tech Mono", monospace;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   display: flex;
   gap: 0.5rem;
   align-items: baseline;
@@ -304,7 +304,7 @@ function _injectCSS() {
 .notify-toast__role {
   color: rgba(0, 255, 65, 0.7);
   flex-shrink: 0;
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   letter-spacing: 0.08em;
 }
 
@@ -323,7 +323,7 @@ function _injectCSS() {
   border: 1px solid rgba(0, 255, 65, 0.35);
   color: rgba(0, 255, 65, 0.6);
   font-family: "Share Tech Mono", monospace;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.12em;
   padding: 0.2rem 0.55rem;
   cursor: pointer;
@@ -362,7 +362,7 @@ function _injectCSS() {
 }
 
 .notify-label {
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   letter-spacing: 0.12em;
   color: rgba(0, 255, 65, 0.7);
   text-transform: uppercase;
@@ -374,7 +374,7 @@ function _injectCSS() {
   color: rgba(0, 255, 65, 0.5);
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   padding: 0 0.2rem;
 }
 .notify-close-btn:hover { color: #00ff41; }
@@ -388,10 +388,10 @@ function _injectCSS() {
 .notify-preset-btn {
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.65);
   font-family: "Share Tech Mono", monospace;
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   letter-spacing: 0.06em;
   text-align: left;
   padding: 0.35rem 0.65rem;
@@ -416,7 +416,7 @@ function _injectCSS() {
   border: 1px solid rgba(0, 255, 65, 0.25);
   color: #e0ffe0;
   font-family: "Share Tech Mono", monospace;
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   padding: 0.2rem 0.4rem;
   outline: none;
 }
@@ -429,7 +429,7 @@ function _injectCSS() {
   border: 1px solid rgba(0, 255, 65, 0.35);
   color: rgba(0, 255, 65, 0.7);
   font-family: "Share Tech Mono", monospace;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   padding: 0.2rem 0.45rem;
   cursor: pointer;
@@ -469,8 +469,8 @@ function _injectCSS() {
   gap: 0.5rem;
   align-items: baseline;
   padding: 0.25rem 0.6rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  font-size: 0.66rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
 }
 
 .notify-log-row__time {
@@ -481,7 +481,7 @@ function _injectCSS() {
 .notify-log-row__role {
   color: rgba(0, 255, 65, 0.7);
   white-space: nowrap;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.06em;
 }
 

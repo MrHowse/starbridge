@@ -229,7 +229,7 @@ export class SectorMap {
 
     // Zoom label.
     ctx.fillStyle    = SM_TEXT_DIM;
-    ctx.font         = '8px "Share Tech Mono", monospace';
+    ctx.font         = '10px "Share Tech Mono", monospace';
     ctx.textAlign    = 'right';
     ctx.textBaseline = 'bottom';
     ctx.fillText('STRATEGIC', W - 4, H - 2);
@@ -456,7 +456,7 @@ export class SectorMap {
 
   _drawGridLabels(ctx, W, H, PAD, cellW, cellH, cols, rows) {
     ctx.fillStyle    = SM_TEXT_DIM;
-    ctx.font         = '7px "Share Tech Mono", monospace';
+    ctx.font         = '10px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
     // Column letters (top).
@@ -524,7 +524,7 @@ export class SectorMap {
 
     // Active sector label (top-left corner of sector boundary).
     ctx.fillStyle    = 'rgba(0, 255, 65, 0.55)';
-    ctx.font         = '9px "Share Tech Mono", monospace';
+    ctx.font         = '11px "Share Tech Mono", monospace';
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'top';
     const sectorLabel = activeSector.name
@@ -552,7 +552,7 @@ export class SectorMap {
 
       const ep = mapRenderer.worldToCanvas(n.ex, n.ey);
       ctx.fillStyle    = 'rgba(0, 255, 65, 0.35)';
-      ctx.font         = '8px "Share Tech Mono", monospace';
+      ctx.font         = '10px "Share Tech Mono", monospace';
       ctx.textAlign    = n.align;
       ctx.textBaseline = n.base;
       const tag = neighbor.name ? `${neighbor.id}: ${neighbor.name}` : neighbor.id;
@@ -561,7 +561,7 @@ export class SectorMap {
 
     // Sector zoom label (bottom-right corner of canvas).
     ctx.fillStyle    = 'rgba(0, 255, 65, 0.45)';
-    ctx.font         = '8px "Share Tech Mono", monospace';
+    ctx.font         = '10px "Share Tech Mono", monospace';
     ctx.textAlign    = 'right';
     ctx.textBaseline = 'bottom';
     ctx.fillText('SECTOR', cw - 4, ch - 4);
@@ -615,7 +615,7 @@ export class SectorMap {
     // Name label below icon.
     const label = station.name || station.id;
     ctx.fillStyle    = color + '99';
-    ctx.font         = '8px "Share Tech Mono", monospace';
+    ctx.font         = '10px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(label.slice(0, 12), sx, sy + r + 2);

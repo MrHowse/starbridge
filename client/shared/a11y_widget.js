@@ -101,7 +101,7 @@ const CSS = `
 
 .a11y-label {
   font-family: monospace;
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   color: rgba(0,255,65,.7);
   letter-spacing: 0.06em;
 }
@@ -153,7 +153,7 @@ const CSS = `
 
 .a11y-panel-title {
   font-family: monospace;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.1em;
   color: rgba(0,255,65,.5);
   border-bottom: 1px solid rgba(0,255,65,.2);

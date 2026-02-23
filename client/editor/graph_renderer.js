@@ -106,7 +106,7 @@ export class GraphRenderer {
 
     // Status: node/edge count
     ctx.fillStyle = "#1e3a5f";
-    ctx.font = "10px 'Courier New'";
+    ctx.font = "12px 'Courier New'";
     ctx.fillText(`nodes:${this._state.nodes.length} edges:${this._state.edges.length}  zoom:${this._state.zoom.toFixed(2)}`, 8, h - 8);
   }
 

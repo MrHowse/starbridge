@@ -96,7 +96,7 @@
 }
 
 .fo-map-label {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   color: var(--text-dim);
 }
 
@@ -125,7 +125,7 @@
   bottom: 0.5rem;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   color: var(--primary);
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -172,7 +172,7 @@
 
 .fo-drone-card {
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   transition: background 0.2s;
 }
 
@@ -189,7 +189,7 @@
 }
 
 .fo-drone-id {
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--text-normal);
@@ -197,7 +197,7 @@
 }
 
 .fo-drone-state-badge {
-  font-size: 0.58rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 0.1rem 0.3rem;
@@ -225,7 +225,7 @@
 }
 
 .fo-fuel-label {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.05em;
   color: var(--text-dim);
   flex-shrink: 0;
@@ -248,7 +248,7 @@
 }
 
 .fo-fuel-pct {
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   color: var(--text-normal);
   min-width: 32px;
   text-align: right;
@@ -273,7 +273,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.4rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .fo-probe-list {
@@ -292,8 +292,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.22rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  font-size: 0.68rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.875rem;
   color: var(--text-dim);
 }
 
@@ -309,7 +309,7 @@
 
 .fo-no-probes {
   padding: 0.3rem 1rem;
-  font-size: 0.7rem;
+  font-size: 0.875rem;
 }
 
 /* =========================================================================
@@ -318,7 +318,7 @@
 
 .fo-btn {
   font-family: var(--font-mono, monospace);
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 0.16rem 0.45rem;
@@ -369,7 +369,7 @@
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
 }
 

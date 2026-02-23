@@ -164,15 +164,15 @@
 }
 
 .freq-label {
-  opacity: 0.6;
-  font-size: 0.65rem;
+  opacity: 0.7;
+  font-size: 0.875rem;
   margin-right: 2px;
 }
 
 .freq-btn {
   padding: 2px 6px;
   font-family: 'Share Tech Mono', monospace;
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   letter-spacing: 0.05em;
   border-radius: 2px;
   border: 1px solid;
@@ -222,7 +222,7 @@
 
 .fire-btn--small {
   padding: 0.3rem 0.5rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   width: auto;
 }
 
@@ -246,13 +246,13 @@
 }
 
 .tube-status {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   text-align: right;
 }
 
 #torpedo-ammo-label {
-  font-size: 0.75rem;
-  opacity: 0.7;
+  font-size: 0.875rem;
+  opacity: 0.8;
 }
 
 /* ── Shield focus ───────────────────────────────────────────────────────── */
@@ -284,7 +284,7 @@
 }
 
 .shield-dir-label {
-  font: 7px 'Share Tech Mono', monospace;
+  font: 10px 'Share Tech Mono', monospace;
   color: rgba(0, 170, 255, 0.45);
   letter-spacing: .05em;
   text-align: center;
@@ -293,7 +293,7 @@
 
 .shield-dir-label--side {
   writing-mode: vertical-rl;
-  font-size: 7px;
+  font-size: 10px;
 }
 
 .shield-pct-grid {
@@ -305,7 +305,7 @@
 }
 
 .shield-pct-val {
-  font: 10px 'Share Tech Mono', monospace;
+  font: 11px 'Share Tech Mono', monospace;
   color: var(--friendly, #00aaff);
 }
 
@@ -316,7 +316,7 @@
 }
 
 .shield-quick-btn {
-  font: 7px 'Share Tech Mono', monospace;
+  font: 10px 'Share Tech Mono', monospace;
   letter-spacing: .05em;
   padding: 3px 4px;
   background: transparent;

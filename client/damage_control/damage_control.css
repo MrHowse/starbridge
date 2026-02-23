@@ -28,7 +28,7 @@
 }
 
 .dc-deck-label {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -62,17 +62,17 @@
 .dc-room-card--normal    { border-left: 3px solid #2a9d2a; }
 .dc-room-card--damaged   { border-left: 3px solid var(--warning); }
 .dc-room-card--fire      { border-left: 3px solid var(--danger); }
-.dc-room-card--decompressed { border-left: 3px solid #555; }
+.dc-room-card--decompressed { border-left: 3px solid #777; }
 
 .dc-room-name {
   flex: 1;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-family: var(--font-mono);
   color: var(--text);
 }
 
 .dc-room-status {
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   font-family: var(--font-mono);
   padding: 2px 6px;
   border-radius: 2px;
@@ -95,7 +95,7 @@
 }
 
 .dc-legend-chip {
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   font-family: var(--font-mono);
   padding: 2px 5px;
   border-radius: 2px;
@@ -139,7 +139,7 @@
 }
 
 .dc-room-detail {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   margin: 2px 0;
 }
@@ -149,7 +149,7 @@
   width: 100%;
   margin-top: 8px;
   padding: 6px 12px;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   border-radius: 3px;
   border: none;
   cursor: pointer;
@@ -182,7 +182,7 @@
   border-radius: 3px;
   padding: 8px 10px;
   margin-bottom: 6px;
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   font-family: var(--font-mono);
   color: var(--text);
 }
