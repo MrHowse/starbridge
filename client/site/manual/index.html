@@ -150,7 +150,11 @@
             stations simultaneously.</li>
             <li><strong>Tactical map (canvas):</strong> North-up overview showing your
             ship, enemy contacts, friendly units, and hazards. Does not scroll — world
-            radius is 80,000 units.</li>
+            radius is 80,000 units. The bottom-right corner shows weapons crewing status:
+            <span style="color:#00ff41">WEAPONS: CREWED</span> (green) when a player
+            occupies Weapons, or
+            <span style="color:#ffb000">WEAPONS: AUTO (50%)</span> (amber) when the
+            auto-fire targeting computer is active.</li>
             <li><strong>Science summary panel:</strong> Condensed view of current sensor
             contacts from the Science station.</li>
             <li><strong>Hull / Shield readout:</strong> Real-time hull percentage and
@@ -289,6 +293,15 @@
             efficiency. Engineering can allocate more power to improve coverage.</li>
             <li><strong>Firing Solution puzzle:</strong> Triggered by precision strike
             missions. Solve to unlock a torpedo firing angle against a moving target.</li>
+            <li><strong>Auto-fire targeting computer:</strong> When no player occupies the
+            Weapons station, an automated targeting computer engages after a 3-second
+            delay. Auto-fire targets the nearest <em>scanned</em> hostile enemy within
+            beam range and arc. It fires at half the manual cadence (1 shot/s vs 0.5 s),
+            with 75% accuracy and no beam frequency matching — resulting in roughly 50%
+            of a crewed Weapons station's effective output. Auto-fire uses beams only (no
+            torpedoes) and does not change the manual target lock. When a player returns
+            to Weapons, auto-fire disengages immediately and full manual control resumes.
+            The Captain's tactical map shows the current status.</li>
           </ul>
 
           <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
@@ -298,7 +311,10 @@
           close to beam range. Use Proximity against clustered enemies; use Piercing
           against heavily shielded targets. Keep both tubes loaded at all times during
           combat — a loaded tube fires instantly. Nuclear requires Captain authorisation
-          — request it before combat, not during.</div>
+          — request it before combat, not during. Auto-fire is a safety net, not a
+          replacement — it cannot match beam frequencies, fire torpedoes, or prioritise
+          high-value targets. Return to Weapons as soon as the crisis on your other
+          station is resolved.</div>
         </div>
       </div>
 
