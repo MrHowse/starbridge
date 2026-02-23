@@ -315,13 +315,21 @@ export class MapRenderer {
       this._drawDamageOverlay(ctx, cw, ch, camX, camY, zoom, now);
     }
 
-    // Range readout.
+    // Range readout + contact count.
     const km = Math.round((this._range * this._zoomLevel) / 1000);
     ctx.fillStyle    = 'rgba(0, 255, 65, 0.45)';
     ctx.font         = '9px "Share Tech Mono", monospace';
     ctx.textAlign    = 'right';
     ctx.textBaseline = 'bottom';
     ctx.fillText(`RANGE: ${km}km`, cw - 6, ch - 4);
+    // Contact count (diagnostic).
+    const nContacts = this._contacts.length;
+    const nTorpedoes = this._torpedoes.length;
+    if (nContacts > 0 || nTorpedoes > 0) {
+      ctx.textAlign    = 'left';
+      ctx.fillStyle    = 'rgba(255, 64, 64, 0.6)';
+      ctx.fillText(`CONTACTS: ${nContacts}  TORP: ${nTorpedoes}`, 6, ch - 4);
+    }
   }
 
   // ── Private draw helpers ───────────────────────────────────────────────────
@@ -416,15 +424,22 @@ export class MapRenderer {
   }
 
   _drawContacts(ctx, cw, ch, camX, camY, zoom, now) {
+    const MARGIN = 20;
     for (const contact of this._contacts) {
       const sx       = cw / 2 + (contact.x - camX) / zoom;
       const sy       = ch / 2 + (contact.y - camY) / zoom;
       const selected = contact.id === this._selectedContactId;
+      const onScreen = sx >= -MARGIN && sx <= cw + MARGIN && sy >= -MARGIN && sy <= ch + MARGIN;
 
-      if (this._drawContactFn) {
-        this._drawContactFn(ctx, sx, sy, contact, selected, now);
+      if (onScreen) {
+        if (this._drawContactFn) {
+          this._drawContactFn(ctx, sx, sy, contact, selected, now);
+        } else {
+          _drawDefaultContact(ctx, sx, sy, contact, selected);
+        }
       } else {
-        _drawDefaultContact(ctx, sx, sy, contact, selected);
+        // Off-screen indicator: arrow at canvas edge pointing toward contact.
+        _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact);
       }
     }
   }
@@ -509,6 +524,12 @@ function _drawDefaultContact(ctx, sx, sy, contact, selected) {
   const s     = shape.size;
   const headRad = (contact.heading || 0) * Math.PI / 180;
 
+  // Bright centre dot — always visible regardless of zoom.
+  ctx.fillStyle = C_ENEMY;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.save();
   ctx.translate(sx, sy);
   ctx.rotate(headRad);
@@ -554,6 +575,40 @@ function _drawDefaultContact(ctx, sx, sy, contact, selected) {
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(contact.id, sx, sy + s + 2);
+}
+
+/** Arrow indicator at canvas edge for off-screen contacts. */
+function _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact) {
+  const cx = cw / 2;
+  const cy = ch / 2;
+  const dx = sx - cx;
+  const dy = sy - cy;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1) return;
+
+  // Clamp to canvas edge with margin.
+  const M = 16;
+  const scale = Math.min(
+    (cw / 2 - M) / Math.abs(dx || 1),
+    (ch / 2 - M) / Math.abs(dy || 1),
+  );
+  const ax = cx + dx * scale;
+  const ay = cy + dy * scale;
+  const angle = Math.atan2(dy, dx);
+
+  ctx.save();
+  ctx.translate(ax, ay);
+  ctx.rotate(angle);
+  ctx.fillStyle = C_ENEMY;
+  ctx.globalAlpha = 0.7;
+  // Small triangle pointing outward.
+  ctx.beginPath();
+  ctx.moveTo(6, 0);
+  ctx.lineTo(-4, -4);
+  ctx.lineTo(-4, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 function _drawShipChevron(ctx, cx, cy, headingRad, halfSize, colour) {
