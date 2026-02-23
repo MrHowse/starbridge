@@ -1486,7 +1486,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             _prev_power = ship.systems[payload.system].power
             gle.set_power(payload.system, payload.level)
             if payload.level != _prev_power:
-                gl.log_event("engineering", "power_changed", {"system": payload.system, "from": _prev_power, "to": payload.level})
+                gl.log_debounced("engineering", "power_changed", {"system": payload.system, "from": _prev_power, "to": payload.level})
             _set_training_flag(glm, "engineering_power_set")
         elif msg_type == "engineering.set_repair" and isinstance(payload, EngineeringSetRepairPayload):
             ship.repair_focus = payload.system
