@@ -157,6 +157,23 @@ def build_state(world: World, ship: Ship) -> dict:
             "intrusion_stun_ticks": enemy.intrusion_stun_ticks,
             "distance": round(dist, 1),
         })
+    # Include detected creatures for EW interaction (sedate / disrupt).
+    creatures_data = []
+    for creature in world.creatures:
+        if not creature.detected or creature.hull <= 0:
+            continue
+        dist = distance(ship.x, ship.y, creature.x, creature.y)
+        creatures_data.append({
+            "id": creature.id,
+            "creature_type": creature.creature_type,
+            "x": round(creature.x, 1),
+            "y": round(creature.y, 1),
+            "behaviour_state": creature.behaviour_state,
+            "hull": round(creature.hull, 1),
+            "hull_max": round(creature.hull_max, 1),
+            "distance": round(dist, 1),
+            "attached": creature.attached,
+        })
     return {
         "jam_target_id": _jam_target_id,
         "countermeasures_active": ship.ew_countermeasure_active,
@@ -165,6 +182,7 @@ def build_state(world: World, ship: Ship) -> dict:
         "jam_base_range": JAM_BASE_RANGE,
         "effective_jam_range": round(JAM_BASE_RANGE * ecm_eff, 1),
         "enemies": enemies_data,
+        "creatures": creatures_data,
         "intrusion_target_id": _intrusion_target_id,
         "intrusion_target_system": _intrusion_target_system,
     }

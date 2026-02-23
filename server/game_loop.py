@@ -1129,7 +1129,7 @@ async def _loop() -> None:
         # 11f. Comms state + NPC responses.
         await _manager.broadcast_to_roles(
             ["comms"],
-            Message.build("comms.state", glco.build_comms_state()),
+            Message.build("comms.state", glco.build_comms_state(_world)),
         )
         for npc_resp in comms_responses:
             await _manager.broadcast_to_roles(

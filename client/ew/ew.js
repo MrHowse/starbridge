@@ -29,6 +29,11 @@ const PLAYER_COLOUR    = '#00c87a';
 const ENEMY_COLOUR     = '#ff5050';
 const JAM_COLOUR       = '#f0c040';
 const INTRUDED_COLOUR  = '#80a0ff';
+const CREATURE_COLOUR  = '#00ffaa';
+
+// Creature types that support EW interactions
+const SEDATABLE_TYPES = new Set(['rift_stalker']);
+const DISRUPTABLE_TYPES = new Set(['swarm']);
 
 // ---------------------------------------------------------------------------
 // State
@@ -132,6 +137,7 @@ function handleMessage(msg) {
       _ewState = msg.payload;
       updateControls();
       updateEnemyList();
+      updateCreatureList();
       // Play lock sound when jam target first acquired.
       if (msg.payload.jam_target_id && msg.payload.jam_target_id !== prevTarget) {
         SoundBank.play('scan_complete');
@@ -257,6 +263,69 @@ function updateEnemyList() {
 
     list.appendChild(card);
   }
+}
+
+function updateCreatureList() {
+  if (!_ewState) return;
+  const list = document.getElementById('creature-list');
+  const creatures = _ewState.creatures || [];
+  const countEl = document.getElementById('creature-count');
+  countEl.textContent = creatures.length;
+
+  if (creatures.length === 0) {
+    list.innerHTML = '<p class="text-dim">No creatures detected.</p>';
+    return;
+  }
+
+  list.innerHTML = '';
+
+  for (const c of creatures) {
+    const distKm = (c.distance / 1000).toFixed(1);
+    const hullPct = c.hull_max > 0 ? Math.round(c.hull / c.hull_max * 100) : 0;
+    const typeName = c.creature_type.replace(/_/g, ' ').toUpperCase();
+    const stateLabel = (c.behaviour_state || 'unknown').toUpperCase();
+
+    const card = document.createElement('div');
+    card.className = 'ew-enemy-card';
+
+    let actionsHtml = '';
+    if (SEDATABLE_TYPES.has(c.creature_type) && c.behaviour_state !== 'sedated') {
+      actionsHtml += `<button class="ew-btn ew-btn--sm" data-sedate="${c.id}">SEDATE</button>`;
+    }
+    if (DISRUPTABLE_TYPES.has(c.creature_type) && c.behaviour_state !== 'dispersed') {
+      actionsHtml += `<button class="ew-btn ew-btn--sm" data-disrupt="${c.id}">DISRUPT</button>`;
+    }
+
+    const stateColour = ['attacking', 'aggressive', 'agitated'].includes(c.behaviour_state)
+      ? 'var(--danger, #ff4040)'
+      : ['sedated', 'dispersed', 'dormant', 'idle'].includes(c.behaviour_state)
+        ? 'var(--success, #00c87a)'
+        : 'var(--warning, #ffaa00)';
+
+    card.innerHTML = `
+      <div class="ew-enemy-card__header">
+        <span class="text-data">${c.id.toUpperCase()}</span>
+        <span class="ew-enemy-card__dist">${distKm}k</span>
+      </div>
+      <div class="ew-enemy-card__type">${typeName} — <span style="color:${stateColour}">${stateLabel}</span></div>
+      <div class="ew-enemy-card__type" style="opacity:0.6">HULL ${hullPct}%${c.attached ? ' — ATTACHED' : ''}</div>
+      ${actionsHtml ? `<div style="margin-top:4px;display:flex;gap:4px">${actionsHtml}</div>` : ''}
+    `;
+
+    list.appendChild(card);
+  }
+
+  // Wire sedate/disrupt buttons
+  list.querySelectorAll('[data-sedate]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (_send) _send('creature.sedate', { creature_id: btn.dataset.sedate });
+    });
+  });
+  list.querySelectorAll('[data-disrupt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (_send) _send('creature.ew_disrupt', { creature_id: btn.dataset.disrupt });
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -405,6 +474,33 @@ function drawMap() {
     ctx.font        = '10px monospace';
     ctx.textAlign   = 'center';
     ctx.fillText(e.id.toUpperCase(), ex, ey + s + 13);
+  }
+
+  // Creature contacts
+  for (const c of (_ewState.creatures || [])) {
+    const cx = w / 2 + (c.x - sx) * scale;
+    const cy = h / 2 + (c.y - sy) * scale;
+
+    const isHostile = ['attacking', 'aggressive', 'agitated'].includes(c.behaviour_state);
+    const colour = isHostile ? '#ff8040' : CREATURE_COLOUR;
+
+    // Circle shape
+    ctx.fillStyle = colour;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Centre dot
+    ctx.fillStyle = '#0a0f0a';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle   = colour;
+    ctx.font        = '9px monospace';
+    ctx.textAlign   = 'center';
+    ctx.fillText(c.creature_type.replace(/_/g, ' ').toUpperCase(), cx, cy + 17);
   }
 
   // Player ship

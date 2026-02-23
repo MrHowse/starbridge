@@ -214,14 +214,32 @@ def _add_transmission(text: str, transmission_type: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def build_comms_state() -> dict:
+def build_comms_state(world: object | None = None) -> dict:
     """Serialise current comms state for broadcast."""
-    return {
+    state: dict = {
         "active_frequency": round(_active_frequency, 3),
         "tuned_faction": get_tuned_faction(),
         "transmissions": list(_transmissions),
         "pending_hails": len(_pending_hails),
     }
+    # Include detected creatures that can be communicated with.
+    creatures_data = []
+    if world is not None:
+        from server.utils.math_helpers import distance
+        ship = world.ship  # type: ignore[union-attr]
+        for creature in world.creatures:  # type: ignore[union-attr]
+            if not creature.detected or creature.hull <= 0:
+                continue
+            dist = distance(ship.x, ship.y, creature.x, creature.y)
+            creatures_data.append({
+                "id": creature.id,
+                "creature_type": creature.creature_type,
+                "behaviour_state": creature.behaviour_state,
+                "distance": round(dist, 1),
+                "communication_progress": round(creature.communication_progress, 1),
+            })
+    state["creatures"] = creatures_data
+    return state
 
 
 def serialise() -> dict:

@@ -182,9 +182,13 @@ def build_sensor_contacts(
             "heading": round(creature.heading, 2),
             "kind": "creature",
             "creature_type": creature.creature_type,
+            "behaviour_state": creature.behaviour_state,
             "scan_state": "scanned",
             "hull": round(creature.hull, 1),
+            "hull_max": round(creature.hull_max, 1),
             "study_progress": round(creature.study_progress, 1),
+            "communication_progress": round(creature.communication_progress, 1),
+            "attached": creature.attached,
             "classification": "unknown",
         })
 

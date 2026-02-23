@@ -42,10 +42,15 @@ let activeFrequency = 0.15;
 let tunedFaction    = null;
 let transmissions   = [];
 let _approachStation = null;  // current approach-zone station info
+let _creatures = [];           // creatures from comms.state
+
+// Creature types that support Comms communication
+const COMMUNICABLE_TYPES = new Set(['rift_stalker', 'leviathan', 'void_whale']);
 
 let canvas, ctx;
 let sliderEl, freqReadoutEl, factionBadgeEl, hailStatusEl;
 let hailPanelEl, hailControlsEl, logEl, assistPanelEl, assistInstructionsEl;
+let creatureSectionEl, creatureCommListEl, creatureCommCountEl;
 let dockingPromptEl = null;   // dynamically created approach prompt
 
 // ── Initialisation ────────────────────────────────────────────────────────────
@@ -62,6 +67,9 @@ function init() {
   logEl               = document.getElementById("transmission-log");
   assistPanelEl       = document.getElementById("assist-panel");
   assistInstructionsEl = document.getElementById("assist-instructions");
+  creatureSectionEl   = document.getElementById("creature-section");
+  creatureCommListEl  = document.getElementById("creature-comm-list");
+  creatureCommCountEl = document.getElementById("creature-comm-count");
 
   // Size canvas to fill its parent wrap
   const wrap = canvas.parentElement;
@@ -179,6 +187,9 @@ function handleCommsState(payload) {
     transmissions = payload.transmissions;
     renderLog();
   }
+  // Update creature communication panel
+  _creatures = payload.creatures || [];
+  renderCreatureComms();
 }
 
 function handleNPCResponse(payload) {
@@ -213,6 +224,74 @@ function renderLog() {
     .reverse()
     .map(t => `<div class="log-entry log-entry--${t.type}">${t.text}</div>`)
     .join("");
+}
+
+// ── Creature communication ────────────────────────────────────────────────────
+
+function renderCreatureComms() {
+  const communicable = _creatures.filter(c => COMMUNICABLE_TYPES.has(c.creature_type));
+  creatureCommCountEl.textContent = communicable.length;
+
+  if (communicable.length === 0) {
+    creatureSectionEl.style.display = "none";
+    return;
+  }
+
+  creatureSectionEl.style.display = "";
+  creatureCommListEl.innerHTML = "";
+
+  for (const c of communicable) {
+    const typeName = c.creature_type.replace(/_/g, " ").toUpperCase();
+    const distKm = (c.distance / 1000).toFixed(1);
+    const commPct = Math.round(c.communication_progress || 0);
+    const stateLabel = (c.behaviour_state || "unknown").toUpperCase();
+
+    const isComplete = commPct >= 100;
+    const isSedated = c.behaviour_state === "sedated";
+    const isCalm = ["idle", "dormant", "sedated", "wandering", "fleeing", "redirected"].includes(c.behaviour_state);
+
+    const card = document.createElement("div");
+    card.className = "log-entry";
+    card.style.cssText = "border:1px solid var(--border-primary);padding:6px;margin-bottom:4px;font-size:.7rem";
+
+    const stateColour = ["attacking", "aggressive", "agitated"].includes(c.behaviour_state)
+      ? "var(--danger, #ff4040)"
+      : isCalm
+        ? "var(--success, #00c87a)"
+        : "var(--warning, #ffaa00)";
+
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--primary)">${typeName}</span>
+        <span class="c-dim">${distKm}k</span>
+      </div>
+      <div>STATE: <span style="color:${stateColour}">${stateLabel}</span></div>
+      <div>COMM LINK: <span style="color:var(--primary)">${commPct}%</span></div>
+      <div style="background:rgba(0,170,80,0.15);height:4px;margin:3px 0">
+        <div style="background:var(--primary);height:100%;width:${commPct}%"></div>
+      </div>
+      ${isComplete
+        ? '<div style="color:var(--success)">COMMUNICATION COMPLETE</div>'
+        : `<button class="btn btn--sm btn--primary" data-comm-id="${c.id}" style="width:100%;margin-top:3px"${!isCalm ? ' disabled title="Creature must be calm to communicate"' : ''}>
+             ${isSedated ? 'COMMUNICATE (SEDATED)' : 'TRANSMIT SIGNAL'}
+           </button>`
+      }
+    `;
+
+    creatureCommListEl.appendChild(card);
+  }
+
+  // Wire communicate buttons — each press increments progress by 10
+  creatureCommListEl.querySelectorAll("[data-comm-id]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const cId = btn.dataset.commId;
+      const creature = _creatures.find(cr => cr.id === cId);
+      const current = creature ? (creature.communication_progress || 0) : 0;
+      const next = Math.min(100, current + 10);
+      send("creature.set_comm_progress", { creature_id: cId, progress: next });
+      addLogEntry(`Transmitting signal to ${cId}… (${next}%)`, "outgoing");
+    });
+  });
 }
 
 // ── Docking helpers ───────────────────────────────────────────────────────────

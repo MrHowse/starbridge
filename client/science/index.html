@@ -144,6 +144,42 @@
           </div>
         </section>
 
+        <!-- Creature interaction panel (shown when a creature contact is selected) -->
+        <section class="ctrl-section panel" id="creature-panel" style="display:none">
+          <div class="panel__header">
+            <span class="text-label">CREATURE ANALYSIS</span>
+            <span class="text-data text-dim" id="creature-type-label">—</span>
+          </div>
+          <div class="creature-body">
+            <div class="result-row">
+              <span class="text-label">STATE</span>
+              <span class="text-data text-bright" id="creature-state">—</span>
+            </div>
+            <div class="result-row">
+              <span class="text-label">HULL</span>
+              <div class="gauge result-gauge">
+                <div class="gauge__fill" id="creature-hull-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="creature-hull-pct">—</span>
+            </div>
+            <div class="result-row" id="creature-study-row">
+              <span class="text-label">BIO STUDY</span>
+              <div class="gauge result-gauge">
+                <div class="gauge__fill gauge__fill--scan" id="creature-study-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="creature-study-pct">0%</span>
+            </div>
+            <div class="result-row" id="creature-comm-row" style="display:none">
+              <span class="text-label">COMMS LINK</span>
+              <div class="gauge result-gauge">
+                <div class="gauge__fill gauge__fill--shield" id="creature-comm-fill" style="width:0%"></div>
+              </div>
+              <span class="text-data" id="creature-comm-pct">0%</span>
+            </div>
+            <p class="text-dim text-body" id="creature-hint" style="margin:6px 0 0;font-size:0.65rem"></p>
+          </div>
+        </section>
+
         <!-- Ship state (sensor power ref) -->
         <section class="ctrl-section panel">
           <div class="panel__header">

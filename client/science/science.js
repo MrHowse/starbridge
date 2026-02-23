@@ -133,6 +133,20 @@ const resShieldFreq      = document.getElementById('res-shield-freq');
 const sensorPowerEl = document.getElementById('sensor-power');
 const sensorEffEl   = document.getElementById('sensor-efficiency');
 
+// Creature analysis panel
+const creaturePanel     = document.getElementById('creature-panel');
+const creatureTypeLabel = document.getElementById('creature-type-label');
+const creatureStateEl   = document.getElementById('creature-state');
+const creatureHullFill  = document.getElementById('creature-hull-fill');
+const creatureHullPct   = document.getElementById('creature-hull-pct');
+const creatureStudyRow  = document.getElementById('creature-study-row');
+const creatureStudyFill = document.getElementById('creature-study-fill');
+const creatureStudyPct  = document.getElementById('creature-study-pct');
+const creatureCommRow   = document.getElementById('creature-comm-row');
+const creatureCommFill  = document.getElementById('creature-comm-fill');
+const creatureCommPct   = document.getElementById('creature-comm-pct');
+const creatureHintEl    = document.getElementById('creature-hint');
+
 const modeBtnEls = {
   em:   document.getElementById('mode-em'),
   grav: document.getElementById('mode-grav'),
@@ -330,6 +344,7 @@ function handleSensorContacts(payload) {
 
   renderContactList();
   updateScanUI();
+  updateCreaturePanel();
 }
 
 function handleScanProgress(payload) {
@@ -554,6 +569,7 @@ function selectContact(id) {
   if (sensorRenderer) sensorRenderer.selectContact(id);
   renderContactList();
   updateScanUI();
+  updateCreaturePanel();
 }
 
 // ---------------------------------------------------------------------------
@@ -613,8 +629,13 @@ function renderContactList() {
       badgeText = c.scan_state === 'scanned' ? 'SCND' : 'UNK';
     }
 
+    // Show creature type or kind badge after the ID.
+    const kindLabel = c.kind === 'creature'
+      ? ` <span class="text-dim" style="font-size:0.6rem">${(c.creature_type || '').replace(/_/g, ' ').toUpperCase()}</span>`
+      : '';
+
     row.innerHTML = `
-      <span class="contact-row__id">${c.id.toUpperCase()}</span>
+      <span class="contact-row__id">${c.id.toUpperCase()}${kindLabel}</span>
       <span class="contact-row__range">${rangeStr}</span>
       <span class="${badgeClass}">${badgeText}</span>
     `;
@@ -622,6 +643,58 @@ function renderContactList() {
     row.addEventListener('click', () => selectContact(c.id));
     contactListEl.appendChild(row);
   }
+}
+
+// Creature interaction hints per type.
+const CREATURE_HINTS = {
+  void_whale:   'Passive. Run BIO sector scan nearby to study. Does not attack.',
+  rift_stalker: 'Territorial. Options: sedate (EW), communicate (COMMS), fight, or leave territory.',
+  hull_leech:   'Parasitic. Attaches to hull. Remove via depressurise, electrical discharge, or EVA.',
+  swarm:        'Hive intelligence. Best countered by EW dispersal. Study reveals dispersal frequency.',
+  leviathan:    'Apex predator. Communicate (COMMS) to redirect. Direct combat is extremely risky.',
+};
+
+const CREATURE_STATE_LABELS = {
+  idle: 'IDLE', aggressive: 'AGGRESSIVE', attacking: 'ATTACKING',
+  fleeing: 'FLEEING', sedated: 'SEDATED', dormant: 'DORMANT',
+  wandering: 'WANDERING', agitated: 'AGITATED', redirected: 'REDIRECTED',
+  approaching: 'APPROACHING', attached: 'ATTACHED',
+  dispersed: 'DISPERSED', spread: 'SPREAD', clustered: 'CLUSTERED',
+};
+
+function updateCreaturePanel() {
+  if (!creaturePanel) return;
+  const c = contacts.find(ct => ct.id === selectedId && ct.kind === 'creature');
+  if (!c) {
+    creaturePanel.style.display = 'none';
+    return;
+  }
+  creaturePanel.style.display = '';
+  const typeName = (c.creature_type || 'unknown').replace(/_/g, ' ').toUpperCase();
+  creatureTypeLabel.textContent = typeName;
+  creatureStateEl.textContent = CREATURE_STATE_LABELS[c.behaviour_state] || c.behaviour_state || '—';
+  // Colour state label based on threat.
+  const hostile = ['attacking', 'aggressive', 'agitated'].includes(c.behaviour_state);
+  const safe    = ['idle', 'dormant', 'sedated', 'redirected', 'dispersed', 'fleeing'].includes(c.behaviour_state);
+  creatureStateEl.style.color = hostile ? '#ff4040' : safe ? '#00ff41' : '#ffaa00';
+
+  const hullPct = c.hull_max > 0 ? Math.round(c.hull / c.hull_max * 100) : 0;
+  creatureHullFill.style.width = `${hullPct}%`;
+  creatureHullPct.textContent  = `${hullPct}%`;
+
+  const study = Math.round(c.study_progress || 0);
+  creatureStudyFill.style.width = `${study}%`;
+  creatureStudyPct.textContent  = `${study}%`;
+
+  const comm = Math.round(c.communication_progress || 0);
+  const hasComm = ['rift_stalker', 'leviathan'].includes(c.creature_type);
+  creatureCommRow.style.display = hasComm ? '' : 'none';
+  if (hasComm) {
+    creatureCommFill.style.width = `${comm}%`;
+    creatureCommPct.textContent  = `${comm}%`;
+  }
+
+  creatureHintEl.textContent = CREATURE_HINTS[c.creature_type] || '';
 }
 
 function updateScanUI() {

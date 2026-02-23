@@ -212,6 +212,12 @@
   background: var(--warning);
 }
 
+.ew-btn--sm {
+  width: auto;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+}
+
 /* ─── Select ──────────────────────────────────────────────────────────────── */
 
 .ew-select {
