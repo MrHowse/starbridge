@@ -158,6 +158,8 @@ function init() {
   });
 
   on('lobby.welcome', (payload) => {
+    const name = sessionStorage.getItem('player_name') || 'ENGINEERING';
+    send('lobby.claim_role', { role: 'engineering', player_name: name });
     console.log('[engineering] Connected as', payload.connection_id);
   });
 
