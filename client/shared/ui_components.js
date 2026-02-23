@@ -47,6 +47,12 @@ let _briefingTimer = null;
  * @param {string} briefingText
  */
 export function showBriefing(missionName, briefingText) {
+  // Skip for sandbox (no meaningful briefing) or if already shown this game session.
+  if (!briefingText || missionName === 'Sandbox') return;
+  const shownKey = 'starbridge_briefing_shown';
+  if (sessionStorage.getItem(shownKey) === missionName) return;
+  sessionStorage.setItem(shownKey, missionName);
+
   const container = document.querySelector('.station-container') || document.body;
 
   let el = document.querySelector('[data-briefing-overlay]');
