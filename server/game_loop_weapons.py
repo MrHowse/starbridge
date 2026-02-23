@@ -875,7 +875,8 @@ async def handle_enemy_beam_hits(
     for ev in beam_hit_events:
         if ev.target == "player":
             sys_damaged = apply_hit_to_player(
-                world.ship, ev.damage, ev.attacker_x, ev.attacker_y
+                world.ship, ev.damage, ev.attacker_x, ev.attacker_y,
+                shield_bypass=getattr(ev, "shield_bypass", 0.0),
             )
             combat_damage_events.extend(sys_damaged)
             gl.log_event("combat", "ship_hit", {

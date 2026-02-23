@@ -376,6 +376,7 @@ CREATURE_TYPE_PARAMS: dict[str, dict] = {
         "beam_cooldown":    2.0,
         "regen_rate":       2.0,
         "sedate_duration": 120.0,
+        "shield_bypass":    0.5,   # bio-energy attack: 50% bypasses shields
     },
     "hull_leech": {
         "hull":            30.0,
@@ -384,6 +385,7 @@ CREATURE_TYPE_PARAMS: dict[str, dict] = {
         "damage_per_interval": 3.0,
         "damage_interval":  5.0,
         "study_duration":  30.0,
+        "shield_bypass":    1.0,   # attached to hull: 100% bypasses shields
     },
     "swarm": {
         "hull":            80.0,
@@ -393,6 +395,7 @@ CREATURE_TYPE_PARAMS: dict[str, dict] = {
         "beam_cooldown":    1.5,
         "swarm_range":   8_000.0,
         "study_duration":  45.0,
+        "shield_bypass":    0.5,   # engulfing attack: 50% bypasses shields
     },
     "leviathan": {
         "hull":           800.0,
@@ -403,6 +406,7 @@ CREATURE_TYPE_PARAMS: dict[str, dict] = {
         "wake_range":   20_000.0,
         "comm_duration":   90.0,
         "study_duration":  60.0,
+        "shield_bypass":    0.4,   # overwhelming energy: 40% bypasses shields
     },
 }
 

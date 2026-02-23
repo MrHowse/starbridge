@@ -79,22 +79,33 @@ def apply_hit_to_player(
     attacker_x: float,
     attacker_y: float,
     rng: Any = _random_module,
+    shield_bypass: float = 0.0,
 ) -> list[tuple[str, float]]:
     """Apply damage to the player ship.
+
+    *shield_bypass* (0–1): fraction of damage that ignores shields entirely.
+    Creature attacks use this so biological/energy attacks aren't fully
+    absorbed by conventional shields.
 
     Returns a list of (system_name, new_health) for any system that took
     structural damage this hit (for broadcasting ship.system_damaged events).
     """
+    # Split damage into bypass (direct hull) and shieldable portions.
+    bypass_frac = max(0.0, min(1.0, shield_bypass))
+    bypass_damage = damage * bypass_frac
+    shieldable    = damage - bypass_damage
+
     # 1. Determine which facing takes the hit.
     facing    = get_hit_facing(ship.heading, ship.x, ship.y, attacker_x, attacker_y)
     shield_hp = getattr(ship.shields, facing)
 
-    # 2. Shield absorption: shields absorb up to shield_hp × COEFF of the hit.
-    absorbed = min(shield_hp * SHIELD_ABSORPTION_COEFF, damage)
+    # 2. Shield absorption: shields absorb up to shield_hp × COEFF of the shieldable portion.
+    absorbed = min(shield_hp * SHIELD_ABSORPTION_COEFF, shieldable)
     setattr(ship.shields, facing, max(0.0, shield_hp - absorbed / SHIELD_ABSORPTION_COEFF))
 
     # Apply difficulty enemy damage multiplier.
-    hull_damage = (damage - absorbed) * ship.difficulty.enemy_damage_multiplier
+    # bypass_damage goes straight to hull; shieldable remainder is (shieldable - absorbed).
+    hull_damage = (bypass_damage + shieldable - absorbed) * ship.difficulty.enemy_damage_multiplier
 
     # Apply Electronic Warfare countermeasure reduction.
     if hull_damage > 0.0 and ship.ew_countermeasure_active and ship.countermeasure_charges > 0:

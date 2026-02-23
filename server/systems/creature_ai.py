@@ -133,6 +133,7 @@ def _tick_rift_stalker(c: Creature, ship: Ship, dt: float) -> list[BeamHitEvent]
                 attacker_x=c.x,
                 attacker_y=c.y,
                 damage=params["beam_dmg"],
+                shield_bypass=params.get("shield_bypass", 0.0),
             ))
         if dist > params["weapon_range"] * 1.5:
             c.behaviour_state = "aggressive"
@@ -168,6 +169,7 @@ def _tick_hull_leech(c: Creature, ship: Ship, dt: float) -> list[BeamHitEvent]:
                 attacker_x=c.x,
                 attacker_y=c.y,
                 damage=params["damage_per_interval"],
+                shield_bypass=params.get("shield_bypass", 0.0),
             ))
         return events
 
@@ -221,6 +223,7 @@ def _tick_swarm(c: Creature, ship: Ship, dt: float) -> list[BeamHitEvent]:
                 attacker_x=c.x,
                 attacker_y=c.y,
                 damage=params["beam_dmg"],
+                shield_bypass=params.get("shield_bypass", 0.0),
             ))
 
     _apply_movement(c, dt)
@@ -263,6 +266,7 @@ def _tick_leviathan(c: Creature, ship: Ship, dt: float) -> list[BeamHitEvent]:
                 attacker_x=c.x,
                 attacker_y=c.y,
                 damage=params["beam_dmg"],
+                shield_bypass=params.get("shield_bypass", 0.0),
             ))
         if c.communication_progress >= 100.0:
             c.behaviour_state = "redirected"

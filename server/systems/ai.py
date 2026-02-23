@@ -33,7 +33,8 @@ class BeamHitEvent:
     attacker_x: float
     attacker_y: float
     damage: float
-    target: str = "player"  # "player" or a station_id
+    target: str = "player"         # "player" or a station_id
+    shield_bypass: float = 0.0     # fraction of damage that ignores shields (0–1)
 
 
 # ---------------------------------------------------------------------------
