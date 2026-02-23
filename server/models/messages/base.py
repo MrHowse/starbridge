@@ -51,7 +51,12 @@ from server.models.messages.engineering import (
 )
 from server.models.messages.helm import HelmSetHeadingPayload, HelmSetThrottlePayload
 from server.models.messages.lobby import LobbyClaimRolePayload, LobbyReleaseRolePayload, LobbyStartGamePayload
-from server.models.messages.science import ScienceCancelScanPayload, ScienceStartScanPayload
+from server.models.messages.science import (
+    ScienceCancelScanPayload,
+    ScienceCancelSectorScanPayload,
+    ScienceStartScanPayload,
+    ScienceStartSectorScanPayload,
+)
 from server.models.messages.creatures import (
     CreatureSedatePayload,
     CreatureEWDisruptPayload,
@@ -128,6 +133,8 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     # Science
     "science.start_scan": ScienceStartScanPayload,
     "science.cancel_scan": ScienceCancelScanPayload,
+    "science.start_sector_scan": ScienceStartSectorScanPayload,
+    "science.cancel_sector_scan": ScienceCancelSectorScanPayload,
     # Captain
     "captain.set_alert": CaptainSetAlertPayload,
     "captain.authorize": CaptainAuthorizePayload,
