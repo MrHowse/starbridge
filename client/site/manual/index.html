@@ -43,15 +43,17 @@
   <a href="#s-tactical"   class="toc-link toc-link--sub">Tactical Officer</a>
   <a href="#s-dc"         class="toc-link toc-link--sub">Damage Control</a>
   <a href="#ship-classes"    class="toc-link">3. Ship Classes</a>
-  <a href="#environment"     class="toc-link">4. Environment</a>
+  <a href="#difficulty"      class="toc-link">4. Difficulty Levels</a>
+  <a href="#environment"     class="toc-link">5. Environment</a>
   <a href="#env-sectors"     class="toc-link toc-link--sub">Sector Grid &amp; Navigation</a>
   <a href="#env-docking"     class="toc-link toc-link--sub">Stations &amp; Docking</a>
   <a href="#env-hazards"     class="toc-link toc-link--sub">Environmental Hazards</a>
   <a href="#env-creatures"   class="toc-link toc-link--sub">Space Creatures</a>
-  <a href="#missions"        class="toc-link">5. Missions</a>
-  <a href="#puzzles"         class="toc-link">6. Puzzles</a>
-  <a href="#admin-guide"     class="toc-link">7. Admin Guide</a>
-  <a href="#shortcuts"       class="toc-link">8. Keyboard Reference</a>
+  <a href="#missions"        class="toc-link">6. Missions</a>
+  <a href="#debrief"         class="toc-link toc-link--sub">Post-Mission Debrief</a>
+  <a href="#puzzles"         class="toc-link">7. Puzzles</a>
+  <a href="#admin-guide"     class="toc-link">8. Admin Guide</a>
+  <a href="#shortcuts"       class="toc-link">9. Keyboard Reference</a>
 </aside>
 
 <!-- ─── Main content ─────────────────────────────────────────────────────── -->
@@ -80,6 +82,16 @@
       <p><strong>Selecting a ship class.</strong> The host chooses a ship class before
       launching. Different classes have different hull ratings, torpedo loadouts, and crew
       requirements. See the <a href="#ship-classes">Ship Classes</a> section for details.</p>
+
+      <p><strong>Choosing difficulty.</strong> The host selects a difficulty preset from
+      the lobby dropdown: Cadet, Officer (default), Commander, or Admiral. Difficulty
+      affects enemy strength, resource availability, repair speed, scan times, event
+      pacing, and more. Hover over each option for a summary. See the
+      <a href="#difficulty">Difficulty Levels</a> section for the full parameter table.</p>
+
+      <p><strong>Player profiles.</strong> Your callsign is tracked across sessions. After
+      each mission, your profile updates with games played, wins, and career achievements.
+      The lobby footer shows your win count. Click LEADERBOARD to see crew rankings.</p>
 
       <p><strong>The briefing screen.</strong> After the host clicks LAUNCH, all players
       are directed to the briefing room. The mission name and objectives appear alongside a
@@ -247,8 +259,14 @@
 
           <p><strong>Controls</strong></p>
           <ul>
-            <li><strong>Radar display (canvas):</strong> Your ship at centre; enemy blips
-            around it. Click an enemy to lock target.</li>
+            <li><strong>Radar display (canvas):</strong> Your ship at centre; contacts
+            around it. Each contact is colour-coded by classification:
+            <span style="color:#ff4040">hostile</span> (red),
+            <span style="color:#ffaa00">neutral</span> (amber),
+            <span style="color:#fff">unknown</span> (white, pulsing), and
+            <span style="color:#00ff41">friendly</span> (green, cannot be targeted).
+            Click a hostile or unknown contact to lock target. Science scans reveal
+            classification.</li>
             <li><strong>Beam fire button:</strong> Fires beam cannons at the locked target.
             Subject to cooldown after each burst.</li>
             <li><strong>Beam frequency selector:</strong> Four frequencies — ALPHA, BETA,
@@ -712,10 +730,144 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 4 — Environment
+       SECTION 4 — Difficulty Levels
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="difficulty" class="section">
+    <h2 class="section__heading">4. Difficulty Levels</h2>
+    <div class="section-body">
+
+      <p>The host selects a difficulty preset in the lobby before launching. Difficulty
+      scales every tunable gameplay parameter. All multipliers are relative to
+      <strong>Officer</strong> (1.0 = baseline). The admin can change difficulty mid-game
+      from the <a href="#admin-guide">admin dashboard</a>.</p>
+
+      <table class="docs-table">
+        <thead>
+          <tr>
+            <th>Preset</th>
+            <th>Summary</th>
+            <th>Recommended for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="hi">Cadet</td>
+            <td>Forgiving combat, slower crises, more resources. UI hints enabled.</td>
+            <td>First-time crews, solo play, learning stations</td>
+          </tr>
+          <tr>
+            <td class="hi">Officer</td>
+            <td>Balanced challenge with fair resources. The default experience.</td>
+            <td>Experienced crews, standard play</td>
+          </tr>
+          <tr>
+            <td class="hi">Commander</td>
+            <td>Enemies hit hard, resources are tight, crises overlap.</td>
+            <td>Crews who have mastered Officer</td>
+          </tr>
+          <tr>
+            <td class="hi">Admiral</td>
+            <td>Everything is lethal, nothing is free, crises never stop.</td>
+            <td>Crews seeking the ultimate test</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1.5rem">Combat</h3>
+      <table class="docs-table">
+        <thead>
+          <tr><th>Parameter</th><th>Cadet</th><th>Officer</th><th>Commander</th><th>Admiral</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Enemy damage</td>     <td>50%</td>  <td>100%</td> <td>130%</td> <td>160%</td></tr>
+          <tr><td>Enemy accuracy</td>   <td>70%</td>  <td>100%</td> <td>115%</td> <td>130%</td></tr>
+          <tr><td>Enemy hull HP</td>    <td>70%</td>  <td>100%</td> <td>130%</td> <td>160%</td></tr>
+          <tr><td>Enemy spawn count</td><td>70%</td>  <td>100%</td> <td>125%</td> <td>150%</td></tr>
+          <tr><td>AI aggression</td>    <td>Low</td>  <td>Medium</td><td>High</td><td>High</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1.5rem">Damage &amp; Repair</h3>
+      <table class="docs-table">
+        <thead>
+          <tr><th>Parameter</th><th>Cadet</th><th>Officer</th><th>Commander</th><th>Admiral</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>System damage chance</td>       <td>30%</td>  <td>50%</td>  <td>65%</td>  <td>80%</td></tr>
+          <tr><td>System damage severity</td>     <td>60%</td>  <td>100%</td> <td>130%</td> <td>160%</td></tr>
+          <tr><td>Magazine cook-off chance</td>    <td>25%</td>  <td>100%</td> <td>150%</td> <td>200%</td></tr>
+          <tr><td>DCT repair speed</td>            <td>150%</td> <td>100%</td> <td>80%</td>  <td>60%</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1.5rem">Crew &amp; Medical</h3>
+      <table class="docs-table">
+        <thead>
+          <tr><th>Parameter</th><th>Cadet</th><th>Officer</th><th>Commander</th><th>Admiral</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Injury chance per hit</td>       <td>25%</td>  <td>40%</td>  <td>50%</td>  <td>60%</td></tr>
+          <tr><td>Severity bias (high = worse)</td><td>0.3</td>  <td>0.5</td>  <td>0.65</td> <td>0.8</td></tr>
+          <tr><td>Injury degradation speed</td>    <td>50%</td>  <td>100%</td> <td>133%</td> <td>200%</td></tr>
+          <tr><td>Critical death timer</td>        <td>200%</td> <td>100%</td> <td>75%</td>  <td>50%</td></tr>
+          <tr><td>Contagion spread chance</td>     <td>15%</td>  <td>30%</td>  <td>40%</td>  <td>50%</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1.5rem">Resources</h3>
+      <table class="docs-table">
+        <thead>
+          <tr><th>Parameter</th><th>Cadet</th><th>Officer</th><th>Commander</th><th>Admiral</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Starting torpedoes</td>    <td>150%</td> <td>100%</td> <td>80%</td>  <td>60%</td></tr>
+          <tr><td>Medical supplies</td>      <td>150%</td> <td>100%</td> <td>80%</td>  <td>60%</td></tr>
+          <tr><td>Battery capacity</td>      <td>125%</td> <td>100%</td> <td>90%</td>  <td>75%</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1.5rem">Scanning &amp; Intel</h3>
+      <table class="docs-table">
+        <thead>
+          <tr><th>Parameter</th><th>Cadet</th><th>Officer</th><th>Commander</th><th>Admiral</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Sensor range</td>            <td>125%</td><td>100%</td><td>90%</td> <td>80%</td></tr>
+          <tr><td>Scan duration</td>           <td>75%</td> <td>100%</td><td>120%</td><td>150%</td></tr>
+          <tr><td>Fog-of-war pre-revealed</td> <td>40%</td> <td>20%</td> <td>10%</td> <td>0%</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1.5rem">Environment &amp; Pacing</h3>
+      <table class="docs-table">
+        <thead>
+          <tr><th>Parameter</th><th>Cadet</th><th>Officer</th><th>Commander</th><th>Admiral</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Hazard damage</td>              <td>50%</td>  <td>100%</td><td>130%</td><td>160%</td></tr>
+          <tr><td>Event interval (sandbox)</td>   <td>150%</td> <td>100%</td><td>75%</td> <td>50%</td></tr>
+          <tr><td>Max simultaneous events</td>    <td>1</td>    <td>2</td>   <td>3</td>   <td>5</td></tr>
+          <tr><td>Boarding frequency</td>         <td>50%</td>  <td>100%</td><td>130%</td><td>175%</td></tr>
+          <tr><td>Docking service time</td>       <td>75%</td>  <td>100%</td><td>125%</td><td>150%</td></tr>
+          <tr><td>Puzzle time limit</td>          <td>150%</td> <td>100%</td><td>80%</td> <td>60%</td></tr>
+          <tr><td>UI hints</td>                   <td>Yes</td>  <td>No</td>  <td>No</td>  <td>No</td></tr>
+        </tbody>
+      </table>
+
+      <div class="tip"><strong>Tips:</strong> Start on Cadet if anyone in your crew is new
+      to the game — the hints and slower pacing give time to learn each station. Officer is
+      the intended balanced experience. Commander is where coordination becomes mandatory:
+      crises overlap and resources run thin. Admiral is a survival challenge — expect to
+      lose ships until your crew works as a unit.</div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SECTION 5 — Environment
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="environment" class="section">
-    <h2 class="section__heading">4. Environment</h2>
+    <h2 class="section__heading">5. Environment</h2>
     <div class="section-body">
 
       <!-- Sector Grid & Navigation -->
@@ -885,10 +1037,10 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 5 — Missions
+       SECTION 6 — Missions
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="missions" class="section">
-    <h2 class="section__heading">5. Missions</h2>
+    <h2 class="section__heading">6. Missions</h2>
     <div class="section-body">
 
       <p>Missions are the core game unit — each mission gives the crew a set of
@@ -937,14 +1089,51 @@
       crew for all other roles so you can focus on learning yours. Access them from the
       lobby by selecting a training mission from the mission list.</p>
 
+      <p><strong>Save &amp; resume.</strong> The host can save the current game state from
+      the admin dashboard or lobby. Saved games appear in the lobby's RESUME SAVED GAME
+      section (host-only). Select a save and click RESUME to restore the full game state
+      including ship position, hull, crew, mission progress, and sector grid visibility.</p>
+
+      <!-- Post-Mission Debrief -->
+      <div id="debrief" class="station">
+        <h3 class="station__heading">POST-MISSION DEBRIEF</h3>
+        <div class="station-body">
+          <p>After a mission ends (victory or defeat), each station displays a VIEW DEBRIEF
+          button. Clicking it opens the debrief page in a new tab with a full mission
+          analysis:</p>
+          <ul>
+            <li><strong>Result badge:</strong> VICTORY or DEFEAT, with mission duration,
+            final hull percentage, and difficulty level.</li>
+            <li><strong>Awards:</strong> Per-station awards earned during the mission
+            (e.g. "Sharpshooter" for Weapons, "Lifesaver" for Medical). Awards are
+            computed from the game log and highlight exceptional station performance.</li>
+            <li><strong>Key moments:</strong> A timestamped timeline of major mission
+            events — first contact, hull breaches, objective completions, crew deaths,
+            and turning points.</li>
+            <li><strong>Captain's log:</strong> All log entries the Captain typed during
+            the mission, presented in chronological order.</li>
+            <li><strong>Station stats table:</strong> Per-station action counts showing
+            total actions and top event type for each role.</li>
+            <li><strong>Captain's Replay:</strong> An animated minimap canvas that plays
+            back the ship's path through the mission. Use the scrubber to jump to any
+            point in time. Key moments appear as gold markers along the route. Playback
+            speed is adjustable.</li>
+          </ul>
+          <div class="tip"><strong>Tips:</strong> The debrief data is stored in your
+          browser's localStorage. It persists until you play another mission. Share your
+          screen during the replay to review tactical decisions as a crew — it's the
+          best way to improve for next time.</div>
+        </div>
+      </div>
+
     </div>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 6 — Puzzles
+       SECTION 7 — Puzzles
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="puzzles" class="section">
-    <h2 class="section__heading">6. Puzzles</h2>
+    <h2 class="section__heading">7. Puzzles</h2>
     <div class="section-body">
 
       <p>Puzzle overlays appear on specific stations when triggered by mission events.
@@ -1021,10 +1210,10 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 7 — Admin Guide
+       SECTION 8 — Admin Guide
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="admin-guide" class="section">
-    <h2 class="section__heading">7. Admin Guide</h2>
+    <h2 class="section__heading">8. Admin Guide</h2>
     <div class="section-body">
 
       <p>The admin dashboard at <a href="/admin/">/admin/</a> provides game management
@@ -1037,8 +1226,13 @@
       restores normal play instantly.</p>
 
       <p><strong>Difficulty presets.</strong> Four presets are available: Cadet, Officer,
-      Commander, and Admiral. Each preset adjusts enemy damage multipliers, system repair
-      rates, and resource limits. Difficulty can be changed mid-game from the dashboard.</p>
+      Commander, and Admiral. Each preset adjusts over 25 gameplay parameters including
+      enemy damage, repair speed, resource levels, scan times, event pacing, and more.
+      Difficulty is normally set in the lobby before launch but can be changed mid-game
+      from the dashboard — changes take effect immediately and all connected stations
+      receive a notification. See the full
+      <a href="#difficulty">Difficulty Levels</a> reference for a complete parameter
+      breakdown.</p>
 
       <p><strong>Save &amp; Resume.</strong> Click SAVE to snapshot the current game
       state to disk. Saves are stored in the <code>saves/</code> directory. To resume,
@@ -1070,10 +1264,10 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       SECTION 8 — Keyboard Quick Reference
+       SECTION 9 — Keyboard Quick Reference
        ═══════════════════════════════════════════════════════════════════════ -->
   <section id="shortcuts" class="section">
-    <h2 class="section__heading">8. Keyboard Quick Reference</h2>
+    <h2 class="section__heading">9. Keyboard Quick Reference</h2>
     <div class="section-body">
 
       <p>Starbridge is primarily mouse-driven. The following keyboard shortcuts apply
