@@ -60,10 +60,10 @@ const C_CRITICAL = '#ff2020';
 const C_OFFLINE  = '#444444';
 
 // Interior map canvas constants (matching Security station geometry)
-const ROOM_W   = 120;
-const ROOM_H   = 70;
-const ROOM_GAP = 8;
-const ROOM_MARGIN = 40;
+const ROOM_W   = 160;
+const ROOM_H   = 96;
+const ROOM_GAP = 24;
+const ROOM_MARGIN = 48;
 
 // ---------------------------------------------------------------------------
 // System definitions — all 9 systems
@@ -139,8 +139,8 @@ let interiorLayout = {};      // room_id → {name, deck, col, row, connections}
 let roomStates     = {};      // room_id → {state, door_sealed}
 let activeDcts     = {};      // room_id → progress 0..1
 let ictx           = null;    // interior canvas context
-let canvasW        = 584;
-let canvasH        = 462;
+let canvasW        = 808;
+let canvasH        = 672;
 
 const flashSystems = {};      // system_key → timestamp of last damage flash
 
@@ -1080,23 +1080,8 @@ function drawInteriorMap(now) {
   // Background
   drawBackground(ctx, canvasW, canvasH);
 
-  // Draw connections between rooms
-  ctx.strokeStyle = 'rgba(0, 255, 65, 0.12)';
-  ctx.lineWidth = 1;
-  for (const [roomId, room] of Object.entries(interiorLayout)) {
-    const from = roomCenter(room.col, room.row);
-    for (const connId of (room.connections || [])) {
-      const conn = interiorLayout[connId];
-      if (!conn) continue;
-      // Only draw each connection once (from lower to higher id)
-      if (connId < roomId) continue;
-      const to = roomCenter(conn.col, conn.row);
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
-    }
-  }
+  // Draw pipelines between rooms
+  drawPipelines(ctx, now);
 
   // Draw rooms
   for (const [roomId, room] of Object.entries(interiorLayout)) {
@@ -1110,30 +1095,30 @@ function drawInteriorMap(now) {
     // Room border
     const borderColor = roomBorderColor(roomState);
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth   = 1;
+    ctx.lineWidth   = 1.5;
     ctx.strokeRect(x, y, ROOM_W, ROOM_H);
 
     // Room name
-    ctx.fillStyle    = 'rgba(0, 255, 65, 0.65)';
-    ctx.font         = '11px "Share Tech Mono", monospace';
+    ctx.fillStyle    = 'rgba(0, 255, 65, 0.8)';
+    ctx.font         = '13px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
-    const label = room.name.length > 15 ? room.name.slice(0, 14) + '\u2026' : room.name;
-    ctx.fillText(label, x + ROOM_W / 2, y + 5);
+    const label = room.name.length > 18 ? room.name.slice(0, 17) + '\u2026' : room.name;
+    ctx.fillText(label, x + ROOM_W / 2, y + 8);
 
     // Deck sub-label
-    ctx.fillStyle = 'rgba(0, 255, 65, 0.35)';
-    ctx.font      = '10px "Share Tech Mono", monospace';
-    ctx.fillText(room.deck.toUpperCase(), x + ROOM_W / 2, y + 17);
+    ctx.fillStyle = 'rgba(0, 255, 65, 0.45)';
+    ctx.font      = '11px "Share Tech Mono", monospace';
+    ctx.fillText(room.deck.toUpperCase(), x + ROOM_W / 2, y + 24);
 
     // DCT progress indicator
     if (roomId in activeDcts) {
       const progress = activeDcts[roomId];
       ctx.fillStyle = 'rgba(0, 255, 65, 0.25)';
-      ctx.fillRect(x + 2, y + ROOM_H - 6, (ROOM_W - 4) * progress, 4);
+      ctx.fillRect(x + 3, y + ROOM_H - 9, (ROOM_W - 6) * progress, 6);
       ctx.strokeStyle = 'rgba(0, 255, 65, 0.4)';
       ctx.lineWidth = 0.5;
-      ctx.strokeRect(x + 2, y + ROOM_H - 6, ROOM_W - 4, 4);
+      ctx.strokeRect(x + 3, y + ROOM_H - 9, ROOM_W - 6, 6);
     }
   }
 
@@ -1143,12 +1128,118 @@ function drawInteriorMap(now) {
   }
 }
 
+/** Return the point where a pipe from `from` to `to` meets the edge of the `from` room. */
+function pipeEdgePoint(fromCol, fromRow, toCol, toRow) {
+  const fc = roomCenter(fromCol, fromRow);
+  const tc = roomCenter(toCol, toRow);
+  const dx = tc.x - fc.x;
+  const dy = tc.y - fc.y;
+  const halfW = ROOM_W / 2;
+  const halfH = ROOM_H / 2;
+
+  // Determine which edge the line exits through
+  if (dx === 0) {
+    // Vertical
+    return { x: fc.x, y: dy > 0 ? fc.y + halfH : fc.y - halfH };
+  }
+  if (dy === 0) {
+    // Horizontal
+    return { x: dx > 0 ? fc.x + halfW : fc.x - halfW, y: fc.y };
+  }
+  // Diagonal — clamp to nearest edge
+  const slope = dy / dx;
+  const edgeX = dx > 0 ? halfW : -halfW;
+  const yAtEdge = edgeX * slope;
+  if (Math.abs(yAtEdge) <= halfH) {
+    return { x: fc.x + edgeX, y: fc.y + yAtEdge };
+  }
+  const edgeY = dy > 0 ? halfH : -halfH;
+  return { x: fc.x + edgeY / slope, y: fc.y + edgeY };
+}
+
+function drawPipelines(ctx, now) {
+  const pipes = [];
+  for (const [roomId, room] of Object.entries(interiorLayout)) {
+    for (const connId of (room.connections || [])) {
+      if (connId < roomId) continue;
+      const conn = interiorLayout[connId];
+      if (!conn) continue;
+      pipes.push({
+        from: pipeEdgePoint(room.col, room.row, conn.col, conn.row),
+        to:   pipeEdgePoint(conn.col, conn.row, room.col, room.row),
+      });
+    }
+  }
+
+  for (const { from, to } of pipes) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1) continue;
+    // Unit normal perpendicular to the pipe
+    const nx = -dy / len;
+    const ny =  dx / len;
+
+    // Layer 1: Glow
+    ctx.strokeStyle = 'rgba(0, 255, 65, 0.06)';
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+
+    // Layer 2: Inner fill
+    ctx.strokeStyle = 'rgba(0, 255, 65, 0.08)';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+
+    // Layer 3: Outer wall lines (two parallel 1px edges)
+    ctx.strokeStyle = 'rgba(0, 255, 65, 0.30)';
+    ctx.lineWidth = 1;
+    for (const sign of [-1, 1]) {
+      const ox = nx * 3 * sign;
+      const oy = ny * 3 * sign;
+      ctx.beginPath();
+      ctx.moveTo(from.x + ox, from.y + oy);
+      ctx.lineTo(to.x + ox, to.y + oy);
+      ctx.stroke();
+    }
+
+    // Layer 4: Flow ticks — animated hash marks scrolling along pipe
+    const tickSpacing = 12;
+    const tickLen = 3;
+    const scrollOffset = (now * 0.03) % tickSpacing;
+    ctx.strokeStyle = 'rgba(0, 255, 65, 0.18)';
+    ctx.lineWidth = 1;
+    for (let d = scrollOffset; d < len; d += tickSpacing) {
+      const t = d / len;
+      const px = from.x + dx * t;
+      const py = from.y + dy * t;
+      ctx.beginPath();
+      ctx.moveTo(px - nx * tickLen, py - ny * tickLen);
+      ctx.lineTo(px + nx * tickLen, py + ny * tickLen);
+      ctx.stroke();
+    }
+
+    // Layer 5: Junction nodes at pipe endpoints
+    ctx.fillStyle = 'rgba(0, 255, 65, 0.25)';
+    for (const pt of [from, to]) {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
 function drawRoomFill(ctx, x, y, roomId, roomState, now) {
   const showDamage  = activeOverlay === 'damage'  || activeOverlay === 'all';
   const showHazards = activeOverlay === 'hazards' || activeOverlay === 'all';
 
   // Default fill
-  ctx.fillStyle = 'rgba(0, 255, 65, 0.02)';
+  ctx.fillStyle = 'rgba(0, 255, 65, 0.04)';
 
   if (showHazards) {
     if (roomState === 'fire') {
@@ -1186,9 +1277,9 @@ function drawTeamOverlays(ctx, _now) {
     const center = roomCenter(room.col, room.row);
 
     // Team icon
-    const iconR = 8;
+    const iconR = 10;
     ctx.beginPath();
-    ctx.arc(center.x, center.y + 20, iconR, 0, Math.PI * 2);
+    ctx.arc(center.x, center.y + 28, iconR, 0, Math.PI * 2);
 
     if (team.status === 'repairing') {
       ctx.fillStyle = 'rgba(0, 255, 65, 0.3)';
@@ -1208,23 +1299,23 @@ function drawTeamOverlays(ctx, _now) {
 
     // Team label
     ctx.fillStyle    = 'rgba(255, 255, 255, 0.7)';
-    ctx.font         = '10px "Share Tech Mono", monospace';
+    ctx.font         = '11px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(team.name.slice(0, 3).toUpperCase(), center.x, center.y + 20);
+    ctx.fillText(team.name.slice(0, 3).toUpperCase(), center.x, center.y + 28);
 
     // Draw path line if travelling
     if (team.status === 'travelling' && team.path?.length > 0) {
-      ctx.setLineDash([3, 3]);
-      ctx.strokeStyle = 'rgba(255, 176, 0, 0.3)';
-      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(255, 176, 0, 0.4)';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(center.x, center.y + 20);
+      ctx.moveTo(center.x, center.y + 28);
       for (const pathRoomId of team.path) {
         const pathRoom = interiorLayout[pathRoomId];
         if (pathRoom) {
           const pathCenter = roomCenter(pathRoom.col, pathRoom.row);
-          ctx.lineTo(pathCenter.x, pathCenter.y + 20);
+          ctx.lineTo(pathCenter.x, pathCenter.y + 28);
         }
       }
       ctx.stroke();
@@ -1235,10 +1326,10 @@ function drawTeamOverlays(ctx, _now) {
 
 function roomBorderColor(state) {
   switch (state) {
-    case 'fire':         return 'rgba(255, 85, 0, 0.6)';
-    case 'decompressed': return 'rgba(100, 150, 200, 0.5)';
-    case 'damaged':      return 'rgba(255, 170, 0, 0.5)';
-    default:             return 'rgba(0, 255, 65, 0.25)';
+    case 'fire':         return 'rgba(255, 85, 0, 0.7)';
+    case 'decompressed': return 'rgba(100, 150, 200, 0.6)';
+    case 'damaged':      return 'rgba(255, 170, 0, 0.6)';
+    default:             return 'rgba(0, 255, 65, 0.35)';
   }
 }
 
