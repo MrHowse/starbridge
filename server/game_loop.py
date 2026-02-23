@@ -934,17 +934,24 @@ async def _loop() -> None:
             elif _sb_type == "system_damage":
                 _sb_sys = _world.ship.systems.get(sb_evt["system"])
                 if _sb_sys is not None:
-                    gle.apply_system_damage(sb_evt["system"], sb_evt["amount"], "environment", tick=_tick_count)
+                    _sb_comp_events = gle.apply_system_damage(sb_evt["system"], sb_evt["amount"], "environment", tick=_tick_count)
                     _sb_dm = gle.get_damage_model()
                     _sb_new_health = _sb_dm.get_system_health(sb_evt["system"]) if _sb_dm else max(0.0, _sb_sys.health - sb_evt["amount"])
+                    _sb_comp_hit = _sb_comp_events[0] if _sb_comp_events else {}
                     await _manager.broadcast(Message.build(
                         "ship.system_damaged",
                         {"system": sb_evt["system"],
                          "new_health": round(_sb_new_health, 1),
-                         "cause": "environment"},
+                         "cause": "environment",
+                         "component": _sb_comp_hit.get("component_id", ""),
+                         "component_health": round(_sb_comp_hit.get("health", 0.0), 1),
+                         "effect": _sb_comp_hit.get("effect", "")},
                     ))
                     gl.log_event("sandbox", "system_damaged", {
                         "system": sb_evt["system"], "amount": sb_evt["amount"],
+                        "component": _sb_comp_hit.get("component_id", ""),
+                        "component_health": round(_sb_comp_hit.get("health", 0.0), 1),
+                        "effect": _sb_comp_hit.get("effect", ""),
                     })
             elif _sb_type == "crew_casualty":
                 _world.ship.crew.apply_casualties(sb_evt["deck"], sb_evt["count"])
@@ -1239,9 +1246,20 @@ async def _loop() -> None:
         for _oc_evt in _eng_result.overclock_events:
             _oc_sys = _oc_evt["system"]
             _oc_health = _world.ship.systems[_oc_sys].health
+            _oc_comp_hit = _oc_evt["components"][0] if _oc_evt.get("components") else {}
             await _manager.broadcast(Message.build(
-                "ship.system_damaged", {"system": _oc_sys, "new_health": round(_oc_health, 1), "cause": "overclock"}))
-            gl.log_event("engineering", "overclock_damage", {"system": _oc_sys, "new_health": round(_oc_health, 1)})
+                "ship.system_damaged", {
+                    "system": _oc_sys, "new_health": round(_oc_health, 1), "cause": "overclock",
+                    "component": _oc_comp_hit.get("component_id", ""),
+                    "component_health": round(_oc_comp_hit.get("health", 0.0), 1),
+                    "effect": _oc_comp_hit.get("effect", ""),
+                }))
+            gl.log_event("engineering", "overclock_damage", {
+                "system": _oc_sys, "new_health": round(_oc_health, 1),
+                "component": _oc_comp_hit.get("component_id", ""),
+                "component_health": round(_oc_comp_hit.get("health", 0.0), 1),
+                "effect": _oc_comp_hit.get("effect", ""),
+            })
         # 12b. Repair team notable events.
         _NOTABLE_TEAM_EVENTS = {"team_arrived", "team_returned", "casualty", "team_eliminated"}
         for _rt_evt in _eng_result.repair_team_events:
@@ -1252,11 +1270,23 @@ async def _loop() -> None:
                 )
         for s, h in combat_damage_events:
             _combat_delta = _combat_health_snapshot.get(s, 100.0) - h
+            _combat_comp_events: list[dict] = []
             if _combat_delta > 0:
-                gle.apply_system_damage(s, _combat_delta, "combat", tick=_tick_count)
+                _combat_comp_events = gle.apply_system_damage(s, _combat_delta, "combat", tick=_tick_count)
+            _combat_comp_hit = _combat_comp_events[0] if _combat_comp_events else {}
             await _manager.broadcast(Message.build(
-                "ship.system_damaged", {"system": s, "new_health": h, "cause": "combat"}))
-            gl.log_event("combat", "system_damaged", {"system": s, "new_health": round(h, 1)})
+                "ship.system_damaged", {
+                    "system": s, "new_health": h, "cause": "combat",
+                    "component": _combat_comp_hit.get("component_id", ""),
+                    "component_health": round(_combat_comp_hit.get("health", 0.0), 1),
+                    "effect": _combat_comp_hit.get("effect", ""),
+                }))
+            gl.log_event("combat", "system_damaged", {
+                "system": s, "new_health": round(h, 1),
+                "component": _combat_comp_hit.get("component_id", ""),
+                "component_health": round(_combat_comp_hit.get("health", 0.0), 1),
+                "effect": _combat_comp_hit.get("effect", ""),
+            })
         for evt in torpedo_events:
             if evt.get("type") == "pd_intercept":
                 await _manager.broadcast(Message.build("weapons.pd_intercept", {

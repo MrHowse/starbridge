@@ -129,7 +129,9 @@ def compute_debrief(events: list[dict]) -> dict:
 
         elif cat == "combat" and ev == "system_damaged":
             sys_name = data.get("system", "system")
-            key_moments.append({"ts": ts, "text": f"System damaged: {sys_name}"})
+            comp = data.get("component", "")
+            comp_text = f" ({comp})" if comp else ""
+            key_moments.append({"ts": ts, "text": f"System damaged: {sys_name}{comp_text}"})
 
         elif cat == "session" and ev == "ended":
             result = data.get("result", "")

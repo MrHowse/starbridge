@@ -224,6 +224,8 @@ class DamageModel:
             events.append({
                 "system": system,
                 "component_id": comp.id,
+                "component_name": comp.name,
+                "effect": comp.effect,
                 "damage": actual,
                 "health": comp.health,
                 "destroyed": comp.is_destroyed,
@@ -267,6 +269,8 @@ class DamageModel:
             events.append({
                 "system": target.system,
                 "component_id": target.id,
+                "component_name": target.name,
+                "effect": target.effect,
                 "damage": actual,
                 "health": target.health,
                 "destroyed": target.is_destroyed,
