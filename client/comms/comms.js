@@ -127,7 +127,8 @@ function init() {
   initRoleBar(send, 'comms');
 
   on("lobby.welcome", () => {
-    send("lobby.claim_role", { role: "comms", player_name: callsign });
+    const name = sessionStorage.getItem("player_name") || "COMMS";
+    send("lobby.claim_role", { role: "comms", player_name: name });
   });
   connect();
 
