@@ -193,6 +193,9 @@ _session_players: dict[str, str] = {}
 # Admin pause flag — when True the tick body is skipped, only sleep runs.
 _paused: bool = False
 
+# Crew factor tracking — previous crew factor per system for threshold notifications.
+_prev_crew_factors: dict[str, float] = {}
+
 # Performance: last serialised DC state — avoid redundant broadcasts when idle.
 _last_dc_state_json: str = ""
 
@@ -412,6 +415,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _applied_science_medical_assists.clear()
     _applied_science_helm_assists.clear()
     _applied_science_weapons_assists.clear()
+    _prev_crew_factors.clear()
     sensors.reset()
     glc.reset()
     gle.reset()
@@ -616,7 +620,8 @@ async def _loop() -> None:
         glfo.tick(_world.ship, TICK_DT)
         glew.tick(_world, _world.ship, TICK_DT)
         gltac.tick(_world, _world.ship, TICK_DT)
-        _world.ship.update_crew_factors()
+        _world.ship.update_crew_factors(individual_roster=glmed.get_roster())
+        _crew_factor_events = _check_crew_factor_thresholds(_world.ship)
         glmed.tick_treatments(_world.ship, TICK_DT)
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
         # v0.06.1: tick individual crew injuries/treatments if roster initialised.
@@ -1222,6 +1227,18 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(
                 ["medical"],
                 Message.build("medical.event", mev),
+            )
+
+        # 11g3. Crew factor threshold notifications.
+        for cfe in _crew_factor_events:
+            await _manager.broadcast_to_roles(
+                cfe["roles"],
+                Message.build("crew.factor_changed", {
+                    "system": cfe["system"],
+                    "crew_factor": cfe["crew_factor"],
+                    "level": cfe["level"],
+                    "message": cfe["message"],
+                }),
             )
 
         # 11h. Hazard damage events → hull_hit broadcast + hazard status.
@@ -1913,6 +1930,72 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
         },
         tick=tick,
     )
+
+
+# ---------------------------------------------------------------------------
+# Crew factor threshold notifications
+# ---------------------------------------------------------------------------
+
+# System name → roles that should receive the notification.
+_CREW_FACTOR_NOTIFY_ROLES: dict[str, list[str]] = {
+    "engines":       ["helm", "captain", "engineering"],
+    "beams":         ["weapons", "captain", "engineering"],
+    "torpedoes":     ["weapons", "captain", "engineering"],
+    "shields":       ["helm", "captain", "engineering"],
+    "sensors":       ["science", "captain", "engineering"],
+    "manoeuvring":   ["helm", "captain", "engineering"],
+    "flight_deck":   ["flight_ops", "captain", "engineering"],
+    "ecm_suite":     ["electronic_warfare", "captain", "engineering"],
+    "point_defence": ["weapons", "captain", "engineering"],
+}
+
+_CREW_FACTOR_THRESHOLDS = [0.75, 0.50, 0.25]
+
+
+def _check_crew_factor_thresholds(ship: Ship) -> list[dict]:
+    """Detect crew factor crossing thresholds and return notification events.
+
+    Compares current crew factors with previously recorded values to detect
+    drops below 75%, 50%, 25% thresholds and recovery above them.
+    """
+    global _prev_crew_factors
+    events: list[dict] = []
+
+    for sys_name, sys_obj in ship.systems.items():
+        factor = sys_obj._crew_factor
+        prev = _prev_crew_factors.get(sys_name, 1.0)
+
+        # Check for crossing below thresholds
+        for threshold in _CREW_FACTOR_THRESHOLDS:
+            if prev >= threshold > factor:
+                pct = round(factor * 100)
+                level = "critical" if threshold <= 0.25 else "warning" if threshold <= 0.50 else "caution"
+                events.append({
+                    "system": sys_name,
+                    "crew_factor": round(factor, 2),
+                    "threshold": threshold,
+                    "level": level,
+                    "message": f"{sys_name.upper()} crew {'critical' if level == 'critical' else 'reduced'} — {pct}% effectiveness",
+                    "roles": _CREW_FACTOR_NOTIFY_ROLES.get(sys_name, ["captain", "engineering"]),
+                })
+
+        # Check for recovery above a previously-crossed threshold
+        if factor > prev:
+            for threshold in _CREW_FACTOR_THRESHOLDS:
+                if prev < threshold <= factor:
+                    pct = round(factor * 100)
+                    events.append({
+                        "system": sys_name,
+                        "crew_factor": round(factor, 2),
+                        "threshold": threshold,
+                        "level": "recovery",
+                        "message": f"{sys_name.upper()} crew restored to {pct}%",
+                        "roles": _CREW_FACTOR_NOTIFY_ROLES.get(sys_name, ["captain", "engineering"]),
+                    })
+
+        _prev_crew_factors[sys_name] = factor
+
+    return events
 
 
 def _check_sensor_assist(ship: Ship) -> Message | None:

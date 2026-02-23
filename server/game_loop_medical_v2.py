@@ -513,11 +513,13 @@ def tick(roster: IndividualCrewRoster, dt: float, difficulty: object | None = No
     events.extend(spread_events)
 
     # 3. Tick active treatments
+    # Medical crew factor: injured/absent medical crew slow treatment.
+    _med_factor = max(roster.crew_factor_for_duty_station("medical_bay"), 0.10)
     completed: list[str] = []
     for crew_id, treatment in list(_active_treatments.items()):
         if treatment.puzzle_required and not treatment.puzzle_completed:
             continue
-        treatment.elapsed += dt
+        treatment.elapsed += dt * _med_factor
         if treatment.elapsed >= treatment.duration:
             _complete_treatment(crew_id, treatment, roster)
             completed.append(crew_id)

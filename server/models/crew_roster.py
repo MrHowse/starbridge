@@ -435,19 +435,15 @@ class IndividualCrewRoster:
         """Count of crew members with 'dead' status."""
         return sum(1 for m in self.members.values() if m.status == "dead")
 
-    def crew_factor_for_system(self, system: str) -> float:
-        """Calculate crew factor (0.0-1.0) for a ship system.
+    def crew_factor_for_duty_station(self, duty_station: str) -> float:
+        """Calculate crew factor (0.0-1.0) for a duty station.
 
-        Based on active crew assigned to the duty station that operates
-        this system. Injured crew at their station count at 50% effectiveness.
-        Crew in medical bay or dead don't count.
+        Based on active crew assigned to the station. Injured crew at their
+        station count at 50% effectiveness. Crew in medical bay or dead don't
+        count.
 
-        Returns 1.0 if no crew are expected at this station (e.g., no mapping).
+        Returns 1.0 if no crew are assigned to the station.
         """
-        duty_station = SYSTEM_TO_DUTY_STATION.get(system)
-        if duty_station is None:
-            return 1.0
-
         assigned = self.get_by_duty_station(duty_station)
         if not assigned:
             return 1.0
@@ -473,6 +469,17 @@ class IndividualCrewRoster:
                     effective += 0.5
 
         return min(effective / total, 1.0)
+
+    def crew_factor_for_system(self, system: str) -> float:
+        """Calculate crew factor (0.0-1.0) for a ship system.
+
+        Looks up the duty station for the system and delegates to
+        crew_factor_for_duty_station(). Returns 1.0 if no mapping exists.
+        """
+        duty_station = SYSTEM_TO_DUTY_STATION.get(system)
+        if duty_station is None:
+            return 1.0
+        return self.crew_factor_for_duty_station(duty_station)
 
     def get_crew_on_deck(self, deck: int, exclude_medical: bool = True) -> list[CrewMember]:
         """Get crew physically on a deck (by location, not assignment).

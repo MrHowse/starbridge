@@ -161,17 +161,28 @@ class Ship:
     countermeasure_charges: int = 10       # finite charges; each absorbed hit costs 1
     ew_countermeasure_active: bool = False  # True when EW station has deployed countermeasures
 
-    def update_crew_factors(self) -> None:
-        """Propagate deck crew_factors into the corresponding ship systems.
+    def update_crew_factors(self, individual_roster: object | None = None) -> None:
+        """Propagate crew_factors into the corresponding ship systems.
 
-        Called once per tick (after engineering). Each system's _crew_factor is
-        set to the crew_factor of the deck that operates it (see DECK_SYSTEM_MAP).
-        Systems on decks with no crew entry default to 1.0.
+        Called once per tick (after engineering). When an IndividualCrewRoster is
+        provided, uses per-duty-station crew factors with a 10% minimum floor.
+        Falls back to the old deck-level CrewRoster otherwise.
+
+        Args:
+            individual_roster: IndividualCrewRoster instance (v0.06.1+), or None.
         """
-        for deck_name, system_names in DECK_SYSTEM_MAP.items():
-            deck = self.crew.decks.get(deck_name)
-            factor = deck.crew_factor if deck is not None else 1.0
-            for sys_name in system_names:
-                sys_obj = self.systems.get(sys_name)
-                if sys_obj is not None:
-                    sys_obj._crew_factor = factor
+        if individual_roster is not None:
+            # v0.06.1+: per-system crew factor from individual crew roster
+            for sys_name, sys_obj in self.systems.items():
+                factor = individual_roster.crew_factor_for_system(sys_name)
+                # 10% minimum floor — basic automation keeps the ship limping
+                sys_obj._crew_factor = max(factor, 0.10)
+        else:
+            # Legacy: deck-level crew factor
+            for deck_name, system_names in DECK_SYSTEM_MAP.items():
+                deck = self.crew.decks.get(deck_name)
+                factor = deck.crew_factor if deck is not None else 1.0
+                for sys_name in system_names:
+                    sys_obj = self.systems.get(sys_name)
+                    if sys_obj is not None:
+                        sys_obj._crew_factor = factor
