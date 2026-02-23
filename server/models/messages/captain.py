@@ -27,3 +27,9 @@ class CaptainSystemOverridePayload(BaseModel):
 class CaptainSaveGamePayload(BaseModel):
     """Sent by Captain station to trigger save-and-return-to-lobby."""
     model_config = {"extra": "allow"}  # accepts empty payload {}
+
+
+class CaptainReassignCrewPayload(BaseModel):
+    """Sent by Captain station to reassign a crew member to a new duty station."""
+    crew_id: str
+    new_duty_station: str

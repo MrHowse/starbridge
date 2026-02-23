@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from server.models.messages import (
     CaptainAddLogPayload,
     CaptainAuthorizePayload,
+    CaptainReassignCrewPayload,
     CaptainUndockPayload,
     CommsHailPayload,
     CommsTuneFrequencyPayload,
@@ -620,7 +621,10 @@ async def _loop() -> None:
         glfo.tick(_world.ship, TICK_DT)
         glew.tick(_world, _world.ship, TICK_DT)
         gltac.tick(_world, _world.ship, TICK_DT)
-        _world.ship.update_crew_factors(individual_roster=glmed.get_roster())
+        # Tick crew reassignment timers before updating crew factors.
+        _reassignment_roster = glmed.get_roster()
+        _reassignment_events = _reassignment_roster.tick_reassignments(TICK_DT) if _reassignment_roster else []
+        _world.ship.update_crew_factors(individual_roster=_reassignment_roster)
         _crew_factor_events = _check_crew_factor_thresholds(_world.ship)
         glmed.tick_treatments(_world.ship, TICK_DT)
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
@@ -1241,6 +1245,12 @@ async def _loop() -> None:
                 }),
             )
 
+        # 11g4. Crew reassignment completion notifications.
+        for _re in _reassignment_events:
+            await _manager.broadcast(
+                Message.build("crew.reassignment_complete", _re),
+            )
+
         # 11h. Hazard damage events → hull_hit broadcast + hazard status.
         for hev in hazard_events:
             await _manager.broadcast(
@@ -1664,6 +1674,18 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             entry = glcap.add_log_entry(payload.text)
             events.append(("captain.log_entry", {"text": entry["text"], "timestamp": entry["timestamp"]}))
             _set_training_flag(glm, "captain_log_added")
+        elif msg_type == "captain.reassign_crew" and isinstance(payload, CaptainReassignCrewPayload):
+            _roster = glmed.get_roster()
+            if _roster is not None:
+                result = _roster.reassign_crew(payload.crew_id, payload.new_duty_station)
+                if result.get("ok"):
+                    gl.log_event("captain", "crew_reassigned", {
+                        "crew_id": payload.crew_id,
+                        "to_station": payload.new_duty_station,
+                    })
+                    events.append(("crew.reassignment_started", result))
+                else:
+                    events.append(("crew.reassignment_error", {"error": result.get("error", "Unknown error")}))
         elif msg_type == "comms.tune_frequency" and isinstance(payload, CommsTuneFrequencyPayload):
             glco.tune(payload.frequency)
             _set_training_flag(glm, "comms_frequency_tuned")

@@ -180,6 +180,12 @@ class CrewMember:
     location: str = "deck_1"         # "deck_N", "medical_bay", "quarantine", "morgue"
     treatment_bed: int | None = None
 
+    # --- Reassignment (Captain crew management, v0.06-crew Part 3) ---
+    original_duty_station: str | None = None   # set when reassigned; None = at original post
+    reassignment_count: int = 0                # max 2 reassignments per member
+    reassignment_timer: float = 0.0            # seconds remaining in transition (30s)
+    reassignment_effectiveness: float = 1.0    # 0.6 at new post, 1.0 at original
+
     @property
     def display_name(self) -> str:
         """Short display name: 'Rank Surname' (e.g. 'Lt. Chen')."""
@@ -226,7 +232,7 @@ class CrewMember:
 
     def to_dict(self) -> dict:
         """Serialise crew member for broadcast/save."""
-        return {
+        d: dict = {
             "id": self.id,
             "first_name": self.first_name,
             "surname": self.surname,
@@ -239,12 +245,19 @@ class CrewMember:
             "location": self.location,
             "treatment_bed": self.treatment_bed,
         }
+        # Only include reassignment fields if non-default (saves bandwidth)
+        if self.original_duty_station is not None:
+            d["original_duty_station"] = self.original_duty_station
+            d["reassignment_count"] = self.reassignment_count
+            d["reassignment_timer"] = round(self.reassignment_timer, 2)
+            d["reassignment_effectiveness"] = self.reassignment_effectiveness
+        return d
 
     @classmethod
     def from_dict(cls, data: dict) -> CrewMember:
         """Deserialise crew member from dict."""
         injuries = [Injury.from_dict(i) for i in data.get("injuries", [])]
-        return cls(
+        m = cls(
             id=data["id"],
             first_name=data["first_name"],
             surname=data["surname"],
@@ -257,6 +270,11 @@ class CrewMember:
             location=data.get("location", f"deck_{data['deck']}"),
             treatment_bed=data.get("treatment_bed"),
         )
+        m.original_duty_station = data.get("original_duty_station")
+        m.reassignment_count = data.get("reassignment_count", 0)
+        m.reassignment_timer = data.get("reassignment_timer", 0.0)
+        m.reassignment_effectiveness = data.get("reassignment_effectiveness", 1.0)
+        return m
 
 
 # ---------------------------------------------------------------------------
@@ -440,7 +458,8 @@ class IndividualCrewRoster:
 
         Based on active crew assigned to the station. Injured crew at their
         station count at 50% effectiveness. Crew in medical bay or dead don't
-        count.
+        count. Reassigned crew contribute at reassignment_effectiveness (0.6)
+        and 0 while their transition timer is running.
 
         Returns 1.0 if no crew are assigned to the station.
         """
@@ -455,18 +474,15 @@ class IndividualCrewRoster:
                 continue
             if m.location in ("medical_bay", "quarantine", "morgue"):
                 continue  # In medical bay, don't count
+            # Reassignment transition: not yet at station
+            if m.reassignment_timer > 0:
+                continue
+            # Base contribution (modified by reassignment effectiveness)
+            base = m.reassignment_effectiveness
             if m.status == "active":
-                effective += 1.0
+                effective += base
             elif m.status in ("injured", "critical"):
-                # Minor injuries: 50% effectiveness
-                worst = m.worst_severity
-                if worst == "minor":
-                    effective += 0.5
-                elif worst == "moderate":
-                    effective += 0.5
-                # Serious/critical at station still count at 50%
-                else:
-                    effective += 0.5
+                effective += base * 0.5
 
         return min(effective / total, 1.0)
 
@@ -496,6 +512,70 @@ class IndividualCrewRoster:
             if m.location == deck_loc:
                 results.append(m)
         return results
+
+    # ---- Reassignment (Captain crew management) ----
+
+    REASSIGNMENT_TIMER: float = 30.0       # seconds to transition to new post
+    REASSIGNMENT_EFFECTIVENESS: float = 0.6  # effectiveness at new post
+    MAX_REASSIGNMENTS: int = 2              # max reassignments per crew member
+
+    def reassign_crew(self, crew_id: str, new_duty_station: str) -> dict:
+        """Reassign a crew member to a new duty station.
+
+        Returns a result dict with 'ok' bool and 'error' string if failed.
+        """
+        member = self.members.get(crew_id)
+        if member is None:
+            return {"ok": False, "error": "Crew member not found"}
+        if member.status == "dead":
+            return {"ok": False, "error": "Cannot reassign dead crew"}
+        if member.location in ("medical_bay", "quarantine", "morgue"):
+            return {"ok": False, "error": "Cannot reassign crew in medical bay"}
+        if member.reassignment_count >= self.MAX_REASSIGNMENTS:
+            return {"ok": False, "error": "Maximum reassignments reached for this crew member"}
+        if member.reassignment_timer > 0:
+            return {"ok": False, "error": "Crew member is already in transition"}
+        if member.duty_station == new_duty_station:
+            return {"ok": False, "error": "Already assigned to this station"}
+
+        # Save original station on first reassignment
+        if member.original_duty_station is None:
+            member.original_duty_station = member.duty_station
+
+        member.duty_station = new_duty_station
+        member.reassignment_count += 1
+        member.reassignment_timer = self.REASSIGNMENT_TIMER
+
+        # Returning to original post restores full effectiveness
+        if new_duty_station == member.original_duty_station:
+            member.reassignment_effectiveness = 1.0
+            member.original_duty_station = None
+        else:
+            member.reassignment_effectiveness = self.REASSIGNMENT_EFFECTIVENESS
+
+        return {
+            "ok": True,
+            "crew_id": crew_id,
+            "name": member.display_name,
+            "from_station": member.original_duty_station or new_duty_station,
+            "to_station": new_duty_station,
+            "timer": self.REASSIGNMENT_TIMER,
+        }
+
+    def tick_reassignments(self, dt: float) -> list[dict]:
+        """Tick reassignment timers. Returns events for completed transitions."""
+        events: list[dict] = []
+        for member in self.members.values():
+            if member.reassignment_timer > 0:
+                member.reassignment_timer = max(0.0, member.reassignment_timer - dt)
+                if member.reassignment_timer == 0.0:
+                    events.append({
+                        "event": "reassignment_complete",
+                        "crew_id": member.id,
+                        "name": member.display_name,
+                        "duty_station": member.duty_station,
+                    })
+        return events
 
     # ---- Serialisation ----
 

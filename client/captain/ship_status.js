@@ -42,6 +42,11 @@ let _mode = 'systems';  // 'systems' | 'crew'
 let _popover = null;
 let _onOverrideToggle = null;
 let _controlRows = {};  // { system_key: { row, status, pwr, health, eff } }
+let _sendFn = null;
+let _systemControlsPanel = null;
+let _crewMgmtPanel = null;
+let _crewMgmtList = null;
+let _rosterData = [];   // Array of crew member dicts from crew.roster
 
 // ---------------------------------------------------------------------------
 // Init
@@ -52,11 +57,17 @@ let _controlRows = {};  // { system_key: { row, status, pwr, health, eff } }
  * @param {HTMLElement} controlsContainer — where to build the system controls table
  * @param {HTMLElement} toggleBtn — toggle Systems/Crew button
  * @param {Function} onOverrideToggle(system, online) — called when Captain toggles
+ * @param {Function} [sendFn] — WebSocket send function for crew reassignment
  */
-export function initShipStatus(canvas, controlsContainer, toggleBtn, onOverrideToggle) {
+export function initShipStatus(canvas, controlsContainer, toggleBtn, onOverrideToggle, sendFn) {
   _canvas = canvas;
   _ctx = canvas.getContext('2d');
   _onOverrideToggle = onOverrideToggle;
+  _sendFn = sendFn || null;
+
+  _systemControlsPanel = document.getElementById('system-controls-panel');
+  _crewMgmtPanel = document.getElementById('crew-mgmt-panel');
+  _crewMgmtList = document.getElementById('crew-mgmt-list');
 
   _sizeCanvas();
   window.addEventListener('resize', _sizeCanvas);
@@ -66,11 +77,18 @@ export function initShipStatus(canvas, controlsContainer, toggleBtn, onOverrideT
   toggleBtn.addEventListener('click', () => {
     _mode = _mode === 'systems' ? 'crew' : 'systems';
     toggleBtn.textContent = _mode === 'systems' ? 'CREW VIEW' : 'SYSTEMS VIEW';
+    _updatePanelVisibility();
     _draw();
   });
 
   _buildSystemControls(controlsContainer);
+  _updatePanelVisibility();
   _draw();
+}
+
+function _updatePanelVisibility() {
+  if (_systemControlsPanel) _systemControlsPanel.style.display = _mode === 'systems' ? '' : 'none';
+  if (_crewMgmtPanel) _crewMgmtPanel.style.display = _mode === 'crew' ? '' : 'none';
 }
 
 function _sizeCanvas() {
@@ -96,6 +114,11 @@ export function updateSystems(systemsPayload) {
 export function updateCrew(crewPayload) {
   _crewState = crewPayload || {};
   _draw();
+}
+
+export function updateRoster(roster) {
+  _rosterData = roster || [];
+  if (_mode === 'crew') _buildCrewMgmtList();
 }
 
 export function updateOverrides(overridesPayload) {
@@ -400,6 +423,113 @@ function _updateControlOverrideUI() {
     els.toggleBtn.className = `sys-ctrl-toggle ${online ? 'sys-ctrl-toggle--on' : 'sys-ctrl-toggle--off'}`;
     els.row.classList.toggle('sys-ctrl-row--override', !online);
     _draw();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Crew management list
+// ---------------------------------------------------------------------------
+
+const DUTY_STATIONS = [
+  'manoeuvring', 'sensors', 'beams', 'torpedoes', 'shields', 'medical_bay', 'engines',
+];
+
+const DUTY_STATION_LABELS = {
+  manoeuvring: 'Bridge',
+  sensors:     'Sensors',
+  beams:       'Beams',
+  torpedoes:   'Torpedoes',
+  shields:     'Shields',
+  medical_bay: 'Medical',
+  engines:     'Engines',
+};
+
+function _buildCrewMgmtList() {
+  if (!_crewMgmtList) return;
+  _crewMgmtList.innerHTML = '';
+
+  // Only show active/injured crew that can be reassigned
+  const eligible = _rosterData.filter(m =>
+    m.status !== 'dead' &&
+    !['medical_bay', 'quarantine', 'morgue'].includes(m.location)
+  );
+
+  if (!eligible.length) {
+    _crewMgmtList.innerHTML = '<div class="text-dim" style="padding:.4rem .6rem;font-size:.75rem">No crew available for reassignment.</div>';
+    return;
+  }
+
+  // Group by current duty station
+  const byStation = {};
+  for (const m of eligible) {
+    const st = m.duty_station;
+    if (!byStation[st]) byStation[st] = [];
+    byStation[st].push(m);
+  }
+
+  for (const station of DUTY_STATIONS) {
+    const crew = byStation[station];
+    if (!crew || !crew.length) continue;
+
+    const header = document.createElement('div');
+    header.className = 'crew-mgmt-station-header';
+    header.textContent = (DUTY_STATION_LABELS[station] || station).toUpperCase();
+    _crewMgmtList.appendChild(header);
+
+    for (const m of crew) {
+      const row = document.createElement('div');
+      row.className = 'crew-mgmt-row';
+      if (m.reassignment_timer > 0) row.classList.add('crew-mgmt-row--transitioning');
+
+      // Name + status
+      const nameEl = document.createElement('span');
+      nameEl.className = 'crew-mgmt-name';
+      const statusMark = m.status === 'active' ? '' : ` [${m.status.toUpperCase()}]`;
+      nameEl.textContent = `${m.rank} ${m.surname}${statusMark}`;
+      if (m.original_duty_station) {
+        nameEl.title = `Reassigned from ${DUTY_STATION_LABELS[m.original_duty_station] || m.original_duty_station} (${m.reassignment_count}/2)`;
+      }
+
+      // Timer or select
+      const actionEl = document.createElement('span');
+      actionEl.className = 'crew-mgmt-action';
+
+      if (m.reassignment_timer > 0) {
+        actionEl.textContent = `${Math.ceil(m.reassignment_timer)}s`;
+        actionEl.classList.add('crew-mgmt-timer');
+      } else if (m.reassignment_count >= 2) {
+        actionEl.textContent = 'MAX';
+        actionEl.classList.add('crew-mgmt-maxed');
+      } else {
+        const select = document.createElement('select');
+        select.className = 'crew-mgmt-select';
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = '—';
+        select.appendChild(defaultOpt);
+
+        for (const ds of DUTY_STATIONS) {
+          if (ds === m.duty_station) continue;
+          const opt = document.createElement('option');
+          opt.value = ds;
+          opt.textContent = DUTY_STATION_LABELS[ds] || ds;
+          select.appendChild(opt);
+        }
+
+        select.addEventListener('change', () => {
+          if (select.value && _sendFn) {
+            _sendFn('captain.reassign_crew', { crew_id: m.id, new_duty_station: select.value });
+          }
+          select.value = '';
+        });
+
+        actionEl.appendChild(select);
+      }
+
+      row.appendChild(nameEl);
+      row.appendChild(actionEl);
+      _crewMgmtList.appendChild(row);
+    }
   }
 }
 

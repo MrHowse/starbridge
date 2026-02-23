@@ -42,6 +42,7 @@ import {
   updateSystems,
   updateCrew,
   updateOverrides,
+  updateRoster,
 } from './ship_status.js';
 
 registerHelp([
@@ -205,6 +206,7 @@ function init() {
   on('docking.undocked',              handleDockingUndocked);
   on('docking.service_complete',      handleDockingServiceComplete);
   on('weapons.auto_fire_status',      handleAutoFireStatus);
+  on('crew.roster',                   handleCrewRoster);
 
   // Docking controls
   if (undockBtn) {
@@ -291,6 +293,7 @@ function handleGameStarted(payload) {
       controlsList,
       viewToggleBtn,
       (system, online) => send('captain.system_override', { system, online }),
+      send,
     );
   }
 
@@ -354,6 +357,12 @@ function handleShipState(payload) {
 
   // Docking panel visibility
   _updateDockingPanel(payload);
+}
+
+function handleCrewRoster(payload) {
+  if (payload && payload.members) {
+    updateRoster(Object.values(payload.members));
+  }
 }
 
 function _updateQuickStatus(state) {
