@@ -255,8 +255,8 @@ def tick(dt: float, world: "World") -> list[dict]:
 
     events: list[dict] = []
 
-    # --- Combat interrupt check -------------------------------------------
-    if _check_combat_interrupt(world):
+    # --- Combat interrupt check (1s grace period after scan start) --------
+    if _state.elapsed >= 1.0 and _check_combat_interrupt(world):
         _state.interrupted = True
         events.append({"type": "interrupted", "reason": "combat"})
         return events

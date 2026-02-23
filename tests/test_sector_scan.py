@@ -156,7 +156,8 @@ class TestCancelScan:
 class TestInterruptResponse:
     def test_continue_resumes_scan(self) -> None:
         glss.start_scan("sector", "em", "A1")
-        # Force interrupted state by injecting enemy
+        # Advance past 1s grace period before injecting enemy
+        glss.tick(1.1, _make_world())
         world = _make_world(enemies=[_enemy_at(50_000, 50_000)])
         glss.tick(0.1, world)
         assert glss.build_progress().get("interrupted") is True
@@ -166,10 +167,19 @@ class TestInterruptResponse:
 
     def test_abort_cancels_scan(self) -> None:
         glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())
         world = _make_world(enemies=[_enemy_at(50_000, 50_000)])
         glss.tick(0.1, world)
         glss.set_interrupt_response(False)
         assert glss.is_active() is False
+
+    def test_no_interrupt_during_grace_period(self) -> None:
+        """Combat detected within the 1s grace period should not interrupt."""
+        glss.start_scan("sector", "em", "A1")
+        world = _make_world(enemies=[_enemy_at(50_000, 50_000)])
+        glss.tick(0.5, world)
+        assert glss.build_progress().get("interrupted") is False
+        assert glss.is_active() is True
 
     def test_response_no_op_when_not_interrupted(self) -> None:
         glss.start_scan("sector", "em", "A1")
@@ -300,6 +310,7 @@ class TestTick:
 
     def test_no_tick_when_interrupted(self) -> None:
         glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())  # past grace period
         enemy = _enemy_at(50_000, 50_000)
         world = _make_world(enemies=[enemy])
         glss.tick(0.1, world)  # triggers interrupt
@@ -308,6 +319,7 @@ class TestTick:
 
     def test_interrupted_event_when_enemy_close(self) -> None:
         glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())  # past grace period
         enemy = _enemy_at(50_000, 50_000)  # within range
         world = _make_world(enemies=[enemy])
         events = glss.tick(0.1, world)
