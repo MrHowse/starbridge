@@ -15,9 +15,10 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import ValidationError
 
 from server import captain, comms, damage_control, engineering, ew, flight_ops, game_loop, helm, lobby, medical, science, security, tactical, weapons
@@ -40,6 +41,20 @@ logger = logging.getLogger("starbridge")
 DEBUG: bool = os.getenv("STARBRIDGE_DEBUG", "true").lower() == "true"
 
 app = FastAPI(title="Starbridge", version="0.0.1")
+
+
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    """Prevent browsers from serving stale JS/CSS during development."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        response = await call_next(request)
+        ct = response.headers.get("content-type", "")
+        if any(t in ct for t in ("javascript", "text/css", "text/html")):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+
+app.add_middleware(NoCacheMiddleware)
 
 # Single connection manager for the process lifetime.
 manager = ConnectionManager()
