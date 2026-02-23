@@ -1,0 +1,405 @@
+/* ── Crew Roster Overlay ── */
+
+.crew-roster-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  font-family: "Share Tech Mono", monospace;
+}
+
+.crew-roster {
+  width: min(96vw, 760px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 255, 65, 0.25);
+  background: rgba(8, 8, 8, 0.98);
+  overflow: hidden;
+}
+
+/* ── Header ── */
+
+.cr-header {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid rgba(0, 255, 65, 0.15);
+  flex-shrink: 0;
+}
+
+.cr-header__row1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cr-header__title {
+  font-size: 1rem;
+  color: #00ff41;
+  letter-spacing: 0.12em;
+}
+
+.cr-header__close {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0.15rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+}
+.cr-header__close:hover {
+  border-color: rgba(0, 255, 65, 0.4);
+  color: #00ff41;
+}
+
+.cr-header__subtitle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 0.2rem;
+}
+
+/* ── Readiness bar ── */
+
+.cr-readiness {
+  padding: 0.4rem 1rem;
+  border-bottom: 1px solid rgba(0, 255, 65, 0.1);
+  flex-shrink: 0;
+}
+
+.cr-readiness__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.2rem;
+}
+
+.cr-readiness__label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.cr-readiness__bar {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+}
+
+.cr-readiness__fill {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.cr-readiness__pct {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  min-width: 3em;
+  text-align: right;
+}
+
+.cr-readiness__counts {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  display: flex;
+  gap: 1rem;
+}
+
+.cr-count--active   { color: #00ff41; }
+.cr-count--injured  { color: #ffaa00; }
+.cr-count--medical  { color: #ff4040; }
+.cr-count--kia      { color: #666; }
+
+/* ── Toolbar ── */
+
+.cr-toolbar {
+  padding: 0.3rem 1rem;
+  border-bottom: 1px solid rgba(0, 255, 65, 0.1);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.cr-toolbar__group {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+}
+
+.cr-toolbar__label {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.3);
+  margin-right: 0.2rem;
+}
+
+.cr-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0.1rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.65rem;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+}
+.cr-btn:hover {
+  border-color: rgba(0, 255, 65, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+}
+.cr-btn--active {
+  border-color: rgba(0, 255, 65, 0.5);
+  color: #00ff41;
+}
+
+.cr-search {
+  flex: 1;
+  min-width: 100px;
+  max-width: 200px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0.15rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  outline: none;
+}
+.cr-search:focus {
+  border-color: rgba(0, 255, 65, 0.4);
+}
+.cr-search::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Crew list (scrollable) ── */
+
+.cr-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.3rem 0.6rem;
+  min-height: 0;
+}
+
+/* ── Deck section ── */
+
+.cr-deck {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 0.4rem;
+}
+
+.cr-deck__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cr-deck__name {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.1em;
+}
+
+.cr-deck__factor {
+  font-size: 0.7rem;
+  padding: 0 0.3rem;
+}
+
+.cr-factor--good    { color: #00ff41; }
+.cr-factor--warn    { color: #ffaa00; }
+.cr-factor--danger  { color: #ff4040; }
+
+/* ── Crew member row ── */
+
+.cr-member {
+  display: flex;
+  align-items: baseline;
+  padding: 0.15rem 0.5rem;
+  gap: 0.4rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+.cr-member:hover {
+  background: rgba(0, 255, 65, 0.04);
+}
+.cr-member--selected {
+  background: rgba(0, 255, 65, 0.08);
+  border-color: rgba(0, 255, 65, 0.15);
+}
+.cr-member--kia {
+  opacity: 0.45;
+}
+
+.cr-member__senior {
+  color: #ffaa00;
+  font-size: 0.7rem;
+  width: 1em;
+  flex-shrink: 0;
+}
+
+.cr-member__name {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.75);
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.cr-member__station {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.35);
+  flex: 1;
+  min-width: 80px;
+}
+
+.cr-member__status {
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 1px;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.cr-status--active  { color: #00ff41; border: 1px solid rgba(0, 255, 65, 0.3); }
+.cr-status--injured { color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.3); }
+.cr-status--medical { color: #ff4040; border: 1px solid rgba(255, 64, 64, 0.3); }
+.cr-status--kia     { color: #666;    border: 1px solid rgba(100, 100, 100, 0.3); }
+
+/* ── Injury sub-line ── */
+
+.cr-injury {
+  padding: 0.1rem 0.5rem 0.1rem 2.4rem;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.cr-injury__sev {
+  font-size: 0.55rem;
+  padding: 0 0.25rem;
+  margin-left: 0.3rem;
+}
+.cr-injury__sev--critical { color: #ff3333; }
+.cr-injury__sev--serious  { color: #ff8800; }
+.cr-injury__sev--moderate { color: #ffaa00; }
+.cr-injury__sev--minor    { color: #888; }
+
+/* ── Expanded crew detail ── */
+
+.cr-detail {
+  padding: 0.2rem 0.5rem 0.3rem 2.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.cr-detail__row {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cr-detail__label {
+  color: rgba(255, 255, 255, 0.25);
+  min-width: 80px;
+}
+
+/* ── System effectiveness ── */
+
+.cr-systems {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid rgba(0, 255, 65, 0.1);
+  flex-shrink: 0;
+}
+
+.cr-systems__title {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.1em;
+}
+
+.cr-systems__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.2rem;
+}
+
+.cr-sys-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.65rem;
+}
+
+.cr-sys-row__name {
+  min-width: 80px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.cr-sys-row__bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  position: relative;
+}
+
+.cr-sys-row__fill {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.cr-sys-row__pct {
+  min-width: 3em;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.cr-sys-row__breakdown {
+  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.25);
+  min-width: 120px;
+}
+
+/* ── Empty state ── */
+
+.cr-empty {
+  padding: 2rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.8rem;
+}
+
+/* ── Scrollbar ── */
+
+.cr-body::-webkit-scrollbar {
+  width: 4px;
+}
+.cr-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cr-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.15);
+}
+
+/* ── Scan-line header effect ── */
+
+.cr-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+}
+.cr-header {
+  position: relative;
+}

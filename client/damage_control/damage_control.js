@@ -19,6 +19,7 @@
 
 import { initConnection } from '../shared/connection.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { initCrewRoster } from '../shared/crew_roster.js';
 import {
   setStatusDot, setAlertLevel, showGameOver,
 } from '../shared/ui_components.js';
@@ -295,6 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   _send = send;
   initRoleBar(send, 'damage_control');
+  initCrewRoster(send);
   SoundBank.init();
   wireButtonSounds(SoundBank);
 });

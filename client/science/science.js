@@ -39,6 +39,7 @@ import { wireButtonSounds } from '../shared/audio_ui.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { initCrewRoster } from '../shared/crew_roster.js';
 
 registerHelp([
   { selector: '#sensor-canvas',     text: 'Sensor display — contacts shown within detection range.', position: 'right' },
@@ -238,6 +239,7 @@ function init() {
   initHelpOverlay();
   initNotifications(send, 'science');
   initRoleBar(send, 'science');
+  initCrewRoster(send);
   connect();
 }
 

@@ -21,6 +21,7 @@
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, showBriefing } from '../shared/ui_components.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { initCrewRoster } from '../shared/crew_roster.js';
 import {
   C_PRIMARY, C_PRIMARY_DIM,
   createStarfield, drawBackground, drawStarfield,
@@ -121,6 +122,7 @@ function init() {
 
   window.addEventListener('resize', resizeCanvas);
   initRoleBar(send, 'viewscreen');
+  initCrewRoster(send);
 
   connect();
 }

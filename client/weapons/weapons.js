@@ -32,6 +32,7 @@ import { wireButtonSounds } from '../shared/audio_ui.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { initCrewRoster } from '../shared/crew_roster.js';
 
 registerHelp([
   { selector: '#radar-canvas',          text: 'Tactical radar — click enemy to select as target.', position: 'right' },
@@ -211,6 +212,7 @@ function init() {
   initHelpOverlay();
   initNotifications(send, 'weapons');
   initRoleBar(send, 'weapons');
+  initCrewRoster(send);
   on('weapons.torpedo_fired', () => SoundBank.play('torpedo_launch'));
   connect();
 }

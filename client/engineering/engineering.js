@@ -38,6 +38,7 @@ import { wireButtonSounds } from '../shared/audio_ui.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { initCrewRoster } from '../shared/crew_roster.js';
 
 registerHelp([
   { selector: '#systems-container', text: 'Power sliders — drag to allocate power (0–150%). Keys 1-9 select system.', position: 'right' },
@@ -185,6 +186,7 @@ function init() {
   initHelpOverlay();
   initNotifications(send, 'engineering');
   initRoleBar(send, 'engineering');
+  initCrewRoster(send);
   connect();
 }
 

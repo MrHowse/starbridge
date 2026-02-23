@@ -36,6 +36,7 @@ import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { initCrewRoster } from '../shared/crew_roster.js';
 
 registerHelp([
   { selector: '#ship-canvas',       text: 'Ship interior — rooms shown with squad (blue) and intruder (red) tokens.', position: 'right' },
@@ -780,6 +781,7 @@ function init() {
   wireButtonSounds(SoundBank);
   initHelpOverlay();
   initRoleBar(send, 'security');
+  initCrewRoster(send);
 
   on('lobby.welcome', () => {
     const name = sessionStorage.getItem('player_name') || 'SECURITY';

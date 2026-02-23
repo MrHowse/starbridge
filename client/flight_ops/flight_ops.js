@@ -13,6 +13,7 @@
 
 import { initSharedUI, on, send } from '../shared/station_base.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { initCrewRoster } from '../shared/crew_roster.js';
 import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
@@ -66,6 +67,7 @@ let targetMode = null;
 SoundBank.init();
 wireButtonSounds(SoundBank);
 initRoleBar(send, 'flight_ops');
+initCrewRoster(send);
 
 initSharedUI({
   role: 'flight_ops',

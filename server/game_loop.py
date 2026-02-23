@@ -1207,11 +1207,16 @@ async def _loop() -> None:
         )
         roster = glmed.get_roster()
         if roster is not None:
+            _roster_payload = {"members": {
+                cid: m.to_dict() for cid, m in roster.members.items()
+            }}
             await _manager.broadcast_to_roles(
                 ["medical"],
-                Message.build("medical.crew_roster", {"members": {
-                    cid: m.to_dict() for cid, m in roster.members.items()
-                }}),
+                Message.build("medical.crew_roster", _roster_payload),
+            )
+            # Broadcast crew roster to ALL roles for the crew manifest overlay.
+            await _manager.broadcast(
+                Message.build("crew.roster", _roster_payload),
             )
         for mev in medical_v2_events:
             await _manager.broadcast_to_roles(
