@@ -33,6 +33,9 @@ class MockManager:
     async def broadcast_to_roles(self, roles: list[str], msg: Message) -> None:
         self.broadcasts.append(msg)
 
+    def get_by_role(self, role: str) -> list:
+        return []
+
 
 def fresh() -> tuple[MockManager, World, asyncio.Queue]:  # type: ignore[type-arg]
     manager = MockManager()

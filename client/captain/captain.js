@@ -203,6 +203,7 @@ function init() {
   on('docking.complete',              handleDockingComplete);
   on('docking.undocked',              handleDockingUndocked);
   on('docking.service_complete',      handleDockingServiceComplete);
+  on('weapons.auto_fire_status',      handleAutoFireStatus);
 
   // Docking controls
   if (undockBtn) {
@@ -431,6 +432,16 @@ function handleDockingServiceComplete({ service, effects }) {
   if (effects && effects.hull_restored > 0) {
     console.log(`Hull repair complete: +${effects.hull_restored} HP`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-fire status
+// ---------------------------------------------------------------------------
+
+let _autoFireActive = false;
+
+function handleAutoFireStatus({ active }) {
+  _autoFireActive = active;
 }
 
 // ---------------------------------------------------------------------------
@@ -792,6 +803,22 @@ function _tacticalLoop() {
     mapCtx.textBaseline = 'bottom';
     mapCtx.fillStyle    = 'rgba(255,176,0,0.85)';
     mapCtx.fillText(_scanIndicatorText, 8, H - 6);
+    mapCtx.restore();
+  }
+  // Weapons crewing status overlay.
+  if (mapCtx && mapCanvas) {
+    const auto = shipState?.auto_fire_active ?? false;
+    mapCtx.save();
+    mapCtx.font         = '9px "Share Tech Mono",monospace';
+    mapCtx.textAlign    = 'right';
+    mapCtx.textBaseline = 'bottom';
+    mapCtx.fillStyle    = auto
+      ? 'rgba(255,176,0,0.85)'   // amber
+      : 'rgba(0,255,65,0.6)';    // green
+    mapCtx.fillText(
+      auto ? 'WEAPONS: AUTO (50%)' : 'WEAPONS: CREWED',
+      mapCanvas.width - 8, mapCanvas.height - 6,
+    );
     mapCtx.restore();
   }
   requestAnimationFrame(_tacticalLoop);

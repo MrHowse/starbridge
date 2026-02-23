@@ -149,6 +149,7 @@ REPAIR_HP_PER_TICK: float = 1.0
 class _ManagerProtocol(Protocol):
     async def broadcast(self, message: Message) -> None: ...
     async def broadcast_to_roles(self, roles: list[str], message: Message) -> None: ...
+    def get_by_role(self, role: str) -> list: ...
 
 
 # Module-level state (set by init)
@@ -654,6 +655,16 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(["science"], science_weapons_msg)
         # Tube loading advancement.
         glw.tick_tube_loading(TICK_DT)
+        # Auto-fire targeting computer.
+        glw.set_weapons_crewed(len(_manager.get_by_role("weapons")) > 0)
+        auto_fire_events = glw.tick_auto_fire(_world.ship, _world, TICK_DT)
+        _af_status = glw.pop_auto_fire_status_changed()
+        if _af_status is not None:
+            _af_label = "AUTO-TARGETING ENGAGED" if _af_status else "MANUAL TARGETING ACTIVE"
+            await _manager.broadcast_to_roles(
+                ["captain"],
+                Message.build("weapons.auto_fire_status", {"active": _af_status, "message": _af_label}),
+            )
         torpedo_events = glw.tick_torpedoes(_world, _world.ship)
         stations = _world.stations if _world.stations else None
         beam_hit_events = tick_enemies(
@@ -1368,6 +1379,8 @@ async def _loop() -> None:
                 }))
         for evt in action_events:
             await _manager.broadcast(Message.build(evt[0], evt[1]))
+        for evt in auto_fire_events:
+            await _manager.broadcast(Message.build(evt[0], evt[1]))
         for evt_type, evt_data in security_events:
             await _manager.broadcast_to_roles(["security"], Message.build(evt_type, evt_data))
         for evt_type, evt_data in station_boarding_events:
@@ -1891,6 +1904,7 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             },
             "active_hazard_types": hazard_system.get_active_hazard_types(),
             "hazard_sensor_modifier": round(hazard_system.get_sensor_modifier(), 3),
+            "auto_fire_active": glw.is_auto_fire_active(),
         },
         tick=tick,
     )

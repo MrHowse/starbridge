@@ -102,6 +102,9 @@ class MockManager:
     async def broadcast_to_roles(self, roles: list[str], msg: object) -> None:
         self.broadcasts.append(msg)
 
+    def get_by_role(self, role: str) -> list:
+        return []
+
 
 def fresh():
     manager = MockManager()

@@ -100,6 +100,11 @@ ION_STUN_TICKS: int = 100
 #: Homing torpedo turn rate (degrees / second).
 HOMING_TURN_RATE: float = 90.0
 
+# Auto-fire targeting computer (activates when Weapons station is uncrewed).
+AUTO_FIRE_INTERVAL: float = 1.0    # seconds between shots (2× manual 0.5s)
+AUTO_FIRE_ACCURACY: float = 0.75   # 75% hit chance
+AUTO_FIRE_DELAY: float = 3.0       # seconds after player leaves before engaging
+
 # ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
@@ -141,12 +146,21 @@ _pending_diplomatic_events: list[dict] = []
 # v0.06 — targeting denial payloads (friendly lock refused) pending broadcast
 _pending_targeting_denials: list[dict] = []
 
+# Auto-fire targeting computer state.
+_auto_fire_active: bool = False
+_auto_fire_cooldown: float = 0.0
+_auto_fire_delay: float = 0.0
+_weapons_crewed: bool = False
+_auto_fire_status_changed: bool | None = None
+
 
 def reset(initial_loadout: dict[str, int] | None = None) -> None:
     """Reset all weapons state. Call at game start."""
     global _weapons_target, _torpedo_ammo, _torpedo_ammo_max, _entity_counter
     global _tube_types, _tube_loading, _tube_type_loading, _pending_nuclear_auths
     global _tube_cooldowns, _tube_reload_times
+    global _auto_fire_active, _auto_fire_cooldown, _auto_fire_delay
+    global _weapons_crewed, _auto_fire_status_changed
     loadout = dict(initial_loadout) if initial_loadout else dict(DEFAULT_TORPEDO_LOADOUT)
     _torpedo_ammo = dict(loadout)
     _torpedo_ammo_max = dict(loadout)
@@ -163,6 +177,11 @@ def reset(initial_loadout: dict[str, int] | None = None) -> None:
     _pending_component_destroyed.clear()
     _pending_diplomatic_events.clear()
     _pending_targeting_denials.clear()
+    _auto_fire_active = False
+    _auto_fire_cooldown = 0.0
+    _auto_fire_delay = 0.0
+    _weapons_crewed = True   # assume crewed — first set_weapons_crewed(False) starts delay
+    _auto_fire_status_changed = None
 
 
 def serialise() -> dict:
@@ -176,6 +195,8 @@ def serialise() -> dict:
         "tube_loading": list(_tube_loading),
         "tube_type_loading": list(_tube_type_loading),
         "entity_counter": _entity_counter,
+        "auto_fire_active": _auto_fire_active,
+        "auto_fire_delay": _auto_fire_delay,
         # pending nuclear auths not serialised — requests don't survive save/resume
     }
 
@@ -184,6 +205,7 @@ def deserialise(data: dict) -> None:
     global _weapons_target, _torpedo_ammo, _torpedo_ammo_max, _tube_cooldowns
     global _tube_types, _tube_loading, _tube_type_loading, _entity_counter
     global _tube_reload_times
+    global _auto_fire_active, _auto_fire_delay
     _weapons_target = data.get("weapons_target")
 
     # Backward compat: old saves stored torpedo_ammo as an int.
@@ -204,6 +226,8 @@ def deserialise(data: dict) -> None:
     _tube_loading[:]      = data.get("tube_loading", [0.0, 0.0])
     _tube_type_loading[:] = data.get("tube_type_loading", ["standard", "standard"])
     _entity_counter       = data.get("entity_counter", 0)
+    _auto_fire_active     = data.get("auto_fire_active", False)
+    _auto_fire_delay      = data.get("auto_fire_delay", 0.0)
     _pending_nuclear_auths.clear()
 
 
@@ -283,6 +307,120 @@ def pop_targeting_denials() -> list[dict]:
     result = list(_pending_targeting_denials)
     _pending_targeting_denials.clear()
     return result
+
+
+# ---------------------------------------------------------------------------
+# Auto-fire targeting computer
+# ---------------------------------------------------------------------------
+
+
+def is_auto_fire_active() -> bool:
+    """Return True if the auto-fire targeting computer is currently engaged."""
+    return _auto_fire_active
+
+
+def set_weapons_crewed(crewed: bool) -> None:
+    """Update whether a player is occupying the Weapons station.
+
+    Called every tick by game_loop.py.
+    """
+    global _weapons_crewed, _auto_fire_active, _auto_fire_delay, _auto_fire_status_changed
+    if crewed and not _weapons_crewed:
+        # Player just arrived — immediately disable auto-fire.
+        if _auto_fire_active:
+            _auto_fire_active = False
+            _auto_fire_status_changed = False
+            gl.log_event("weapons", "auto_fire", {"active": False})
+        _auto_fire_delay = 0.0
+    elif not crewed and _weapons_crewed:
+        # Player just left — start the activation delay.
+        _auto_fire_delay = AUTO_FIRE_DELAY
+    _weapons_crewed = crewed
+
+
+def pop_auto_fire_status_changed() -> bool | None:
+    """Return True/False when auto-fire status changed, or None if unchanged."""
+    global _auto_fire_status_changed
+    result = _auto_fire_status_changed
+    _auto_fire_status_changed = None
+    return result
+
+
+def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]]:
+    """Advance the auto-fire targeting computer.
+
+    Returns a list of (event_type, payload) tuples to broadcast.
+    """
+    global _auto_fire_active, _auto_fire_cooldown, _auto_fire_delay, _auto_fire_status_changed
+
+    if _weapons_crewed:
+        return []
+
+    # Activation delay countdown.
+    if not _auto_fire_active:
+        if _auto_fire_delay > 0.0:
+            _auto_fire_delay = max(0.0, _auto_fire_delay - dt)
+            if _auto_fire_delay <= 0.0:
+                _auto_fire_active = True
+                _auto_fire_cooldown = 0.0
+                _auto_fire_status_changed = True
+                gl.log_event("weapons", "auto_fire", {"active": True})
+        return []
+
+    # Active — countdown cooldown, then attempt to fire.
+    _auto_fire_cooldown = max(0.0, _auto_fire_cooldown - dt)
+    if _auto_fire_cooldown > 0.0:
+        return []
+
+    target = _find_auto_fire_target(ship, world)
+    if target is None:
+        return []
+
+    # Accuracy roll — miss resets cooldown without damage.
+    if _rng.random() > AUTO_FIRE_ACCURACY:
+        _auto_fire_cooldown = AUTO_FIRE_INTERVAL
+        return []
+
+    dmg = BEAM_PLAYER_DAMAGE * ship.systems["beams"].efficiency
+    apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency="")
+
+    event_payload = {
+        "target_id": target.id,
+        "target_x": target.x,
+        "target_y": target.y,
+        "damage": round(dmg, 2),
+        "beam_frequency": "",
+        "source": "auto",
+    }
+    gl.log_event("weapons", "beam_fired", {
+        "target_id": target.id, "damage": round(dmg, 2), "source": "auto",
+    })
+
+    if target.hull <= 0.0:
+        world.enemies = [e for e in world.enemies if e.id != target.id]
+        gl.log_event("combat", "enemy_destroyed", {"enemy_id": target.id, "cause": "beam_auto"})
+
+    _auto_fire_cooldown = AUTO_FIRE_INTERVAL
+    return [("weapons.beam_fired", event_payload)]
+
+
+def _find_auto_fire_target(ship: Ship, world: World):
+    """Return the nearest scanned hostile enemy in beam range+arc, or None."""
+    best = None
+    best_dist = float("inf")
+    for enemy in world.enemies:
+        if getattr(enemy, "scan_state", None) != "scanned":
+            continue
+        dist = distance(ship.x, ship.y, enemy.x, enemy.y)
+        if dist > BEAM_PLAYER_RANGE:
+            continue
+        brg = bearing_to(ship.x, ship.y, enemy.x, enemy.y)
+        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+            continue
+        if dist < best_dist:
+            best = enemy
+            best_dist = dist
+    return best
 
 
 def _classify_target(world: World, entity_id: str | None) -> str:
