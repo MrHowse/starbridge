@@ -105,6 +105,13 @@ function renderHeader(data) {
   durationEl.textContent   = `DURATION: ${fmtDuration(data.duration_s)}`;
   hullEl.textContent       = data.hull_remaining != null
     ? `HULL: ${Math.round(data.hull_remaining)}%` : 'HULL: —';
+  if (data.difficulty) {
+    const diffEl = document.createElement('span');
+    diffEl.className = 'debrief__difficulty';
+    diffEl.textContent = `DIFFICULTY: ${data.difficulty.toUpperCase()}`;
+    diffEl.style.cssText = 'margin-left:1.5em;opacity:0.7;';
+    durationEl.parentNode.insertBefore(diffEl, durationEl.nextSibling);
+  }
 }
 
 // ---------------------------------------------------------------------------

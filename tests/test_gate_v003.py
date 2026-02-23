@@ -245,10 +245,10 @@ class TestDifficultyPresetsGate:
         assert get_preset("officer").hints_enabled is False
 
     def test_cadet_easier_damage(self):
-        assert get_preset("cadet").enemy_damage_mult < get_preset("officer").enemy_damage_mult
+        assert get_preset("cadet").enemy_damage_multiplier < get_preset("officer").enemy_damage_multiplier
 
     def test_admiral_harder_damage(self):
-        assert get_preset("admiral").enemy_damage_mult > get_preset("officer").enemy_damage_mult
+        assert get_preset("admiral").enemy_damage_multiplier > get_preset("officer").enemy_damage_multiplier
 
     def test_cadet_longer_puzzles(self):
         assert get_preset("cadet").puzzle_time_mult > get_preset("officer").puzzle_time_mult
@@ -259,7 +259,7 @@ class TestDifficultyPresetsGate:
     def test_unknown_preset_falls_back_to_officer(self):
         p = get_preset("nonexistent")
         officer = get_preset("officer")
-        assert p.enemy_damage_mult == officer.enemy_damage_mult
+        assert p.enemy_damage_multiplier == officer.enemy_damage_multiplier
 
 
 # ---------------------------------------------------------------------------

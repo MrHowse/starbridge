@@ -486,8 +486,10 @@ def notify_puzzle_complete(crew_id: str, success: bool) -> None:
 # ---------------------------------------------------------------------------
 
 
-def tick(roster: IndividualCrewRoster, dt: float) -> list[dict]:
+def tick(roster: IndividualCrewRoster, dt: float, difficulty: object | None = None) -> list[dict]:
     """Tick all medical logic for one frame.
+
+    *difficulty* — when provided, scales contagion spread chance.
 
     Returns list of event dicts for broadcasts.
     """
@@ -506,7 +508,7 @@ def tick(roster: IndividualCrewRoster, dt: float) -> list[dict]:
 
     # 2. Tick contagion spread
     _contagion_spread_timer, spread_events = tick_contagion_spread(
-        roster, dt, _contagion_spread_timer, _rng
+        roster, dt, _contagion_spread_timer, _rng, difficulty=difficulty,
     )
     events.extend(spread_events)
 

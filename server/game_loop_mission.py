@@ -12,7 +12,7 @@ import math
 
 import server.game_logger as gl
 from server.models.messages import Message
-from server.models.world import World, spawn_enemy
+from server.models.world import ENEMY_TYPE_PARAMS, World, spawn_enemy
 from server.mission_graph import MissionGraph
 from server.missions.loader import load_mission, spawn_from_mission, spawn_wave
 from server.systems import sensors
@@ -286,6 +286,12 @@ async def tick_mission(
     for action in _mission_engine.pop_pending_actions():
         if action.get("action") == "spawn_wave":
             spawn_wave(action.get("enemies", []), world)
+            _ehm = getattr(ship.difficulty, "enemy_health_multiplier", 1.0)
+            if _ehm != 1.0:
+                for _e in world.enemies:
+                    if _e.hull == ENEMY_TYPE_PARAMS.get(_e.type, {}).get("hull", 0):
+                        # Only scale freshly spawned enemies at base hull.
+                        _e.hull = round(_e.hull * _ehm, 1)
         elif action.get("action") == "start_puzzle":
             _pending_puzzle_starts.append(action)
         elif action.get("action") == "deploy_squads":

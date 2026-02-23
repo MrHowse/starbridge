@@ -84,10 +84,12 @@ class _SectorScanState:
     cancelled: bool = False
     complete: bool = False
     _revealed_phase: int = -1             # highest phase whose reveals were applied
+    scan_time_multiplier: float = 1.0     # from difficulty preset (>1 = slower)
 
     @property
     def duration(self) -> float:
-        return SECTOR_SWEEP_DURATION if self.scale == "sector" else LONG_RANGE_DURATION
+        base = SECTOR_SWEEP_DURATION if self.scale == "sector" else LONG_RANGE_DURATION
+        return base * max(0.1, self.scan_time_multiplier)
 
     @property
     def progress(self) -> float:
@@ -135,6 +137,7 @@ def start_scan(
     mode: str,
     sector_id: str,
     adjacent_ids: list[str] | None = None,
+    scan_time_multiplier: float = 1.0,
 ) -> bool:
     """Begin a new sector sweep or long-range scan.
 
@@ -143,6 +146,7 @@ def start_scan(
     ``mode`` must be ``"em"``, ``"grav"``, ``"bio"``, or ``"sub"``.
     ``sector_id`` is the ID of the current sector (sector sweep target).
     ``adjacent_ids`` lists adjacent sector IDs (used for long_range scale).
+    ``scan_time_multiplier`` scales duration (>1 = slower, from difficulty).
     """
     global _state
     if is_active():
@@ -152,6 +156,7 @@ def start_scan(
         mode=mode,
         sector_id=sector_id,
         adjacent_ids=list(adjacent_ids or []),
+        scan_time_multiplier=scan_time_multiplier,
     )
     return True
 

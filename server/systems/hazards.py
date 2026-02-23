@@ -133,6 +133,7 @@ def tick_hazards(world: World, ship: Ship, dt: float) -> list[dict]:
     active: list[str] = []
 
     events: list[dict] = []
+    _hz_mult = getattr(ship.difficulty, "hazard_damage_multiplier", 1.0)
 
     # ── Entity hazard zones ─────────────────────────────────────────────────
     for hz in world.hazards:
@@ -140,14 +141,14 @@ def tick_hazards(world: World, ship: Ship, dt: float) -> list[dict]:
             continue
 
         if hz.hazard_type == "minefield":
-            damage = round(MINEFIELD_DAMAGE_PER_SEC * dt, 3)
+            damage = round(MINEFIELD_DAMAGE_PER_SEC * dt * _hz_mult, 3)
             ship.hull = max(0.0, ship.hull - damage)
             events.append({"hazard_id": hz.id, "hazard_type": "minefield", "damage": damage})
             if "minefield" not in active:
                 active.append("minefield")
 
         elif hz.hazard_type == "radiation_zone":
-            damage = round(RADIATION_DAMAGE_PER_SEC * dt, 3)
+            damage = round(RADIATION_DAMAGE_PER_SEC * dt * _hz_mult, 3)
             ship.hull = max(0.0, ship.hull - damage)
             events.append({"hazard_id": hz.id, "hazard_type": "radiation_zone", "damage": damage})
             if "radiation_zone" not in active:
@@ -185,7 +186,7 @@ def tick_hazards(world: World, ship: Ship, dt: float) -> list[dict]:
                     active.append("asteroid_field")
                 _sensor_modifier = min(_sensor_modifier, smod)
                 if ship.throttle > ASTEROID_THROTTLE_THRESHOLD:
-                    damage = round(ASTEROID_DAMAGE_PER_SEC * dt, 3)
+                    damage = round(ASTEROID_DAMAGE_PER_SEC * dt * _hz_mult, 3)
                     ship.hull = max(0.0, ship.hull - damage)
                     events.append({
                         "hazard_id": sector.id,
@@ -212,7 +213,7 @@ def tick_hazards(world: World, ship: Ship, dt: float) -> list[dict]:
                     if total_shields >= RADIATION_SHIELD_THRESHOLD
                     else 0.0
                 )
-                raw = RADIATION_SECTOR_DAMAGE_PER_SEC * dt
+                raw = RADIATION_SECTOR_DAMAGE_PER_SEC * dt * _hz_mult
                 damage = round(raw * (1.0 - absorption), 3)
                 ship.hull = max(0.0, ship.hull - damage)
                 events.append({

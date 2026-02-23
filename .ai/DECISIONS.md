@@ -735,3 +735,45 @@ This creates the crew dependency loop: *"Science, scan that cruiser." "I can't �
 **Alternatives considered**:
 - Cancel game loop task on pause, restart on resume — rejected: complex restart; connection state lost
 - Slow-motion pause (reduce tick rate to 1 Hz) — rejected: introduces state drift; admin needs a clean frozen state
+
+---
+
+## 2026-02-23 — Difficulty system: 28-field DifficultyPreset with full game wiring (v0.06)
+
+**Decision**: The original 4-field `DifficultyPreset` (enemy_damage_mult, puzzle_time_mult, hints_enabled, spawn_rate_mult) was expanded to a 28-field frozen dataclass that covers every tunable gameplay parameter. All multipliers use 1.0 = Officer baseline. The preset is stored on `Ship.difficulty` and threaded through every game subsystem via `getattr(difficulty, field, default)` for safe backward compatibility.
+
+**Multiplier categories**:
+- **Combat** (5 fields): damage, accuracy, health, count, aggression
+- **Damage & repair** (4): component damage chance/severity, cook-off chance, repair speed
+- **Crew & medical** (5): injury chance, severity bias, degradation/death timers, contagion spread
+- **Resources** (4): torpedoes, medical supplies, battery capacity, fuel consumption
+- **Scanning & intel** (3): sensor range, scan time, fog-of-war reveal fraction
+- **Environmental** (1): hazard damage
+- **Sandbox** (2): event interval, event overlap max
+- **Timers & pacing** (2): docking service duration, boarding frequency
+- **Legacy** (2): puzzle_time_mult, hints_enabled
+
+**Balance rationale** (Cadet → Officer → Commander → Admiral):
+- Cadet is 0.5–0.75× threat with 1.25–1.5× resources — forgiving enough that a new crew can learn station mechanics without being overwhelmed. Hints enabled.
+- Officer is 1.0× across the board — the baseline experience for an experienced crew.
+- Commander is 1.15–1.3× threat with 0.8–0.9× resources — crises overlap (event_overlap_max=3) and enemies disengage less (aggression=1.0).
+- Admiral is 1.3–1.6× threat with 0.6–0.75× resources — no fog-of-war pre-reveal, overlap_max=5, repairs 40% slower, contagion 67% more likely.
+
+**Wiring approach**: Each game subsystem accepts an optional `difficulty` parameter (defaulting to `None`). Multipliers are accessed via `getattr(difficulty, "field_name", safe_default)` so old tests that don't pass difficulty continue to work unmodified. This avoids a forced migration of 2800+ existing tests.
+
+**Key implementation details**:
+- Enemy health is scaled at spawn time (not per-tick) — applied after `init_mission()`, after sandbox `spawn_enemy()`, and after mission `spawn_wave()`
+- Torpedo loadout is scaled before `glw.reset()` with `int(base * mult + 0.5)` rounding
+- Fog-of-war pre-reveal: random sample of `int(total_sectors * reveal_fraction + 0.5)` sectors set to SCANNED
+- AI aggression: `eff_flee = flee_threshold * max(0.1, 1.0 - aggression + 0.25)` — higher aggression = lower effective flee threshold = enemies fight longer
+- Default aggression when no difficulty provided = 0.25 (yields factor 1.0 = no change from pre-difficulty behaviour)
+- Sandbox event intervals multiplied by `event_interval_multiplier`; boarding interval additionally divided by `boarding_frequency_multiplier`
+- Repair speed: effective duration = `DCT_REPAIR_DURATION / max(0.1, repair_speed_multiplier)` (>1 = faster repairs)
+- Scan time: effective duration = base × `scan_time_multiplier` (>1 = slower scans)
+
+**Admin override**: POST `/admin/difficulty` broadcasts `game.difficulty_changed` with new preset details. GET `/api/difficulty_presets` returns all presets with summaries.
+
+**Alternatives considered**:
+- Per-mission difficulty overrides — deferred: mission JSON can override individual fields in future
+- Continuous slider instead of 4 presets — rejected: harder to balance; presets are easier to test and communicate
+- Dynamic difficulty adjustment (auto-scale during play) — deferred: requires telemetry and more design work

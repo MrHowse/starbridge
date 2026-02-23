@@ -145,12 +145,18 @@ def is_active() -> bool:
     return _active
 
 
-def tick(world: "World", dt: float) -> list[dict]:
-    """Advance all timers by *dt* seconds.  Return event dicts to process."""
+def tick(world: "World", dt: float, difficulty: object | None = None) -> list[dict]:
+    """Advance all timers by *dt* seconds.  Return event dicts to process.
+
+    *difficulty* — when provided, scales event intervals and boarding frequency.
+    """
     if not _active:
         return []
 
     global _entity_counter
+
+    _evt_mult = getattr(difficulty, "event_interval_multiplier", 1.0) if difficulty else 1.0
+    _brd_mult = getattr(difficulty, "boarding_frequency_multiplier", 1.0) if difficulty else 1.0
 
     for key in list(_timers):
         _timers[key] -= dt
@@ -176,7 +182,7 @@ def tick(world: "World", dt: float) -> list[dict]:
                 "y":          sy,
                 "id":         f"sb_e{_entity_counter}",
             })
-        _timers["enemy_spawn"] = random.uniform(*ENEMY_SPAWN_INTERVAL)
+        _timers["enemy_spawn"] = random.uniform(*ENEMY_SPAWN_INTERVAL) * _evt_mult
 
     # --- System damage — micrometeorite / power surge (Engineering / DC) --
     if _timers.get("system_damage", 1.0) <= 0.0:
@@ -184,13 +190,13 @@ def tick(world: "World", dt: float) -> list[dict]:
         if system in world.ship.systems:
             amount = round(random.uniform(8.0, 20.0), 1)
             events.append({"type": "system_damage", "system": system, "amount": amount})
-        _timers["system_damage"] = random.uniform(*SYSTEM_DAMAGE_INTERVAL)
+        _timers["system_damage"] = random.uniform(*SYSTEM_DAMAGE_INTERVAL) * _evt_mult
 
     # --- Crew casualty — accident on a random deck (Medical) --------------
     if _timers.get("crew_casualty", 1.0) <= 0.0:
         deck = random.choice(CREW_DECKS)
         events.append({"type": "crew_casualty", "deck": deck, "count": 1})
-        _timers["crew_casualty"] = random.uniform(*CREW_CASUALTY_INTERVAL)
+        _timers["crew_casualty"] = random.uniform(*CREW_CASUALTY_INTERVAL) * _evt_mult
 
     # --- Boarding attempt (Security) --------------------------------------
     if _timers.get("boarding", 1.0) <= 0.0:
@@ -203,7 +209,7 @@ def tick(world: "World", dt: float) -> list[dict]:
             ],
         })
         _entity_counter += 1
-        _timers["boarding"] = random.uniform(*BOARDING_INTERVAL)
+        _timers["boarding"] = random.uniform(*BOARDING_INTERVAL) * _evt_mult / max(0.1, _brd_mult)
 
     # --- Incoming transmission — NPC contact on a faction band (Comms) ----
     if _timers.get("incoming_transmission", 1.0) <= 0.0:
@@ -214,13 +220,13 @@ def tick(world: "World", dt: float) -> list[dict]:
             "frequency":    TRANSMISSION_FACTIONS[faction],
             "message_hint": random.choice(_TRANSMISSION_HINTS),
         })
-        _timers["incoming_transmission"] = random.uniform(*INCOMING_TRANSMISSION_INTERVAL)
+        _timers["incoming_transmission"] = random.uniform(*INCOMING_TRANSMISSION_INTERVAL) * _evt_mult
 
     # --- Hull micro-damage — micrometeorite strike (Damage Control) -------
     if _timers.get("hull_micro_damage", 1.0) <= 0.0:
         amount = round(random.uniform(2.0, 8.0), 1)
         events.append({"type": "hull_micro_damage", "amount": amount})
-        _timers["hull_micro_damage"] = random.uniform(*HULL_MICRO_DAMAGE_INTERVAL)
+        _timers["hull_micro_damage"] = random.uniform(*HULL_MICRO_DAMAGE_INTERVAL) * _evt_mult
 
     # --- Sensor anomaly — unexplained reading for Science to investigate --
     if _timers.get("sensor_anomaly", 1.0) <= 0.0:
@@ -238,7 +244,7 @@ def tick(world: "World", dt: float) -> list[dict]:
             "id":           f"sb_a{_entity_counter}",
             "anomaly_type": random.choice(SENSOR_ANOMALY_TYPES),
         })
-        _timers["sensor_anomaly"] = random.uniform(*SENSOR_ANOMALY_INTERVAL)
+        _timers["sensor_anomaly"] = random.uniform(*SENSOR_ANOMALY_INTERVAL) * _evt_mult
 
     # --- Drone opportunity — scan target enters range (Flight Ops) --------
     if _timers.get("drone_opportunity", 1.0) <= 0.0:
@@ -256,7 +262,7 @@ def tick(world: "World", dt: float) -> list[dict]:
             "id":    f"sb_d{_entity_counter}",
             "label": random.choice(DRONE_OPPORTUNITY_LABELS),
         })
-        _timers["drone_opportunity"] = random.uniform(*DRONE_OPPORTUNITY_INTERVAL)
+        _timers["drone_opportunity"] = random.uniform(*DRONE_OPPORTUNITY_INTERVAL) * _evt_mult
 
     # --- Enemy jamming attempt (Electronic Warfare) -----------------------
     if _timers.get("enemy_jamming", 1.0) <= 0.0:
@@ -264,7 +270,7 @@ def tick(world: "World", dt: float) -> list[dict]:
             "type":     "enemy_jamming",
             "strength": round(random.uniform(0.3, 0.7), 2),
         })
-        _timers["enemy_jamming"] = random.uniform(*ENEMY_JAMMING_INTERVAL)
+        _timers["enemy_jamming"] = random.uniform(*ENEMY_JAMMING_INTERVAL) * _evt_mult
 
     # --- Creature spawn (Science / EW / Weapons / Comms challenge) -------
     if _timers.get("creature_spawn", 1.0) <= 0.0:
@@ -284,7 +290,7 @@ def tick(world: "World", dt: float) -> list[dict]:
                 "y":             round(cy, 1),
                 "id":            f"sb_c{_entity_counter}",
             })
-        _timers["creature_spawn"] = random.uniform(*CREATURE_SPAWN_INTERVAL)
+        _timers["creature_spawn"] = random.uniform(*CREATURE_SPAWN_INTERVAL) * _evt_mult
 
     # --- Distress signal — emergency broadcast (Comms / Helm / Captain) --
     if _timers.get("distress_signal", 1.0) <= 0.0:
@@ -300,7 +306,7 @@ def tick(world: "World", dt: float) -> list[dict]:
             "y":         round(dsy, 1),
             "frequency": 0.90,
         })
-        _timers["distress_signal"] = random.uniform(*DISTRESS_SIGNAL_INTERVAL)
+        _timers["distress_signal"] = random.uniform(*DISTRESS_SIGNAL_INTERVAL) * _evt_mult
 
     return events
 

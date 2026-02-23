@@ -127,14 +127,14 @@ def test_deserialise_ship_restores_captain_offline():
 def test_deserialise_ship_restores_difficulty():
     ship = _fresh_ship()
     ship.difficulty = DifficultySettings(
-        enemy_damage_mult=2.0, puzzle_time_mult=0.5,
-        spawn_rate_mult=1.5, crew_casualty_mult=0.8,
+        enemy_damage_multiplier=2.0, puzzle_time_mult=0.5,
+        sensor_range_multiplier=1.5, injury_chance=0.8,
         hints_enabled=True,
     )
     data = ss._serialise_ship(ship)
     target = Ship()
     ss._deserialise_ship(data, target)
-    assert target.difficulty.enemy_damage_mult == pytest.approx(2.0)
+    assert target.difficulty.enemy_damage_multiplier == pytest.approx(2.0)
     assert target.difficulty.hints_enabled is True
 
 

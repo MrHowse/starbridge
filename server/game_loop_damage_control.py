@@ -120,9 +120,16 @@ def cancel_dct(room_id: str) -> bool:
     return False
 
 
-def tick(interior: ShipInterior, dt: float) -> None:
-    """Advance DCT repairs and fire spreading for one simulation tick."""
+def tick(interior: ShipInterior, dt: float, difficulty: object | None = None) -> None:
+    """Advance DCT repairs and fire spreading for one simulation tick.
+
+    *difficulty* — when provided, ``repair_speed_multiplier`` scales DCT
+    repair duration (>1 = faster repairs, shorter duration).
+    """
     global _fire_spread_timer
+
+    repair_mult = getattr(difficulty, "repair_speed_multiplier", 1.0) if difficulty else 1.0
+    effective_repair_dur = DCT_REPAIR_DURATION / max(0.1, repair_mult)
 
     # Advance DCT repairs.
     completed: list[str] = []
@@ -135,7 +142,7 @@ def tick(interior: ShipInterior, dt: float) -> None:
             completed.append(room_id)
             continue
 
-        if elapsed >= DCT_REPAIR_DURATION:
+        if elapsed >= effective_repair_dur:
             # Reduce severity by one level.
             new_state = _SEVERITY_DOWN.get(_SEVERITY.get(room.state, 0), "normal")
             room.state = new_state
@@ -158,7 +165,7 @@ def tick(interior: ShipInterior, dt: float) -> None:
         _tick_fire_spread(interior)
 
 
-def build_dc_state(interior: ShipInterior) -> dict:
+def build_dc_state(interior: ShipInterior, difficulty: object | None = None) -> dict:
     """Serialise current DC state for broadcasting to Engineering.
 
     Returns:
@@ -167,6 +174,8 @@ def build_dc_state(interior: ShipInterior) -> dict:
           "active_dcts": {room_id: progress_fraction}   — 0.0 to 1.0
         }
     """
+    repair_mult = getattr(difficulty, "repair_speed_multiplier", 1.0) if difficulty else 1.0
+    effective_repair_dur = DCT_REPAIR_DURATION / max(0.1, repair_mult)
     damaged_rooms = {
         room_id: {
             "name": room.name,
@@ -177,7 +186,7 @@ def build_dc_state(interior: ShipInterior) -> dict:
         if room.state != "normal"
     }
     active_dcts = {
-        room_id: round(min(elapsed / DCT_REPAIR_DURATION, 1.0), 2)
+        room_id: round(min(elapsed / effective_repair_dur, 1.0), 2)
         for room_id, elapsed in _active_dcts.items()
     }
     return {"rooms": damaged_rooms, "active_dcts": active_dcts}

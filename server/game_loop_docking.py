@@ -250,8 +250,12 @@ def request_clearance(station_id: str, world, ship) -> str | None:
     return None
 
 
-def start_service(service: str) -> str | None:
-    """Request a docking service to begin. Returns error string or None on success."""
+def start_service(service: str, difficulty: object | None = None) -> str | None:
+    """Request a docking service to begin. Returns error string or None on success.
+
+    *difficulty* — when provided, ``docking_service_multiplier`` scales the
+    service duration (>1 = slower services).
+    """
     if _state != "docked":
         return "Not docked"
     if service not in SERVICE_DURATIONS:
@@ -259,10 +263,12 @@ def start_service(service: str) -> str | None:
     if service in _active_services:
         return f"Service already running: {service}"
 
-    _active_services[service] = SERVICE_DURATIONS[service]
+    svc_mult = getattr(difficulty, "docking_service_multiplier", 1.0) if difficulty else 1.0
+    duration = SERVICE_DURATIONS[service] * max(0.1, svc_mult)
+    _active_services[service] = duration
     _emit(None, "docking.service_started", {
         "service": service,
-        "duration": SERVICE_DURATIONS[service],
+        "duration": duration,
     })
     return None
 

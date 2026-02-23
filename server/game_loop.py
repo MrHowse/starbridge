@@ -381,8 +381,18 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _sector_grid_dirty = True  # broadcast on first tick
     gln.reset()
     glss.reset()
-    glw.reset(sc.get_torpedo_loadout())
+    # Apply starting_torpedo_multiplier from difficulty preset.
+    _diff_preset = get_preset(difficulty)
+    _base_loadout = sc.get_torpedo_loadout()
+    _scaled_loadout = {
+        k: max(0, int(v * _diff_preset.starting_torpedo_multiplier + 0.5))
+        for k, v in _base_loadout.items()
+    }
+    glw.reset(_scaled_loadout)
     glmed.reset()
+    if _diff_preset.medical_supply_multiplier != 1.0:
+        _base_med = glmed.get_supplies()
+        glmed.set_supplies(round(_base_med * _diff_preset.medical_supply_multiplier, 1))
     gls.reset()
     glco.reset()
     glcap.reset()
@@ -420,10 +430,15 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.ship.docked_at = None
     _world.ship.crew = CrewRoster()
     _world.ship.interior = make_default_interior()
-    _world.ship.difficulty = get_preset(difficulty)
+    _world.ship.difficulty = _diff_preset
     logger.info(
         "Ship class: %s (hull=%.0f, ammo=%d), difficulty: %s",
         sc.id, sc.max_hull, sum(sc.get_torpedo_loadout().values()), difficulty,
+    )
+
+    # Apply difficulty scaling to medical supplies.
+    _world.ship.medical_supplies = int(
+        _world.ship.medical_supplies * _diff_preset.medical_supply_multiplier + 0.5
     )
 
     glm.init_mission(mission_id, _world)
@@ -432,12 +447,37 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _spawn_stations_from_grid(_world)
     glsb.setup_world(_world)  # no-op unless sandbox is active
 
+    # Apply enemy_health_multiplier to all initially spawned enemies.
+    if _diff_preset.enemy_health_multiplier != 1.0:
+        for _ene in _world.enemies:
+            _ene.hull = round(_ene.hull * _diff_preset.enemy_health_multiplier, 1)
+
     # v0.06.2 Engineering subsystems (power grid, repair teams, damage model).
     _crew_ids: list[str] = []
     for _dk_name, _dk in _world.ship.crew.decks.items():
         for _ci in range(_dk.total):
             _crew_ids.append(f"{_dk_name}_{_ci}")
     gle.init(_world.ship, crew_member_ids=_crew_ids)
+
+    # Apply battery_capacity_multiplier to the power grid.
+    _pg = gle.get_power_grid()
+    if _pg is not None and _diff_preset.battery_capacity_multiplier != 1.0:
+        _pg.battery_capacity = round(
+            _pg.battery_capacity * _diff_preset.battery_capacity_multiplier, 1
+        )
+        _pg.battery_charge = min(_pg.battery_charge, _pg.battery_capacity)
+
+    # Apply fog_of_war_reveal — pre-reveal a fraction of sectors.
+    if _world.sector_grid is not None and _diff_preset.fog_of_war_reveal > 0.0:
+        from server.models.sector import SectorVisibility
+        _all_sids = list(_world.sector_grid.sectors.keys())
+        _n_reveal = int(len(_all_sids) * _diff_preset.fog_of_war_reveal + 0.5)
+        if _n_reveal > 0:
+            _reveal_ids = random.sample(_all_sids, min(_n_reveal, len(_all_sids)))
+            for _sid in _reveal_ids:
+                s = _world.sector_grid.sectors[_sid]
+                if s.visibility == SectorVisibility.UNKNOWN:
+                    _world.sector_grid.set_visibility(_sid, SectorVisibility.SCANNED)
 
     _task = asyncio.create_task(_loop(), name="game_loop")
     logger.info("Game loop started (mission: %s, %d Hz)", mission_id, TICK_RATE)
@@ -563,7 +603,7 @@ async def _loop() -> None:
         # 3.1 Training auto-simulation (only active during training missions).
         gltr.auto_helm_tick(_world.ship, TICK_DT)
         gltr.auto_engineering_tick(_world.ship, TICK_DT)
-        gldc.tick(_world.ship.interior, TICK_DT)
+        gldc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty)
         glfo.tick(_world.ship, TICK_DT)
         glew.tick(_world, _world.ship, TICK_DT)
         gltac.tick(_world, _world.ship, TICK_DT)
@@ -572,7 +612,7 @@ async def _loop() -> None:
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
         # v0.06.1: tick individual crew injuries/treatments if roster initialised.
         _med_roster = glmed.get_roster()
-        medical_v2_events = glmed.tick(_med_roster, TICK_DT) if _med_roster else []
+        medical_v2_events = glmed.tick(_med_roster, TICK_DT, difficulty=_world.ship.difficulty) if _med_roster else []
         security_events = gls.tick_security(_world.ship.interior, _world.ship, TICK_DT)
         station_boarding_events = gls.tick_station_boarding(_world.ship, TICK_DT)
         comms_responses = glco.tick_comms(TICK_DT)
@@ -608,7 +648,10 @@ async def _loop() -> None:
         glw.tick_tube_loading(TICK_DT)
         torpedo_events = glw.tick_torpedoes(_world, _world.ship)
         stations = _world.stations if _world.stations else None
-        beam_hit_events = tick_enemies(_world.enemies, _world.ship, TICK_DT, stations, sensor_modifier=_hazard_sensor_mod)
+        beam_hit_events = tick_enemies(
+            _world.enemies, _world.ship, TICK_DT, stations,
+            sensor_modifier=_hazard_sensor_mod, difficulty=_world.ship.difficulty,
+        )
 
         # 5.5 Station AI — turrets, launchers, fighter bays, sensor arrays.
         _station_attacked_ids = glw.pop_stations_attacked()
@@ -877,12 +920,14 @@ async def _loop() -> None:
             })
 
         # 8.72. Sandbox activity events (free-play only).
-        for sb_evt in glsb.tick(_world, TICK_DT):
+        for sb_evt in glsb.tick(_world, TICK_DT, difficulty=_world.ship.difficulty):
             _sb_type = sb_evt["type"]
             if _sb_type == "spawn_enemy":
-                _world.enemies.append(
-                    spawn_enemy(sb_evt["enemy_type"], sb_evt["x"], sb_evt["y"], sb_evt["id"])
-                )
+                _sb_enemy = spawn_enemy(sb_evt["enemy_type"], sb_evt["x"], sb_evt["y"], sb_evt["id"])
+                _ehm = _world.ship.difficulty.enemy_health_multiplier
+                if _ehm != 1.0:
+                    _sb_enemy.hull = round(_sb_enemy.hull * _ehm, 1)
+                _world.enemies.append(_sb_enemy)
                 gl.log_event("sandbox", "enemy_spawned", {
                     "type": sb_evt["enemy_type"], "id": sb_evt["id"],
                 })
@@ -1138,7 +1183,7 @@ async def _loop() -> None:
 
         # 11i. Engineering damage-control state → Engineering + Damage Control stations.
         # Performance: only broadcast if state has changed since last tick.
-        _dc_state_msg = gldc.build_dc_state(_world.ship.interior)
+        _dc_state_msg = gldc.build_dc_state(_world.ship.interior, difficulty=_world.ship.difficulty)
         _dc_json = json.dumps(_dc_state_msg, separators=(",", ":"), sort_keys=True)
         if _dc_json != _last_dc_state_json:
             _last_dc_state_json = _dc_json
@@ -1441,6 +1486,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                     payload.mode,
                     _current_sector_id or "",
                     _adj_ids,
+                    scan_time_multiplier=ship.difficulty.scan_time_multiplier,
                 )
                 gl.log_event("science", "sector_scan_started", {
                     "scale": payload.scale,
@@ -1610,7 +1656,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                     }))
                 gl.log_event("comms", "docking_clearance_requested", {"station_id": payload.station_id})
         elif msg_type == "docking.start_service" and isinstance(payload, DockingStartServicePayload):
-            err = gldo.start_service(payload.service)
+            err = gldo.start_service(payload.service, difficulty=ship.difficulty)
             if err:
                 logger.warning("docking.start_service error: %s", err)
             else:
@@ -1889,10 +1935,12 @@ def _build_game_stats() -> dict:
     """Build stats payload for game.over — duration, remaining hull, captain's log."""
     duration = round(_time.monotonic() - _game_start_time, 1)
     hull = round(_world.ship.hull if _world is not None else 0.0, 1)
+    diff = _world.ship.difficulty if _world is not None else None
     return {
         "duration_s": duration,
         "hull_remaining": hull,
         "captain_log": glcap.get_log(),
+        "difficulty": diff.name if diff else "Officer",
     }
 
 

@@ -57,6 +57,8 @@ def tick_enemies(
     dt: float,
     stations: list[Station] | None = None,
     sensor_modifier: float = 1.0,
+    *,
+    difficulty: object | None = None,
 ) -> list[BeamHitEvent]:
     """Update all enemy AI states and movement; return any beam hit events.
 
@@ -65,7 +67,16 @@ def tick_enemies(
 
     *sensor_modifier* scales each enemy's detect_range to model nebula /
     hazard concealment (e.g. 0.5 = half the normal detection range).
+
+    *difficulty* — a DifficultyPreset object. When provided, ``enemy_accuracy``
+    scales beam hit probability and ``enemy_ai_aggression`` adjusts the flee
+    threshold (higher = enemies stay in the fight longer).
     """
+    import random as _rng_mod
+    accuracy_mult = getattr(difficulty, "enemy_accuracy", 1.0) if difficulty else 1.0
+    # Default aggression=0.25 (no scaling) when no difficulty is provided;
+    # Officer preset uses 0.75 which halves the effective flee threshold.
+    aggression = getattr(difficulty, "enemy_ai_aggression", 0.25) if difficulty else 0.25
     events: list[BeamHitEvent] = []
     dead_ids: list[str] = []
 
@@ -83,7 +94,7 @@ def tick_enemies(
         dist = distance(enemy.x, enemy.y, target_x, target_y)
 
         # ── State transitions ─────────────────────────────────────────────
-        _update_state(enemy, params, dist, eff_detect_range)
+        _update_state(enemy, params, dist, eff_detect_range, aggression=aggression)
 
         # ── Despawn check (fleeing enemy too far away) ────────────────────
         if enemy.ai_state == "flee" and dist > 2.0 * eff_detect_range:
@@ -109,6 +120,11 @@ def tick_enemies(
         if enemy.ai_state == "attack" and enemy.beam_cooldown <= 0.0 and not stunned:
             brg = bearing_to(enemy.x, enemy.y, target_x, target_y)
             if beam_in_arc(enemy.heading, brg, params["arc_deg"]):
+                # Accuracy check: miss probability scales with difficulty.
+                hit_chance = min(1.0, accuracy_mult)
+                if hit_chance < 1.0 and _rng_mod.random() > hit_chance:
+                    enemy.beam_cooldown = params["beam_cooldown"]
+                    continue  # miss
                 # Jamming reduces beam damage (jam_factor=0 → full damage).
                 effective_dmg = params["beam_dmg"] * max(0.0, 1.0 - enemy.jam_factor)
                 events.append(
@@ -137,11 +153,20 @@ def tick_enemies(
 # ---------------------------------------------------------------------------
 
 
-def _update_state(enemy: Enemy, params: dict, dist: float, detect_range: float | None = None) -> None:
+def _update_state(
+    enemy: Enemy,
+    params: dict,
+    dist: float,
+    detect_range: float | None = None,
+    aggression: float = 0.75,
+) -> None:
     """Apply state-machine transitions.
 
     *detect_range* overrides ``params["detect_range"]`` when provided (used by
     hazard sensor-modifier to model enemy detection in nebulae).
+
+    *aggression* scales the flee threshold: higher values (closer to 1.0) mean
+    the enemy stays in the fight longer (flees at lower HP fraction).
     """
     state = enemy.ai_state
     max_hull = params["hull"]
@@ -156,8 +181,10 @@ def _update_state(enemy: Enemy, params: dict, dist: float, detect_range: float |
             enemy.ai_state = "attack"
 
     elif state == "attack":
-        flee_hp = params["flee_threshold"] * max_hull
-        if enemy.hull < flee_hp:
+        # aggression scales flee_threshold: at 1.0 use full threshold,
+        # at 0.5 flee at double the threshold (flee earlier).
+        eff_flee = params["flee_threshold"] * max(0.1, 1.0 - aggression + 0.25)
+        if enemy.hull < eff_flee * max_hull:
             enemy.ai_state = "flee"
 
     # "flee" has no return transitions; enemy despawns when far enough away.

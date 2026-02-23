@@ -202,16 +202,17 @@ def generate_injuries(
     severity_scale: float = 1.0,
     rng: random.Random | None = None,
     tick: int = 0,
+    difficulty: object | None = None,
 ) -> list[tuple[str, Injury]]:
     """Generate injuries for crew on the affected deck.
 
     Returns list of (crew_member_id, Injury) tuples.
 
     Not everyone gets hurt. Roll for each crew member on the deck:
-    - Base chance: BASE_INJURY_CHANCE * severity_scale
+    - Base chance: difficulty.injury_chance * severity_scale
     - Roll for specific injury from the cause's injury pool
     - Roll for body region where "random" is specified
-    - Assign severity, description, timers
+    - Assign severity, description, timers (scaled by difficulty)
 
     Args:
         cause: Injury cause type (key into INJURY_TEMPLATES).
@@ -220,6 +221,7 @@ def generate_injuries(
         severity_scale: Multiplier for injury chance (difficulty scaling).
         rng: Optional random instance for deterministic generation.
         tick: Current game tick for injury timestamp.
+        difficulty: DifficultyPreset for scaling (optional).
     """
     if rng is None:
         rng = random.Random()
@@ -232,8 +234,17 @@ def generate_injuries(
     if not crew_on_deck:
         return []
 
+    # Difficulty scaling
+    base_chance = getattr(difficulty, "injury_chance", BASE_INJURY_CHANCE) if difficulty else BASE_INJURY_CHANCE
+    severity_bias = getattr(difficulty, "injury_severity_bias", 0.5) if difficulty else 0.5
+    degrade_mult = getattr(difficulty, "degradation_timer_multiplier", 1.0) if difficulty else 1.0
+    death_mult = getattr(difficulty, "death_timer_multiplier", 1.0) if difficulty else 1.0
+
     results: list[tuple[str, Injury]] = []
-    injury_chance = min(BASE_INJURY_CHANCE * severity_scale, 1.0)
+    injury_chance = min(base_chance * severity_scale, 1.0)
+
+    # Sort templates by severity for bias weighting
+    severity_rank = {"minor": 0, "moderate": 1, "serious": 2, "critical": 3}
 
     for member in crew_on_deck:
         if member.status == "dead":
@@ -246,13 +257,30 @@ def generate_injuries(
         num_injuries = 1 if rng.random() < 0.7 else 2
 
         for _ in range(num_injuries):
-            template = rng.choice(templates)
+            # Severity bias: higher bias weights toward more severe templates.
+            if severity_bias != 0.5 and len(templates) > 1:
+                weights = []
+                for t in templates:
+                    rank = severity_rank.get(t.severity, 1)
+                    w = 1.0 + (rank * severity_bias * 2.0)
+                    weights.append(w)
+                total = sum(weights)
+                r = rng.random() * total
+                cumulative = 0.0
+                template = templates[0]
+                for i, w in enumerate(weights):
+                    cumulative += w
+                    if r <= cumulative:
+                        template = templates[i]
+                        break
+            else:
+                template = rng.choice(templates)
             body_region = _resolve_body_region(template.body_region, rng)
             description = _resolve_description(template.description, body_region)
 
             severity = template.severity
-            degrade = DEGRADE_TIMERS.get(severity, 0.0)
-            death = CRITICAL_DEATH_TIMER if severity == "critical" else None
+            degrade = DEGRADE_TIMERS.get(severity, 0.0) * degrade_mult
+            death = CRITICAL_DEATH_TIMER * death_mult if severity == "critical" else None
 
             injury = Injury(
                 id=roster.next_injury_id(),
@@ -381,6 +409,7 @@ def tick_contagion_spread(
     dt: float,
     spread_timer: float,
     rng: random.Random | None = None,
+    difficulty: object | None = None,
 ) -> tuple[float, list[dict]]:
     """Tick contagion spread logic.
 
@@ -392,6 +421,7 @@ def tick_contagion_spread(
         dt: Delta time in seconds.
         spread_timer: Current spread timer (accumulated).
         rng: Random instance for determinism.
+        difficulty: DifficultyPreset for scaling contagion_spread_chance.
 
     Returns:
         (new_spread_timer, list of spread events)
@@ -405,6 +435,7 @@ def tick_contagion_spread(
 
     spread_timer = 0.0
     events: list[dict] = []
+    spread_chance = getattr(difficulty, "contagion_spread_chance", CONTAGION_SPREAD_CHANCE) if difficulty else CONTAGION_SPREAD_CHANCE
 
     # Find infected crew not in quarantine
     infected = [
@@ -426,7 +457,7 @@ def tick_contagion_spread(
         ]
 
         for target in targets:
-            if rng.random() < CONTAGION_SPREAD_CHANCE:
+            if rng.random() < spread_chance:
                 # Spread infection
                 injury = Injury(
                     id=roster.next_injury_id(),

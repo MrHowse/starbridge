@@ -94,7 +94,7 @@ def apply_hit_to_player(
     setattr(ship.shields, facing, max(0.0, shield_hp - absorbed / SHIELD_ABSORPTION_COEFF))
 
     # Apply difficulty enemy damage multiplier.
-    hull_damage = (damage - absorbed) * ship.difficulty.enemy_damage_mult
+    hull_damage = (damage - absorbed) * ship.difficulty.enemy_damage_multiplier
 
     # Apply Electronic Warfare countermeasure reduction.
     if hull_damage > 0.0 and ship.ew_countermeasure_active and ship.countermeasure_charges > 0:
@@ -107,14 +107,13 @@ def apply_hit_to_player(
     damaged_systems: list[tuple[str, float]] = []
     if hull_damage > 0:
         ship.hull = max(0.0, ship.hull - hull_damage)
-        if rng.random() < HULL_SYSTEM_DAMAGE_CHANCE:
+        if rng.random() < ship.difficulty.component_damage_chance:
             system_name = rng.choice(list(ship.systems.keys()))
-            dmg = rng.uniform(SYSTEM_DAMAGE_MIN, SYSTEM_DAMAGE_MAX)
+            dmg = rng.uniform(SYSTEM_DAMAGE_MIN, SYSTEM_DAMAGE_MAX) * ship.difficulty.component_severity_multiplier
             ship.systems[system_name].health = max(0.0, ship.systems[system_name].health - dmg)
             damaged_systems.append((system_name, ship.systems[system_name].health))
-        # Crew casualties scaled by difficulty.crew_casualty_mult.
-        # Uses rng.choice only for deck selection; does not add an extra rng.random() call.
-        casualties = int((hull_damage * ship.difficulty.crew_casualty_mult) / CREW_CASUALTY_PER_HULL_DAMAGE)
+        # Crew casualties scaled by difficulty.injury_chance (normalised to officer=0.4).
+        casualties = int((hull_damage * ship.difficulty.injury_chance / 0.4) / CREW_CASUALTY_PER_HULL_DAMAGE)
         if casualties > 0 and ship.crew.decks:
             deck_name = rng.choice(list(ship.crew.decks.keys()))
             ship.crew.apply_casualties(deck_name, casualties)

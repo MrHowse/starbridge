@@ -236,6 +236,23 @@ async def api_status() -> dict:
     }
 
 
+@app.get("/api/difficulty_presets")
+async def api_difficulty_presets() -> dict:
+    """Return all difficulty presets with descriptions for lobby UI."""
+    from server.difficulty import PRESETS as _PRESETS, preset_summary
+    return {
+        "presets": {
+            key: {
+                "name": p.name,
+                "description": p.description,
+                "summary": preset_summary(p),
+                "hints_enabled": p.hints_enabled,
+            }
+            for key, p in _PRESETS.items()
+        }
+    }
+
+
 @app.get("/manual")
 @app.get("/manual/")
 async def manual_page() -> FileResponse:
@@ -427,16 +444,24 @@ async def admin_broadcast_msg(payload: dict) -> dict:
 
 @app.post("/admin/difficulty")
 async def admin_set_difficulty(payload: dict) -> dict:
-    """Change the difficulty preset mid-game."""
-    from server.difficulty import PRESETS as _PRESETS
+    """Change the difficulty preset mid-game and broadcast to all clients."""
+    from server.difficulty import PRESETS as _PRESETS, preset_summary
+    from server.models.messages import Message
     preset = str(payload.get("preset", "")).strip()
     if not preset:
         raise HTTPException(status_code=400, detail="'preset' is required.")
     if preset not in _PRESETS:
         raise HTTPException(status_code=400, detail=f"Unknown difficulty preset: '{preset}'.")
-    world.ship.difficulty = _get_preset(preset)
-    preset = preset  # keep variable for return
+    new_preset = _get_preset(preset)
+    world.ship.difficulty = new_preset
     logger.info("[ADMIN] Difficulty changed to '%s'", preset)
+    # Broadcast to all clients so UI can update.
+    await manager.broadcast(Message.build("game.difficulty_changed", {
+        "preset": preset,
+        "name": new_preset.name,
+        "description": new_preset.description,
+        "summary": preset_summary(new_preset),
+    }))
     return {"difficulty": preset}
 
 

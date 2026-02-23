@@ -80,7 +80,8 @@ def sensor_range(ship: Ship, hazard_modifier: float = 1.0) -> float:
     *hazard_modifier* (0.0–1.0) further reduces range when environmental
     hazards such as nebulae or radiation zones are active.
     """
-    return BASE_SENSOR_RANGE * ship.systems["sensors"].efficiency * hazard_modifier
+    diff_mult = getattr(ship.difficulty, "sensor_range_multiplier", 1.0)
+    return BASE_SENSOR_RANGE * ship.systems["sensors"].efficiency * hazard_modifier * diff_mult
 
 
 def tick(world: World, ship: Ship, dt: float) -> list[str]:
@@ -95,8 +96,11 @@ def tick(world: World, ship: Ship, dt: float) -> list[str]:
         return []
 
     efficiency = max(_MIN_EFFICIENCY, ship.systems["sensors"].efficiency)
+    scan_time_mult = getattr(ship.difficulty, "scan_time_multiplier", 1.0)
     # Higher efficiency → smaller denominator → larger progress increment.
-    progress_per_sec = 100.0 / (BASE_SCAN_TIME / efficiency)
+    # scan_time_multiplier >1 = slower scans (longer duration).
+    effective_scan_time = BASE_SCAN_TIME * max(0.1, scan_time_mult)
+    progress_per_sec = 100.0 / (effective_scan_time / efficiency)
     _active_scan.progress = min(100.0, _active_scan.progress + progress_per_sec * dt)
 
     if _active_scan.progress >= 100.0:
