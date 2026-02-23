@@ -153,8 +153,8 @@ def test_system_damage_on_hull_hit_when_rng_triggers():
 
     result = apply_hit_to_player(ship, damage, 0.0, -1_000.0, rng=mock_rng)
 
-    assert len(result) == 1
-    assert result[0][0] == "engines"
+    assert len(result.damaged_systems) == 1
+    assert result.damaged_systems[0][0] == "engines"
     assert ship.systems["engines"].health == pytest.approx(100.0 - 15.0)
 
 
@@ -167,7 +167,7 @@ def test_no_system_damage_when_rng_suppresses():
     mock_rng.random.return_value = 1.0  # above chance → no system damage
 
     result = apply_hit_to_player(ship, damage, 0.0, -1_000.0, rng=mock_rng)
-    assert result == []
+    assert result.damaged_systems == []
 
 
 def test_no_system_damage_when_hull_damage_is_zero():
@@ -182,7 +182,7 @@ def test_no_system_damage_when_hull_damage_is_zero():
     result = apply_hit_to_player(ship, damage, 0.0, -1_000.0, rng=mock_rng)
     # Hull damage = 1 - min(40, 1) = 0 → no system damage
     assert ship.hull == 100.0
-    assert result == []
+    assert result.damaged_systems == []
 
 
 def test_hull_does_not_go_below_zero():

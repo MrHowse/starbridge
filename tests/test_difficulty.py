@@ -222,7 +222,7 @@ def test_component_damage_chance_cadet():
     rng.uniform.return_value = 10.0
     initial = ship.hull
     result = apply_hit_to_player(ship, 10.0, 0.0, 1000.0, rng=rng)
-    assert len(result) == 0  # no system damaged
+    assert len(result.damaged_systems) == 0  # no system damaged
 
 
 def test_component_damage_chance_admiral():
@@ -234,7 +234,7 @@ def test_component_damage_chance_admiral():
     rng.choice.return_value = "engines"
     rng.uniform.return_value = 10.0
     result = apply_hit_to_player(ship, 10.0, 0.0, 1000.0, rng=rng)
-    assert len(result) == 1  # system damaged
+    assert len(result.damaged_systems) == 1  # system damaged
 
 
 def test_component_severity_scales():

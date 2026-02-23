@@ -87,6 +87,8 @@ from server.models.messages import (
     MapClearRoutePayload,
 )
 from server.models.crew import CrewRoster
+from server.models.crew_roster import IndividualCrewRoster
+from server.models.injuries import generate_injuries
 from server.models.interior import make_default_interior
 from server.models.ship_class import load_ship_class
 from server.difficulty import get_preset
@@ -431,9 +433,15 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.ship.crew = CrewRoster()
     _world.ship.interior = make_default_interior()
     _world.ship.difficulty = _diff_preset
+
+    # v0.06.1: Generate individual crew roster and wire into medical v2.
+    _crew_count = (sc.min_crew + sc.max_crew) // 2
+    _individual_roster = IndividualCrewRoster.generate(_crew_count, ship_class=ship_class)
+    glmed.init_roster(_individual_roster, ship_class=ship_class)
+
     logger.info(
-        "Ship class: %s (hull=%.0f, ammo=%d), difficulty: %s",
-        sc.id, sc.max_hull, sum(sc.get_torpedo_loadout().values()), difficulty,
+        "Ship class: %s (hull=%.0f, ammo=%d, crew=%d), difficulty: %s",
+        sc.id, sc.max_hull, sum(sc.get_torpedo_loadout().values()), _crew_count, difficulty,
     )
 
     # Apply difficulty scaling to medical supplies.
@@ -714,7 +722,7 @@ async def _loop() -> None:
         # 6. Enemy beam hits (ship AI + station turrets + creatures). 7. Shields. 7.5 Scan. 7.6 Docking. 8. Cooldowns.
         _hull_before_combat = _world.ship.hull
         _combat_health_snapshot = {n: s.health for n, s in _world.ship.systems.items()}
-        combat_damage_events = await glw.handle_enemy_beam_hits(
+        combat_damage_events, combat_casualties = await glw.handle_enemy_beam_hits(
             list(beam_hit_events) + list(station_beam_hits) + creature_beam_hits, _world, _manager
         )
         gldc.apply_hull_damage(_hull_before_combat - _world.ship.hull, _world.ship.interior)
@@ -955,9 +963,35 @@ async def _loop() -> None:
                     })
             elif _sb_type == "crew_casualty":
                 _world.ship.crew.apply_casualties(sb_evt["deck"], sb_evt["count"])
-                gl.log_event("sandbox", "crew_casualty", {
-                    "deck": sb_evt["deck"], "count": sb_evt["count"],
-                })
+                # v0.06.1: generate individual injuries via the injury system.
+                _sb_roster = glmed.get_roster()
+                if _sb_roster is not None:
+                    _DECK_NAME_TO_NUM = {"bridge": 1, "sensors": 2, "weapons": 3, "shields": 3, "engineering": 5, "medical": 4}
+                    _sb_phys_deck = _DECK_NAME_TO_NUM.get(sb_evt["deck"], 1)
+                    _sb_injuries = generate_injuries(
+                        "system_malfunction", _sb_phys_deck, _sb_roster,
+                        severity_scale=1.0, tick=_tick_count,
+                        difficulty=_world.ship.difficulty,
+                    )
+                    for _sb_cid, _sb_inj in _sb_injuries:
+                        _sb_member = _sb_roster.members.get(_sb_cid)
+                        if _sb_member is not None:
+                            _sb_member.injuries.append(_sb_inj)
+                            _sb_member.update_status()
+                    for _sb_cid, _sb_inj in _sb_injuries:
+                        _sb_member = _sb_roster.members.get(_sb_cid)
+                        gl.log_event("sandbox", "crew_casualty", {
+                            "deck": sb_evt["deck"],
+                            "crew_id": _sb_cid,
+                            "crew_name": _sb_member.display_name if _sb_member else _sb_cid,
+                            "injury_type": _sb_inj.type,
+                            "body_region": _sb_inj.body_region,
+                            "severity": _sb_inj.severity,
+                        })
+                else:
+                    gl.log_event("sandbox", "crew_casualty", {
+                        "deck": sb_evt["deck"], "count": sb_evt["count"],
+                    })
             elif _sb_type == "start_boarding":
                 if not gls.is_boarding_active():
                     gls.start_boarding(_world.ship.interior, [], sb_evt["intruders"])
@@ -1287,6 +1321,31 @@ async def _loop() -> None:
                 "component_health": round(_combat_comp_hit.get("health", 0.0), 1),
                 "effect": _combat_comp_hit.get("effect", ""),
             })
+        # 12c. Combat crew casualties — generate individual injuries.
+        _combat_roster = glmed.get_roster()
+        if _combat_roster is not None:
+            for _cc in combat_casualties:
+                _cc_injuries = generate_injuries(
+                    "explosion", _cc.physical_deck, _combat_roster,
+                    severity_scale=min(_cc.count, 3) * 0.5, tick=_tick_count,
+                    difficulty=_world.ship.difficulty,
+                )
+                for _cc_cid, _cc_inj in _cc_injuries:
+                    _cc_member = _combat_roster.members.get(_cc_cid)
+                    if _cc_member is not None:
+                        _cc_member.injuries.append(_cc_inj)
+                        _cc_member.update_status()
+                for _cc_cid, _cc_inj in _cc_injuries:
+                    _cc_member = _combat_roster.members.get(_cc_cid)
+                    gl.log_event("combat", "crew_casualty", {
+                        "deck": _cc.deck_name,
+                        "crew_id": _cc_cid,
+                        "crew_name": _cc_member.display_name if _cc_member else _cc_cid,
+                        "injury_type": _cc_inj.type,
+                        "body_region": _cc_inj.body_region,
+                        "severity": _cc_inj.severity,
+                    })
+
         for evt in torpedo_events:
             if evt.get("type") == "pd_intercept":
                 await _manager.broadcast(Message.build("weapons.pd_intercept", {

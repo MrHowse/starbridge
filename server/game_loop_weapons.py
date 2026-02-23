@@ -30,6 +30,7 @@ from server.systems.combat import (
     BEAM_PLAYER_ARC_DEG,
     BEAM_PLAYER_DAMAGE,
     BEAM_PLAYER_RANGE,
+    CombatHitResult,
     apply_hit_to_enemy,
     apply_hit_to_player,
     beam_in_arc,
@@ -868,17 +869,23 @@ async def handle_enemy_beam_hits(
     beam_hit_events: list,
     world: World,
     manager: object,
-) -> list[tuple[str, float]]:
-    """Apply enemy beam hits to player or stations. Returns combat damage events."""
+) -> tuple[list[tuple[str, float]], list]:
+    """Apply enemy beam hits to player or stations.
+
+    Returns (combat_damage_events, combat_casualties) where casualties
+    is a list of CombatCasualty objects from apply_hit_to_player.
+    """
     combat_damage_events: list[tuple[str, float]] = []
+    combat_casualties: list = []
 
     for ev in beam_hit_events:
         if ev.target == "player":
-            sys_damaged = apply_hit_to_player(
+            hit_result = apply_hit_to_player(
                 world.ship, ev.damage, ev.attacker_x, ev.attacker_y,
                 shield_bypass=getattr(ev, "shield_bypass", 0.0),
             )
-            combat_damage_events.extend(sys_damaged)
+            combat_damage_events.extend(hit_result.damaged_systems)
+            combat_casualties.extend(hit_result.casualties)
             gl.log_event("combat", "ship_hit", {
                 "attacker_id": ev.attacker_id,
                 "damage": round(ev.damage, 2),
@@ -918,4 +925,4 @@ async def handle_enemy_beam_hits(
                     )
                 )
 
-    return combat_damage_events
+    return combat_damage_events, combat_casualties
