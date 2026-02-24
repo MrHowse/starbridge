@@ -204,8 +204,8 @@ def tick(world: "World", dt: float, difficulty: object | None = None) -> list[di
         events.append({
             "type": "start_boarding",
             "intruders": [
-                {"id": f"sb_i{_entity_counter}",     "room_id": "conn", "objective_id": None},
-                {"id": f"sb_i{_entity_counter + 1}", "room_id": "conn", "objective_id": None},
+                {"id": f"sb_i{_entity_counter}",     "room_id": "cargo_hold", "objective_id": "bridge"},
+                {"id": f"sb_i{_entity_counter + 1}", "room_id": "cargo_hold", "objective_id": "engine_room"},
             ],
         })
         _entity_counter += 1

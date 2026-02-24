@@ -149,8 +149,8 @@ class TestSandboxActive:
         assert len(board[0]["intruders"]) == 2
         for intruder in board[0]["intruders"]:
             assert "id" in intruder
-            assert intruder["room_id"] == "conn"
-            assert intruder["objective_id"] is None
+            assert intruder["room_id"] == "cargo_hold"
+            assert intruder["objective_id"] is not None
 
     # --- multiple events ---
 

@@ -104,6 +104,12 @@ def deploy_squads(interior: ShipInterior, squad_specs: list[dict]) -> None:
     ]
 
 
+_DEFAULT_SQUAD_SPECS: list[dict] = [
+    {"id": "squad_1", "room_id": "bridge"},
+    {"id": "squad_2", "room_id": "combat_info"},
+]
+
+
 def start_boarding(
     interior: ShipInterior,
     squad_specs: list[dict],
@@ -113,6 +119,7 @@ def start_boarding(
 
     squad_specs: list of {id, room_id} dicts. If empty, any squads already
     placed by deploy_squads() are preserved (planning → combat transition).
+    If no squads exist at all, default squads are auto-created.
     intruder_specs: list of {id, room_id, objective_id} dicts.
     """
     global _boarding_active
@@ -122,7 +129,13 @@ def start_boarding(
             MarineSquad(id=s["id"], room_id=s["room_id"])
             for s in squad_specs
         ]
-    # If squad_specs is empty, preserve squads already placed by deploy_squads().
+    elif not interior.marine_squads:
+        # No squads provided and none pre-deployed — auto-create defaults.
+        interior.marine_squads = [
+            MarineSquad(id=s["id"], room_id=s["room_id"])
+            for s in _DEFAULT_SQUAD_SPECS
+            if s["room_id"] in interior.rooms
+        ]
 
     interior.intruders = [
         Intruder(
