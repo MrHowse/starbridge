@@ -94,6 +94,9 @@ _pending_standing_changes: list[dict] = []
 # Pending NPC responses (consumed by game_loop for broadcast)
 _pending_npc_responses: list[dict] = []
 
+# Pending decode completions (consumed by game_loop for debrief logging)
+_pending_decode_completions: list[dict] = []
+
 # Probe state
 _active_probes: dict[str, float] = {}  # target_id → remaining_seconds
 PROBE_DURATION: float = 15.0
@@ -139,6 +142,7 @@ def reset() -> None:
     _pending_intel_routes.clear()
     _pending_standing_changes.clear()
     _pending_npc_responses.clear()
+    _pending_decode_completions.clear()
     _active_probes.clear()
     _transmissions.clear()
     _comms_contacts.clear()
@@ -362,6 +366,12 @@ def _tick_decode(dt: float, crew_factor: float, bandwidth_quality: float) -> lis
                 "signal_type": sig.signal_type,
                 "faction": sig.faction,
                 "intel_value": sig.intel_value,
+            })
+            _pending_decode_completions.append({
+                "signal_id": sig.id,
+                "signal_type": sig.signal_type,
+                "faction": sig.faction,
+                "source_name": sig.source_name,
             })
 
     return events
@@ -769,6 +779,13 @@ def pop_pending_npc_responses() -> list[dict]:
     responses = list(_pending_npc_responses)
     _pending_npc_responses.clear()
     return responses
+
+
+def pop_pending_decode_completions() -> list[dict]:
+    """Drain and return pending decode completion events (for debrief logging)."""
+    completions = list(_pending_decode_completions)
+    _pending_decode_completions.clear()
+    return completions
 
 
 # ---------------------------------------------------------------------------

@@ -405,3 +405,204 @@ class TestComputeFromLog:
         assert d["awards"] == []
         assert d["key_moments"] == []
         assert d["timeline"] == []
+
+
+# ---------------------------------------------------------------------------
+# game_debrief: compute_debrief — dynamic missions
+# ---------------------------------------------------------------------------
+
+
+class TestComputeDebriefDynamicMissions:
+    """Dynamic mission tracking in debrief."""
+
+    def test_mission_offered_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "mission_offered",
+             "data": {"mission": {"id": "dm_1", "title": "Rescue", "mission_type": "rescue",
+                                   "objectives": [{"id": "o1"}, {"id": "o2"}]}}},
+        ]
+        d = gdb.compute_debrief(events)
+        dm = d["dynamic_missions"]
+        assert dm["missions_offered"] == 1
+        assert dm["objectives_total"] == 2
+
+    def test_mission_accepted_counted_and_logged(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "mission_accepted",
+             "data": {"mission": {"id": "dm_1", "title": "Rescue Op"}}},
+        ]
+        d = gdb.compute_debrief(events)
+        dm = d["dynamic_missions"]
+        assert dm["missions_accepted"] == 1
+        texts = [m["text"] for m in d["key_moments"]]
+        assert any("Rescue Op" in t for t in texts)
+
+    def test_mission_completed_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "mission_completed",
+             "data": {"mission_id": "dm_1", "title": "Rescue Op",
+                      "rewards": {"crew": 2, "reputation": 5, "faction_standing": {"civilian": 10.0}}}},
+        ]
+        d = gdb.compute_debrief(events)
+        dm = d["dynamic_missions"]
+        assert dm["missions_completed"] == 1
+        assert dm["total_rewards"]["crew"] == 2
+        assert dm["total_rewards"]["reputation"] == 5
+
+    def test_mission_failed_counted_and_logged(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "mission_failed",
+             "data": {"mission_id": "dm_1", "title": "Lost Patrol", "reason": "Timed out"}},
+        ]
+        d = gdb.compute_debrief(events)
+        dm = d["dynamic_missions"]
+        assert dm["missions_failed"] == 1
+        texts = [m["text"] for m in d["key_moments"]]
+        assert any("Lost Patrol" in t for t in texts)
+
+    def test_mission_declined_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "mission_declined",
+             "data": {"mission_id": "dm_1"}},
+        ]
+        d = gdb.compute_debrief(events)
+        assert d["dynamic_missions"]["missions_declined"] == 1
+
+    def test_mission_expired_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "mission_expired",
+             "data": {"mission_id": "dm_1"}},
+        ]
+        d = gdb.compute_debrief(events)
+        assert d["dynamic_missions"]["missions_expired"] == 1
+
+    def test_objective_completed_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "objective_completed",
+             "data": {"mission_id": "dm_1", "objective_id": "o1"}},
+            {"tick": 2, "ts": 2.0, "cat": "dynamic_mission", "event": "objective_completed",
+             "data": {"mission_id": "dm_1", "objective_id": "o2"}},
+        ]
+        d = gdb.compute_debrief(events)
+        assert d["dynamic_missions"]["objectives_completed"] == 2
+
+    def test_total_rewards_aggregated(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "mission_completed",
+             "data": {"mission_id": "dm_1", "title": "A",
+                      "rewards": {"crew": 2, "reputation": 5, "supplies": {"torpedoes": 3}}}},
+            {"tick": 2, "ts": 2.0, "cat": "dynamic_mission", "event": "mission_completed",
+             "data": {"mission_id": "dm_2", "title": "B",
+                      "rewards": {"crew": 1, "reputation": 3, "supplies": {"torpedoes": 1, "fuel": 5}}}},
+        ]
+        d = gdb.compute_debrief(events)
+        tr = d["dynamic_missions"]["total_rewards"]
+        assert tr["crew"] == 3
+        assert tr["reputation"] == 8
+        assert tr["supplies"]["torpedoes"] == 4
+        assert tr["supplies"]["fuel"] == 5
+
+    def test_empty_log_has_zero_missions(self):
+        d = gdb.compute_debrief([])
+        dm = d["dynamic_missions"]
+        assert dm["missions_offered"] == 0
+        assert dm["missions_completed"] == 0
+
+    def test_dynamic_mission_events_count_toward_captain(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "dynamic_mission", "event": "mission_offered",
+             "data": {"mission": {"id": "dm_1", "title": "X", "mission_type": "rescue", "objectives": []}}},
+        ]
+        d = gdb.compute_debrief(events)
+        assert "captain" in d["per_station_stats"]
+        assert d["per_station_stats"]["captain"]["total"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# game_debrief: compute_debrief — comms performance
+# ---------------------------------------------------------------------------
+
+
+class TestComputeDebriefCommsPerformance:
+    """Comms performance tracking in debrief."""
+
+    def test_signals_decoded_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "comms", "event": "signal_decoded",
+             "data": {"signal_id": "s1", "signal_type": "distress", "faction": "civilian"}},
+            {"tick": 2, "ts": 2.0, "cat": "comms", "event": "signal_decoded",
+             "data": {"signal_id": "s2", "signal_type": "encrypted", "faction": "imperial"}},
+        ]
+        d = gdb.compute_debrief(events)
+        assert d["comms_performance"]["signals_decoded"] == 2
+
+    def test_avg_decode_time_computed(self):
+        events = [
+            {"tick": 1, "ts": 5.0, "cat": "comms", "event": "decode_started",
+             "data": {"signal_id": "s1"}},
+            {"tick": 2, "ts": 15.0, "cat": "comms", "event": "signal_decoded",
+             "data": {"signal_id": "s1"}},
+            {"tick": 3, "ts": 20.0, "cat": "comms", "event": "decode_started",
+             "data": {"signal_id": "s2"}},
+            {"tick": 4, "ts": 40.0, "cat": "comms", "event": "signal_decoded",
+             "data": {"signal_id": "s2"}},
+        ]
+        d = gdb.compute_debrief(events)
+        cp = d["comms_performance"]
+        assert cp["signals_decoded"] == 2
+        # s1: 15-5=10, s2: 40-20=20 → avg=15
+        assert cp["avg_decode_time"] == 15.0
+
+    def test_intel_routed_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "comms", "event": "intel_routed",
+             "data": {"target": "weapons", "signal_id": "s1"}},
+            {"tick": 2, "ts": 2.0, "cat": "comms", "event": "intel_routed",
+             "data": {"target": "science", "signal_id": "s2"}},
+            {"tick": 3, "ts": 3.0, "cat": "comms", "event": "intel_routed",
+             "data": {"target": "weapons", "signal_id": "s3"}},
+        ]
+        d = gdb.compute_debrief(events)
+        cp = d["comms_performance"]
+        assert cp["intel_routed"] == 3
+        assert cp["intel_destinations"]["weapons"] == 2
+        assert cp["intel_destinations"]["science"] == 1
+
+    def test_diplomatic_responses_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "comms", "event": "diplomatic_response",
+             "data": {"signal_id": "s1", "response_id": "r1"}},
+        ]
+        d = gdb.compute_debrief(events)
+        assert d["comms_performance"]["diplomatic_responses"] == 1
+
+    def test_hails_sent_counted(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "comms", "event": "hail_sent",
+             "data": {"contact_id": "c1"}},
+            {"tick": 2, "ts": 2.0, "cat": "comms", "event": "hail_sent",
+             "data": {"contact_id": "c2"}},
+        ]
+        d = gdb.compute_debrief(events)
+        assert d["comms_performance"]["hails_sent"] == 2
+
+    def test_standing_changes_tracked(self):
+        events = [
+            {"tick": 1, "ts": 1.0, "cat": "comms", "event": "standing_changed",
+             "data": {"faction": "civilian", "amount": 10.0, "reason": "rescue"}},
+            {"tick": 2, "ts": 2.0, "cat": "comms", "event": "standing_changed",
+             "data": {"faction": "civilian", "amount": -5.0, "reason": "ignored"}},
+            {"tick": 3, "ts": 3.0, "cat": "comms", "event": "standing_changed",
+             "data": {"faction": "imperial", "amount": -3.0, "reason": "hostile"}},
+        ]
+        d = gdb.compute_debrief(events)
+        cp = d["comms_performance"]
+        assert cp["net_standings"]["civilian"] == 5.0
+        assert cp["net_standings"]["imperial"] == -3.0
+
+    def test_empty_log_has_zero_comms(self):
+        d = gdb.compute_debrief([])
+        cp = d["comms_performance"]
+        assert cp["signals_decoded"] == 0
+        assert cp["intel_routed"] == 0
+        assert cp["hails_sent"] == 0

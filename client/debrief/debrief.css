@@ -286,6 +286,55 @@
 .replay-dot--ship   { background: #00d4ff; }
 .replay-dot--moment { background: #ffd700; }
 
+/* ── Missions + Comms debrief ── */
+.debrief-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.debrief-stat-row .text-label { font-size: .7rem; opacity: 0.7; }
+.debrief-stat-row .text-body  { font-size: .7rem; }
+
+.debrief-val--good { color: #00ff88; }
+.debrief-val--bad  { color: #ff4040; }
+
+.debrief-mission-detail {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 0;
+  font-size: .65rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.debrief-mission-type {
+  background: rgba(255,176,0,0.15);
+  color: #ffb000;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-size: .6rem;
+  letter-spacing: .06em;
+  flex-shrink: 0;
+}
+.debrief-mission-title { flex: 1; }
+.debrief-mission-status { flex-shrink: 0; letter-spacing: .06em; }
+
+.debrief-rewards,
+.debrief-intel-destinations,
+.debrief-standings {
+  margin-top: 6px;
+  font-size: .65rem;
+}
+.debrief-rewards .text-label,
+.debrief-intel-destinations .text-label,
+.debrief-standings .text-label {
+  opacity: 0.7;
+  margin-right: 6px;
+}
+.debrief-missions-summary {
+  margin-bottom: 8px;
+}
+
 /* ── Responsive tweak ── */
 @media (max-width: 720px) {
   .debrief-body { flex-direction: column; }

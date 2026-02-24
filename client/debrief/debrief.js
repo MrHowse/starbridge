@@ -184,6 +184,140 @@ function renderStats(perStation) {
 }
 
 // ---------------------------------------------------------------------------
+// Render dynamic missions
+// ---------------------------------------------------------------------------
+
+const missionsPanel = document.getElementById('missions-debrief-panel');
+const missionsList  = document.getElementById('missions-debrief-list');
+
+function renderMissions(dm) {
+  if (!dm || dm.missions_offered === 0) return;
+  missionsPanel.style.display = '';
+  missionsList.innerHTML = '';
+
+  // Summary row
+  const summary = document.createElement('div');
+  summary.className = 'debrief-missions-summary';
+  summary.innerHTML = `
+    <div class="debrief-stat-row">
+      <span class="text-label">OFFERED</span><span class="text-body">${dm.missions_offered}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">ACCEPTED</span><span class="text-body">${dm.missions_accepted}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">COMPLETED</span><span class="text-body debrief-val--good">${dm.missions_completed}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">FAILED</span><span class="text-body debrief-val--bad">${dm.missions_failed}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">DECLINED / EXPIRED</span><span class="text-body">${dm.missions_declined + dm.missions_expired}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">OBJECTIVES</span><span class="text-body">${dm.objectives_completed} / ${dm.objectives_total}</span>
+    </div>
+  `;
+  missionsList.appendChild(summary);
+
+  // Mission details
+  if (dm.mission_details && dm.mission_details.length) {
+    for (const m of dm.mission_details) {
+      const completed = dm.completion_details?.find(c => c.mission_id === m.id);
+      const failed    = dm.failure_details?.find(f => f.mission_id === m.id);
+      const status = completed ? 'COMPLETED' : failed ? 'FAILED' : 'OFFERED';
+      const cls    = completed ? 'debrief-val--good' : failed ? 'debrief-val--bad' : '';
+
+      const row = document.createElement('div');
+      row.className = 'debrief-mission-detail';
+      row.innerHTML = `
+        <span class="debrief-mission-type">${esc(m.mission_type?.toUpperCase() || '—')}</span>
+        <span class="debrief-mission-title">${esc(m.title || '—')}</span>
+        <span class="debrief-mission-status ${cls}">${status}</span>
+      `;
+      missionsList.appendChild(row);
+    }
+  }
+
+  // Total rewards
+  const rew = dm.total_rewards;
+  if (rew && (rew.crew > 0 || rew.reputation > 0 || Object.keys(rew.supplies || {}).length)) {
+    const rewDiv = document.createElement('div');
+    rewDiv.className = 'debrief-rewards';
+    let html = '<span class="text-label">TOTAL REWARDS:</span>';
+    if (rew.crew > 0) html += ` <span class="text-body">+${rew.crew} crew</span>`;
+    if (rew.reputation > 0) html += ` <span class="text-body">+${rew.reputation} rep</span>`;
+    for (const [item, qty] of Object.entries(rew.supplies || {})) {
+      html += ` <span class="text-body">+${qty} ${esc(item)}</span>`;
+    }
+    rewDiv.innerHTML = html;
+    missionsList.appendChild(rewDiv);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Render comms performance
+// ---------------------------------------------------------------------------
+
+const commsPanel = document.getElementById('comms-debrief-panel');
+const commsList  = document.getElementById('comms-debrief-list');
+
+function renderCommsPerformance(cp) {
+  if (!cp || (cp.signals_decoded === 0 && cp.hails_sent === 0 && cp.intel_routed === 0)) return;
+  commsPanel.style.display = '';
+  commsList.innerHTML = '';
+
+  const stats = document.createElement('div');
+  stats.className = 'debrief-comms-stats';
+  stats.innerHTML = `
+    <div class="debrief-stat-row">
+      <span class="text-label">SIGNALS DECODED</span><span class="text-body">${cp.signals_decoded}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">AVG DECODE TIME</span><span class="text-body">${cp.avg_decode_time > 0 ? cp.avg_decode_time + 's' : '—'}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">INTEL ROUTED</span><span class="text-body">${cp.intel_routed}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">HAILS SENT</span><span class="text-body">${cp.hails_sent}</span>
+    </div>
+    <div class="debrief-stat-row">
+      <span class="text-label">DIPLOMATIC RESPONSES</span><span class="text-body">${cp.diplomatic_responses}</span>
+    </div>
+  `;
+  commsList.appendChild(stats);
+
+  // Intel destinations
+  if (cp.intel_destinations && Object.keys(cp.intel_destinations).length) {
+    const destDiv = document.createElement('div');
+    destDiv.className = 'debrief-intel-destinations';
+    let html = '<span class="text-label">INTEL DESTINATIONS:</span>';
+    for (const [dest, count] of Object.entries(cp.intel_destinations)) {
+      html += ` <span class="text-body">${esc(dest)} ×${count}</span>`;
+    }
+    destDiv.innerHTML = html;
+    commsList.appendChild(destDiv);
+  }
+
+  // Net faction standings
+  if (cp.net_standings && Object.keys(cp.net_standings).length) {
+    const standDiv = document.createElement('div');
+    standDiv.className = 'debrief-standings';
+    standDiv.innerHTML = '<span class="text-label">NET STANDING CHANGES:</span>';
+    for (const [faction, amount] of Object.entries(cp.net_standings)) {
+      const sign = amount >= 0 ? '+' : '';
+      const cls  = amount >= 0 ? 'debrief-val--good' : 'debrief-val--bad';
+      const item = document.createElement('span');
+      item.className = `text-body ${cls}`;
+      item.textContent = ` ${esc(faction)}: ${sign}${amount}`;
+      standDiv.appendChild(item);
+    }
+    commsList.appendChild(standDiv);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Captain's Replay
 // ---------------------------------------------------------------------------
 
@@ -347,6 +481,8 @@ if (!_data || !_data.debrief) {
   renderAwards(_data.debrief.awards);
   renderMoments(_data.debrief.key_moments);
   renderCaptainLog(_data.captain_log);
+  renderMissions(_data.debrief.dynamic_missions);
+  renderCommsPerformance(_data.debrief.comms_performance);
   renderStats(_data.debrief.per_station_stats);
   initReplay(_data.debrief.timeline, _data.debrief.key_moments);
 }

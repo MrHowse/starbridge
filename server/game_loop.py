@@ -1234,13 +1234,14 @@ async def _loop() -> None:
             enemy_ids=frozenset(e.id for e in _world.enemies),
             docked_station_id=gldo.get_docked_station_id(),
         )
-        # Broadcast mission events to captain.
+        # Broadcast mission events to captain and log for debrief.
         _dm_events = gldm.pop_pending_mission_events()
         for _dme in _dm_events:
             await _manager.broadcast_to_roles(
                 ["captain", "comms"],
                 Message.build(f"mission.{_dme['event']}", _dme),
             )
+            gl.log_event("dynamic_mission", _dme["event"], _dme)
         # Broadcast active/offered mission list to captain every tick.
         _dm_list = gldm.get_missions_for_broadcast()
         if _dm_list:
@@ -1338,6 +1339,10 @@ async def _loop() -> None:
                 Message.build("comms.npc_response", npc_resp),
             )
 
+        # 11f1b. Log signal decode completions for debrief.
+        for _dc in glco.pop_pending_decode_completions():
+            gl.log_event("comms", "signal_decoded", _dc)
+
         # 11f2. Intel routes → broadcast to target stations.
         for intel_route in glco.pop_pending_intel_routes():
             _target = intel_route.get("target_station", "captain")
@@ -1356,6 +1361,11 @@ async def _loop() -> None:
                 ["comms", "captain"],
                 Message.build("comms.standing_changed", sc),
             )
+            gl.log_event("comms", "standing_changed", {
+                "faction": sc.get("faction_id", ""),
+                "amount": sc.get("amount", 0),
+                "reason": sc.get("reason", ""),
+            })
 
         # 11g. Medical disease state + spread events.
         await _manager.broadcast_to_roles(
@@ -1927,11 +1937,16 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             glco.hail(payload.contact_id, payload.message_type,
                        frequency=payload.frequency, hail_type=payload.hail_type)
             _set_training_flag(glm, "comms_hail_sent")
+            gl.log_event("comms", "hail_sent", {"contact_id": payload.contact_id})
         elif msg_type == "comms.decode_signal" and isinstance(payload, CommsDecodeSignalPayload):
             glco.start_decode(payload.signal_id)
+            gl.log_event("comms", "decode_started", {"signal_id": payload.signal_id})
         elif msg_type == "comms.respond" and isinstance(payload, CommsRespondPayload):
             glco.respond_to_signal(payload.signal_id, payload.response_id)
             gldm.notify_signal_responded(payload.signal_id)
+            gl.log_event("comms", "diplomatic_response", {
+                "signal_id": payload.signal_id, "response_id": payload.response_id,
+            })
         elif msg_type == "comms.route_intel" and isinstance(payload, CommsRouteIntelPayload):
             glco.route_intel(payload.signal_id, payload.target_station)
         elif msg_type == "comms.set_channel" and isinstance(payload, CommsSetChannelPayload):
