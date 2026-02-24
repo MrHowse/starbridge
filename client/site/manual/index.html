@@ -555,31 +555,41 @@
       <div id="s-flightops" class="station">
         <h3 class="station__heading">FLIGHT OPERATIONS</h3>
         <div class="station-body">
-          <p><em>Role summary:</em> You operate the ship's drone bay and probe
-          launchers. Drones extend sensor coverage dynamically; probes are deployed
-          permanently at fixed locations. Both feed contacts directly to the Science
-          station's sensor map. Fuel is finite — manage your flight deck carefully.</p>
+          <p><em>Role summary:</em> You command the ship's flight deck: launching,
+          recovering, and directing drones on tactical missions. Five drone types
+          (scout, combat, rescue, survey, ECM) cover sensor extension, fire support,
+          search and rescue, area survey, and electronic warfare. Sensor buoys and
+          decoys are expendable assets. Fuel is finite — manage your flight deck
+          carefully.</p>
 
           <p><strong>Controls</strong></p>
           <ul>
-            <li><strong>Sector map (canvas):</strong> Shows ship, drone positions, probe
-            positions, and detection bubbles for each unit.</li>
-            <li><strong>Drone cards:</strong> One card per drone showing state (Hangar /
-            Transit / Deployed / Returning), fuel percentage, and controls.</li>
-            <li><strong>Launch Drone:</strong> Click LAUNCH, then click a destination on
-            the sector map. The drone flies there and enters deployed state.</li>
-            <li><strong>Recall Drone:</strong> Orders the drone back to the ship for
-            refuelling. Refill rate: 20%/sec.</li>
-            <li><strong>Deploy Probe:</strong> Click DEPLOY, then click a position on
-            the map. The probe is permanent (no fuel, no recall). Stock is limited.</li>
-            <li><strong>Probe stock counter:</strong> Shows remaining probes. Default: 4.</li>
+            <li><strong>Tactical map (canvas):</strong> Shows ship, drone positions with
+            type-specific icons, sensor coverage circles, waypoint routes, sensor buoys,
+            and decoy positions.</li>
+            <li><strong>Drone cards:</strong> One card per airborne drone showing callsign,
+            type, status, fuel/hull/ammo/cargo bars, mission info, and action buttons.</li>
+            <li><strong>Hangar section:</strong> Shows drones on deck with turnaround
+            progress (refuel/rearm/repair) and Launch or Rush Launch buttons.</li>
+            <li><strong>Launch Drone:</strong> Click LAUNCH on a hangar drone card.</li>
+            <li><strong>Recall Drone:</strong> Click RECALL to order the drone back for
+            recovery and turnaround.</li>
+            <li><strong>Set Waypoint:</strong> Click the map with a drone selected to
+            set its destination. Use W key for waypoint mode, P key for patrol route.</li>
+            <li><strong>Deploy Decoy:</strong> Click DEPLOY DECOY, then click the map to
+            set the deployment direction. Decoys expire after ~30 seconds.</li>
+            <li><strong>Deploy Buoy:</strong> Survey drones can deploy persistent sensor
+            buoys at their current position (B key).</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
-          <div class="tip"><strong>Tips:</strong> A drone in Transit burns fuel at
-          4%/sec; a deployed drone burns 1.5%/sec. Recall drones above 30% fuel so they
-          can reach the ship before running dry. Place probes at mission waypoints or
-          known choke points — they're permanent but finite.</div>
+          <p><strong>Keyboard shortcuts:</strong> 1-9 select drone, L launch, R recall,
+          W waypoint mode, P patrol route, D deploy decoy, B deploy buoy, E toggle
+          engagement rules, C clear to land, Tab cycle drones, Esc cancel.</p>
+          <div class="tip"><strong>Tips:</strong> Plan patrol routes that maximise
+          coverage within fuel constraints. Recall drones before they reach bingo fuel.
+          Rush turnaround to get drones airborne faster, but they launch with partial
+          fuel/ammo. Coordinate with Science for sensor coverage and Weapons for fire
+          support targets.</div>
         </div>
       </div>
 
