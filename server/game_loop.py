@@ -77,6 +77,22 @@ from server.models.messages import (
     ScienceScanInterruptResponsePayload,
     SecurityMoveSquadPayload,
     SecurityToggleDoorPayload,
+    SecuritySendTeamPayload,
+    SecuritySetPatrolPayload,
+    SecurityStationTeamPayload,
+    SecurityDisengageTeamPayload,
+    SecurityAssignEscortPayload,
+    SecurityLockDoorPayload,
+    SecurityUnlockDoorPayload,
+    SecurityLockdownDeckPayload,
+    SecurityLiftLockdownPayload,
+    SecuritySealBulkheadPayload,
+    SecurityUnsealBulkheadPayload,
+    SecuritySetDeckAlertPayload,
+    SecurityArmCrewPayload,
+    SecurityDisarmCrewPayload,
+    SecurityQuarantineRoomPayload,
+    SecurityLiftQuarantinePayload,
     WeaponsFireBeamsPayload,
     WeaponsFireTorpedoPayload,
     WeaponsLoadTubePayload,
@@ -471,6 +487,9 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
             _crew_ids.append(f"{_dk_name}_{_ci}")
     gle.init(_world.ship, crew_member_ids=_crew_ids)
 
+    # v0.06.3: Initialise marine teams for security station.
+    gls.init_marine_teams(ship_class, crew_member_ids=_crew_ids)
+
     # Apply battery_capacity_multiplier to the power grid.
     _pg = gle.get_power_grid()
     if _pg is not None and _diff_preset.battery_capacity_multiplier != 1.0:
@@ -630,6 +649,9 @@ async def _loop() -> None:
         _med_roster = glmed.get_roster()
         medical_v2_events = glmed.tick(_med_roster, TICK_DT, difficulty=_world.ship.difficulty) if _med_roster else []
         security_events = gls.tick_security(_world.ship.interior, _world.ship, TICK_DT)
+        # v0.06.3: Enhanced combat system (marine teams + boarding parties).
+        combat_events = gls.tick_combat(_world.ship.interior, _world.ship, TICK_DT)
+        security_events.extend(combat_events)
         station_boarding_events = gls.tick_station_boarding(_world.ship, TICK_DT)
         comms_responses = glco.tick_comms(TICK_DT)
         hazard_events = hazard_system.tick_hazards(_world, _world.ship, TICK_DT)
@@ -944,6 +966,14 @@ async def _loop() -> None:
             gl.log_event("security", "boarding_started", {
                 "intruder_count": len(boarding_action.get("intruders", [])),
             })
+            # v0.06.3: Comms intercept — if Comms is crewed, give intel hint.
+            if len(_manager.get_by_role("comms")) > 0:
+                await _manager.broadcast_to_roles(
+                    ["comms", "security", "captain"],
+                    Message.build("comms.boarding_intercept", {
+                        "message": "Intercepted enemy comms: boarding party detected.",
+                    }),
+                )
 
         # 8.72. Sandbox activity events (free-play only).
         for sb_evt in glsb.tick(_world, TICK_DT, difficulty=_world.ship.difficulty):
@@ -1411,6 +1441,15 @@ async def _loop() -> None:
             await _manager.broadcast(Message.build(evt[0], evt[1]))
         for evt_type, evt_data in security_events:
             await _manager.broadcast_to_roles(["security"], Message.build(evt_type, evt_data))
+            # v0.06.3: Forward critical security events to captain + medical.
+            if evt_type in (
+                "security.boarding_alert", "security.party_eliminated",
+                "security.sabotage_started", "security.sabotage_complete",
+                "security.squad_eliminated",
+            ):
+                await _manager.broadcast_to_roles(["captain"], Message.build(evt_type, evt_data))
+            if evt_type in ("security.squad_casualty",):
+                await _manager.broadcast_to_roles(["medical"], Message.build(evt_type, evt_data))
         for evt_type, evt_data in station_boarding_events:
             await _manager.broadcast_to_roles(["security"], Message.build(evt_type, evt_data))
 
@@ -1554,13 +1593,22 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             gle.start_reroute(payload.target_bus)
             gl.log_event("engineering", "reroute_started", {"target_bus": payload.target_bus})
         elif msg_type == "engineering.request_escort" and isinstance(payload, EngineeringRequestEscortPayload):
-            # Find first available marine squad for escort duty.
-            _escort_squad = next(
-                (sq for sq in ship.interior.marine_squads if sq.health > 0),
+            # v0.06.3: prefer new-style marine teams; fall back to legacy squads.
+            _escort_team = next(
+                (t for t in gls.get_marine_teams()
+                 if t.status in ("idle", "patrolling") and len(t.members) > 0),
                 None,
             )
-            if _escort_squad is not None:
-                gle.request_escort(payload.team_id, _escort_squad.id)
+            if _escort_team is not None:
+                gls.assign_escort(_escort_team.id, payload.team_id)
+                gle.request_escort(payload.team_id, _escort_team.id)
+            else:
+                _escort_squad = next(
+                    (sq for sq in ship.interior.marine_squads if sq.health > 0),
+                    None,
+                )
+                if _escort_squad is not None:
+                    gle.request_escort(payload.team_id, _escort_squad.id)
             gl.log_event("engineering", "escort_requested", {"team_id": payload.team_id})
         elif msg_type == "engineering.cancel_repair_order" and isinstance(payload, EngineeringCancelRepairOrderPayload):
             gle.cancel_repair_order(payload.order_id)
@@ -1661,6 +1709,60 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             gls.toggle_door(ship.interior, payload.room_id, payload.squad_id)
             gl.log_event("security", "door_toggled", {"room_id": payload.room_id, "squad_id": payload.squad_id})
             _set_training_flag(glm, "security_door_toggled")
+        # v0.06.3 — enhanced security commands
+        elif msg_type == "security.send_team" and isinstance(payload, SecuritySendTeamPayload):
+            gls.send_team(payload.team_id, payload.destination)
+            gl.log_event("security", "team_sent", {"team_id": payload.team_id, "destination": payload.destination})
+        elif msg_type == "security.set_patrol" and isinstance(payload, SecuritySetPatrolPayload):
+            gls.set_team_patrol(payload.team_id, payload.route)
+            gl.log_event("security", "patrol_set", {"team_id": payload.team_id, "route": payload.route})
+        elif msg_type == "security.station_team" and isinstance(payload, SecurityStationTeamPayload):
+            gls.station_team(payload.team_id)
+            gl.log_event("security", "team_stationed", {"team_id": payload.team_id})
+        elif msg_type == "security.disengage_team" and isinstance(payload, SecurityDisengageTeamPayload):
+            gls.disengage_team(payload.team_id)
+            gl.log_event("security", "team_disengaged", {"team_id": payload.team_id})
+        elif msg_type == "security.assign_escort" and isinstance(payload, SecurityAssignEscortPayload):
+            gls.assign_escort(payload.team_id, payload.repair_team_id)
+            gle.request_escort(payload.repair_team_id, payload.team_id)
+            gl.log_event("security", "escort_assigned", {"team_id": payload.team_id, "repair_team_id": payload.repair_team_id})
+        elif msg_type == "security.lock_door" and isinstance(payload, SecurityLockDoorPayload):
+            gls.lock_door(ship.interior, payload.room_id)
+            gl.log_event("security", "door_locked", {"room_id": payload.room_id})
+        elif msg_type == "security.unlock_door" and isinstance(payload, SecurityUnlockDoorPayload):
+            gls.unlock_door(ship.interior, payload.room_id)
+            gl.log_event("security", "door_unlocked", {"room_id": payload.room_id})
+        elif msg_type == "security.lockdown_deck" and isinstance(payload, SecurityLockdownDeckPayload):
+            count = gls.lockdown_deck(ship.interior, payload.deck)
+            gl.log_event("security", "deck_lockdown", {"deck": payload.deck, "locked": count})
+        elif msg_type == "security.lift_lockdown" and isinstance(payload, SecurityLiftLockdownPayload):
+            if payload.all:
+                count = gls.lift_lockdown_all(ship.interior)
+                gl.log_event("security", "lift_lockdown_all", {"unlocked": count})
+            elif payload.deck is not None:
+                count = gls.lift_deck_lockdown(ship.interior, payload.deck)
+                gl.log_event("security", "lift_deck_lockdown", {"deck": payload.deck, "unlocked": count})
+        elif msg_type == "security.seal_bulkhead" and isinstance(payload, SecuritySealBulkheadPayload):
+            gls.seal_bulkhead(payload.deck_above, payload.deck_below)
+            gl.log_event("security", "bulkhead_sealed", {"deck_above": payload.deck_above, "deck_below": payload.deck_below})
+        elif msg_type == "security.unseal_bulkhead" and isinstance(payload, SecurityUnsealBulkheadPayload):
+            gls.start_unseal_bulkhead(payload.deck_above, payload.deck_below)
+            gl.log_event("security", "bulkhead_unseal_started", {"deck_above": payload.deck_above, "deck_below": payload.deck_below})
+        elif msg_type == "security.set_deck_alert" and isinstance(payload, SecuritySetDeckAlertPayload):
+            gls.set_deck_alert(payload.deck, payload.level)
+            gl.log_event("security", "deck_alert_set", {"deck": payload.deck, "level": payload.level})
+        elif msg_type == "security.arm_crew" and isinstance(payload, SecurityArmCrewPayload):
+            gls.arm_crew(payload.deck)
+            gl.log_event("security", "crew_armed", {"deck": payload.deck})
+        elif msg_type == "security.disarm_crew" and isinstance(payload, SecurityDisarmCrewPayload):
+            gls.disarm_crew(payload.deck)
+            gl.log_event("security", "crew_disarmed", {"deck": payload.deck})
+        elif msg_type == "security.quarantine_room" and isinstance(payload, SecurityQuarantineRoomPayload):
+            gls.quarantine_room(ship.interior, payload.room_id)
+            gl.log_event("security", "room_quarantined", {"room_id": payload.room_id})
+        elif msg_type == "security.lift_quarantine" and isinstance(payload, SecurityLiftQuarantinePayload):
+            gls.lift_quarantine(ship.interior, payload.room_id)
+            gl.log_event("security", "quarantine_lifted", {"room_id": payload.room_id})
         elif msg_type == "captain.authorize" and isinstance(payload, CaptainAuthorizePayload):
             if world is not None:
                 for evt in glw.resolve_nuclear_auth(payload.request_id, payload.approved, ship, world):
@@ -1923,6 +2025,17 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "active_hazard_types": hazard_system.get_active_hazard_types(),
             "hazard_sensor_modifier": round(hazard_system.get_sensor_modifier(), 3),
             "auto_fire_active": glw.is_auto_fire_active(),
+            # v0.06.3: Security status for Captain display.
+            "boarding_active": gls.is_boarding_active(),
+            "boarding_party_count": len(gls.get_boarding_parties()),
+            "marine_squad_count": len([t for t in gls.get_marine_teams() if len(t.members) > 0]),
+            "marine_squad_total": len(gls.get_marine_teams()),
+            "locked_door_count": len(gls.get_locked_doors()),
+            "deck_alerts": gls.get_all_deck_alerts(),
+            "armed_decks": sorted(gls.get_armed_decks()),
+            "sealed_bulkheads": [list(b) for b in gls.get_sealed_bulkheads()],
+            "quarantined_rooms": sorted(gls.get_quarantined_rooms()),
+            "sensor_coverage": round(gls.get_sensor_coverage(ship.interior), 3),
         },
         tick=tick,
     )

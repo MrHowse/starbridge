@@ -18,7 +18,26 @@ from server.models.messages.medical import (
     MedicalTreatPayload,
 )
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
-from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
+from server.models.messages.security import (
+    SecurityMoveSquadPayload,
+    SecurityToggleDoorPayload,
+    SecuritySendTeamPayload,
+    SecuritySetPatrolPayload,
+    SecurityStationTeamPayload,
+    SecurityDisengageTeamPayload,
+    SecurityAssignEscortPayload,
+    SecurityLockDoorPayload,
+    SecurityUnlockDoorPayload,
+    SecurityLockdownDeckPayload,
+    SecurityLiftLockdownPayload,
+    SecuritySealBulkheadPayload,
+    SecurityUnsealBulkheadPayload,
+    SecuritySetDeckAlertPayload,
+    SecurityArmCrewPayload,
+    SecurityDisarmCrewPayload,
+    SecurityQuarantineRoomPayload,
+    SecurityLiftQuarantinePayload,
+)
 from server.models.messages.flight_ops import (
     FlightOpsDeployProbePayload,
     FlightOpsLaunchDronePayload,
@@ -166,6 +185,22 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     # Security
     "security.move_squad": SecurityMoveSquadPayload,
     "security.toggle_door": SecurityToggleDoorPayload,
+    "security.send_team": SecuritySendTeamPayload,
+    "security.set_patrol": SecuritySetPatrolPayload,
+    "security.station_team": SecurityStationTeamPayload,
+    "security.disengage_team": SecurityDisengageTeamPayload,
+    "security.assign_escort": SecurityAssignEscortPayload,
+    "security.lock_door": SecurityLockDoorPayload,
+    "security.unlock_door": SecurityUnlockDoorPayload,
+    "security.lockdown_deck": SecurityLockdownDeckPayload,
+    "security.lift_lockdown": SecurityLiftLockdownPayload,
+    "security.seal_bulkhead": SecuritySealBulkheadPayload,
+    "security.unseal_bulkhead": SecurityUnsealBulkheadPayload,
+    "security.set_deck_alert": SecuritySetDeckAlertPayload,
+    "security.arm_crew": SecurityArmCrewPayload,
+    "security.disarm_crew": SecurityDisarmCrewPayload,
+    "security.quarantine_room": SecurityQuarantineRoomPayload,
+    "security.lift_quarantine": SecurityLiftQuarantinePayload,
     # Comms
     "comms.tune_frequency": CommsTuneFrequencyPayload,
     "comms.hail": CommsHailPayload,

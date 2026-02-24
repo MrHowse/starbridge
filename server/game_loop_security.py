@@ -685,6 +685,7 @@ def build_interior_state(interior: ShipInterior, ship: Ship) -> dict:
         "armed_decks": sorted(_armed_decks),
         "quarantined_rooms": sorted(_quarantined_rooms),
         "sensor_status": dict(_sensor_status),
+        "sensor_coverage": round(get_sensor_coverage(interior), 3),
     }
 
 

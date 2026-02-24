@@ -83,7 +83,26 @@ from server.models.messages.medical import (
 )
 
 # Security
-from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
+from server.models.messages.security import (
+    SecurityMoveSquadPayload,
+    SecurityToggleDoorPayload,
+    SecuritySendTeamPayload,
+    SecuritySetPatrolPayload,
+    SecurityStationTeamPayload,
+    SecurityDisengageTeamPayload,
+    SecurityAssignEscortPayload,
+    SecurityLockDoorPayload,
+    SecurityUnlockDoorPayload,
+    SecurityLockdownDeckPayload,
+    SecurityLiftLockdownPayload,
+    SecuritySealBulkheadPayload,
+    SecurityUnsealBulkheadPayload,
+    SecuritySetDeckAlertPayload,
+    SecurityArmCrewPayload,
+    SecurityDisarmCrewPayload,
+    SecurityQuarantineRoomPayload,
+    SecurityLiftQuarantinePayload,
+)
 
 # Crew
 from server.models.messages.crew import CrewNotifyPayload
@@ -205,6 +224,22 @@ __all__ = [
     # security
     "SecurityMoveSquadPayload",
     "SecurityToggleDoorPayload",
+    "SecuritySendTeamPayload",
+    "SecuritySetPatrolPayload",
+    "SecurityStationTeamPayload",
+    "SecurityDisengageTeamPayload",
+    "SecurityAssignEscortPayload",
+    "SecurityLockDoorPayload",
+    "SecurityUnlockDoorPayload",
+    "SecurityLockdownDeckPayload",
+    "SecurityLiftLockdownPayload",
+    "SecuritySealBulkheadPayload",
+    "SecurityUnsealBulkheadPayload",
+    "SecuritySetDeckAlertPayload",
+    "SecurityArmCrewPayload",
+    "SecurityDisarmCrewPayload",
+    "SecurityQuarantineRoomPayload",
+    "SecurityLiftQuarantinePayload",
     # crew
     "CrewNotifyPayload",
     # comms
