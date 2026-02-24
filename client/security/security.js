@@ -1,30 +1,37 @@
 /**
- * Starbridge — Security Station
+ * Starbridge — Security Station (v0.06.3)
  *
- * Renders the ship interior as a room grid canvas. During boarding events,
- * shows marine squad tokens (blue) and intruder tokens (red, fog-of-war
- * filtered by the server). Supports click-to-select-squad + click-to-move
- * and door toggle via the sidebar.
- *
- * Planning phase (tactical_positioning puzzle):
- *   puzzle.started (tactical_positioning) — show threat markers, countdown,
- *                                           COMMIT POSITIONS button
- *   puzzle.result                         — hide planning UI, boarding begins
+ * Full interior combat UI with marine team commands, boarding party intel,
+ * door control, lockdowns, bulkheads, alert levels, armoury, quarantine.
  *
  * Server messages received:
  *   game.started              — show UI, store static interior_layout
- *   security.interior_state   — squads, intruders, room states (every tick)
- *   puzzle.started            — planning phase overlay (tactical_positioning)
- *   puzzle.result             — planning phase ends
+ *   security.interior_state   — full state: teams, parties, rooms, systems
  *   ship.alert_changed        — update station alert colour
  *   ship.hull_hit             — hit-flash border
  *   game.over                 — defeat/victory overlay
  *
  * Server messages sent:
  *   lobby.claim_role          { role: 'security', player_name }
- *   security.move_squad       { squad_id, room_id }
- *   security.toggle_door      { squad_id, room_id }
- *   puzzle.submit             { puzzle_id, submission: { confirmed: true } }
+ *   security.move_squad       { squad_id, room_id }  (legacy)
+ *   security.toggle_door      { squad_id, room_id }  (legacy)
+ *   security.send_team        { team_id, destination }
+ *   security.set_patrol       { team_id, route: [room_ids] }
+ *   security.station_team     { team_id }
+ *   security.disengage_team   { team_id }
+ *   security.assign_escort    { team_id, repair_team_id }
+ *   security.lock_door        { room_id }
+ *   security.unlock_door      { room_id }
+ *   security.lockdown_deck    { deck }
+ *   security.lockdown_all     {}
+ *   security.lift_lockdown    { deck }  or { all: true }
+ *   security.seal_bulkhead    { deck_above, deck_below }
+ *   security.unseal_bulkhead  { deck_above, deck_below }
+ *   security.set_deck_alert   { deck, level }
+ *   security.arm_crew         { deck }
+ *   security.disarm_crew      { deck }
+ *   security.quarantine_room  { room_id }
+ *   security.lift_quarantine  { room_id }
  */
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
@@ -39,10 +46,10 @@ import { initRoleBar } from '../shared/role_bar.js';
 import { initCrewRoster } from '../shared/crew_roster.js';
 
 registerHelp([
-  { selector: '#ship-canvas',       text: 'Ship interior — rooms shown with squad (blue) and intruder (red) tokens.', position: 'right' },
-  { selector: '#squad-list',        text: 'Marine squads — click to select, then click a room to move.', position: 'left' },
-  { selector: '#btn-toggle-door',   text: 'Toggle door — seal/unseal adjacent room to control intruder movement.', position: 'above' },
-  { selector: '#intruder-list',     text: 'Known intruder positions — updated from adjacent marine squads.', position: 'left' },
+  { selector: '#ship-canvas',  text: 'Ship interior — rooms, marine teams (blue ▲), boarders (red ✕). Click rooms to interact.', position: 'right' },
+  { selector: '#team-list',    text: 'Marine squads — click to select, use buttons to command.', position: 'left' },
+  { selector: '#boarding-list', text: 'Boarding party intelligence and status.', position: 'left' },
+  { selector: '.controls-bar', text: 'Security controls: door locks, lockdowns, bulkheads, arm crew, quarantine.', position: 'above' },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -53,15 +60,11 @@ const ROOM_W    = 120;
 const ROOM_H    = 70;
 const MARGIN    = 40;
 const GAP       = 8;
-// 4 columns, 5 rows
-const CANVAS_W  = MARGIN * 2 + 4 * (ROOM_W + GAP) - GAP;  // 584
-const CANVAS_H  = MARGIN * 2 + 5 * (ROOM_H + GAP) - GAP;  // 462
+const CANVAS_W  = MARGIN * 2 + 4 * (ROOM_W + GAP) - GAP;
+const CANVAS_H  = MARGIN * 2 + 5 * (ROOM_H + GAP) - GAP;
 
-const SQUAD_R   = 13;   // marine squad token radius
-const INTRUDER_R = 9;   // intruder token radius
 const HIT_FLASH_MS = 500;
 
-// Fixed palette (matches STYLE_GUIDE — does not shift with alert level)
 const C_BG       = '#0a0a0a';
 const C_PRIMARY  = '#00ff41';
 const C_FRIENDLY = '#00aaff';
@@ -69,38 +72,14 @@ const C_HOSTILE  = '#ff3333';
 const C_NEUTRAL  = '#888888';
 const C_WARN     = '#ffb000';
 const C_FIRE     = '#ff6600';
-const C_DIM      = 'rgba(0,255,65,0.25)';
 const C_CONN     = 'rgba(0,255,65,0.18)';
 
-// ---------------------------------------------------------------------------
-// Hull geometry constants
-// ---------------------------------------------------------------------------
-
-const HULL_CX = CANVAS_W / 2;   // 292 — horizontal centre of canvas
-
-/**
- * Hull polygon vertices (bow = top, stern = bottom, clockwise).
- * Designed to contain the 4-col × 5-row room grid (x=40..544, y=40..422)
- * with ~16 px margin on each side.
- */
+// Hull geometry
+const HULL_CX = CANVAS_W / 2;
 const HULL_VERTICES = [
-  [292,   5],  // bow tip
-  [160,  38],  // left bow shoulder
-  [ 24,  96],  // left upper flank
-  [ 16, 200],  // left amidships (widest)
-  [ 24, 332],  // left lower flank
-  [ 60, 422],  // left stern quarter
-  [148, 448],  // left stern
-  [292, 454],  // stern centre
-  [436, 448],  // right stern
-  [524, 422],  // right stern quarter
-  [560, 332],  // right lower flank
-  [568, 200],  // right amidships
-  [560,  96],  // right upper flank
-  [424,  38],  // right bow shoulder
+  [292,5],[160,38],[24,96],[16,200],[24,332],[60,422],[148,448],
+  [292,454],[436,448],[524,422],[560,332],[568,200],[560,96],[424,38],
 ];
-
-/** Y positions of deck separator ribs (midpoint between consecutive row gaps). */
 const DECK_BOUNDARIES_Y = [114, 192, 270, 348];
 
 // ---------------------------------------------------------------------------
@@ -114,45 +93,47 @@ const secMainEl      = document.querySelector('[data-security-main]');
 const missionLabelEl = document.getElementById('mission-label');
 const stationEl      = document.querySelector('.station-container');
 
-const canvas          = document.getElementById('ship-canvas');
-const ctx             = canvas.getContext('2d');
+const canvas           = document.getElementById('ship-canvas');
+const ctx              = canvas.getContext('2d');
 const boardingStatusEl = document.getElementById('boarding-status');
-const selectionHintEl  = document.getElementById('selection-hint');
-const squadListEl      = document.getElementById('squad-list');
-const intruderListEl   = document.getElementById('intruder-list');
-const doorControlEl    = document.getElementById('door-control');
+const teamListEl       = document.getElementById('team-list');
+const boardingListEl   = document.getElementById('boarding-list');
+const alertListEl      = document.getElementById('alert-list');
+const escortListEl     = document.getElementById('escort-list');
 
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
-/** room_id → { name, deck, col, row, connections[] } — static, from game.started */
-let layout = {};
-/** room_id → { state, door_sealed } — dynamic, from interior_state */
-let roomsState = {};
-/** [ { id, room_id, health, action_points, count } ] */
+let layout = {};       // room_id -> { name, deck, col, row, connections[] }
+let roomsState = {};   // room_id -> { state, door_sealed }
+
+// Legacy squads + intruders (still rendered if present)
 let squads = [];
-/** [ { id, room_id, health, objective_id } ] — FOW-filtered by server */
 let intruders = [];
 let isBoarding = false;
-let selectedSquadId = null;
 
-// Planning phase state (tactical_positioning puzzle)
-let planningPuzzleId   = null;   // active puzzle id, or null
-let planningThreats    = [];     // [{ id, room_id, objective_id }]
-let planningTimeLimit  = 0;
-let planningCountdown  = 0;
-let _planningInterval  = null;   // setInterval handle for countdown
+// Enhanced state (v0.06.3)
+let marineTeams = [];      // from interior_state.marine_teams
+let boardingParties = [];  // from interior_state.boarding_parties
+let lockedDoors = [];
+let breachedDoors = [];
+let sealedBulkheads = [];
+let deckAlerts = {};       // { "1": "normal", ... }
+let armedDecks = [];
+let quarantinedRooms = [];
+let sensorStatus = {};
+
+let selectedTeamId = null;
+let selectedRoomId = null;
+let selectedSquadId = null;  // legacy
 
 // ---------------------------------------------------------------------------
 // Geometry helpers
 // ---------------------------------------------------------------------------
 
 function roomPixel(col, row) {
-  return {
-    x: MARGIN + col * (ROOM_W + GAP),
-    y: MARGIN + row * (ROOM_H + GAP),
-  };
+  return { x: MARGIN + col * (ROOM_W + GAP), y: MARGIN + row * (ROOM_H + GAP) };
 }
 
 function roomCenter(col, row) {
@@ -160,121 +141,47 @@ function roomCenter(col, row) {
   return { x: x + ROOM_W / 2, y: y + ROOM_H / 2 };
 }
 
-/** Return room_id at canvas pixel (px, py), or null. */
 function roomAtPoint(px, py) {
   for (const [roomId, r] of Object.entries(layout)) {
     const { x, y } = roomPixel(r.col, r.row);
-    if (px >= x && px <= x + ROOM_W && py >= y && py <= y + ROOM_H) {
-      return roomId;
-    }
+    if (px >= x && px <= x + ROOM_W && py >= y && py <= y + ROOM_H) return roomId;
   }
   return null;
 }
 
 // ---------------------------------------------------------------------------
-// Hull rendering — ship-shaped background
+// Hull rendering
 // ---------------------------------------------------------------------------
 
-/** Trace the hull polygon onto the current ctx path (does not stroke/fill). */
 function hullPath() {
   ctx.beginPath();
   ctx.moveTo(HULL_VERTICES[0][0], HULL_VERTICES[0][1]);
-  for (let i = 1; i < HULL_VERTICES.length; i++) {
-    ctx.lineTo(HULL_VERTICES[i][0], HULL_VERTICES[i][1]);
-  }
+  for (let i = 1; i < HULL_VERTICES.length; i++) ctx.lineTo(HULL_VERTICES[i][0], HULL_VERTICES[i][1]);
   ctx.closePath();
 }
 
-/** Draw the ship hull silhouette: dark interior fill + glowing edge. */
 function drawHull() {
   ctx.save();
-
-  // Dark hull interior
-  hullPath();
-  ctx.fillStyle = '#030d05';
-  ctx.fill();
-
-  // Armour-plate doubling — thick inner stroke (creates a recessed-edge look)
-  ctx.save();
-  hullPath();
-  ctx.clip();
-  hullPath();
-  ctx.strokeStyle = 'rgba(0,255,65,0.09)';
-  ctx.lineWidth   = 10;
-  ctx.stroke();
-  ctx.restore();
-
-  // Outer hull edge with glow
-  hullPath();
-  ctx.shadowBlur   = 22;
-  ctx.shadowColor  = 'rgba(0,255,65,0.5)';
-  ctx.strokeStyle  = 'rgba(0,255,65,0.6)';
-  ctx.lineWidth    = 1.5;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
+  hullPath(); ctx.fillStyle = '#030d05'; ctx.fill();
+  ctx.save(); hullPath(); ctx.clip(); hullPath();
+  ctx.strokeStyle = 'rgba(0,255,65,0.09)'; ctx.lineWidth = 10; ctx.stroke(); ctx.restore();
+  hullPath(); ctx.shadowBlur = 22; ctx.shadowColor = 'rgba(0,255,65,0.5)';
+  ctx.strokeStyle = 'rgba(0,255,65,0.6)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.shadowBlur = 0;
   ctx.restore();
 }
 
-/** Draw decorative structural elements: keel spine, deck ribs, orientation labels. */
 function drawStructure() {
-  ctx.save();
-
-  // Clip all structure to the hull interior
-  hullPath();
-  ctx.clip();
-
-  // Keel / spine line (vertical centre)
-  ctx.setLineDash([5, 7]);
-  ctx.strokeStyle = 'rgba(0,255,65,0.18)';
-  ctx.lineWidth   = 1;
-  ctx.beginPath();
-  ctx.moveTo(HULL_CX, 10);
-  ctx.lineTo(HULL_CX, 450);
-  ctx.stroke();
-
-  // Deck separator ribs (horizontal dashed lines at row boundaries)
-  for (const y of DECK_BOUNDARIES_Y) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(CANVAS_W, y);
-    ctx.stroke();
-  }
+  ctx.save(); hullPath(); ctx.clip();
+  ctx.setLineDash([5, 7]); ctx.strokeStyle = 'rgba(0,255,65,0.18)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(HULL_CX, 10); ctx.lineTo(HULL_CX, 450); ctx.stroke();
+  for (const y of DECK_BOUNDARIES_Y) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke(); }
   ctx.setLineDash([]);
-
-  // Orientation labels
-  ctx.font         = '10px "Share Tech Mono", monospace';
-  ctx.fillStyle    = 'rgba(0,255,65,0.28)';
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText('BOW', HULL_CX, 10);
-  ctx.textBaseline = 'bottom';
-  ctx.fillText('STERN', HULL_CX, 448);
-
-  // PORT / STBD side labels (rotated)
-  ctx.font      = '9px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(0,255,65,0.16)';
-  ctx.textBaseline = 'middle';
-
-  ctx.save();
-  ctx.translate(12, CANVAS_H / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('PORT', 0, 0);
-  ctx.restore();
-
-  ctx.save();
-  ctx.translate(CANVAS_W - 12, CANVAS_H / 2);
-  ctx.rotate(Math.PI / 2);
-  ctx.fillText('STBD', 0, 0);
-  ctx.restore();
-
-  // Engine exhaust glow at stern (subtle amber radial gradient)
+  ctx.font = '10px "Share Tech Mono", monospace'; ctx.fillStyle = 'rgba(0,255,65,0.28)';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('BOW', HULL_CX, 10);
+  ctx.textBaseline = 'bottom'; ctx.fillText('STERN', HULL_CX, 448);
   const eng = ctx.createRadialGradient(HULL_CX, 450, 0, HULL_CX, 450, 90);
-  eng.addColorStop(0, 'rgba(255,110,0,0.10)');
-  eng.addColorStop(1, 'rgba(255,110,0,0)');
-  ctx.fillStyle = eng;
-  ctx.fillRect(HULL_CX - 90, 368, 180, 88);
-
+  eng.addColorStop(0, 'rgba(255,110,0,0.10)'); eng.addColorStop(1, 'rgba(255,110,0,0)');
+  ctx.fillStyle = eng; ctx.fillRect(HULL_CX - 90, 368, 180, 88);
   ctx.restore();
 }
 
@@ -282,206 +189,162 @@ function drawStructure() {
 // Canvas rendering
 // ---------------------------------------------------------------------------
 
-function roomStrokeColor(state) {
-  switch (state) {
+function roomStrokeColor(roomId, rs) {
+  if (quarantinedRooms.includes(roomId)) return '#ff00ff';
+  if (breachedDoors.includes(roomId)) return C_NEUTRAL;
+  switch (rs.state) {
     case 'damaged':      return C_WARN;
     case 'decompressed': return C_NEUTRAL;
     case 'fire':         return C_FIRE;
-    case 'hostile':      return C_HOSTILE;
     default:             return C_PRIMARY;
   }
 }
 
+function doorLineStyle(roomId) {
+  if (breachedDoors.includes(roomId)) return { dash: [2, 3], color: C_NEUTRAL };
+  if (lockedDoors.includes(roomId)) return { dash: [3, 4], color: 'rgba(255,51,51,0.5)' };
+  return { dash: [], color: C_CONN };
+}
+
 function draw() {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-
-  // Void background (space outside hull)
-  ctx.fillStyle = C_BG;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-  // Ship hull silhouette + structural overlays
-  drawHull();
-  drawStructure();
-
+  ctx.fillStyle = C_BG; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  drawHull(); drawStructure();
   if (Object.keys(layout).length === 0) return;
 
-  // 1. Connection lines (drawn first, behind rooms)
+  // 1. Connection lines
   const drawnConns = new Set();
   for (const [roomId, r] of Object.entries(layout)) {
     for (const connId of r.connections) {
       const key = [roomId, connId].sort().join(':');
       if (drawnConns.has(key)) continue;
       drawnConns.add(key);
-
-      const conn = layout[connId];
-      if (!conn) continue;
-
+      const conn = layout[connId]; if (!conn) continue;
       const a = roomCenter(r.col, r.row);
       const b = roomCenter(conn.col, conn.row);
-      const connRoomState = roomsState[connId] || {};
-
-      ctx.save();
-      ctx.lineWidth = 1;
-      if (connRoomState.door_sealed) {
-        ctx.setLineDash([3, 4]);
-        ctx.strokeStyle = 'rgba(255,51,51,0.4)';
-      } else {
-        ctx.setLineDash([]);
-        ctx.strokeStyle = C_CONN;
-      }
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
+      const style = doorLineStyle(connId);
+      ctx.save(); ctx.lineWidth = 1; ctx.setLineDash(style.dash);
+      ctx.strokeStyle = style.color;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       ctx.restore();
     }
   }
 
-  // 2. Rooms — fill, border, sealed indicator
-  const selectedSquad = squads.find(s => s.id === selectedSquadId);
+  // 2. Rooms
   for (const [roomId, r] of Object.entries(layout)) {
     const { x, y } = roomPixel(r.col, r.row);
     const rs = roomsState[roomId] || { state: 'normal', door_sealed: false };
-    const color = roomStrokeColor(rs.state);
+    const color = roomStrokeColor(roomId, rs);
+    const isSelected = roomId === selectedRoomId;
 
-    const isSelectedRoom = selectedSquad && selectedSquad.room_id === roomId;
-    const isTargetable   = selectedSquadId && !isSelectedRoom;
+    // Has hostiles?
+    const hasHostiles = boardingParties.some(bp => bp.location === roomId);
 
-    // Room fill
-    if (isSelectedRoom) {
-      ctx.fillStyle = 'rgba(0,170,255,0.08)';
-    } else if (isTargetable) {
-      ctx.fillStyle = 'rgba(0,255,65,0.04)';
-    } else {
-      ctx.fillStyle = 'rgba(0,255,65,0.02)';
-    }
+    // Fill
+    if (hasHostiles) ctx.fillStyle = 'rgba(255,51,51,0.08)';
+    else if (isSelected) ctx.fillStyle = 'rgba(0,170,255,0.08)';
+    else ctx.fillStyle = 'rgba(0,255,65,0.02)';
     ctx.fillRect(x, y, ROOM_W, ROOM_H);
 
-    // Room border
-    ctx.strokeStyle = isSelectedRoom ? C_FRIENDLY : color;
-    ctx.lineWidth   = isSelectedRoom ? 2 : 1;
+    // Border
+    ctx.strokeStyle = isSelected ? C_FRIENDLY : color;
+    ctx.lineWidth = isSelected ? 2 : 1;
     ctx.strokeRect(x, y, ROOM_W, ROOM_H);
 
-    // Sealed door indicator: small filled square in top-right corner
+    // Sealed indicator
     if (rs.door_sealed) {
-      ctx.fillStyle = C_HOSTILE;
+      const dc = breachedDoors.includes(roomId) ? C_NEUTRAL
+               : lockedDoors.includes(roomId) ? C_HOSTILE : C_WARN;
+      ctx.fillStyle = dc;
       ctx.fillRect(x + ROOM_W - 7, y + 1, 6, 6);
     }
 
-    // 3. Room name label
-    ctx.fillStyle    = isSelectedRoom ? C_FRIENDLY : color;
-    ctx.font         = '11px "Share Tech Mono", monospace';
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'top';
-    const label = r.name.length > 15 ? r.name.slice(0, 14) + '…' : r.name;
-    ctx.fillText(label, x + ROOM_W / 2, y + 5);
+    // Quarantine indicator
+    if (quarantinedRooms.includes(roomId)) {
+      ctx.fillStyle = 'rgba(255,0,255,0.15)';
+      ctx.fillRect(x, y, ROOM_W, ROOM_H);
+      ctx.fillStyle = '#ff00ff'; ctx.font = '8px "Share Tech Mono", monospace';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      ctx.fillText('Q', x + ROOM_W - 3, y + 2);
+    }
 
-    // Deck sub-label (dimmer, smaller)
-    ctx.fillStyle = 'rgba(0,255,65,0.35)';
-    ctx.font      = '10px "Share Tech Mono", monospace';
+    // Sensor damage overlay
+    const sensor = sensorStatus[roomId];
+    if (sensor === 'damaged') {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(x, y, ROOM_W, ROOM_H);
+    }
+
+    // Room name
+    ctx.fillStyle = isSelected ? C_FRIENDLY : color;
+    ctx.font = '11px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const label = r.name.length > 15 ? r.name.slice(0, 14) + '\u2026' : r.name;
+    ctx.fillText(label, x + ROOM_W / 2, y + 5);
+    ctx.fillStyle = 'rgba(0,255,65,0.35)'; ctx.font = '10px "Share Tech Mono", monospace';
     ctx.fillText(r.deck.toUpperCase(), x + ROOM_W / 2, y + 17);
   }
 
-  // 3.5. Planning phase threat markers
-  if (planningThreats.length > 0) {
-    for (const threat of planningThreats) {
-      // Spawn room: orange fill + "SPAWN" label
-      const spawnR = layout[threat.room_id];
-      if (spawnR) {
-        const { x, y } = roomPixel(spawnR.col, spawnR.row);
-        ctx.fillStyle = 'rgba(255,176,0,0.12)';
-        ctx.fillRect(x, y, ROOM_W, ROOM_H);
-        ctx.strokeStyle = C_WARN;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 3]);
-        ctx.strokeRect(x + 1, y + 1, ROOM_W - 2, ROOM_H - 2);
-        ctx.setLineDash([]);
-        ctx.fillStyle = C_WARN;
-        ctx.font = 'bold 10px "Share Tech Mono", monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('THREAT', x + ROOM_W / 2, y + ROOM_H - 4);
-      }
-      // Objective room: red X overlay
-      const objR = layout[threat.objective_id];
-      if (objR) {
-        const { x, y } = roomPixel(objR.col, objR.row);
-        ctx.fillStyle = 'rgba(255,51,51,0.10)';
-        ctx.fillRect(x, y, ROOM_W, ROOM_H);
-        ctx.strokeStyle = 'rgba(255,51,51,0.6)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x + 6, y + 6);
-        ctx.lineTo(x + ROOM_W - 6, y + ROOM_H - 6);
-        ctx.moveTo(x + ROOM_W - 6, y + 6);
-        ctx.lineTo(x + 6, y + ROOM_H - 6);
-        ctx.stroke();
-        ctx.fillStyle = C_HOSTILE;
-        ctx.font = 'bold 10px "Share Tech Mono", monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('OBJ', x + ROOM_W / 2, y + ROOM_H - 4);
-      }
-    }
-  }
-
-  // 4. Squad tokens (blue circles with count)
+  // 3. Legacy squad tokens (blue circles)
   for (const sq of squads) {
-    const r = layout[sq.room_id];
-    if (!r) continue;
-
-    const squadsInRoom = squads.filter(s => s.room_id === sq.room_id);
-    const idx = squadsInRoom.indexOf(sq);
-    const spread = squadsInRoom.length > 1 ? SQUAD_R * 1.8 : 0;
-    const offset = (idx - (squadsInRoom.length - 1) / 2) * spread;
-
+    const r = layout[sq.room_id]; if (!r) continue;
     const center = roomCenter(r.col, r.row);
-    const cx = center.x + offset;
-    const cy = center.y + 10;
-
-    const isSel = sq.id === selectedSquadId;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, SQUAD_R, 0, Math.PI * 2);
-    ctx.fillStyle   = isSel ? 'rgba(0,170,255,0.35)' : 'rgba(0,170,255,0.12)';
-    ctx.fill();
-    ctx.strokeStyle = isSel ? '#66ccff' : C_FRIENDLY;
-    ctx.lineWidth   = isSel ? 2 : 1;
-    ctx.stroke();
-
-    // Count
-    ctx.fillStyle    = C_FRIENDLY;
-    ctx.font         = `bold 11px "Share Tech Mono", monospace`;
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(sq.count <= 0 ? '0' : String(sq.count), cx, cy);
+    ctx.save(); ctx.beginPath(); ctx.arc(center.x, center.y + 10, 13, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,170,255,0.12)'; ctx.fill();
+    ctx.strokeStyle = C_FRIENDLY; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = C_FRIENDLY; ctx.font = 'bold 11px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(sq.count), center.x, center.y + 10);
     ctx.restore();
   }
 
-  // 5. Intruder tokens (red circles with !)
-  for (const intr of intruders) {
-    const r = layout[intr.room_id];
-    if (!r) continue;
-
+  // 4. Marine team tokens (blue triangles)
+  for (const team of marineTeams) {
+    const r = layout[team.location]; if (!r) continue;
+    const teamsInRoom = marineTeams.filter(t => t.location === team.location);
+    const idx = teamsInRoom.indexOf(team);
+    const spread = teamsInRoom.length > 1 ? 20 : 0;
+    const offset = (idx - (teamsInRoom.length - 1) / 2) * spread;
     const center = roomCenter(r.col, r.row);
-    const cx = center.x;
-    const cy = center.y - 14;
+    const cx = center.x + offset, cy = center.y + 12;
+    const isSel = team.id === selectedTeamId;
 
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, INTRUDER_R, 0, Math.PI * 2);
-    ctx.fillStyle   = 'rgba(255,51,51,0.25)';
-    ctx.fill();
-    ctx.strokeStyle = C_HOSTILE;
-    ctx.lineWidth   = 1;
-    ctx.stroke();
+    // Triangle
+    ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx - 7, cy + 5); ctx.lineTo(cx + 7, cy + 5); ctx.closePath();
+    ctx.fillStyle = isSel ? 'rgba(0,170,255,0.35)' : 'rgba(0,170,255,0.12)'; ctx.fill();
+    ctx.strokeStyle = isSel ? '#66ccff' : C_FRIENDLY; ctx.lineWidth = isSel ? 2 : 1; ctx.stroke();
+    // Label
+    ctx.fillStyle = C_FRIENDLY; ctx.font = 'bold 9px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(team.size), cx, cy);
+    ctx.restore();
+  }
 
-    ctx.fillStyle    = C_HOSTILE;
-    ctx.font         = `bold 10px "Share Tech Mono", monospace`;
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('!', cx, cy);
+  // 5. Boarding party tokens (red X marks)
+  for (const bp of boardingParties) {
+    const r = layout[bp.location]; if (!r) continue;
+    const center = roomCenter(r.col, r.row);
+    const cx = center.x, cy = center.y - 14;
+    ctx.save();
+    ctx.strokeStyle = C_HOSTILE; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - 6, cy - 6); ctx.lineTo(cx + 6, cy + 6);
+    ctx.moveTo(cx + 6, cy - 6); ctx.lineTo(cx - 6, cy + 6); ctx.stroke();
+    ctx.fillStyle = C_HOSTILE; ctx.font = 'bold 9px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(bp.members), cx, cy + 12);
+    ctx.restore();
+  }
+
+  // 6. Legacy intruder tokens
+  for (const intr of intruders) {
+    const r = layout[intr.room_id]; if (!r) continue;
+    const center = roomCenter(r.col, r.row);
+    ctx.save(); ctx.beginPath(); ctx.arc(center.x, center.y - 14, 9, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,51,51,0.25)'; ctx.fill();
+    ctx.strokeStyle = C_HOSTILE; ctx.stroke();
+    ctx.fillStyle = C_HOSTILE; ctx.font = 'bold 10px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', center.x, center.y - 14);
     ctx.restore();
   }
 }
@@ -490,208 +353,316 @@ function draw() {
 // Sidebar rendering
 // ---------------------------------------------------------------------------
 
-function renderSidebar() {
-  // Boarding / planning status badge
-  const isPlanning = planningPuzzleId !== null;
-  if (isPlanning) {
-    const secs = Math.max(0, Math.ceil(planningCountdown));
-    boardingStatusEl.textContent = `POSITIONING — ${secs}s`;
-    boardingStatusEl.className   = 'text-data c-warn boarding-active';
-  } else {
-    boardingStatusEl.textContent = isBoarding ? 'BOARDING ACTIVE' : 'STANDBY';
-    boardingStatusEl.className   = isBoarding
-      ? 'text-data c-hostile boarding-active'
-      : 'text-data text-dim';
-  }
-
-  // Selection hint
-  const selSquad = squads.find(s => s.id === selectedSquadId);
-  if (isPlanning && !selSquad) {
-    selectionHintEl.textContent = 'Move squads to intercept — then COMMIT';
-    selectionHintEl.style.color = C_WARN;
-  } else if (selSquad) {
-    selectionHintEl.textContent = `${selSquad.id.toUpperCase()} selected — click target room`;
-    selectionHintEl.style.color = C_FRIENDLY;
-  } else {
-    selectionHintEl.textContent = 'Click a squad token to select';
-    selectionHintEl.style.color = '';
-  }
-
-  // Squad cards
-  squadListEl.innerHTML = '';
-  if (squads.length === 0) {
-    const p = document.createElement('p');
-    p.className   = 'text-dim text-label squad-list__empty';
-    p.textContent = isBoarding ? 'No squads deployed' : '—';
-    squadListEl.appendChild(p);
-  }
-  for (const sq of squads) {
-    const isSel    = sq.id === selectedSquadId;
-    const isElim   = sq.count <= 0;
-    const healthPct = Math.max(0, sq.health);
-    const apPct     = Math.max(0, (sq.action_points / 10) * 100);
-    const roomName  = layout[sq.room_id]?.name || sq.room_id;
-
-    let cardClass = 'squad-card';
-    if (isSel)  cardClass += ' squad-card--selected';
-    if (isElim) cardClass += ' squad-card--eliminated';
-
-    const hpClass = healthPct < 50 ? 'gauge__fill--danger'
-                  : healthPct < 75 ? 'gauge__fill--warn'
-                  : '';
-
-    const card = document.createElement('div');
-    card.className = cardClass;
-    card.innerHTML = `
-      <div class="squad-card__header">
-        <span class="text-label c-friendly">${sq.id.toUpperCase()}</span>
-        <span class="text-data ${isElim ? 'text-dim' : 'c-friendly'}">${sq.count} MBR</span>
-      </div>
-      <div class="squad-card__location text-label text-dim">${roomName.toUpperCase()}</div>
-      <div class="squad-bar-row">
-        <span class="text-label">HP</span>
-        <div class="squad-bar gauge">
-          <div class="gauge__fill ${hpClass}" style="width:${healthPct}%"></div>
-        </div>
-        <span class="text-data">${Math.round(sq.health)}</span>
-      </div>
-      <div class="squad-bar-row">
-        <span class="text-label">AP</span>
-        <div class="squad-bar gauge">
-          <div class="gauge__fill" style="width:${apPct}%"></div>
-        </div>
-        <span class="text-data">${sq.action_points.toFixed(1)}</span>
-      </div>
+function renderAlerts() {
+  alertListEl.innerHTML = '';
+  const deckNames = { 1: 'Bridge', 2: 'Operations', 3: 'Combat', 4: 'Medical', 5: 'Engineering' };
+  for (let d = 1; d <= 5; d++) {
+    const level = deckAlerts[String(d)] || 'normal';
+    const row = document.createElement('div');
+    row.className = 'alert-row';
+    row.innerHTML = `
+      <span class="text-label text-dim">DECK ${d} ${deckNames[d]}</span>
+      <span class="alert-badge alert-badge--${level}">${level.toUpperCase()}</span>
     `;
-
-    if (!isElim) {
-      card.addEventListener('click', () => {
-        selectedSquadId = (selectedSquadId === sq.id) ? null : sq.id;
-        draw();
-        renderSidebar();
-      });
-    }
-    squadListEl.appendChild(card);
-  }
-
-  // Door control (boarding) / COMMIT button (planning)
-  if (isPlanning) {
-    doorControlEl.style.display = '';
-    doorControlEl.innerHTML = `
-      <span class="text-label c-warn">PLANNING PHASE</span>
-      <button class="fire-btn" id="btn-commit-positions" style="margin-top:0.3rem">
-        COMMIT POSITIONS
-      </button>
-    `;
-    document.getElementById('btn-commit-positions')?.addEventListener('click', () => {
-      if (!planningPuzzleId) return;
-      send('puzzle.submit', {
-        puzzle_id: planningPuzzleId,
-        submission: { confirmed: true },
-      });
+    row.addEventListener('click', () => {
+      const levels = ['normal', 'caution', 'combat', 'evacuate'];
+      const next = levels[(levels.indexOf(level) + 1) % levels.length];
+      send('security.set_deck_alert', { deck: d, level: next });
     });
-  } else if (selSquad && isBoarding) {
-    doorControlEl.style.display = '';
-    doorControlEl.innerHTML = `
-      <span class="text-label">DOOR CONTROL</span>
-      <div class="door-control__row">
-        <select id="door-room-select" class="door-select"></select>
-        <button class="fire-btn fire-btn--small" id="btn-toggle-door">TOGGLE</button>
-      </div>
-    `;
-    const newSelect = document.getElementById('door-room-select');
-    const newToggleBtn = document.getElementById('btn-toggle-door');
-    const squadRoomDef = layout[selSquad.room_id];
-    if (squadRoomDef && newSelect) {
-      const candidates = [selSquad.room_id, ...squadRoomDef.connections];
-      for (const roomId of candidates) {
-        const opt = document.createElement('option');
-        opt.value       = roomId;
-        const rs        = roomsState[roomId] || {};
-        const sealTag   = rs.door_sealed ? ' [SEALED]' : '';
-        opt.textContent = ((layout[roomId]?.name || roomId) + sealTag).toUpperCase();
-        newSelect.appendChild(opt);
-      }
-    }
-    newToggleBtn?.addEventListener('click', () => {
-      if (!selectedSquadId) return;
-      const targetRoomId = newSelect?.value;
-      if (!targetRoomId) return;
-      send('security.toggle_door', { squad_id: selectedSquadId, room_id: targetRoomId });
-    });
-  } else {
-    doorControlEl.style.display = 'none';
-  }
-
-  // Intruder list
-  intruderListEl.innerHTML = '';
-  if (intruders.length === 0) {
-    const p = document.createElement('p');
-    p.className   = 'text-dim text-label intruder-list__empty';
-    p.textContent = isBoarding ? 'No contacts' : '—';
-    intruderListEl.appendChild(p);
-    return;
-  }
-  for (const intr of intruders) {
-    const roomName = layout[intr.room_id]?.name     || intr.room_id;
-    const objName  = layout[intr.objective_id]?.name || intr.objective_id;
-    const hpPct    = Math.max(0, intr.health);
-
-    const item = document.createElement('div');
-    item.className = 'intruder-item';
-    item.innerHTML = `
-      <div class="intruder-item__row">
-        <span class="text-label c-hostile">${intr.id.toUpperCase()}</span>
-        <span class="text-data c-hostile">${Math.round(intr.health)}%</span>
-      </div>
-      <div class="intruder-detail-row">
-        <span class="text-label text-dim">LOC:</span>
-        <span class="text-label">${roomName.toUpperCase()}</span>
-      </div>
-      <div class="intruder-detail-row">
-        <span class="text-label text-dim">OBJ:</span>
-        <span class="text-label">${objName.toUpperCase()}</span>
-      </div>
-      <div class="intruder-hp gauge" style="margin-top:0.2rem">
-        <div class="gauge__fill gauge__fill--danger" style="width:${hpPct}%"></div>
-      </div>
-    `;
-    intruderListEl.appendChild(item);
+    alertListEl.appendChild(row);
   }
 }
 
+function renderTeams() {
+  teamListEl.innerHTML = '';
+  if (marineTeams.length === 0) {
+    // Fall back to legacy squads
+    for (const sq of squads) {
+      const isSel = sq.id === selectedSquadId;
+      const card = document.createElement('div');
+      card.className = `team-card${isSel ? ' team-card--selected' : ''}${sq.count <= 0 ? ' team-card--incap' : ''}`;
+      const roomName = layout[sq.room_id]?.name || sq.room_id;
+      card.innerHTML = `
+        <div class="team-card__header">
+          <span class="text-label c-friendly">${sq.id.toUpperCase()}</span>
+          <span class="text-data c-friendly">${sq.count} MBR</span>
+        </div>
+        <div class="team-card__location text-label text-dim">${roomName.toUpperCase()}</div>
+      `;
+      if (sq.count > 0) card.addEventListener('click', () => { selectedSquadId = isSel ? null : sq.id; draw(); renderTeams(); });
+      teamListEl.appendChild(card);
+    }
+    return;
+  }
+
+  for (const team of marineTeams) {
+    const isSel = team.id === selectedTeamId;
+    const isIncap = team.status === 'incapacitated';
+    const roomName = layout[team.location]?.name || team.location;
+    const memberPct = Math.round((team.size / team.max_size) * 100);
+    const ammoPct = Math.round(team.ammo);
+
+    const card = document.createElement('div');
+    card.className = `team-card${isSel ? ' team-card--selected' : ''}${isIncap ? ' team-card--incap' : ''}`;
+    card.innerHTML = `
+      <div class="team-card__header">
+        <span class="text-label c-friendly">${team.callsign}</span>
+        <span class="text-data" style="color:${team.status === 'engaging' ? C_HOSTILE : C_FRIENDLY}">${team.status.toUpperCase()}</span>
+      </div>
+      <div class="team-card__location text-label text-dim">${roomName.toUpperCase()}</div>
+      <div class="team-bar-row">
+        <span class="text-label">MBR</span>
+        <div class="team-bar gauge"><div class="gauge__fill${memberPct < 50 ? ' gauge__fill--danger' : ''}" style="width:${memberPct}%"></div></div>
+        <span class="text-data">${team.size}/${team.max_size}</span>
+      </div>
+      <div class="team-bar-row">
+        <span class="text-label">AMO</span>
+        <div class="team-bar gauge"><div class="gauge__fill${ammoPct < 30 ? ' gauge__fill--warn' : ''}" style="width:${ammoPct}%"></div></div>
+        <span class="text-data">${ammoPct}%</span>
+      </div>
+      ${team.engagement ? `<div class="text-label c-hostile" style="font-size:0.75rem">ENGAGING: ${team.engagement}</div>` : ''}
+    `;
+
+    // Action buttons
+    if (!isIncap) {
+      const actions = document.createElement('div');
+      actions.className = 'team-actions';
+
+      if (team.status === 'engaging') {
+        const btnDis = document.createElement('button');
+        btnDis.className = 'team-btn'; btnDis.textContent = 'DISENGAGE';
+        btnDis.addEventListener('click', (e) => { e.stopPropagation(); send('security.disengage_team', { team_id: team.id }); });
+        actions.appendChild(btnDis);
+      } else {
+        const btnResp = document.createElement('button');
+        btnResp.className = 'team-btn'; btnResp.textContent = 'RESPOND';
+        btnResp.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectedTeamId = team.id;
+          draw(); renderTeams();
+        });
+        actions.appendChild(btnResp);
+
+        const btnSta = document.createElement('button');
+        btnSta.className = 'team-btn'; btnSta.textContent = 'STATION';
+        btnSta.addEventListener('click', (e) => { e.stopPropagation(); send('security.station_team', { team_id: team.id }); });
+        actions.appendChild(btnSta);
+      }
+      card.appendChild(actions);
+    }
+
+    if (!isIncap) {
+      card.addEventListener('click', () => { selectedTeamId = isSel ? null : team.id; draw(); renderTeams(); });
+    }
+    teamListEl.appendChild(card);
+  }
+}
+
+function renderBoardingIntel() {
+  boardingListEl.innerHTML = '';
+  const parties = boardingParties.length > 0 ? boardingParties : [];
+  if (parties.length === 0 && intruders.length === 0) {
+    boardingListEl.innerHTML = '<p class="text-dim text-label">NO CONTACTS</p>';
+    return;
+  }
+
+  for (const bp of parties) {
+    const roomName = layout[bp.location]?.name || bp.location;
+    const moralePct = Math.round((bp.morale || 1) * 100);
+    const sabPct = Math.round((bp.sabotage_progress || 0) * 100);
+    const card = document.createElement('div');
+    card.className = 'bp-card';
+    card.innerHTML = `
+      <div class="bp-card__row">
+        <span class="text-label c-hostile">${bp.id.toUpperCase()}</span>
+        <span class="text-data c-hostile">${bp.members}/${bp.max_members}</span>
+      </div>
+      <div class="bp-detail"><span class="text-label text-dim">LOC:</span><span class="text-label">${roomName.toUpperCase()}</span></div>
+      <div class="bp-detail"><span class="text-label text-dim">OBJ:</span><span class="text-label">${(bp.objective || '?').toUpperCase()}</span></div>
+      <div class="bp-detail"><span class="text-label text-dim">STS:</span><span class="text-label">${bp.status.toUpperCase()}</span></div>
+      ${bp.status === 'sabotaging' ? `<div class="bp-detail"><span class="text-label text-dim">SAB:</span><span class="text-label c-hostile">${sabPct}%</span></div>` : ''}
+      <div class="team-bar-row">
+        <span class="text-label text-dim">MOR</span>
+        <div class="team-bar gauge"><div class="gauge__fill${moralePct < 30 ? ' gauge__fill--danger' : ' gauge__fill--warn'}" style="width:${moralePct}%"></div></div>
+      </div>
+    `;
+    boardingListEl.appendChild(card);
+  }
+
+  // Legacy intruders
+  for (const intr of intruders) {
+    const roomName = layout[intr.room_id]?.name || intr.room_id;
+    const item = document.createElement('div');
+    item.className = 'bp-card';
+    item.innerHTML = `
+      <div class="bp-card__row">
+        <span class="text-label c-hostile">${intr.id.toUpperCase()}</span>
+        <span class="text-data c-hostile">${Math.round(intr.health)}%</span>
+      </div>
+      <div class="bp-detail"><span class="text-label text-dim">LOC:</span><span class="text-label">${roomName.toUpperCase()}</span></div>
+    `;
+    boardingListEl.appendChild(item);
+  }
+}
+
+function renderStatusBar() {
+  const boardingCount = boardingParties.length;
+  const engagedCount = marineTeams.filter(t => t.status === 'engaging').length;
+  const totalTeams = marineTeams.length;
+  const lockedCount = lockedDoors.length;
+
+  document.getElementById('sb-boarding').textContent = boardingCount > 0
+    ? `BOARDING: ${boardingCount} ACTIVE` : 'BOARDING: NONE';
+  document.getElementById('sb-boarding').style.color = boardingCount > 0 ? C_HOSTILE : '';
+
+  document.getElementById('sb-squads').textContent = `SQUADS: ${engagedCount}/${totalTeams} ENGAGED`;
+  document.getElementById('sb-doors').textContent = `DOORS: ${lockedCount} LOCKED`;
+
+  const armedPct = Math.round((1 - armedDecks.length / 2) * 100);
+  document.getElementById('sb-armoury').textContent = `ARMOURY: ${armedPct}%`;
+
+  const totalRooms = Object.keys(layout).length || 20;
+  const damagedSensors = Object.values(sensorStatus).filter(s => s === 'damaged').length;
+  const sensorPct = Math.round(((totalRooms - damagedSensors) / totalRooms) * 100);
+  document.getElementById('sb-sensors').textContent = `SENSORS: ${sensorPct}%`;
+
+  boardingStatusEl.textContent = isBoarding || boardingCount > 0 ? 'BOARDING ACTIVE' : 'STANDBY';
+  boardingStatusEl.className = isBoarding || boardingCount > 0
+    ? 'text-data c-hostile boarding-active' : 'text-data text-dim';
+}
+
+function renderAll() {
+  draw();
+  renderAlerts();
+  renderTeams();
+  renderBoardingIntel();
+  renderStatusBar();
+}
+
 // ---------------------------------------------------------------------------
-// Canvas click interaction
+// Canvas click
 // ---------------------------------------------------------------------------
 
 canvas.addEventListener('click', (e) => {
-  const rect   = canvas.getBoundingClientRect();
-  const scaleX = canvas.width  / rect.width;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
   const px = (e.clientX - rect.left) * scaleX;
-  const py = (e.clientY - rect.top)  * scaleY;
+  const py = (e.clientY - rect.top) * scaleY;
 
   const roomId = roomAtPoint(px, py);
   if (!roomId) return;
 
-  if (selectedSquadId) {
-    const selSquad = squads.find(s => s.id === selectedSquadId);
-    if (selSquad && selSquad.room_id === roomId) {
-      // Click on own room → deselect
-      selectedSquadId = null;
-    } else {
-      // Click on another room → move (works during both planning and boarding)
-      send('security.move_squad', { squad_id: selectedSquadId, room_id: roomId });
-      selectedSquadId = null;
-    }
-  } else {
-    // Select the first non-eliminated squad in this room
-    const found = squads.find(s => s.room_id === roomId && s.count > 0);
-    if (found) selectedSquadId = found.id;
+  // If a marine team is selected, send it to the clicked room
+  if (selectedTeamId) {
+    send('security.send_team', { team_id: selectedTeamId, destination: roomId });
+    selectedTeamId = null;
+    renderAll();
+    return;
   }
 
-  draw();
-  renderSidebar();
+  // Legacy squad move
+  if (selectedSquadId) {
+    send('security.move_squad', { squad_id: selectedSquadId, room_id: roomId });
+    selectedSquadId = null;
+    renderAll();
+    return;
+  }
+
+  // Select room
+  selectedRoomId = selectedRoomId === roomId ? null : roomId;
+  renderAll();
+});
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+
+document.getElementById('btn-lock')?.addEventListener('click', () => {
+  if (selectedRoomId) send('security.lock_door', { room_id: selectedRoomId });
+});
+
+document.getElementById('btn-unlock')?.addEventListener('click', () => {
+  if (selectedRoomId) send('security.unlock_door', { room_id: selectedRoomId });
+});
+
+document.getElementById('sel-lockdown')?.addEventListener('change', function () {
+  const val = this.value; this.value = '';
+  if (val === 'deck' && selectedRoomId) {
+    const r = layout[selectedRoomId];
+    if (r) send('security.lockdown_deck', { deck: parseInt(r.deck) || 1 });
+  } else if (val === 'ship') send('security.lockdown_all', {});
+  else if (val === 'lift_deck' && selectedRoomId) {
+    const r = layout[selectedRoomId];
+    if (r) send('security.lift_lockdown', { deck: parseInt(r.deck) || 1 });
+  } else if (val === 'lift_all') send('security.lift_lockdown', { all: true });
+});
+
+document.getElementById('sel-bulkhead')?.addEventListener('change', function () {
+  const val = this.value; this.value = '';
+  const m = val.match(/(seal|unseal)_(\d)_(\d)/);
+  if (!m) return;
+  const type = m[1] === 'seal' ? 'security.seal_bulkhead' : 'security.unseal_bulkhead';
+  send(type, { deck_above: parseInt(m[2]), deck_below: parseInt(m[3]) });
+});
+
+document.getElementById('sel-arm')?.addEventListener('change', function () {
+  const val = this.value; this.value = '';
+  const m = val.match(/(arm|disarm)_(\d)/);
+  if (!m) return;
+  const type = m[1] === 'arm' ? 'security.arm_crew' : 'security.disarm_crew';
+  send(type, { deck: parseInt(m[2]) });
+});
+
+document.getElementById('sel-quarantine')?.addEventListener('change', function () {
+  const val = this.value; this.value = '';
+  if (val === 'room' && selectedRoomId) send('security.quarantine_room', { room_id: selectedRoomId });
+  else if (val === 'lift' && selectedRoomId) send('security.lift_quarantine', { room_id: selectedRoomId });
+});
+
+document.getElementById('sel-alert')?.addEventListener('change', function () {
+  const val = this.value; this.value = '';
+  if (!selectedRoomId) return;
+  const r = layout[selectedRoomId];
+  if (r && val) send('security.set_deck_alert', { deck: parseInt(r.deck) || 1, level: val });
+});
+
+// Populate quarantine and alert selects
+function populateSelects() {
+  const qSel = document.getElementById('sel-quarantine');
+  if (qSel && qSel.options.length <= 1) {
+    qSel.innerHTML = '<option value="">QUARANTINE ▼</option>';
+    qSel.innerHTML += '<option value="room">QUARANTINE ROOM</option>';
+    qSel.innerHTML += '<option value="lift">LIFT QUARANTINE</option>';
+  }
+  const aSel = document.getElementById('sel-alert');
+  if (aSel && aSel.options.length <= 1) {
+    aSel.innerHTML = '<option value="">SET ALERT ▼</option>';
+    for (const lvl of ['normal', 'caution', 'combat', 'evacuate']) {
+      aSel.innerHTML += `<option value="${lvl}">${lvl.toUpperCase()}</option>`;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  switch (e.key.toLowerCase()) {
+    case 'l': if (selectedRoomId) send('security.lock_door', { room_id: selectedRoomId }); break;
+    case 'u': if (selectedRoomId) send('security.unlock_door', { room_id: selectedRoomId }); break;
+    case 'q': if (selectedRoomId) send('security.quarantine_room', { room_id: selectedRoomId }); break;
+    case 'tab':
+      e.preventDefault();
+      if (marineTeams.length > 0) {
+        const idx = marineTeams.findIndex(t => t.id === selectedTeamId);
+        selectedTeamId = marineTeams[(idx + 1) % marineTeams.length].id;
+        renderAll();
+      }
+      break;
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -699,54 +670,30 @@ canvas.addEventListener('click', (e) => {
 // ---------------------------------------------------------------------------
 
 function handleGameStarted(payload) {
-  standbyEl.style.display  = 'none';
-  secMainEl.style.display  = '';
-  if (payload.mission_name)    missionLabelEl.textContent = payload.mission_name;
+  standbyEl.style.display = 'none';
+  for (const el of document.querySelectorAll('[data-security-main]')) el.style.display = '';
+  if (payload.mission_name) missionLabelEl.textContent = payload.mission_name;
   if (payload.interior_layout) layout = payload.interior_layout;
   showBriefing(payload.mission_name, payload.briefing_text);
-  draw();
-  renderSidebar();
+  populateSelects();
+  renderAll();
 }
 
 function handleInteriorState(payload) {
-  isBoarding  = payload.is_boarding || false;
-  squads      = payload.squads     || [];
-  intruders   = payload.intruders  || [];
-  roomsState  = payload.rooms      || {};
-  draw();
-  renderSidebar();
-}
-
-function handlePuzzleStarted(payload) {
-  if (payload.type !== 'tactical_positioning') return;
-  planningPuzzleId  = payload.puzzle_id;
-  planningThreats   = payload.data?.intruder_threats || [];
-  planningTimeLimit = payload.time_limit || 60;
-  planningCountdown = planningTimeLimit;
-
-  // Client-side countdown (server is authoritative; this is display only).
-  if (_planningInterval) clearInterval(_planningInterval);
-  _planningInterval = setInterval(() => {
-    planningCountdown -= 0.1;
-    if (planningCountdown <= 0) {
-      clearInterval(_planningInterval);
-      _planningInterval = null;
-    }
-    renderSidebar();  // update countdown badge
-  }, 100);
-
-  draw();
-  renderSidebar();
-}
-
-function handlePuzzleResult(payload) {
-  if (payload.puzzle_id !== planningPuzzleId) return;
-  // Planning phase ended — clear state.
-  planningPuzzleId = null;
-  planningThreats  = [];
-  if (_planningInterval) { clearInterval(_planningInterval); _planningInterval = null; }
-  draw();
-  renderSidebar();
+  isBoarding       = payload.is_boarding || false;
+  squads           = payload.squads || [];
+  intruders        = payload.intruders || [];
+  roomsState       = payload.rooms || {};
+  marineTeams      = payload.marine_teams || [];
+  boardingParties  = payload.boarding_parties || [];
+  lockedDoors      = payload.locked_doors || [];
+  breachedDoors    = payload.breached_doors || [];
+  sealedBulkheads  = payload.sealed_bulkheads || [];
+  deckAlerts       = payload.deck_alerts || {};
+  armedDecks       = payload.armed_decks || [];
+  quarantinedRooms = payload.quarantined_rooms || [];
+  sensorStatus     = payload.sensor_status || {};
+  renderAll();
 }
 
 function handleHullHit() {
@@ -760,7 +707,7 @@ function handleHullHit() {
 // ---------------------------------------------------------------------------
 
 function init() {
-  canvas.width  = CANVAS_W;
+  canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
 
   onStatusChange((status) => {
@@ -770,8 +717,6 @@ function init() {
 
   on('game.started',            handleGameStarted);
   on('security.interior_state', handleInteriorState);
-  on('puzzle.started',          handlePuzzleStarted);
-  on('puzzle.result',           handlePuzzleResult);
   on('ship.alert_changed',      (p) => setAlertLevel(p.level));
   on('ship.hull_hit',           handleHullHit);
   on('game.over',               (p) => { SoundBank.play(p.result === 'victory' ? 'victory' : 'defeat'); showGameOver(p.result, p.stats); });
@@ -788,6 +733,7 @@ function init() {
     send('lobby.claim_role', { role: 'security', player_name: name });
   });
 
+  populateSelects();
   connect();
 }
 

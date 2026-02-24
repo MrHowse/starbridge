@@ -35,51 +35,116 @@
     <!-- ── Active security layout ──────────────────────────────────────── -->
     <div class="security-main" data-security-main style="display:none">
 
-      <!-- ── Left: Ship interior canvas ────────────────────────────────── -->
-      <div class="canvas-panel panel">
-        <div class="panel__header canvas-panel__header">
-          <span class="text-label">SHIP INTERIOR</span>
-          <span class="text-data text-dim" id="boarding-status">STANDBY</span>
-          <span class="text-label text-dim" id="selection-hint">Select a room to move squads</span>
+      <!-- ── Left: Ship interior + controls ──────────────────────────── -->
+      <div class="left-panel">
+
+        <!-- Deck tabs + canvas -->
+        <div class="canvas-panel panel">
+          <div class="panel__header canvas-panel__header">
+            <span class="text-label">SHIP INTERIOR</span>
+            <span class="text-data text-dim" id="boarding-status">STANDBY</span>
+            <div class="deck-tabs" id="deck-tabs">
+              <button class="deck-tab deck-tab--active" data-deck="0">ALL</button>
+              <button class="deck-tab" data-deck="1">D1</button>
+              <button class="deck-tab" data-deck="2">D2</button>
+              <button class="deck-tab" data-deck="3">D3</button>
+              <button class="deck-tab" data-deck="4">D4</button>
+              <button class="deck-tab" data-deck="5">D5</button>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="ship-canvas"></canvas>
+          </div>
         </div>
-        <div class="canvas-wrap">
-          <canvas id="ship-canvas"></canvas>
+
+        <!-- Controls bar -->
+        <div class="controls-bar panel">
+          <div class="controls-row">
+            <button class="ctrl-btn" id="btn-lock" title="Lock selected room door (L)">LOCK</button>
+            <button class="ctrl-btn" id="btn-unlock" title="Unlock selected room door (U)">UNLOCK</button>
+            <select class="ctrl-select" id="sel-lockdown" title="Lockdown options (D)">
+              <option value="">LOCKDOWN ▼</option>
+              <option value="deck">LOCKDOWN DECK</option>
+              <option value="ship">LOCKDOWN SHIP</option>
+              <option value="lift_deck">LIFT DECK</option>
+              <option value="lift_all">LIFT ALL</option>
+            </select>
+            <select class="ctrl-select" id="sel-bulkhead" title="Seal bulkhead between decks">
+              <option value="">BULKHEAD ▼</option>
+              <option value="seal_1_2">SEAL D1-D2</option>
+              <option value="seal_2_3">SEAL D2-D3</option>
+              <option value="seal_3_4">SEAL D3-D4</option>
+              <option value="seal_4_5">SEAL D4-D5</option>
+              <option value="unseal_1_2">UNSEAL D1-D2</option>
+              <option value="unseal_2_3">UNSEAL D2-D3</option>
+              <option value="unseal_3_4">UNSEAL D3-D4</option>
+              <option value="unseal_4_5">UNSEAL D4-D5</option>
+            </select>
+            <select class="ctrl-select" id="sel-arm" title="Arm crew on deck (A)">
+              <option value="">ARM CREW ▼</option>
+              <option value="arm_1">ARM DECK 1</option>
+              <option value="arm_2">ARM DECK 2</option>
+              <option value="arm_3">ARM DECK 3</option>
+              <option value="arm_4">ARM DECK 4</option>
+              <option value="arm_5">ARM DECK 5</option>
+              <option value="disarm_1">DISARM DECK 1</option>
+              <option value="disarm_2">DISARM DECK 2</option>
+              <option value="disarm_3">DISARM DECK 3</option>
+              <option value="disarm_4">DISARM DECK 4</option>
+              <option value="disarm_5">DISARM DECK 5</option>
+            </select>
+            <select class="ctrl-select" id="sel-quarantine" title="Quarantine room (Q)">
+              <option value="">QUARANTINE ▼</option>
+            </select>
+            <select class="ctrl-select" id="sel-alert" title="Set deck alert level">
+              <option value="">SET ALERT ▼</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <!-- ── Right: Sidebar ─────────────────────────────────────────────── -->
+      <!-- ── Right: Intel sidebar ─────────────────────────────────────── -->
       <div class="sidebar panel">
 
-        <!-- Squads section -->
-        <div class="sidebar-section sidebar-section--squads">
-          <div class="panel__header">
-            <span class="text-label">MARINE SQUADS</span>
-          </div>
-          <div id="squad-list" class="squad-list"></div>
-
-          <!-- Door control (shown when a squad is selected) -->
-          <div class="door-control" id="door-control" style="display:none">
-            <span class="text-label">DOOR CONTROL</span>
-            <div class="door-control__row">
-              <select id="door-room-select" class="door-select"></select>
-              <button class="fire-btn fire-btn--small" id="btn-toggle-door">TOGGLE</button>
-            </div>
-          </div>
+        <!-- Alert status per deck -->
+        <div class="sidebar-section sidebar-section--alerts">
+          <div class="panel__header"><span class="text-label">ALERT STATUS</span></div>
+          <div id="alert-list" class="alert-list"></div>
         </div>
 
-        <!-- Intruders section -->
-        <div class="sidebar-section sidebar-section--intruders">
-          <div class="panel__header">
-            <span class="text-label">HOSTILE CONTACTS</span>
-          </div>
-          <div id="intruder-list" class="intruder-list">
-            <p class="text-dim text-label intruder-list__empty">—</p>
+        <!-- Marine squads -->
+        <div class="sidebar-section sidebar-section--squads">
+          <div class="panel__header"><span class="text-label">MARINE SQUADS</span></div>
+          <div id="team-list" class="team-list"></div>
+        </div>
+
+        <!-- Boarding intel -->
+        <div class="sidebar-section sidebar-section--intel">
+          <div class="panel__header"><span class="text-label">BOARDING INTEL</span></div>
+          <div id="boarding-list" class="boarding-list"></div>
+        </div>
+
+        <!-- Escort requests -->
+        <div class="sidebar-section sidebar-section--escorts">
+          <div class="panel__header"><span class="text-label">ESCORT REQUESTS</span></div>
+          <div id="escort-list" class="escort-list">
+            <p class="text-dim text-label">—</p>
           </div>
         </div>
 
       </div>
 
     </div>
+
+    <!-- ── Bottom status bar ──────────────────────────────────────────── -->
+    <div class="status-bar" id="status-bar" data-security-main style="display:none">
+      <span class="text-label" id="sb-boarding">BOARDING: NONE</span>
+      <span class="text-label" id="sb-squads">SQUADS: 0/0</span>
+      <span class="text-label" id="sb-doors">DOORS: 0 LOCKED</span>
+      <span class="text-label" id="sb-armoury">ARMOURY: 100%</span>
+      <span class="text-label" id="sb-sensors">SENSORS: 100%</span>
+    </div>
+
   </div>
   <script type="module" src="security.js"></script>
   <script type="module" src="../shared/a11y_widget.js"></script>
