@@ -49,9 +49,19 @@ from server.models.messages.security import (
     SecurityLiftQuarantinePayload,
 )
 from server.models.messages.flight_ops import (
-    FlightOpsDeployProbePayload,
+    FlightOpsAbortLandingPayload,
+    FlightOpsClearToLandPayload,
+    FlightOpsDeployBuoyPayload,
+    FlightOpsDeployDecoyPayload,
+    FlightOpsDesignateTargetPayload,
+    FlightOpsEscortAssignPayload,
     FlightOpsLaunchDronePayload,
     FlightOpsRecallDronePayload,
+    FlightOpsRushTurnaroundPayload,
+    FlightOpsSetBehaviourPayload,
+    FlightOpsSetEngagementRulesPayload,
+    FlightOpsSetWaypointPayload,
+    FlightOpsSetWaypointsPayload,
 )
 from server.models.messages.ew import (
     EWSetJamTargetPayload,
@@ -228,9 +238,19 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "puzzle.request_assist": PuzzleAssistPayload,
     "puzzle.cancel": PuzzleCancelPayload,
     # Flight Ops
-    "flight_ops.launch_drone":  FlightOpsLaunchDronePayload,
-    "flight_ops.recall_drone":  FlightOpsRecallDronePayload,
-    "flight_ops.deploy_probe":  FlightOpsDeployProbePayload,
+    "flight_ops.launch_drone":          FlightOpsLaunchDronePayload,
+    "flight_ops.recall_drone":          FlightOpsRecallDronePayload,
+    "flight_ops.set_waypoint":          FlightOpsSetWaypointPayload,
+    "flight_ops.set_waypoints":         FlightOpsSetWaypointsPayload,
+    "flight_ops.set_engagement_rules":  FlightOpsSetEngagementRulesPayload,
+    "flight_ops.set_behaviour":         FlightOpsSetBehaviourPayload,
+    "flight_ops.designate_target":      FlightOpsDesignateTargetPayload,
+    "flight_ops.deploy_decoy":          FlightOpsDeployDecoyPayload,
+    "flight_ops.deploy_buoy":           FlightOpsDeployBuoyPayload,
+    "flight_ops.escort_assign":         FlightOpsEscortAssignPayload,
+    "flight_ops.clear_to_land":         FlightOpsClearToLandPayload,
+    "flight_ops.rush_turnaround":       FlightOpsRushTurnaroundPayload,
+    "flight_ops.abort_landing":         FlightOpsAbortLandingPayload,
     # Electronic Warfare
     "ew.set_jam_target":         EWSetJamTargetPayload,
     "ew.toggle_countermeasures": EWToggleCountermeasuresPayload,

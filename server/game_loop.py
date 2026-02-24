@@ -53,9 +53,19 @@ from server.models.messages import (
     TacticalRemoveAnnotationPayload,
     TacticalCreateStrikePlanPayload,
     TacticalExecuteStrikePlanPayload,
-    FlightOpsDeployProbePayload,
+    FlightOpsAbortLandingPayload,
+    FlightOpsClearToLandPayload,
+    FlightOpsDeployBuoyPayload,
+    FlightOpsDeployDecoyPayload,
+    FlightOpsDesignateTargetPayload,
+    FlightOpsEscortAssignPayload,
     FlightOpsLaunchDronePayload,
     FlightOpsRecallDronePayload,
+    FlightOpsRushTurnaroundPayload,
+    FlightOpsSetBehaviourPayload,
+    FlightOpsSetEngagementRulesPayload,
+    FlightOpsSetWaypointPayload,
+    FlightOpsSetWaypointsPayload,
     EngineeringCancelDCTPayload,
     EngineeringCancelRepairOrderPayload,
     EngineeringDispatchDCTPayload,
@@ -1981,19 +1991,37 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                     "from_role": payload.from_role.strip()[:20] or "crew",
                 }))
         elif msg_type == "flight_ops.launch_drone" and isinstance(payload, FlightOpsLaunchDronePayload):
-            glfo.launch_drone(payload.drone_id, payload.target_x, payload.target_y, ship)
+            glfo.launch_drone(payload.drone_id, ship)
             gl.log_event("flight_ops", "drone_launched", {"drone_id": payload.drone_id})
             _set_training_flag(glm, "flightops_drone_launched")
         elif msg_type == "flight_ops.recall_drone" and isinstance(payload, FlightOpsRecallDronePayload):
             glfo.recall_drone(payload.drone_id)
             gl.log_event("flight_ops", "drone_recalled", {"drone_id": payload.drone_id})
             _set_training_flag(glm, "flightops_drone_recalled")
-        elif msg_type == "flight_ops.deploy_probe" and isinstance(payload, FlightOpsDeployProbePayload):
-            glfo.deploy_probe(payload.target_x, payload.target_y)
-            gl.log_event("flight_ops", "probe_deployed", {
-                "target_x": payload.target_x, "target_y": payload.target_y,
-            })
-            _set_training_flag(glm, "flightops_probe_deployed")
+        elif msg_type == "flight_ops.set_waypoint" and isinstance(payload, FlightOpsSetWaypointPayload):
+            glfo.set_waypoint(payload.drone_id, payload.x, payload.y)
+        elif msg_type == "flight_ops.set_waypoints" and isinstance(payload, FlightOpsSetWaypointsPayload):
+            wps = [(p[0], p[1]) for p in payload.waypoints if len(p) >= 2]
+            glfo.set_waypoints(payload.drone_id, wps)
+        elif msg_type == "flight_ops.set_engagement_rules" and isinstance(payload, FlightOpsSetEngagementRulesPayload):
+            glfo.set_engagement_rules(payload.drone_id, payload.rules)
+        elif msg_type == "flight_ops.set_behaviour" and isinstance(payload, FlightOpsSetBehaviourPayload):
+            glfo.set_behaviour(payload.drone_id, payload.behaviour)
+        elif msg_type == "flight_ops.designate_target" and isinstance(payload, FlightOpsDesignateTargetPayload):
+            glfo.designate_target(payload.drone_id, payload.target_id)
+        elif msg_type == "flight_ops.deploy_decoy" and isinstance(payload, FlightOpsDeployDecoyPayload):
+            glfo.deploy_decoy_cmd(payload.direction, ship)
+            gl.log_event("flight_ops", "decoy_deployed", {"direction": payload.direction})
+        elif msg_type == "flight_ops.deploy_buoy" and isinstance(payload, FlightOpsDeployBuoyPayload):
+            glfo.deploy_buoy_cmd(payload.drone_id)
+        elif msg_type == "flight_ops.escort_assign" and isinstance(payload, FlightOpsEscortAssignPayload):
+            glfo.escort_assign(payload.drone_id, payload.escort_target)
+        elif msg_type == "flight_ops.clear_to_land" and isinstance(payload, FlightOpsClearToLandPayload):
+            glfo.clear_to_land(payload.drone_id)
+        elif msg_type == "flight_ops.rush_turnaround" and isinstance(payload, FlightOpsRushTurnaroundPayload):
+            glfo.rush_turnaround(payload.drone_id)
+        elif msg_type == "flight_ops.abort_landing" and isinstance(payload, FlightOpsAbortLandingPayload):
+            glfo.abort_landing(payload.drone_id)
         elif msg_type == "ew.set_jam_target" and isinstance(payload, EWSetJamTargetPayload):
             glew.set_jam_target(payload.entity_id)
             gl.log_event("ew", "jam_target_set", {"entity_id": payload.entity_id})

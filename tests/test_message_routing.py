@@ -36,7 +36,7 @@ from server.models.messages.captain import (
 from server.models.messages.medical import MedicalTreatCrewPayload, MedicalAdmitPayload
 from server.models.messages.security import SecurityMoveSquadPayload, SecurityToggleDoorPayload
 from server.models.messages.comms import CommsTuneFrequencyPayload, CommsHailPayload
-from server.models.messages.flight_ops import FlightOpsLaunchDronePayload, FlightOpsDeployProbePayload
+from server.models.messages.flight_ops import FlightOpsLaunchDronePayload, FlightOpsDeployDecoyPayload
 from server.models.messages.ew import EWSetJamTargetPayload, EWToggleCountermeasuresPayload
 from server.models.messages.tactical import TacticalSetEngagementPriorityPayload, TacticalAddAnnotationPayload
 from server.models.messages.puzzle import PuzzleSubmitPayload, PuzzleCancelPayload
@@ -261,17 +261,16 @@ class TestCommsValidation:
 
 class TestFlightOpsValidation:
     def test_flight_ops_launch_drone(self):
-        msg = _msg("flight_ops.launch_drone", {
-            "drone_id": "drone_1", "target_x": 100.0, "target_y": 200.0,
-        })
+        msg = _msg("flight_ops.launch_drone", {"drone_id": "drone_1"})
         result = validate_payload(msg)
         assert isinstance(result, FlightOpsLaunchDronePayload)
         assert result.drone_id == "drone_1"
 
-    def test_flight_ops_deploy_probe(self):
-        msg = _msg("flight_ops.deploy_probe", {"target_x": 500.0, "target_y": 600.0})
+    def test_flight_ops_deploy_decoy(self):
+        msg = _msg("flight_ops.deploy_decoy", {"direction": 90.0})
         result = validate_payload(msg)
-        assert isinstance(result, FlightOpsDeployProbePayload)
+        assert isinstance(result, FlightOpsDeployDecoyPayload)
+        assert result.direction == 90.0
 
 
 class TestEWValidation:
@@ -744,12 +743,12 @@ class TestStationHandlerQueueIntegration:
         mock_sender = MockManager()
         queue: asyncio.Queue = asyncio.Queue()
         flight_ops.init(mock_sender, queue)
-        msg = _msg("flight_ops.deploy_probe", {"target_x": 1000.0, "target_y": 2000.0})
+        msg = _msg("flight_ops.deploy_decoy", {"direction": 180.0})
         await flight_ops.handle_flight_ops_message("conn1", msg)
         assert not queue.empty()
         msg_type, payload = queue.get_nowait()
-        assert msg_type == "flight_ops.deploy_probe"
-        assert isinstance(payload, FlightOpsDeployProbePayload)
+        assert msg_type == "flight_ops.deploy_decoy"
+        assert isinstance(payload, FlightOpsDeployDecoyPayload)
 
     @pytest.mark.asyncio
     async def test_ew_handler_queues_message(self):

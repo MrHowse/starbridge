@@ -125,9 +125,19 @@ from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPaylo
 
 # Flight Ops
 from server.models.messages.flight_ops import (
-    FlightOpsDeployProbePayload,
+    FlightOpsAbortLandingPayload,
+    FlightOpsClearToLandPayload,
+    FlightOpsDeployBuoyPayload,
+    FlightOpsDeployDecoyPayload,
+    FlightOpsDesignateTargetPayload,
+    FlightOpsEscortAssignPayload,
     FlightOpsLaunchDronePayload,
     FlightOpsRecallDronePayload,
+    FlightOpsRushTurnaroundPayload,
+    FlightOpsSetBehaviourPayload,
+    FlightOpsSetEngagementRulesPayload,
+    FlightOpsSetWaypointPayload,
+    FlightOpsSetWaypointsPayload,
 )
 
 # Electronic Warfare
@@ -271,7 +281,17 @@ __all__ = [
     # flight ops
     "FlightOpsLaunchDronePayload",
     "FlightOpsRecallDronePayload",
-    "FlightOpsDeployProbePayload",
+    "FlightOpsSetWaypointPayload",
+    "FlightOpsSetWaypointsPayload",
+    "FlightOpsSetEngagementRulesPayload",
+    "FlightOpsSetBehaviourPayload",
+    "FlightOpsDesignateTargetPayload",
+    "FlightOpsDeployDecoyPayload",
+    "FlightOpsDeployBuoyPayload",
+    "FlightOpsEscortAssignPayload",
+    "FlightOpsClearToLandPayload",
+    "FlightOpsRushTurnaroundPayload",
+    "FlightOpsAbortLandingPayload",
     # electronic warfare
     "EWSetJamTargetPayload",
     "EWToggleCountermeasuresPayload",

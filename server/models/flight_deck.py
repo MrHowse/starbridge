@@ -252,6 +252,8 @@ class FlightDeck:
         ta.refuel_remaining = 0.0
         ta.rearm_remaining = 0.0
         ta.repair_remaining = 0.0
+        # Emit event so game loop processes the completion.
+        self.pending_events.append({"type": "turnaround_complete", "drone_id": drone_id})
         return True
 
     def is_turnaround_complete(self, drone_id: str) -> bool:
