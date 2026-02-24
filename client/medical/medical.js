@@ -516,7 +516,9 @@ function renderInjuryList(member) {
     } else {
       const treatType = inj.treatment_type || 'first_aid';
       const treatDur = inj.treatment_duration ? Math.round(inj.treatment_duration) : '?';
-      const treatLabel = treatType.replace(/_/g, ' ').toUpperCase();
+      const treatLabel = treatType === 'stabilise'
+        ? 'TREAT'
+        : treatType.replace(/_/g, ' ').toUpperCase();
       const inBed = member.treatment_bed != null;
       const hasTreatment = _findTreatment(member.id) != null;
 
@@ -733,6 +735,16 @@ if (injuryListEl) {
       send('medical.treat', { crew_id: crewId, injury_id: injuryId });
     } else if (action === 'stabilise') {
       send('medical.stabilise', { crew_id: crewId, injury_id: injuryId });
+      // Flash the timer element green and play confirmation sound
+      const card = btn.closest('.inj-card');
+      if (card) {
+        const timer = card.querySelector('.inj-card__timer');
+        if (timer) {
+          timer.classList.add('inj-card__timer--stabilised');
+          setTimeout(() => timer.classList.remove('inj-card__timer--stabilised'), 1200);
+        }
+      }
+      SoundBank.play('scan_complete');
     }
   });
 }

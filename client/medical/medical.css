@@ -334,6 +334,16 @@
   color: #ffaa00;
 }
 
+.inj-card__timer--stabilised {
+  animation: stabilise-flash 1.2s ease-out;
+}
+
+@keyframes stabilise-flash {
+  0%   { color: #00ff41; text-shadow: 0 0 6px rgba(0, 255, 65, 0.6); }
+  60%  { color: #00ff41; text-shadow: 0 0 3px rgba(0, 255, 65, 0.3); }
+  100% { color: inherit; text-shadow: none; }
+}
+
 .inj-card__actions {
   display: flex;
   gap: 0.4rem;

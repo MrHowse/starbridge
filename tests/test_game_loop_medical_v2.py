@@ -883,6 +883,78 @@ def test_supplies_capped_at_max():
     assert glmed.get_supplies() == glmed.MAX_MEDICAL_SUPPLIES
 
 
+def test_stabilise_serious_resets_degrade_timer():
+    roster = setup_medical()
+    member = make_member()
+    inj = make_injury_obj(severity="serious")
+    inj.degrade_timer = 30.0  # Partially degraded
+    member.injuries.append(inj)
+    member.update_status()
+    roster.members[member.id] = member
+
+    result = glmed.stabilise_crew(member.id, inj.id)
+    assert result["success"] is True
+    assert inj.degrade_timer == DEGRADE_TIMERS["serious"]  # 120.0
+
+
+def test_stabilise_critical_resets_death_timer():
+    roster = setup_medical()
+    member = make_member()
+    inj = make_injury_obj(severity="critical")
+    inj.death_timer = 50.0  # Partially degraded
+    member.injuries.append(inj)
+    member.status = "critical"
+    roster.members[member.id] = member
+
+    result = glmed.stabilise_crew(member.id, inj.id)
+    assert result["success"] is True
+    assert inj.death_timer == CRITICAL_DEATH_TIMER  # 240.0
+
+
+def test_stabilise_moderate_resets_degrade_timer():
+    roster = setup_medical()
+    member = make_member()
+    inj = make_injury_obj(severity="moderate")
+    inj.degrade_timer = 60.0  # Partially degraded
+    member.injuries.append(inj)
+    member.update_status()
+    roster.members[member.id] = member
+
+    result = glmed.stabilise_crew(member.id, inj.id)
+    assert result["success"] is True
+    assert inj.degrade_timer == DEGRADE_TIMERS["moderate"]  # 180.0
+
+
+def test_stabilise_deducts_supplies():
+    roster = setup_medical()
+    glmed.set_supplies(100.0)
+    member = make_member()
+    inj = make_injury_obj(severity="moderate")
+    inj.degrade_timer = 60.0
+    member.injuries.append(inj)
+    member.update_status()
+    roster.members[member.id] = member
+
+    glmed.stabilise_crew(member.id, inj.id)
+    assert glmed.get_supplies() == pytest.approx(100.0 - TREATMENT_SUPPLY_COSTS["stabilise"])
+
+
+def test_stabilise_works_at_zero_supplies_deducts_nothing_extra():
+    roster = setup_medical()
+    glmed.set_supplies(0.0)
+    member = make_member()
+    inj = make_injury_obj(severity="serious")
+    inj.degrade_timer = 30.0
+    member.injuries.append(inj)
+    member.update_status()
+    roster.members[member.id] = member
+
+    result = glmed.stabilise_crew(member.id, inj.id)
+    assert result["success"] is True
+    assert glmed.get_supplies() == pytest.approx(0.0)
+    assert inj.degrade_timer == DEGRADE_TIMERS["serious"]
+
+
 def test_reset_clears_everything():
     roster = setup_medical()
     member = make_member()
