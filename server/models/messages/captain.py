@@ -33,3 +33,13 @@ class CaptainReassignCrewPayload(BaseModel):
     """Sent by Captain station to reassign a crew member to a new duty station."""
     crew_id: str
     new_duty_station: str
+
+
+class CaptainAcceptMissionPayload(BaseModel):
+    """Sent by Captain station to accept an offered dynamic mission."""
+    mission_id: str
+
+
+class CaptainDeclineMissionPayload(BaseModel):
+    """Sent by Captain station to decline an offered dynamic mission."""
+    mission_id: str

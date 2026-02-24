@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
+from server.models.messages.captain import CaptainAcceptMissionPayload, CaptainAddLogPayload, CaptainAuthorizePayload, CaptainDeclineMissionPayload, CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
 from server.models.messages.comms import (
     CommsAssessDistressPayload,
     CommsDecodeSignalPayload,
@@ -182,6 +182,8 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "captain.system_override": CaptainSystemOverridePayload,
     "captain.save_game": CaptainSaveGamePayload,
     "captain.reassign_crew": CaptainReassignCrewPayload,
+    "captain.accept_mission": CaptainAcceptMissionPayload,
+    "captain.decline_mission": CaptainDeclineMissionPayload,
     "captain.undock": CaptainUndockPayload,
     # Medical (legacy)
     "medical.treat_crew": MedicalTreatCrewPayload,

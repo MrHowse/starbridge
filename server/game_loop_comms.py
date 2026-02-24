@@ -9,6 +9,7 @@ deserialise().  New interface added for signal queue, decode, diplomacy.
 """
 from __future__ import annotations
 
+import logging
 import random
 from typing import Any
 
@@ -48,6 +49,8 @@ from server.models.comms import (
     Signal,
     TranslationMatrix,
 )
+
+logger = logging.getLogger("starbridge.game_loop_comms")
 
 # ---------------------------------------------------------------------------
 # Legacy constants (kept for backward compat with training missions)
@@ -141,6 +144,7 @@ def reset() -> None:
     _comms_contacts.clear()
     _pending_contact_updates.clear()
     _signal_contact_map.clear()
+    _pending_generated_missions.clear()
 
     # Set up default channels
     for name, status, cost in CHANNEL_DEFAULTS:
@@ -348,6 +352,10 @@ def _tick_decode(dt: float, crew_factor: float, bandwidth_quality: float) -> lis
             if sig.language in ("alien_alpha", "alien_beta"):
                 _advance_translation(sig.language, 0.1)
 
+            # Try generating a dynamic mission from this decoded signal
+            if sig.location_data is not None:
+                _try_generate_mission_from_signal(sig)
+
             events.append({
                 "signal_id": sig.id,
                 "source_name": sig.source_name,
@@ -357,6 +365,156 @@ def _tick_decode(dt: float, crew_factor: float, bandwidth_quality: float) -> lis
             })
 
     return events
+
+
+# ---------------------------------------------------------------------------
+# Mission generation from decoded signals
+# ---------------------------------------------------------------------------
+
+# Pending missions generated from signal decode (consumed by game_loop)
+_pending_generated_missions: list = []
+
+
+def _try_generate_mission_from_signal(sig: Signal) -> None:
+    """Attempt to generate a dynamic mission from a fully-decoded signal.
+
+    Only signals with location_data and specific types qualify.
+    """
+    if sig.location_data is None:
+        return
+
+    import server.game_loop_dynamic_missions as gldm
+    from server.models.dynamic_mission import (
+        generate_diplomatic_mission,
+        generate_escort_mission,
+        generate_intercept_mission,
+        generate_investigation_mission,
+        generate_patrol_mission,
+        generate_rescue_mission,
+        generate_salvage_mission,
+        generate_trade_mission,
+    )
+
+    loc = sig.location_data
+    pos = (float(loc["position"][0]), float(loc["position"][1]))
+    contact_id = _signal_contact_map.get(sig.id, "")
+    mission_id = gldm.next_mission_id()
+    is_trap = loc.get("is_trap", False)
+
+    # Build comms assessment from distress assessment if available
+    assessment_text = ""
+    if sig.signal_type == "distress":
+        a = assess_distress(sig.id)
+        if a:
+            risk = a.get("risk_level", "unknown")
+            assessment_text = f"Risk assessment: {risk}. " + " ".join(a.get("factors", []))
+
+    mission = None
+
+    if sig.signal_type == "distress":
+        mission = generate_rescue_mission(
+            mission_id=mission_id,
+            signal_id=sig.id,
+            contact_id=contact_id,
+            vessel_name=sig.source_name,
+            position=pos,
+            faction=sig.faction,
+            tick=_tick,
+            is_trap=is_trap,
+            comms_assessment=assessment_text,
+        )
+    elif sig.signal_type == "hail" and sig.faction == "civilian":
+        mission = generate_escort_mission(
+            mission_id=mission_id,
+            signal_id=sig.id,
+            contact_id=contact_id,
+            vessel_name=sig.source_name,
+            position=pos,
+            faction=sig.faction,
+            tick=_tick,
+            comms_assessment=assessment_text,
+        )
+    elif sig.signal_type == "encrypted" and sig.threat_level == "hostile":
+        mission = generate_intercept_mission(
+            mission_id=mission_id,
+            signal_id=sig.id,
+            contact_id=contact_id,
+            position=pos,
+            faction=sig.faction,
+            tick=_tick,
+            comms_assessment=assessment_text,
+        )
+    elif sig.signal_type == "data_burst":
+        mission = generate_investigation_mission(
+            mission_id=mission_id,
+            signal_id=sig.id,
+            contact_id=contact_id,
+            position=pos,
+            tick=_tick,
+            comms_assessment=assessment_text,
+        )
+    elif sig.signal_type == "broadcast" and sig.intel_category == "fleet":
+        mission = generate_patrol_mission(
+            mission_id=mission_id,
+            signal_id=sig.id,
+            contact_id=contact_id,
+            position=pos,
+            faction=sig.faction,
+            tick=_tick,
+            comms_assessment=assessment_text,
+        )
+    elif sig.signal_type == "broadcast" and sig.intel_category == "navigation":
+        mission = generate_salvage_mission(
+            mission_id=mission_id,
+            signal_id=sig.id,
+            contact_id=contact_id,
+            position=pos,
+            tick=_tick,
+            comms_assessment=assessment_text,
+        )
+    elif sig.signal_type == "hail" and sig.faction not in ("unknown", "civilian"):
+        # Non-civilian hail → could be trade or diplomatic
+        fs = _factions.get(sig.faction)
+        if fs and fs.standing < -10:
+            mission = generate_diplomatic_mission(
+                mission_id=mission_id,
+                signal_id=sig.id,
+                contact_id=contact_id,
+                faction=sig.faction,
+                position=pos,
+                tick=_tick,
+                comms_assessment=assessment_text,
+            )
+        else:
+            mission = generate_trade_mission(
+                mission_id=mission_id,
+                signal_id=sig.id,
+                contact_id=contact_id,
+                vessel_name=sig.source_name,
+                position=pos,
+                faction=sig.faction,
+                tick=_tick,
+                comms_assessment=assessment_text,
+            )
+
+    if mission is not None:
+        # Link mission to contact
+        contact = get_comms_contact(contact_id) if contact_id else None
+        if contact is not None:
+            contact.mission_id = mission.id
+
+        _pending_generated_missions.append(mission)
+        logger.info(
+            "Generated %s mission '%s' from signal %s",
+            mission.mission_type, mission.title, sig.id,
+        )
+
+
+def pop_pending_generated_missions() -> list:
+    """Drain and return missions generated from signal decode."""
+    missions = list(_pending_generated_missions)
+    _pending_generated_missions.clear()
+    return missions
 
 
 def _handle_decode_contact_progress(sig: Signal, old_progress: float) -> None:

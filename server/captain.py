@@ -31,6 +31,8 @@ _QUEUE_FORWARDED_TYPES = frozenset({
     "captain.authorize",
     "captain.add_log",
     "captain.undock",
+    "captain.accept_mission",
+    "captain.decline_mission",
 })
 
 
