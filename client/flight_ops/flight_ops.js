@@ -18,12 +18,14 @@ import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAP_WORLD_RADIUS = 60_000;   // world units visible from centre
+let _mapWorldRadius = 60_000;   // world units visible from centre
+let _foRangeControl = null;
 const DRONE_FUEL_LOW   = 20.0;     // matches server DRONE_LOW_FUEL
 
 // ---------------------------------------------------------------------------
@@ -77,6 +79,21 @@ initSharedUI({
     standbyEl.style.display = 'none';
     mainEl.style.display    = 'grid';
     if (payload.mission_name) missionLabel.textContent = payload.mission_name;
+
+    // Range control
+    const rangeBarEl = document.getElementById('range-bar');
+    if (rangeBarEl && !_foRangeControl) {
+      const cfg = STATION_RANGES.flight_ops;
+      _foRangeControl = new RangeControl({
+        container:    rangeBarEl,
+        ranges:       cfg.available,
+        defaultRange: cfg.default,
+        onChange:      (key, worldUnits) => { _mapWorldRadius = worldUnits; renderMap(); },
+      });
+      _foRangeControl.attach();
+      _mapWorldRadius = _foRangeControl.currentRangeUnits();
+    }
+
     resizeCanvas();
     SoundBank.setAmbient('life_support', { active: true });
   },
@@ -139,7 +156,7 @@ function worldToCanvas(wx, wy) {
   const h = mapCanvas.height;
   const cx = w / 2;
   const cy = h / 2;
-  const scale = Math.min(w, h) / 2 / MAP_WORLD_RADIUS;
+  const scale = Math.min(w, h) / 2 / _mapWorldRadius;
   return {
     cx: cx + (wx - shipState.position.x) * scale,
     cy: cy + (wy - shipState.position.y) * scale,
@@ -152,7 +169,7 @@ function canvasToWorld(px, py) {
   const h = mapCanvas.height;
   const cx = w / 2;
   const cy = h / 2;
-  const scale = Math.min(w, h) / 2 / MAP_WORLD_RADIUS;
+  const scale = Math.min(w, h) / 2 / _mapWorldRadius;
   return {
     wx: shipState.position.x + (px - cx) / scale,
     wy: shipState.position.y + (py - cy) / scale,
@@ -250,7 +267,7 @@ function renderMap() {
 function drawGrid() {
   const w = mapCanvas.width;
   const h = mapCanvas.height;
-  const scale = Math.min(w, h) / 2 / MAP_WORLD_RADIUS;
+  const scale = Math.min(w, h) / 2 / _mapWorldRadius;
   const cx = w / 2;
   const cy = h / 2;
 
@@ -268,7 +285,7 @@ function drawSensorBubble(wx, wy, range, colour, alpha) {
   const { cx, cy } = worldToCanvas(wx, wy);
   const w = mapCanvas.width;
   const h = mapCanvas.height;
-  const scale = Math.min(w, h) / 2 / MAP_WORLD_RADIUS;
+  const scale = Math.min(w, h) / 2 / _mapWorldRadius;
 
   ctx.beginPath();
   ctx.arc(cx, cy, range * scale, 0, Math.PI * 2);

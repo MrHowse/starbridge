@@ -22,12 +22,14 @@ import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAP_WORLD_RADIUS = 100_000;
+let _mapWorldRadius = 100_000;
+let _rangeControl   = null;
 
 const THREAT_COLOURS = {
   critical: '#ff5050',
@@ -97,6 +99,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Strike plan step builder
   document.getElementById('btn-add-step').addEventListener('click', addPendingStep);
   document.getElementById('btn-create-plan').addEventListener('click', createStrikePlan);
+
+  // Range control
+  const rangeBarEl = document.getElementById('range-bar');
+  if (rangeBarEl) {
+    const cfg = STATION_RANGES.tactical;
+    _rangeControl = new RangeControl({
+      container:    rangeBarEl,
+      ranges:       cfg.available,
+      defaultRange: cfg.default,
+      onChange:      (key, worldUnits) => { _mapWorldRadius = worldUnits; },
+    });
+    _rangeControl.attach();
+    _mapWorldRadius = _rangeControl.currentRangeUnits();
+  }
 
   // Canvas resize
   const ro = new ResizeObserver(resizeCanvas);
@@ -334,7 +350,7 @@ function handleCanvasClick(relX, relY) {
   const sy    = _shipState.position?.y || 50_000;
   const w     = canvas.width;
   const h     = canvas.height;
-  const scale = Math.min(w, h) / 2 / MAP_WORLD_RADIUS;
+  const scale = Math.min(w, h) / 2 / _mapWorldRadius;
 
   const wx = sx + (relX - w / 2) / scale;
   const wy = sy + (relY - h / 2) / scale;
@@ -355,7 +371,7 @@ function handleCanvasClick(relX, relY) {
   }
 
   // No tool active: click nearest enemy to toggle intercept target
-  const threshold = MAP_WORLD_RADIUS * 0.06;
+  const threshold = _mapWorldRadius * 0.06;
   let nearest     = null;
   let nearestDist = Infinity;
   for (const e of (_tacState?.enemies || [])) {
@@ -408,7 +424,7 @@ function drawMap() {
   const ship  = _shipState;
   const sx    = ship.position?.x || 50_000;
   const sy    = ship.position?.y || 50_000;
-  const scale = Math.min(w, h) / 2 / MAP_WORLD_RADIUS;
+  const scale = Math.min(w, h) / 2 / _mapWorldRadius;
 
   // Background grid rings
   ctx.strokeStyle = '#1a2a1a';

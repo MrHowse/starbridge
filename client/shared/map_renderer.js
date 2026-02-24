@@ -108,6 +108,9 @@ export class MapRenderer {
     this._damageEvents = [];   // { x, y, time }
     this._overlayDamage = false;
     this._beamFlash     = null;  // { sx, sy, tx, ty, time } — screen coords
+
+    // Meaningful range rings (beam/torpedo/sensor).
+    this._rangeRingDefs = [];   // [{range, label, style}] in world units
   }
 
   // ── Public data API ────────────────────────────────────────────────────────
@@ -142,6 +145,23 @@ export class MapRenderer {
     const trail = this._torpedoTrails.get(torpedoId);
     if (!trail || trail.length === 0) return null;
     return trail[trail.length - 1];
+  }
+
+  /** Set viewport range in world units (does NOT filter contacts). */
+  setRange(worldUnits) {
+    this._range = worldUnits;
+    this._zoomLevel = 1.0;   // reset scroll zoom when range changes
+  }
+
+  /**
+   * Set meaningful range rings to display.
+   * @param {Array<{range: number, label: string, style: string}>} defs
+   *   range — world units from ship
+   *   label — e.g. 'BEAM', 'TORP', 'SENSOR'
+   *   style — 'dotted' | 'dashed' | 'solid'
+   */
+  setRangeRings(defs) {
+    this._rangeRingDefs = defs;
   }
 
   // ── Damage overlay ─────────────────────────────────────────────────────────
@@ -373,13 +393,49 @@ export class MapRenderer {
   }
 
   _drawRangeRings(ctx, cw, ch) {
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const zoom = this._effectiveZoom(cw, ch);
+
+    // If meaningful range ring defs are set, draw those instead.
+    if (this._rangeRingDefs.length > 0) {
+      for (const def of this._rangeRingDefs) {
+        const r = def.range / zoom;
+        // Skip rings too small (< 12px) or too large (> 3× canvas).
+        if (r < 12 || r > Math.max(cw, ch) * 3) continue;
+
+        ctx.save();
+        if (def.style === 'dotted')      ctx.setLineDash([2, 4]);
+        else if (def.style === 'dashed') ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = C_RING;
+        ctx.lineWidth   = 0.8;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label at top of ring.
+        const labelY = cy - r - 3;
+        if (labelY > 4) {
+          ctx.fillStyle    = 'rgba(255, 176, 0, 0.4)';
+          ctx.font         = '8px "Share Tech Mono", monospace';
+          ctx.textAlign    = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(def.label, cx, labelY);
+        }
+        ctx.restore();
+      }
+      return;
+    }
+
+    // Default: 3 concentric rings at 1/3 intervals.
     const halfMin = Math.min(cw, ch) / 2;
     ctx.strokeStyle = C_RING;
     ctx.lineWidth   = 1;
     for (let i = 1; i <= 3; i++) {
       const r = halfMin * (i / 3);
       ctx.beginPath();
-      ctx.arc(cw / 2, ch / 2, r, 0, Math.PI * 2);
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -439,7 +495,7 @@ export class MapRenderer {
         }
       } else {
         // Off-screen indicator: arrow at canvas edge pointing toward contact.
-        _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact);
+        _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact, this._shipState);
       }
     }
   }
@@ -577,8 +633,8 @@ function _drawDefaultContact(ctx, sx, sy, contact, selected) {
   ctx.fillText(contact.id, sx, sy + s + 2);
 }
 
-/** Arrow indicator at canvas edge for off-screen contacts. */
-function _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact) {
+/** Arrow indicator at canvas edge for off-screen contacts, with distance label. */
+function _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact, shipState) {
   const cx = cw / 2;
   const cy = ch / 2;
   const dx = sx - cx;
@@ -586,8 +642,13 @@ function _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact) {
   const dist = Math.hypot(dx, dy);
   if (dist < 1) return;
 
+  // Colour by classification.
+  const cls = contact.classification || 'hostile';
+  const CLS_COLORS = { hostile: '#ff4040', unknown: '#ffffff', friendly: '#00ff41', neutral: '#ffaa00' };
+  const color = CLS_COLORS[cls] || C_ENEMY;
+
   // Clamp to canvas edge with margin.
-  const M = 16;
+  const M = 20;
   const scale = Math.min(
     (cw / 2 - M) / Math.abs(dx || 1),
     (ch / 2 - M) / Math.abs(dy || 1),
@@ -599,16 +660,36 @@ function _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact) {
   ctx.save();
   ctx.translate(ax, ay);
   ctx.rotate(angle);
-  ctx.fillStyle = C_ENEMY;
-  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.8;
   // Small triangle pointing outward.
   ctx.beginPath();
-  ctx.moveTo(6, 0);
-  ctx.lineTo(-4, -4);
-  ctx.lineTo(-4, 4);
+  ctx.moveTo(7, 0);
+  ctx.lineTo(-4, -5);
+  ctx.lineTo(-4, 5);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
+
+  // Distance label next to the arrow.
+  if (shipState?.position) {
+    const worldDist = Math.hypot(
+      contact.x - shipState.position.x,
+      contact.y - shipState.position.y,
+    );
+    const km = (worldDist / 1000).toFixed(0);
+    // Position label just inside the arrow.
+    const lx = ax - Math.cos(angle) * 14;
+    const ly = ay - Math.sin(angle) * 14;
+    ctx.save();
+    ctx.fillStyle    = color;
+    ctx.globalAlpha  = 0.7;
+    ctx.font         = '8px "Share Tech Mono", monospace';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${km}km`, lx, ly);
+    ctx.restore();
+  }
 }
 
 function _drawShipChevron(ctx, cx, cy, headingRad, halfSize, colour) {

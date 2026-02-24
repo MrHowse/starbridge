@@ -20,12 +20,14 @@ import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAP_WORLD_RADIUS = 30_000;
+let _mapWorldRadius = 30_000;
+let _ewRangeControl = null;
 const PLAYER_COLOUR    = '#00c87a';
 const ENEMY_COLOUR     = '#ff5050';
 const JAM_COLOUR       = '#f0c040';
@@ -101,6 +103,20 @@ document.addEventListener('DOMContentLoaded', () => {
       target_system: targetSystem,
     });
   });
+
+  // Range control
+  const rangeBarEl = document.getElementById('range-bar');
+  if (rangeBarEl) {
+    const cfg = STATION_RANGES.electronic_warfare;
+    _ewRangeControl = new RangeControl({
+      container:    rangeBarEl,
+      ranges:       cfg.available,
+      defaultRange: cfg.default,
+      onChange:      (key, worldUnits) => { _mapWorldRadius = worldUnits; },
+    });
+    _ewRangeControl.attach();
+    _mapWorldRadius = _ewRangeControl.currentRangeUnits();
+  }
 
   // Canvas resize
   const ro = new ResizeObserver(resizeCanvas);
@@ -341,7 +357,7 @@ function handleCanvasClick(relX, relY) {
   const sy     = ship.position?.y || 50_000;
   const w = canvas.width;
   const h = canvas.height;
-  const scale  = Math.min(w, h) / 2 / MAP_WORLD_RADIUS;
+  const scale  = Math.min(w, h) / 2 / _mapWorldRadius;
 
   // Convert canvas click to world offset from ship
   const wOffX  = (relX - w / 2) / scale;
@@ -350,7 +366,7 @@ function handleCanvasClick(relX, relY) {
   const wy     = sy + wOffY;
 
   // Click threshold in world units (~6% of viewport radius)
-  const threshold = MAP_WORLD_RADIUS * 0.06;
+  const threshold = _mapWorldRadius * 0.06;
   let nearest = null;
   let nearestDist = Infinity;
 
@@ -405,7 +421,7 @@ function drawMap() {
   const ship  = _shipState;
   const sx    = ship.position?.x || 50_000;
   const sy    = ship.position?.y || 50_000;
-  const scale = Math.min(w, h) / 2 / MAP_WORLD_RADIUS;
+  const scale = Math.min(w, h) / 2 / _mapWorldRadius;
 
   // Background grid rings
   ctx.strokeStyle = '#1a2a1a';

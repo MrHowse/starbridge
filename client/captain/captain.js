@@ -25,6 +25,7 @@ import { initRoleBar } from '../shared/role_bar.js';
 import { initCrewRoster } from '../shared/crew_roster.js';
 import { MapRenderer } from '../shared/map_renderer.js';
 import { SectorMap, ZOOM_RANGES } from '../shared/sector_map.js';
+import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
 import {
   initViewports,
   updateViewportContacts,
@@ -144,9 +145,8 @@ let _labelsOn     = false;
 // Science sector-scan status indicator (shown on tactical map).
 let _scanIndicatorText = null;
 
-// Zoom UI
-const _mapZoomLabel = document.getElementById('map-zoom-label');
-const _zoomBtns     = document.querySelectorAll('.zoom-btn');
+// Range control
+let _rangeControl = null;
 
 // ---------------------------------------------------------------------------
 // Init
@@ -216,14 +216,7 @@ function init() {
     emergencyUndockBtn.addEventListener('click', () => send('captain.undock', { emergency: true }));
   }
 
-  // Zoom buttons
-  _zoomBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (_sectorMap) _setZoom(btn.dataset.zoom);
-    });
-  });
-
-  // Viewport keys (1–5 for mode, H/L for highlights/labels) + fallthrough to sector map zoom
+  // Viewport keys (1–5 for mode, H/L for highlights/labels)
   document.addEventListener('keydown', (e) => {
     if (!gameActive) return;
     const VP_KEYS = { '1': 'fore', '2': 'aft', '3': 'port', '4': 'starboard', '5': 'quad' };
@@ -245,11 +238,6 @@ function init() {
       _updateVpToolbarUI();
       e.preventDefault();
       return;
-    }
-    // Pass remaining keys to sector map (Z to cycle zoom)
-    if (_sectorMap && _sectorMap.handleKey(e.key)) {
-      _updateZoomUI();
-      e.preventDefault();
     }
   });
 
@@ -297,25 +285,37 @@ function handleGameStarted(payload) {
     );
   }
 
+  // Range control
+  const rangeBarEl = document.getElementById('range-bar');
+  if (rangeBarEl) {
+    const cfg = STATION_RANGES.captain;
+    _rangeControl = new RangeControl({
+      container:    rangeBarEl,
+      ranges:       cfg.available,
+      defaultRange: cfg.default,
+      onChange:      _onCaptainRangeChange,
+    });
+    _rangeControl.attach();
+  }
+
   // Tactical map + sector map
   if (mapCanvas) {
     mapRenderer = new MapRenderer(mapCanvas, {
-      range:          MAP_WORLD_RADIUS,
+      range:          _rangeControl ? _rangeControl.currentRangeUnits() : MAP_WORLD_RADIUS,
       orientation:    'north-up',
       showGrid:       true,
-      showRangeRings: false,
+      showRangeRings: true,
       zoom:           { enabled: true },
     });
     _sectorMap = new SectorMap({
       allowedLevels: ['tactical', 'sector', 'strategic'],
       defaultZoom:   'sector',
       onRoutePlot:   (wx, wy) => send('map.plot_route', { to_x: wx, to_y: wy }),
-      onZoomChange:  _updateZoomUI,
+      onZoomChange:  () => {},
     });
     _sectorMap.setMapRenderer(mapRenderer);
     _sectorMap.setupStrategicClick(mapCanvas);
     _buildDamageToggle();
-    _updateZoomUI();
   }
 
   _resizeTactical();
@@ -491,6 +491,18 @@ function handleWorldEntities(payload) {
 
 function handleSectorGrid(payload) {
   if (_sectorMap) _sectorMap.updateSectorGrid(payload);
+
+  // Feed sector bounds to range control for SEC auto-calc.
+  if (_rangeControl && payload) {
+    const active = (payload.sectors || []).find(s => s.visibility === 'active');
+    if (active) {
+      const SECTOR_SIZE = 100_000;
+      const cx = active.col * SECTOR_SIZE + SECTOR_SIZE / 2;
+      const cy = active.row * SECTOR_SIZE + SECTOR_SIZE / 2;
+      _rangeControl.setSectorBounds(cx, cy, SECTOR_SIZE);
+    }
+    _rangeControl.setStrategicGrid(payload);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -505,19 +517,26 @@ function handleScanIndicator({ text }) {
 // Zoom controls
 // ---------------------------------------------------------------------------
 
-function _setZoom(level) {
-  if (!_sectorMap) return;
-  _sectorMap.setZoomLevel(level);
-  _updateZoomUI();
-}
-
-function _updateZoomUI() {
-  if (!_sectorMap) return;
-  const level = _sectorMap.getZoomLevel();
-  if (_mapZoomLabel) _mapZoomLabel.textContent = _sectorMap.zoomLabel();
-  _zoomBtns.forEach(btn => {
-    btn.classList.toggle('zoom-btn--active', btn.dataset.zoom === level);
-  });
+function _onCaptainRangeChange(key, worldUnits) {
+  if (key === 'SEC' && _sectorMap && _rangeControl) {
+    const { x, y } = _rangeControl.getSectorCentre();
+    _sectorMap.setZoomLevel('sector');
+    if (mapRenderer) {
+      mapRenderer.setRange(worldUnits);
+      mapRenderer.setCameraOverride(x, y);
+    }
+    return;
+  }
+  if (key === 'STR' && _sectorMap) {
+    _sectorMap.setZoomLevel('strategic');
+    return;
+  }
+  // Normal range: tactical mode on SectorMap, direct range on renderer.
+  if (_sectorMap) _sectorMap.setZoomLevel('tactical');
+  if (mapRenderer) {
+    mapRenderer.setRange(worldUnits);
+    mapRenderer.clearCameraOverride();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -779,8 +798,9 @@ function _resizeTactical() {
 function _tacticalLoop() {
   if (!gameActive) return;
   const now = performance.now();
-  if (_sectorMap && _sectorMap.isStrategic()) {
+  if (_rangeControl && _rangeControl.isStrategic() && _sectorMap) {
     // Strategic view: render sector grid directly on map canvas.
+    _sectorMap.setZoomLevel('strategic');
     if (mapCanvas) _sectorMap.renderStrategic(mapCanvas, now);
   } else if (mapRenderer) {
     mapRenderer.render(now);
@@ -789,7 +809,7 @@ function _tacticalLoop() {
       _sectorMap.renderStationOverlay(mapCtx, mapCanvas, mapRenderer);
     }
     // Sector boundary + adjacent sector labels.
-    if (mapCtx && mapCanvas && _sectorMap && _sectorMap.getZoomLevel() === 'sector') {
+    if (mapCtx && mapCanvas && _sectorMap && _rangeControl && _rangeControl.isSector()) {
       _sectorMap.renderSectorBoundaryOverlay(mapCtx, mapCanvas, mapRenderer);
     }
     // Heading label overlay (tactical / sector modes only).

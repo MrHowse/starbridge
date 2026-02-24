@@ -49,6 +49,7 @@ registerHelp([
 ]);
 import { C_PRIMARY } from '../shared/renderer.js';
 import { MapRenderer } from '../shared/map_renderer.js';
+import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -165,12 +166,15 @@ const interruptOverlayEl = document.getElementById('scan-interrupt-overlay');
 const scanContinueBtn    = document.getElementById('scan-continue-btn');
 const scanAbortBtn       = document.getElementById('scan-abort-btn');
 
+const rangeBarEl = document.getElementById('range-bar');
+
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
 
 let gameActive     = false;
 let sensorRenderer = null;
+let rangeControl   = null;
 
 let shipState   = null;               // most recent ship.state payload
 let contacts    = [];                 // most recent sensor.contacts list
@@ -271,9 +275,19 @@ function handleGameStarted(payload) {
   updateScaleSelectorUI();
   if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
 
+  // Range control (replaces old fixed range).
+  const sciRanges = STATION_RANGES.science;
+  rangeControl = new RangeControl({
+    container:    rangeBarEl,
+    ranges:       sciRanges.available,
+    defaultRange: sciRanges.default,
+    onChange:      _onRangeChange,
+  });
+  rangeControl.attach();
+
   requestAnimationFrame(() => {
     sensorRenderer = new MapRenderer(sensorCanvas, {
-      range:         sensorRange,
+      range:         rangeControl.currentRangeUnits(),
       orientation:   'north-up',
       showGrid:      false,
       showRangeRings: true,
@@ -290,6 +304,7 @@ function handleGameStarted(payload) {
       },
     });
     sensorRenderer.onContactClick((id) => selectContact(id));
+    _updateSensorRangeRings();
     requestAnimationFrame(renderLoop);
   });
 
@@ -311,13 +326,14 @@ function handleShipState(payload) {
   if (!gameActive) return;
   shipState = payload;
 
-  // Derive sensor range from sensor system efficiency.
+  // Derive sensor range from sensor system efficiency (game mechanic — detection range).
   const sensorEff = payload.systems?.sensors?.efficiency ?? 1.0;
   sensorRange     = BASE_SENSOR_RANGE * sensorEff;
 
   if (sensorRenderer) {
-    sensorRenderer._range = sensorRange * SCAN_MODES[scanMode].rangeScale;
+    // Viewport range is controlled by RangeControl, NOT sensor range.
     sensorRenderer.updateShipState(payload);
+    _updateSensorRangeRings();
   }
 
   // Update sensor status panel.
@@ -775,8 +791,8 @@ function renderLoop(now) {
       scanMode         = modeSwitchTarget;
       modeSwitchTarget = null;
       if (sensorRenderer) {
-        sensorRenderer._range = sensorRange * SCAN_MODES[scanMode].rangeScale;
         sensorRenderer.updateContacts(filterContactsForMode(contacts));
+        _updateSensorRangeRings();
       }
       updateModeSelectorUI();
     }
@@ -1176,6 +1192,25 @@ function drawBearingLines(ctx, cw, ch) {
   }
 
   ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Range control
+// ---------------------------------------------------------------------------
+
+function _onRangeChange(key, worldUnits) {
+  if (!sensorRenderer) return;
+  sensorRenderer.setRange(worldUnits);
+  _updateSensorRangeRings();
+}
+
+/** Update the meaningful range rings based on current sensor efficiency. */
+function _updateSensorRangeRings() {
+  if (!sensorRenderer) return;
+  const modeScale = SCAN_MODES[scanMode].rangeScale;
+  sensorRenderer.setRangeRings([
+    { range: sensorRange * modeScale, label: 'SENSOR', style: 'solid' },
+  ]);
 }
 
 // ---------------------------------------------------------------------------

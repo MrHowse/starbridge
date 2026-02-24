@@ -25,6 +25,7 @@ import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, showBriefing, showGameOver } from '../shared/ui_components.js';
 import { C_PRIMARY_DIM, C_FRIENDLY } from '../shared/renderer.js';
 import { MapRenderer } from '../shared/map_renderer.js';
+import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
 import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
 import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_events.js';
@@ -128,6 +129,8 @@ const shieldLockXBtn  = document.getElementById('shield-lock-x');
 const shieldLockYBtn  = document.getElementById('shield-lock-y');
 const shieldCentreBtn = document.getElementById('shield-centre');
 
+const rangeBarEl = document.getElementById('range-bar');
+
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
@@ -135,6 +138,7 @@ const shieldCentreBtn = document.getElementById('shield-centre');
 let gameActive    = false;
 let radarCtx      = null;
 let radarRenderer = null;  // MapRenderer instance
+let rangeControl  = null;
 let hintsEnabled  = false;  // true when difficulty === 'cadet'
 
 let shipState   = null;   // most recent ship.state payload
@@ -228,6 +232,16 @@ function handleGameStarted(payload) {
   hintsEnabled = payload.difficulty === 'cadet';
   gameActive = true;
 
+  // Range control (replaces old fixed RADAR_WORLD_RADIUS).
+  const wpnRanges = STATION_RANGES.weapons;
+  rangeControl = new RangeControl({
+    container:    rangeBarEl,
+    ranges:       wpnRanges.available,
+    defaultRange: wpnRanges.default,
+    onChange:      _onRangeChange,
+  });
+  rangeControl.attach();
+
   requestAnimationFrame(() => {
     radarCtx = radarCanvas.getContext('2d');
     resizeRadar();
@@ -235,7 +249,7 @@ function handleGameStarted(payload) {
 
     // Create MapRenderer for radar (contacts + grid; beam arc drawn separately).
     radarRenderer = new MapRenderer(radarCanvas, {
-      range: RADAR_WORLD_RADIUS,
+      range: rangeControl.currentRangeUnits(),
       orientation: 'north-up',
       showGrid: false,
       showRangeRings: true,
@@ -286,6 +300,7 @@ function handleGameStarted(payload) {
       },
     });
     radarRenderer.onContactClick((id) => selectTarget(id));
+    _updateWeaponRangeRings();
 
     requestAnimationFrame(renderLoop);
   });
@@ -989,7 +1004,7 @@ function drawRadar(now) {
   const ARC_DEG = 45;
   const headRad = shipState.heading * Math.PI / 180;
   const zoom    = radarRenderer.getZoom();
-  const arcR    = Math.min(cx, cy) * (8000 / RADAR_WORLD_RADIUS);
+  const arcR    = 8000 / zoom;   // beam range in canvas pixels
   const upAngle = -Math.PI / 2;
   const leftArc  = upAngle - ARC_DEG * Math.PI / 180;
   const rightArc = upAngle + ARC_DEG * Math.PI / 180;
@@ -1137,6 +1152,25 @@ function drawCreatureShape(ctx, sx, sy, color, selected) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Range control
+// ---------------------------------------------------------------------------
+
+function _onRangeChange(key, worldUnits) {
+  if (!radarRenderer) return;
+  radarRenderer.setRange(worldUnits);
+  _updateWeaponRangeRings();
+}
+
+/** Update range rings showing beam range, torpedo range. */
+function _updateWeaponRangeRings() {
+  if (!radarRenderer) return;
+  radarRenderer.setRangeRings([
+    { range: 8_000,  label: 'BEAM',  style: 'dotted' },
+    { range: 40_000, label: 'TORP',  style: 'dashed' },
+  ]);
 }
 
 // ---------------------------------------------------------------------------
