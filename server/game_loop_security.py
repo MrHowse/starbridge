@@ -96,11 +96,43 @@ ARMED_CREW_FIREPOWER: float = 0.25 # armed crew (armoury issued)
 MARINE_ARMOUR_MULT: float = 0.5    # marines take 50% less damage
 BASE_CASUALTIES_PER_TICK: float = 0.3
 
+# v0.06.3 — ship security systems state
+BULKHEAD_UNSEAL_TIME: float = 30.0   # seconds to unseal a bulkhead
+ARM_CREW_TIME: float = 20.0          # seconds to arm/disarm crew on a deck
+MAX_ARMED_DECKS: int = 2             # armoury can arm 2 decks at once
+ALERT_LEVELS = ("normal", "caution", "combat", "evacuate")
+EVACUATE_CREW_FACTOR: float = 0.10   # crew factor when deck evacuated
+COMBAT_ALERT_CASUALTY_MULT: float = 0.5  # crew take 50% fewer casualties
+
+# Door/room state per room (supplements Room.door_sealed)
+_locked_doors: set[str] = set()          # room_ids with security-locked doors
+_breached_doors: set[str] = set()        # room_ids with breached (broken) doors
+_lockdown_decks: set[int] = set()        # decks under lockdown
+_ship_lockdown: bool = False             # ship-wide lockdown active
+
+# Internal sensors
+_sensor_status: dict[str, str] = {}      # room_id -> "active"/"damaged"/"boosted"
+_sensor_boost_rooms: set[str] = set()    # rooms with boosted sensors
+
+# Emergency bulkheads (between deck pairs)
+_sealed_bulkheads: set[tuple[int, int]] = set()  # (deck_above, deck_below)
+_bulkhead_unseal_progress: dict[tuple[int, int], float] = {}  # progress toward unseal
+
+# Alert levels per deck
+_deck_alerts: dict[int, str] = {}        # deck_number -> alert level
+
+# Armoury
+_armed_decks: set[int] = set()           # decks with armed crew
+_arming_progress: dict[int, float] = {}  # deck -> progress toward arming
+
+# Quarantine
+_quarantined_rooms: set[str] = set()     # room_ids under quarantine
+
 
 def reset() -> None:
     """Clear all boarding state. Called at game start."""
     global _boarding_active, _station_boarding_active, _station_boarding_interior
-    global _next_party_id
+    global _next_party_id, _ship_lockdown
     _boarding_active = False
     _eliminated_reported.clear()
     _station_boarding_active = False
@@ -110,6 +142,19 @@ def reset() -> None:
     _boarding_parties.clear()
     _next_party_id = 0
     _damage_accum.clear()
+    # Security systems
+    _locked_doors.clear()
+    _breached_doors.clear()
+    _lockdown_decks.clear()
+    _ship_lockdown = False
+    _sensor_status.clear()
+    _sensor_boost_rooms.clear()
+    _sealed_bulkheads.clear()
+    _bulkhead_unseal_progress.clear()
+    _deck_alerts.clear()
+    _armed_decks.clear()
+    _arming_progress.clear()
+    _quarantined_rooms.clear()
 
 
 
@@ -123,12 +168,22 @@ def serialise() -> dict:
         "marine_teams": [t.to_dict() for t in _marine_teams],
         "boarding_parties": [p.to_dict() for p in _boarding_parties],
         "next_party_id": _next_party_id,
+        # Security systems
+        "locked_doors": sorted(_locked_doors),
+        "breached_doors": sorted(_breached_doors),
+        "lockdown_decks": sorted(_lockdown_decks),
+        "ship_lockdown": _ship_lockdown,
+        "sensor_status": dict(_sensor_status),
+        "sealed_bulkheads": [[a, b] for a, b in sorted(_sealed_bulkheads)],
+        "deck_alerts": {str(k): v for k, v in _deck_alerts.items()},
+        "armed_decks": sorted(_armed_decks),
+        "quarantined_rooms": sorted(_quarantined_rooms),
     }
 
 
 def deserialise(data: dict) -> None:
     global _boarding_active, _station_boarding_active, _station_boarding_interior
-    global _next_party_id
+    global _next_party_id, _ship_lockdown
     _boarding_active = data.get("boarding_active", False)
     _eliminated_reported.clear()
     _eliminated_reported.update(data.get("eliminated_reported", []))
@@ -144,6 +199,26 @@ def deserialise(data: dict) -> None:
     for pd in data.get("boarding_parties", []):
         _boarding_parties.append(BoardingParty.from_dict(pd))
     _next_party_id = data.get("next_party_id", 0)
+    # Restore security systems.
+    _locked_doors.clear()
+    _locked_doors.update(data.get("locked_doors", []))
+    _breached_doors.clear()
+    _breached_doors.update(data.get("breached_doors", []))
+    _lockdown_decks.clear()
+    _lockdown_decks.update(data.get("lockdown_decks", []))
+    _ship_lockdown = data.get("ship_lockdown", False)
+    _sensor_status.clear()
+    _sensor_status.update(data.get("sensor_status", {}))
+    _sealed_bulkheads.clear()
+    for pair in data.get("sealed_bulkheads", []):
+        _sealed_bulkheads.add(tuple(pair))
+    _deck_alerts.clear()
+    for k, v in data.get("deck_alerts", {}).items():
+        _deck_alerts[int(k)] = v
+    _armed_decks.clear()
+    _armed_decks.update(data.get("armed_decks", []))
+    _quarantined_rooms.clear()
+    _quarantined_rooms.update(data.get("quarantined_rooms", []))
 
 
 # ---------------------------------------------------------------------------
@@ -601,6 +676,15 @@ def build_interior_state(interior: ShipInterior, ship: Ship) -> dict:
             for p in _boarding_parties
             if not p.is_eliminated
         ],
+        "locked_doors": sorted(_locked_doors),
+        "breached_doors": sorted(_breached_doors),
+        "ship_lockdown": _ship_lockdown,
+        "lockdown_decks": sorted(_lockdown_decks),
+        "sealed_bulkheads": [[a, b] for a, b in sorted(_sealed_bulkheads)],
+        "deck_alerts": {str(k): v for k, v in _deck_alerts.items()},
+        "armed_decks": sorted(_armed_decks),
+        "quarantined_rooms": sorted(_quarantined_rooms),
+        "sensor_status": dict(_sensor_status),
     }
 
 
@@ -721,6 +805,369 @@ def disengage_team(team_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Ship security systems (v0.06.3 Part 5)
+# ---------------------------------------------------------------------------
+
+# Deck → room_id mapping for the default interior.
+DECK_ROOMS: dict[int, list[str]] = {
+    1: ["bridge", "conn", "ready_room", "observation"],
+    2: ["sensor_array", "science_lab", "comms_center", "astrometrics"],
+    3: ["weapons_bay", "torpedo_room", "shields_control", "combat_info"],
+    4: ["medbay", "surgery", "quarantine", "pharmacy"],
+    5: ["main_engineering", "engine_room", "auxiliary_power", "cargo_hold"],
+}
+
+# Inter-deck corridor connections (vertical corridor rooms).
+DECK_CORRIDOR_PAIRS: list[tuple[str, str]] = [
+    ("conn", "science_lab"),           # deck 1-2
+    ("science_lab", "torpedo_room"),   # deck 2-3
+    ("torpedo_room", "surgery"),       # deck 3-4
+    ("surgery", "engine_room"),        # deck 4-5
+]
+
+
+def _room_deck(room_id: str) -> int:
+    """Return the deck number for a room_id, or 0 if unknown."""
+    for deck, rooms in DECK_ROOMS.items():
+        if room_id in rooms:
+            return deck
+    return 0
+
+
+# ---- Door control ----
+
+
+def lock_door(interior: ShipInterior, room_id: str) -> bool:
+    """Lock a door. Returns False if room unknown or already breached."""
+    if room_id not in interior.rooms:
+        return False
+    if room_id in _breached_doors:
+        return False  # breached doors can't be locked
+    room = interior.rooms[room_id]
+    room.door_sealed = True
+    _locked_doors.add(room_id)
+    return True
+
+
+def unlock_door(interior: ShipInterior, room_id: str) -> bool:
+    """Unlock a door. Returns False if room unknown."""
+    if room_id not in interior.rooms:
+        return False
+    room = interior.rooms[room_id]
+    room.door_sealed = False
+    _locked_doors.discard(room_id)
+    return True
+
+
+def lockdown_deck(interior: ShipInterior, deck: int) -> int:
+    """Lock all doors on a deck. Returns count of doors locked."""
+    rooms = DECK_ROOMS.get(deck, [])
+    count = 0
+    for rid in rooms:
+        if rid in interior.rooms and rid not in _breached_doors:
+            interior.rooms[rid].door_sealed = True
+            _locked_doors.add(rid)
+            count += 1
+    _lockdown_decks.add(deck)
+    return count
+
+
+def lift_deck_lockdown(interior: ShipInterior, deck: int) -> int:
+    """Unlock all doors on a deck. Returns count of doors unlocked."""
+    rooms = DECK_ROOMS.get(deck, [])
+    count = 0
+    for rid in rooms:
+        if rid in interior.rooms and rid not in _breached_doors:
+            interior.rooms[rid].door_sealed = False
+            _locked_doors.discard(rid)
+            count += 1
+    _lockdown_decks.discard(deck)
+    return count
+
+
+def lockdown_all(interior: ShipInterior) -> int:
+    """Ship-wide lockdown. Returns count of doors locked."""
+    global _ship_lockdown
+    count = 0
+    for rid, room in interior.rooms.items():
+        if rid not in _breached_doors:
+            room.door_sealed = True
+            _locked_doors.add(rid)
+            count += 1
+    _ship_lockdown = True
+    _lockdown_decks.update(DECK_ROOMS.keys())
+    return count
+
+
+def lift_lockdown_all(interior: ShipInterior) -> int:
+    """Lift ship-wide lockdown. Returns count of doors unlocked."""
+    global _ship_lockdown
+    count = 0
+    for rid, room in interior.rooms.items():
+        if rid not in _breached_doors:
+            room.door_sealed = False
+            _locked_doors.discard(rid)
+            count += 1
+    _ship_lockdown = False
+    _lockdown_decks.clear()
+    return count
+
+
+def is_ship_lockdown() -> bool:
+    return _ship_lockdown
+
+
+def get_locked_doors() -> set[str]:
+    return set(_locked_doors)
+
+
+def get_breached_doors() -> set[str]:
+    return set(_breached_doors)
+
+
+def mark_door_breached(room_id: str) -> None:
+    """Mark a door as breached (broken open by boarders). Called internally."""
+    _breached_doors.add(room_id)
+    _locked_doors.discard(room_id)
+
+
+# ---- Internal sensors ----
+
+
+def get_sensor_status(room_id: str) -> str:
+    """Return sensor status for a room: 'active', 'damaged', or 'boosted'."""
+    return _sensor_status.get(room_id, "active")
+
+
+def set_sensor_status(room_id: str, status: str) -> None:
+    """Set sensor status for a room."""
+    _sensor_status[room_id] = status
+
+
+def activate_sensor_boost(room_id: str) -> bool:
+    """Boost sensors in a room. Returns True if successful."""
+    if _sensor_status.get(room_id) == "damaged":
+        return False  # can't boost damaged sensors
+    _sensor_status[room_id] = "boosted"
+    _sensor_boost_rooms.add(room_id)
+    return True
+
+
+def deactivate_sensor_boost(room_id: str) -> None:
+    """Remove sensor boost from a room."""
+    _sensor_boost_rooms.discard(room_id)
+    if _sensor_status.get(room_id) == "boosted":
+        _sensor_status[room_id] = "active"
+
+
+def get_sensor_coverage(interior: ShipInterior) -> float:
+    """Return fraction of rooms with working sensors (0.0-1.0)."""
+    if not interior.rooms:
+        return 0.0
+    working = sum(
+        1 for rid in interior.rooms
+        if _sensor_status.get(rid, "active") != "damaged"
+    )
+    return working / len(interior.rooms)
+
+
+# ---- Emergency bulkheads ----
+
+
+def _normalise_bulkhead(deck_a: int, deck_b: int) -> tuple[int, int]:
+    return (min(deck_a, deck_b), max(deck_a, deck_b))
+
+
+def seal_bulkhead(deck_above: int, deck_below: int) -> bool:
+    """Seal the bulkhead between two adjacent decks. Returns True if sealed."""
+    pair = _normalise_bulkhead(deck_above, deck_below)
+    if abs(pair[1] - pair[0]) != 1:
+        return False  # decks must be adjacent
+    _sealed_bulkheads.add(pair)
+    _bulkhead_unseal_progress.pop(pair, None)
+    return True
+
+
+def start_unseal_bulkhead(deck_above: int, deck_below: int) -> bool:
+    """Start unsealing a bulkhead (takes BULKHEAD_UNSEAL_TIME seconds).
+
+    Returns True if unseal started. Actual unseal happens in tick.
+    """
+    pair = _normalise_bulkhead(deck_above, deck_below)
+    if pair not in _sealed_bulkheads:
+        return False
+    _bulkhead_unseal_progress[pair] = 0.0
+    return True
+
+
+def is_bulkhead_sealed(deck_above: int, deck_below: int) -> bool:
+    pair = _normalise_bulkhead(deck_above, deck_below)
+    return pair in _sealed_bulkheads
+
+
+def get_sealed_bulkheads() -> set[tuple[int, int]]:
+    return set(_sealed_bulkheads)
+
+
+def is_inter_deck_blocked(room_from: str, room_to: str) -> bool:
+    """Return True if movement between rooms is blocked by a sealed bulkhead."""
+    deck_from = _room_deck(room_from)
+    deck_to = _room_deck(room_to)
+    if deck_from == 0 or deck_to == 0 or deck_from == deck_to:
+        return False
+    pair = _normalise_bulkhead(deck_from, deck_to)
+    return pair in _sealed_bulkheads
+
+
+# ---- Alert levels ----
+
+
+def set_deck_alert(deck: int, level: str) -> bool:
+    """Set alert level for a deck. Returns False if invalid level."""
+    if level not in ALERT_LEVELS:
+        return False
+    if deck not in DECK_ROOMS:
+        return False
+    _deck_alerts[deck] = level
+    return True
+
+
+def get_deck_alert(deck: int) -> str:
+    return _deck_alerts.get(deck, "normal")
+
+
+def get_all_deck_alerts() -> dict[int, str]:
+    return {d: _deck_alerts.get(d, "normal") for d in DECK_ROOMS}
+
+
+def get_casualty_multiplier(room_id: str) -> float:
+    """Return crew casualty multiplier based on deck alert level.
+
+    Combat alert halves casualties. Normal/caution = 1.0.
+    """
+    deck = _room_deck(room_id)
+    level = _deck_alerts.get(deck, "normal")
+    if level == "combat":
+        return COMBAT_ALERT_CASUALTY_MULT
+    return 1.0
+
+
+def get_crew_factor_override(deck: int) -> float | None:
+    """Return crew factor override if deck is evacuated, else None."""
+    level = _deck_alerts.get(deck, "normal")
+    if level == "evacuate":
+        return EVACUATE_CREW_FACTOR
+    return None
+
+
+# ---- Armoury ----
+
+
+def arm_crew(deck: int) -> bool:
+    """Issue sidearms to crew on a deck. Returns False if at max armed decks."""
+    if deck not in DECK_ROOMS:
+        return False
+    if deck in _armed_decks:
+        return True  # already armed
+    if len(_armed_decks) >= MAX_ARMED_DECKS:
+        return False  # armoury stock exhausted
+    _armed_decks.add(deck)
+    return True
+
+
+def disarm_crew(deck: int) -> bool:
+    """Collect weapons from crew on a deck."""
+    if deck not in _armed_decks:
+        return False
+    _armed_decks.discard(deck)
+    return True
+
+
+def is_crew_armed(deck: int) -> bool:
+    return deck in _armed_decks
+
+
+def get_armed_decks() -> set[int]:
+    return set(_armed_decks)
+
+
+def get_crew_firepower(room_id: str) -> float:
+    """Return per-crew firepower for a room based on arming status."""
+    deck = _room_deck(room_id)
+    if deck in _armed_decks:
+        return ARMED_CREW_FIREPOWER
+    return CREW_FIREPOWER
+
+
+# ---- Quarantine ----
+
+
+def quarantine_room(interior: ShipInterior, room_id: str) -> bool:
+    """Quarantine a room: lock doors and isolate atmosphere."""
+    if room_id not in interior.rooms:
+        return False
+    _quarantined_rooms.add(room_id)
+    interior.rooms[room_id].door_sealed = True
+    _locked_doors.add(room_id)
+    return True
+
+
+def quarantine_deck(interior: ShipInterior, deck: int) -> int:
+    """Quarantine all rooms on a deck. Returns count of rooms quarantined."""
+    rooms = DECK_ROOMS.get(deck, [])
+    count = 0
+    for rid in rooms:
+        if rid in interior.rooms:
+            _quarantined_rooms.add(rid)
+            interior.rooms[rid].door_sealed = True
+            _locked_doors.add(rid)
+            count += 1
+    return count
+
+
+def lift_quarantine(interior: ShipInterior, room_id: str) -> bool:
+    """Lift quarantine on a room."""
+    if room_id not in _quarantined_rooms:
+        return False
+    _quarantined_rooms.discard(room_id)
+    interior.rooms[room_id].door_sealed = False
+    _locked_doors.discard(room_id)
+    return True
+
+
+def is_quarantined(room_id: str) -> bool:
+    return room_id in _quarantined_rooms
+
+
+def get_quarantined_rooms() -> set[str]:
+    return set(_quarantined_rooms)
+
+
+# ---- Tick bulkhead unseal progress ----
+
+
+def tick_security_systems(dt: float) -> list[tuple[str, dict]]:
+    """Tick security systems that have timers (bulkhead unseal).
+
+    Returns events to broadcast.
+    """
+    events: list[tuple[str, dict]] = []
+    completed = []
+    for pair, progress in _bulkhead_unseal_progress.items():
+        _bulkhead_unseal_progress[pair] = progress + dt
+        if _bulkhead_unseal_progress[pair] >= BULKHEAD_UNSEAL_TIME:
+            _sealed_bulkheads.discard(pair)
+            completed.append(pair)
+            events.append((
+                "security.bulkhead_unsealed",
+                {"deck_above": pair[0], "deck_below": pair[1]},
+            ))
+    for pair in completed:
+        del _bulkhead_unseal_progress[pair]
+    return events
+
+
+# ---------------------------------------------------------------------------
 # Enhanced tick — boarding party movement
 # ---------------------------------------------------------------------------
 
@@ -793,6 +1240,7 @@ def _advance_party(
         party.breach_progress += dt
         if party.breach_progress >= BREACH_TIME:
             next_room.door_sealed = False  # door breached open
+            mark_door_breached(next_room_id)
             party.breach_progress = 0.0
             events.append((
                 "security.door_breached",
@@ -1051,6 +1499,9 @@ def tick_combat(
     _tick_boarding_parties(interior, dt, events)
     _tick_marine_teams(interior, dt, events)
     _tick_room_combat(dt, events)
+
+    # Tick security system timers (bulkhead unseal)
+    events.extend(tick_security_systems(dt))
 
     # Clean up eliminated parties
     _boarding_parties[:] = [p for p in _boarding_parties if not p.is_eliminated]
