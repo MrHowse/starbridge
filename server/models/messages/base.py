@@ -54,15 +54,25 @@ from server.models.messages.lobby import LobbyClaimRolePayload, LobbyReleaseRole
 from server.models.messages.science import (
     ScienceCancelScanPayload,
     ScienceCancelSectorScanPayload,
+    ScienceScanInterruptResponsePayload,
     ScienceStartScanPayload,
     ScienceStartSectorScanPayload,
 )
+from server.models.messages.crew import CrewNotifyPayload
 from server.models.messages.creatures import (
     CreatureSedatePayload,
     CreatureEWDisruptPayload,
     CreatureCommProgressPayload,
     CreatureLeeechRemovePayload,
 )
+from server.models.messages.docking import (
+    CaptainUndockPayload,
+    DockingCancelServicePayload,
+    DockingRequestClearancePayload,
+    DockingStartServicePayload,
+)
+from server.models.messages.game import GameBriefingLaunchPayload
+from server.models.messages.navigation import MapClearRoutePayload, MapPlotRoutePayload
 from server.models.messages.weapons import (
     WeaponsFireBeamsPayload,
     WeaponsFireTorpedoPayload,
@@ -135,6 +145,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "science.cancel_scan": ScienceCancelScanPayload,
     "science.start_sector_scan": ScienceStartSectorScanPayload,
     "science.cancel_sector_scan": ScienceCancelSectorScanPayload,
+    "science.scan_interrupt_response": ScienceScanInterruptResponsePayload,
     # Captain
     "captain.set_alert": CaptainSetAlertPayload,
     "captain.authorize": CaptainAuthorizePayload,
@@ -142,6 +153,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "captain.system_override": CaptainSystemOverridePayload,
     "captain.save_game": CaptainSaveGamePayload,
     "captain.reassign_crew": CaptainReassignCrewPayload,
+    "captain.undock": CaptainUndockPayload,
     # Medical (legacy)
     "medical.treat_crew": MedicalTreatCrewPayload,
     "medical.cancel_treatment": MedicalCancelTreatmentPayload,
@@ -184,6 +196,17 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "creature.ew_disrupt":        CreatureEWDisruptPayload,
     "creature.set_comm_progress": CreatureCommProgressPayload,
     "creature.leech_remove":      CreatureLeeechRemovePayload,
+    # Docking (v0.05f)
+    "docking.request_clearance": DockingRequestClearancePayload,
+    "docking.start_service":     DockingStartServicePayload,
+    "docking.cancel_service":    DockingCancelServicePayload,
+    # Navigation
+    "map.plot_route":  MapPlotRoutePayload,
+    "map.clear_route": MapClearRoutePayload,
+    # Crew
+    "crew.notify": CrewNotifyPayload,
+    # Game
+    "game.briefing_launch": GameBriefingLaunchPayload,
 }
 
 

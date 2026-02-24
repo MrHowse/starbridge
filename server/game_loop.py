@@ -47,7 +47,6 @@ from server.models.messages import (
     FlightOpsDeployProbePayload,
     FlightOpsLaunchDronePayload,
     FlightOpsRecallDronePayload,
-    GameBriefingLaunchPayload,
     EngineeringCancelDCTPayload,
     EngineeringCancelRepairOrderPayload,
     EngineeringDispatchDCTPayload,
@@ -1760,8 +1759,6 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "tactical.execute_strike_plan" and isinstance(payload, TacticalExecuteStrikePlanPayload):
             ok = gltac.execute_strike_plan(payload.plan_id)
             gl.log_event("tactical", "strike_plan_executed", {"plan_id": payload.plan_id, "found": ok})
-        elif msg_type == "game.briefing_launch" and isinstance(payload, GameBriefingLaunchPayload):
-            events.append(("game.all_ready", {}))
         elif msg_type == "map.plot_route" and isinstance(payload, MapPlotRoutePayload):
             if world is not None:
                 route = gln.calculate_route(
@@ -1844,14 +1841,6 @@ def _set_training_flag(glm_module: object, flag: str) -> None:
     me = glm_module.get_mission_engine()  # type: ignore[union-attr]
     if me is not None:
         me.set_training_flag(flag)
-
-
-def _apply_power(ship: Ship, system_name: str, requested: float) -> None:
-    """Set a system's power level, clamped to the remaining budget."""
-    sys_obj = ship.systems[system_name]
-    other_total = sum(s.power for name, s in ship.systems.items() if name != system_name)
-    available = POWER_BUDGET - other_total
-    sys_obj.power = max(0.0, min(requested, available))
 
 
 def _apply_engineering(ship: Ship) -> list[tuple[str, float]]:

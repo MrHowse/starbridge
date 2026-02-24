@@ -24,7 +24,7 @@ from pydantic import ValidationError
 from server import captain, comms, damage_control, engineering, ew, flight_ops, game_loop, helm, lobby, medical, science, security, tactical, weapons
 from server.mission_validator import validate_mission as _validate_mission
 from server.connections import ConnectionManager
-from server.models.messages import Message, VALID_SYSTEMS
+from server.models.messages import Message, VALID_SYSTEMS, validate_payload
 from server.models.world import World, spawn_enemy
 import server.save_system as _ss
 import server.profiles as _prof
@@ -119,6 +119,35 @@ async def _handle_game_message(connection_id: str, message: Message) -> None:
         logger.info("Captain launched from briefing — broadcasting game.all_ready")
 
 
+async def _queue_forward_handler(connection_id: str, message: Message) -> None:
+    """Generic handler for message categories that validate-and-queue to the game loop.
+
+    Used for prefixes (puzzle, creature, docking, map, crew) whose messages are
+    processed in game_loop._drain_queue rather than by a dedicated station handler.
+    """
+    try:
+        payload = validate_payload(message)
+    except ValidationError as exc:
+        await manager.send(
+            connection_id,
+            Message.build(
+                "error.validation",
+                {"message": str(exc), "original_type": message.type},
+            ),
+        )
+        logger.warning("Validation error from %s: %s", connection_id, exc)
+        return
+
+    if payload is None:
+        logger.warning(
+            "Unhandled message type '%s' from %s", message.type, connection_id
+        )
+        return
+
+    await input_queue.put((message.type, payload))
+    logger.debug("Queued %s from %s", message.type, connection_id)
+
+
 _HANDLERS: dict[str, _MessageHandler] = {
     "lobby": lobby.handle_lobby_message,
     "game": _handle_game_message,
@@ -134,6 +163,12 @@ _HANDLERS: dict[str, _MessageHandler] = {
     "ew": ew.handle_ew_message,
     "tactical": tactical.handle_tactical_message,
     "damage_control": damage_control.handle_damage_control_message,
+    # Generic queue-forwarded categories (handled in game_loop._drain_queue)
+    "puzzle":   _queue_forward_handler,
+    "creature": _queue_forward_handler,
+    "docking":  _queue_forward_handler,
+    "map":      _queue_forward_handler,
+    "crew":     _queue_forward_handler,
 }
 
 

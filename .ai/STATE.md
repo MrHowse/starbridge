@@ -3,15 +3,18 @@
 > **LIVING DOCUMENT** — Update after every AI engineering session.
 > This is the single source of truth for what exists in the project.
 
-**Last updated**: 2026-02-22 (v0.05k COMPLETE — Space Creatures)
-**Current phase**: v0.05k COMPLETE ✓ — v0.05 in progress
-**Overall status**: 2558 tests passing. 12 stations (11 active + viewscreen passive).
-29 JSON missions (17 story + 12 training) + sandbox — all in graph format. 9 puzzle types.
-7 ship classes. 4 difficulty presets. Mission editor. Save/resume. Player profiles. Admin dashboard.
+**Last updated**: 2026-02-24 (v0.06-crew COMPLETE — Individual Crew System)
+**Current phase**: v0.06-crew COMPLETE ✓ — v0.06 in progress
+**Overall status**: 3513 tests passing. 12 stations (11 active + viewscreen passive).
+33 JSON missions (21 story + 12 training) + sandbox — all in graph format. 9 puzzle types.
+7 ship classes. 4 difficulty presets (28 fields, fully wired). Mission editor. Save/resume. Player profiles. Admin dashboard.
 Accessibility pass (colour-blind mode, reduced-motion, keyboard nav) across all 19 pages.
 Game event logger (JSONL) + Debrief Dashboard + Captain's Replay.
 MissionGraph engine (parallel/branch/conditional nodes) — all missions use graph format.
 5 space creature types (void_whale, rift_stalker, hull_leech, swarm, leviathan) with per-type AI.
+Sector system (5×5 + 8×8 grids, FoW, sector scanning). Space stations (docking, services, enemy stations with AI).
+8 torpedo types. Environmental hazards. Station assault missions. Creature missions.
+Landing page + site docs. 4-facing shield system. Full difficulty wiring. Individual crew roster with reassignment.
 
 ---
 
@@ -70,7 +73,7 @@ MissionGraph engine (parallel/branch/conditional nodes) — all missions use gra
 - `server/engineering.py` — validates + enqueues engineering messages
 - `server/weapons.py` — validates + enqueues weapons messages
 - `server/science.py` — validates + enqueues science messages
-- `server/captain.py` — `captain.set_alert`: broadcasts `ship.alert_changed` directly (instant, no queue). **[v0.03]** `game_loop_captain.py` sub-module for captain-side state.
+- `server/captain.py` — Direct broadcast handler for all `captain.*` messages. `init(manager, ship, queue)` — queue enables forwarding. Handles `set_alert`, `system_override`, `save_game`, `reassign_crew` directly; forwards `authorize`, `add_log`, `undock` to game loop queue via `_QUEUE_FORWARDED_TYPES`. **[v0.06-crew]** Routing fix: all captain.* messages route here via main.py `_HANDLERS` map (NOT via `_drain_queue`). `game_loop_captain.py` sub-module for captain-side state.
 - `server/medical.py` — validates + enqueues medical messages
 - `server/security.py` — validates + enqueues `security.move_squad` and `security.toggle_door`
 - `server/comms.py` — validates + enqueues `comms.tune_frequency` and `comms.hail`
@@ -105,6 +108,12 @@ MissionGraph engine (parallel/branch/conditional nodes) — all missions use gra
 - `server/game_loop_docking.py` — **[v0.05f]** docking state machine: `reset()`, `serialise()/deserialise()`, `is_docked()`, `get_state()`, `get_active_services()`, `request_clearance()`, `start_service()`, `cancel_service()`, `captain_undock(emergency)`, `tick(world, ship, manager, dt)`. States: none→clearance_pending→sequencing→docked→undocking→none. Constants: `DOCK_APPROACH_MAX_THROTTLE=10%`, `DOCKING_SEQUENCE_DURATION=10s`, `UNDOCKING_DURATION=5s`, `SHIELDS_DOCKED_CAP=50%`. 10 services with durations (hull_repair 60s → full hull restore; system_repair 20s → all systems 100%; medical_transfer 45s → +10 supplies + stabilise critical; torpedo_resupply 30s → **[v0.05g]** refills all 8 types to max; ew_database_update 30s → +5 charges; others placeholder). Proximity approach_info emitted to Helm when near station (2× docking_range). Physics: velocity/throttle=0, shields capped while docked/sequencing.
 - `server/game_loop_sandbox.py` — **[v0.05a]** sandbox activity generator: `reset(active)`, `is_active()`, `tick(world, dt)`. 10 event types covering all 12 stations: `spawn_enemy` (60-90s, Weapons/Helm/Tactical/Science), `system_damage` (45-75s, Engineering/DC), `crew_casualty` (60-100s, Medical), `start_boarding` (120-180s, Security/DC), `incoming_transmission` (90-120s, Comms), `hull_micro_damage` (120-180s, DC), `sensor_anomaly` (90-150s, Science), `drone_opportunity` (120-180s, Flight Ops), `enemy_jamming` (180-240s, EW), `distress_signal` (180-300s, Comms/Helm/Captain). Initial stagger timers ensure all 10 fire within 5 minutes.
 
+#### Individual Crew System (v0.06-crew)
+- `server/models/crew_roster.py` — **[v0.06-crew]** `IndividualCrewRoster` with named `CrewMember` instances. `crew_factor_for_duty_station(station)` — accounts for active/injured/dead/medical_bay status, reassignment timer (blocks contribution while > 0), reassignment_effectiveness (0.6 at new post). `reassign_crew(crew_id, new_station)` — 30s transition timer, 60% effectiveness, max 2 reassignments per member, returning to original restores 100%. `tick_reassignments(dt)` counts down timers. Threshold notifications at 75/50/25% crossing. Serialisation via `to_dict()`/`from_dict()`.
+- `server/game_loop_medical_v2.py` — **[v0.06-crew]** Medical feedback loop: `treatment.elapsed += dt * max(roster.crew_factor_for_duty_station("medical_bay"), 0.10)`. `get_roster()` public API for captain.py access.
+- `server/models/ship.py` — **[v0.06-crew]** `update_crew_factors()` accepts `individual_roster` parameter with 10% minimum floor. Falls back to legacy deck-level system when no individual roster. **[v0.06a]** 4-facing shields (fore/aft/port/starboard, default 50 each); `calculate_shield_distribution(x,y)→dict`; `shield_focus={x,y}` + `shield_distribution`.
+- `server/difficulty.py` — **[v0.06-difficulty]** `DifficultyPreset` expanded to 28 fields; all multipliers wired into combat/AI/sensors/hazards/DC/sandbox/docking/scanning/medical/injuries. Admin override endpoint.
+
 #### Mission System (`server/missions/`)
 - `server/missions/loader.py` — `load_mission(id)`: reads `missions/<id>.json`; sandbox returns synthetic graph-format dict. **[v0.04b]** Sandbox dict uses graph format: `{nodes:[], edges:[], start_node:None, victory_nodes:[], defeat_condition:None}`.
 - `server/missions/engine.py` — `MissionEngine` class. Sequential objectives. **Still used in tests with inline dicts (do not remove).** Trigger types: all standard triggers + `training_flag`.
@@ -124,7 +133,7 @@ MissionGraph engine (parallel/branch/conditional nodes) — all missions use gra
 
 ### Missions
 
-#### Standard Missions (15 JSON files + sandbox)
+#### Standard Missions (20 JSON files + sandbox)
 - **Sandbox** — synthetic dict in `loader.py`; free play, no objectives, continuous enemy spawns
 - `missions/first_contact.json` — 4 sequential: patrol → scan scout → destroy all → return
 - `missions/defend_station.json` — 3 waves + station defence
@@ -143,6 +152,13 @@ MissionGraph engine (parallel/branch/conditional nodes) — all missions use gra
 - **[v0.04c]** `missions/pandemic.json` — 3-way pathogen branch; two nested parallel "all" outcome paths
 - **[v0.05j]** `missions/fortress.json` — enemy outpost assault; branch: stealth (jam sensor → dock) vs direct assault (destroy gen_0 → gen_1 → hull < 50% → dock); reinforcement conditional (max_activations=1); victory: station_captured
 - **[v0.05j]** `missions/supply_line.json` — parallel: destroy depot + intercept all supply_ ships; conditional resupply waves at t=60/120 (guard: depot alive, max_activations=1); reinforcement conditional; victory: extract
+- **[v0.05l]** `missions/migration.json` — creature mission: void whale migration event
+- **[v0.05l]** `missions/the_nest.json` — creature mission: rift stalker nest
+- **[v0.05l]** `missions/outbreak.json` — creature mission: swarm/hull leech outbreak
+- **[v0.05n]** `missions/long_patrol.json` — story mission: extended patrol
+- **[v0.05n]** `missions/deep_space_rescue.json` — story mission: deep space rescue
+- **[v0.05n]** `missions/siege_breaker.json` — story mission: break a siege
+- **[v0.05n]** `missions/first_survey.json` — story mission: first survey
 
 #### Training Missions (12 JSON files — one per role)
 All training missions carry `"is_training": true` and `"target_role"`. Objectives use `training_flag` triggers. All have hints. All have `≥3` objectives.
@@ -302,9 +318,18 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 | `test_environmental_hazards.py` | 69 | v0.05h |
 | `test_enemy_stations.py` | 77 | v0.05i |
 | `test_station_assault_missions.py` | 57 | v0.05j |
+| `test_creature_missions.py` | ~56 | v0.05k–l |
+| `test_sandbox_v2.py` | ~40 | v0.05m |
+| `test_story_missions.py` | ~57 | v0.05n |
+| `test_gate_v005.py` | 152 | v0.05o |
+| `test_shield_focus.py` | 28 | v0.06a |
+| `test_difficulty.py` | 69 | v0.06-difficulty (updated) |
+| `test_crew_factor.py` | 55 | v0.06-crew |
 
 **Total at v0.04c: 1781 tests** ✓
 **Total at v0.05j: 2483 tests** ✓
+**Total at v0.05o: 2863 tests** ✓ (v0.05 CLOSED 2026-02-22)
+**Total at v0.06-crew: 3513 tests** ✓
 
 ### v0.04 Additions (tests/test_gate_v004.py + more)
 
@@ -407,7 +432,7 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 - Game event logger (JSONL, `logs/` dir) with debrief computation
 - Debrief Dashboard: post-game awards, key moments, per-station stats, Captain's Replay canvas
 - Mission briefing room (`/client/briefing/`): pre-game briefing with atmospheric rendering
-- 23 missions: 11 story (Sandbox + 11 JSON) + 12 training (one per role)
+- 33 missions: 21 story (Sandbox + 20 JSON) + 12 training (one per role)
 - All stations handle `ship.alert_changed` + `game.started` briefing + `game.over` result overlay
 
 ---
@@ -512,9 +537,47 @@ All training missions carry `"is_training": true` and `"target_role"`. Objective
 - Profile leaderboard is client-fetch on demand (no live updates)
 - medical_ship/carrier still have no differentiated gameplay mechanics
 
+### v0.05 Gate: COMPLETE ✓ — 2026-02-22
+
+- [x] 2863 tests passing; 0 regressions
+- [x] Sector system: 5×5 standard + 8×8 exploration grids; 6 visibility levels; FoW; sector scanning (3 scales)
+- [x] Space stations: docking state machine; 10 services; physics lockout; save round-trip
+- [x] 8 torpedo types: standard/homing/ion/piercing/heavy/proximity/nuclear/experimental
+- [x] Environmental hazards: sector-type effects; hazard_modifier on shields/sensors
+- [x] Enemy stations: turrets/launchers/fighters; station_ai.py; station boarding
+- [x] Station assault missions (fortress, supply_line); 5 new triggers
+- [x] Space creatures: 5 types with per-type AI; creature missions (migration, the_nest, outbreak)
+- [x] Story missions: long_patrol, deep_space_rescue, siege_breaker, first_survey
+- [x] Sandbox overhaul: creature spawn, port/derelict/hazards
+- [x] Balance pass: 6 tweaks applied
+- [x] Gate tests: test_gate_v005.py — 152 tests
+
+### v0.06 Progress (in progress)
+
+**v0.06a: 2D Shield Focus Control** ✓ (2923 tests)
+- 4-facing shields (fore/aft/port/starboard); `calculate_shield_distribution(x,y)`
+- `get_hit_facing()` in combat.py; canvas drag UI + lock/centre buttons
+- Captain 4-bar shield display; `tests/test_shield_focus.py` (+28 tests)
+
+**v0.06-difficulty: Full Difficulty System Wiring** ✓ (3440 tests)
+- DifficultyPreset expanded to 28 fields
+- All multipliers wired into combat/AI/sensors/hazards/DC/sandbox/docking/scanning/medical/injuries
+- Admin override endpoint; lobby tooltips; debrief display
+- `tests/test_difficulty.py` updated (+69 tests)
+
+**v0.06-crew: Individual Crew System** ✓ (3513 tests)
+- `server/models/crew_roster.py`: IndividualCrewRoster with named CrewMembers; crew_factor_for_duty_station()
+- Crew factor → system effectiveness pipeline with 10% minimum floor
+- Medical feedback loop: treatment speed scales with medical crew factor
+- Captain crew reassignment: 30s timer, 60% effectiveness, max 2 reassignments
+- Captain station crew management UI (ship_status.js panel with dropdowns)
+- Captain routing fix: all captain.* messages route via captain.py; queue forwarding for authorize/add_log/undock
+- Threshold notifications at 75/50/25% crossing
+- `tests/test_crew_factor.py` — 55 tests
+
 ---
 
-## File Manifest (v0.03 — updated 2026-02-20)
+## File Manifest (updated 2026-02-24)
 
 ```
 starbridge/
@@ -565,6 +628,9 @@ starbridge/
 │   │   ├── interior.py       [2a.1]
 │   │   ├── security.py       [2c.1]
 │   │   ├── ship_class.py     [v0.03o]
+│   │   ├── sector.py         [v0.05b]
+│   │   ├── flight_ops.py     [v0.03j]
+│   │   ├── crew_roster.py    [v0.06-crew]
 │   │   └── messages/
 │   │       ├── __init__.py
 │   │       ├── base.py
@@ -583,7 +649,20 @@ starbridge/
 │   │   ├── physics.py
 │   │   ├── combat.py
 │   │   ├── ai.py
-│   │   └── sensors.py
+│   │   ├── sensors.py
+│   │   ├── station_ai.py     [v0.05i]
+│   │   ├── hazards.py        [v0.05h]
+│   │   └── creature_ai.py    [v0.05k]
+│   ├── game_loop_science_scan.py [v0.05d]
+│   ├── game_loop_docking.py  [v0.05f]
+│   ├── game_loop_sandbox.py  [v0.05a]
+│   ├── game_loop_creatures.py [v0.05k]
+│   ├── game_loop_medical_v2.py [v0.06-crew]
+│   ├── mission_graph.py      [v0.04a]
+│   ├── save_system.py        [v0.04f]
+│   ├── profiles.py           [v0.04g]
+│   ├── admin.py              [v0.04h]
+│   ├── mission_validator.py  [v0.04d]
 │   ├── missions/
 │   │   ├── __init__.py
 │   │   ├── loader.py
@@ -613,6 +692,11 @@ starbridge/
 │   │   ├── audio.js          (placeholder)
 │   │   ├── role_bar.js       [v0.03 — multi-role support]
 │   │   ├── puzzle_renderer.js
+│   │   ├── settings.js       [v0.04j]
+│   │   ├── accessibility.css [v0.04j]
+│   │   ├── a11y_widget.js    [v0.04j]
+│   │   ├── crew_roster.js    [v0.06-crew]
+│   │   ├── crew_roster.css   [v0.06-crew]
 │   │   └── puzzle_types/
 │   │       ├── sequence_match.js
 │   │       ├── circuit_routing.js
@@ -678,10 +762,20 @@ starbridge/
 │   │   ├── index.html
 │   │   ├── viewscreen.js
 │   │   └── viewscreen.css
-│   └── debrief/              [v0.03n]
+│   ├── debrief/              [v0.03n]
+│   │   ├── index.html
+│   │   ├── debrief.js
+│   │   └── debrief.css
+│   ├── editor/               [v0.04d]
+│   ├── damage_control/       [v0.04e]
+│   ├── login/                [v0.04g]
+│   ├── admin/                [v0.04h]
+│   └── site/                 [v0.04l — landing page + docs]
+│       ├── site.css
 │       ├── index.html
-│       ├── debrief.js
-│       └── debrief.css
+│       ├── manual/
+│       ├── faq/
+│       └── about/
 ├── ships/                    [v0.03o]
 │   ├── scout.json
 │   ├── corvette.json
@@ -717,7 +811,20 @@ starbridge/
 │   ├── salvage_run.json      [v0.04c]
 │   ├── first_contact_remastered.json [v0.04c]
 │   ├── the_convoy.json       [v0.04c]
-│   └── pandemic.json         [v0.04c]
+│   ├── pandemic.json         [v0.04c]
+│   ├── fortress.json         [v0.05j]
+│   ├── supply_line.json      [v0.05j]
+│   ├── migration.json        [v0.05l]
+│   ├── the_nest.json         [v0.05l]
+│   ├── outbreak.json         [v0.05l]
+│   ├── long_patrol.json      [v0.05n]
+│   ├── deep_space_rescue.json [v0.05n]
+│   ├── siege_breaker.json    [v0.05n]
+│   └── first_survey.json     [v0.05n]
+├── sectors/                     [v0.05b]
+│   ├── standard_grid.json
+│   ├── exploration_grid.json
+│   └── sector_schema.json
 ├── docs/
 │   ├── MESSAGE_PROTOCOL.md
 │   ├── MISSION_FORMAT.md
@@ -772,7 +879,17 @@ starbridge/
 │   ├── test_ship_classes.py       — 71 [v0.03o]
 │   ├── test_gate_v003.py          — 183 [v0.03o]
 │   ├── test_mission_graph.py      — 118 [v0.04a]
-│   └── test_graph_missions.py     —  60 [v0.04c]
+│   ├── test_graph_missions.py     —  60 [v0.04c]
+│   ├── test_sector_scan.py        —  52 [v0.05d]
+│   ├── test_space_stations.py     —  24 [v0.05e]
+│   ├── test_docking.py            —  44 [v0.05f]
+│   ├── test_torpedo_expansion.py  — ~80 [v0.05g]
+│   ├── test_environmental_hazards.py — 69 [v0.05h]
+│   ├── test_enemy_stations.py     —  77 [v0.05i]
+│   ├── test_station_assault_missions.py — 57 [v0.05j]
+│   ├── test_gate_v005.py          — 152 [v0.05o]
+│   ├── test_shield_focus.py       —  28 [v0.06a]
+│   └── test_crew_factor.py        —  55 [v0.06-crew]
 ├── logs/                          (runtime — .gitignore)
 ├── pytest.ini
 ├── requirements.txt
