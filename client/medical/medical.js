@@ -123,8 +123,7 @@ let sortMode = 'urgency';     // urgency | deck | name | arrival
 let filterSeverity = 'all';   // all | critical | serious | moderate | minor
 let filterDeck = 'all';       // all | 1-5
 let bodyRegionFilter = null;  // null or body region string
-let _renderedCasualtyHash = '';
-let _renderedDetailHash = '';
+let _renderedDetailId = null;
 let _highlightIndex = -1;     // keyboard nav index
 
 // ---------------------------------------------------------------------------
@@ -133,7 +132,7 @@ let _highlightIndex = -1;     // keyboard nav index
 
 function getCasualties() {
   const list = Object.values(crewRoster).filter(m => {
-    if (m.status === 'active' && (!m.injuries || m.injuries.length === 0)) return false;
+    if (m.status === 'active' && (!m.injuries || m.injuries.length === 0 || m.injuries.every(i => i.treated))) return false;
     return true;
   });
 
@@ -241,70 +240,144 @@ function displayName(member) {
 
 function renderCasualtyList() {
   const casualties = getCasualties();
-  const hash = JSON.stringify({ ids: casualties.map(c => c.id), sel: selectedCrewId, sort: sortMode, filt: filterSeverity, deck: filterDeck });
-  if (hash === _renderedCasualtyHash) return;
-  _renderedCasualtyHash = hash;
 
-  casualtyListEl.innerHTML = '';
-
+  // Empty state
   if (casualties.length === 0) {
+    const existing = casualtyListEl.querySelectorAll('.cas-card');
+    if (existing.length === 0 && casualtyListEl.querySelector('.med-empty-msg')) return;
     casualtyListEl.innerHTML = '<p class="text-body text-dim med-empty-msg">No casualties reported.</p>';
     return;
   }
 
+  // Remove empty message if present
+  const emptyMsg = casualtyListEl.querySelector('.med-empty-msg');
+  if (emptyMsg) emptyMsg.remove();
+
+  // Build map of existing cards by crew ID
+  const existingCards = new Map();
+  casualtyListEl.querySelectorAll('[data-crew-id]').forEach(card => {
+    existingCards.set(card.dataset.crewId, card);
+  });
+
+  // Current casualty IDs in order
+  const currentIds = new Set(casualties.map(c => c.id));
+
+  // Remove cards for crew no longer in the list
+  existingCards.forEach((card, id) => {
+    if (!currentIds.has(id)) card.remove();
+  });
+
+  // Save scroll position
+  const scrollPos = casualtyListEl.scrollTop;
+
+  // Update existing or create new cards, in correct order
+  let prevNode = null;
   for (const member of casualties) {
-    const worst = getWorstSeverity(member);
-    const isDead = member.status === 'dead';
-    const isSelected = member.id === selectedCrewId;
-
-    const card = document.createElement('div');
-    card.className = 'cas-card';
-    if (isDead) card.classList.add('cas-card--dead');
-    else if (worst) card.classList.add(`cas-card--${worst}`);
-    if (isSelected) card.classList.add('cas-card--selected');
-    card.dataset.crewId = member.id;
-    card.setAttribute('role', 'option');
-    card.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-
-    // Row 1: Name + severity badge
-    const sevBadge = isDead
-      ? '<span class="cas-card__severity sev--critical">DECEASED</span>'
-      : worst
-        ? `<span class="cas-card__severity sev--${worst}">${SEVERITY_LABELS[worst] || worst.toUpperCase()}</span>`
-        : '';
-
-    // Row 2: Worst injury description + timer
-    const worstInj = !isDead && member.injuries ? member.injuries.filter(i => !i.treated).sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99))[0] : null;
-    const injDesc = worstInj ? worstInj.description || worstInj.type.replace(/_/g, ' ') : '';
-
-    let timerHtml = '';
-    if (!isDead && worstInj) {
-      if (worstInj.severity === 'critical' && worstInj.death_timer != null) {
-        timerHtml = `<span class="cas-card__timer cas-card__timer--death">${fmtTimer(worstInj.death_timer)}</span>`;
-      } else if (worstInj.degrade_timer != null) {
-        timerHtml = `<span class="cas-card__timer cas-card__timer--degrade">${fmtTimer(worstInj.degrade_timer)}</span>`;
-      }
+    let card = existingCards.get(member.id);
+    if (card) {
+      _updateCasualtyCard(card, member);
+    } else {
+      card = _createCasualtyCard(member);
     }
 
-    // Row 3: Deck + duty station
-    const deckLabel = member.deck != null ? `Deck ${member.deck}` : '';
-    const stationLabel = member.duty_station ? member.duty_station.replace(/_/g, ' ') : '';
-
-    card.innerHTML = `
-      <div class="cas-card__row1">
-        <span class="cas-card__name">${displayName(member)}</span>
-        ${sevBadge}
-      </div>
-      <div class="cas-card__row2">
-        <span class="cas-card__injury">${injDesc}</span>
-        ${timerHtml}
-      </div>
-      <div class="cas-card__row3">${deckLabel}${stationLabel ? ' — ' + stationLabel : ''}</div>
-      ${isDead ? '<span class="cas-deceased-overlay">DECEASED</span>' : ''}
-    `;
-
-    casualtyListEl.appendChild(card);
+    // Ensure correct DOM order
+    const nextSibling = prevNode ? prevNode.nextSibling : casualtyListEl.firstChild;
+    if (card !== nextSibling) {
+      casualtyListEl.insertBefore(card, nextSibling);
+    }
+    prevNode = card;
   }
+
+  // Restore scroll position
+  casualtyListEl.scrollTop = scrollPos;
+}
+
+function _createCasualtyCard(member) {
+  const card = document.createElement('div');
+  card.className = 'cas-card';
+  card.dataset.crewId = member.id;
+  card.setAttribute('role', 'option');
+
+  // Build inner structure once (spans will be updated in place)
+  card.innerHTML = `
+    <div class="cas-card__row1">
+      <span class="cas-card__name"></span>
+      <span class="cas-card__severity"></span>
+    </div>
+    <div class="cas-card__row2">
+      <span class="cas-card__injury"></span>
+      <span class="cas-card__timer"></span>
+    </div>
+    <div class="cas-card__row3"></div>
+    <span class="cas-deceased-overlay">DECEASED</span>
+  `;
+
+  card.classList.add('cas-card--entering');
+  card.addEventListener('animationend', () => card.classList.remove('cas-card--entering'), { once: true });
+
+  _updateCasualtyCard(card, member);
+  return card;
+}
+
+function _updateCasualtyCard(card, member) {
+  const worst = getWorstSeverity(member);
+  const isDead = member.status === 'dead';
+  const isSelected = member.id === selectedCrewId;
+
+  // Severity class (only change if different)
+  const sevClasses = ['cas-card--critical', 'cas-card--serious', 'cas-card--moderate', 'cas-card--minor', 'cas-card--dead'];
+  const wantClass = isDead ? 'cas-card--dead' : worst ? `cas-card--${worst}` : null;
+  for (const cls of sevClasses) {
+    card.classList.toggle(cls, cls === wantClass);
+  }
+  card.classList.toggle('cas-card--selected', isSelected);
+  card.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+
+  // Row 1: Name + severity badge
+  const nameEl = card.querySelector('.cas-card__name');
+  const sevEl = card.querySelector('.cas-card__severity');
+  const name = displayName(member);
+  if (nameEl.textContent !== name) nameEl.textContent = name;
+
+  if (isDead) {
+    sevEl.className = 'cas-card__severity sev--critical';
+    if (sevEl.textContent !== 'DECEASED') sevEl.textContent = 'DECEASED';
+  } else if (worst) {
+    sevEl.className = `cas-card__severity sev--${worst}`;
+    const label = SEVERITY_LABELS[worst] || worst.toUpperCase();
+    if (sevEl.textContent !== label) sevEl.textContent = label;
+  } else {
+    sevEl.className = 'cas-card__severity';
+    sevEl.textContent = '';
+  }
+
+  // Row 2: Worst injury + timer
+  const injEl = card.querySelector('.cas-card__injury');
+  const timerEl = card.querySelector('.cas-card__timer');
+
+  const worstInj = !isDead && member.injuries
+    ? member.injuries.filter(i => !i.treated).sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99))[0]
+    : null;
+  const injDesc = worstInj ? worstInj.description || worstInj.type.replace(/_/g, ' ') : '';
+  if (injEl.textContent !== injDesc) injEl.textContent = injDesc;
+
+  if (!isDead && worstInj && worstInj.severity === 'critical' && worstInj.death_timer != null) {
+    timerEl.className = 'cas-card__timer cas-card__timer--death';
+    timerEl.textContent = fmtTimer(worstInj.death_timer);
+  } else if (!isDead && worstInj && worstInj.degrade_timer != null) {
+    timerEl.className = 'cas-card__timer cas-card__timer--degrade';
+    timerEl.textContent = fmtTimer(worstInj.degrade_timer);
+  } else {
+    timerEl.className = 'cas-card__timer';
+    timerEl.textContent = '';
+  }
+
+  // Row 3: Deck + station
+  const row3El = card.querySelector('.cas-card__row3');
+  const deckLabel = member.deck != null ? `Deck ${member.deck}` : '';
+  const stationLabel = member.duty_station ? member.duty_station.replace(/_/g, ' ') : '';
+  const row3Text = `${deckLabel}${stationLabel ? ' — ' + stationLabel : ''}`;
+  if (row3El.textContent !== row3Text) row3El.textContent = row3Text;
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +402,8 @@ function renderPatientDetail() {
   ptDeckEl.textContent = member.deck != null ? `DECK ${member.deck}` : '';
   ptLocationEl.textContent = member.location ? member.location.replace(/_/g, ' ').toUpperCase() : '';
 
-  renderBodyDiagram(member);
+  // Body diagram is rendered by the dedicated animation loop (_startDiagramLoop)
+  // at 60fps for smooth pulse animation — do NOT call renderBodyDiagram here.
   renderInjuryList(member);
   updateActionButtons(member);
 }
@@ -458,11 +532,15 @@ function _withAlpha(hex, alpha) {
 // Rendering: Injury list
 // ---------------------------------------------------------------------------
 
-function renderInjuryList(member) {
-  injuryListEl.innerHTML = '';
+let _injuryListHash = '';
 
+function renderInjuryList(member) {
   if (!member.injuries || member.injuries.length === 0) {
-    injuryListEl.innerHTML = '<p class="text-body text-dim">No injuries.</p>';
+    if (injuryListEl.querySelector('.inj-card')) injuryListEl.innerHTML = '';
+    if (!injuryListEl.querySelector('.text-dim')) {
+      injuryListEl.innerHTML = '<p class="text-body text-dim">No injuries.</p>';
+    }
+    _injuryListHash = '';
     return;
   }
 
@@ -476,6 +554,17 @@ function renderInjuryList(member) {
   const filtered = bodyRegionFilter
     ? sorted.filter(i => i.body_region === bodyRegionFilter || i.body_region === 'whole_body')
     : sorted;
+
+  // Hash over the data that actually changes to skip no-op rebuilds
+  const treatment = _findTreatment(member.id);
+  const tElapsed = treatment ? Math.round(treatment.elapsed) : -1;
+  const hash = filtered.map(i =>
+    `${i.id}:${i.severity}:${i.treated}:${i.treating}:${Math.ceil(i.death_timer ?? -1)}:${Math.ceil(i.degrade_timer ?? -1)}`
+  ).join('|') + `|bed=${member.treatment_bed}|te=${tElapsed}|rf=${bodyRegionFilter}`;
+  if (hash === _injuryListHash) return;
+  _injuryListHash = hash;
+
+  injuryListEl.innerHTML = '';
 
   for (const inj of filtered) {
     const card = document.createElement('div');
@@ -502,8 +591,6 @@ function renderInjuryList(member) {
     if (inj.treated) {
       actionsHtml = '<span class="text-label" style="color:var(--system-healthy)">TREATED</span>';
     } else if (inj.treating) {
-      // Show progress bar
-      const treatment = _findTreatment(member.id);
       const pct = treatment ? Math.min(100, Math.round((treatment.elapsed / treatment.duration) * 100)) : 0;
       const puzzleWait = treatment && treatment.puzzle_required && !treatment.puzzle_completed;
       const label = puzzleWait ? 'AWAITING PROCEDURE' : `${pct}%`;
@@ -520,7 +607,7 @@ function renderInjuryList(member) {
         ? 'TREAT'
         : treatType.replace(/_/g, ' ').toUpperCase();
       const inBed = member.treatment_bed != null;
-      const hasTreatment = _findTreatment(member.id) != null;
+      const hasTreatment = treatment != null;
 
       actionsHtml = `
         <div class="inj-card__actions">
@@ -685,8 +772,7 @@ function _startDiagramLoop() {
 function selectCrew(crewId) {
   selectedCrewId = (selectedCrewId === crewId) ? null : crewId;
   bodyRegionFilter = null;
-  _renderedCasualtyHash = '';
-  _renderedDetailHash = '';
+  _renderedDetailId = null;
   render();
 }
 
@@ -763,7 +849,6 @@ document.querySelectorAll('[data-sort]').forEach(btn => {
     sortMode = btn.dataset.sort;
     document.querySelectorAll('[data-sort]').forEach(b => b.classList.remove('med-sort-btn--active'));
     btn.classList.add('med-sort-btn--active');
-    _renderedCasualtyHash = '';
     render();
   });
 });
@@ -774,7 +859,6 @@ document.querySelectorAll('[data-filter]').forEach(btn => {
     filterSeverity = btn.dataset.filter;
     document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('med-filter-btn--active'));
     btn.classList.add('med-filter-btn--active');
-    _renderedCasualtyHash = '';
     render();
   });
 });
@@ -785,7 +869,6 @@ document.querySelectorAll('[data-deck]').forEach(btn => {
     filterDeck = btn.dataset.deck;
     document.querySelectorAll('[data-deck]').forEach(b => b.classList.remove('med-filter-btn--active'));
     btn.classList.add('med-filter-btn--active');
-    _renderedCasualtyHash = '';
     render();
   });
 });
@@ -944,7 +1027,6 @@ function handleCrewRoster(payload) {
   for (const [id, data] of Object.entries(members)) {
     crewRoster[id] = data;
   }
-  _renderedCasualtyHash = '';
   render();
 }
 
@@ -971,8 +1053,7 @@ function handleMedicalEvent(payload) {
       break;
   }
 
-  _renderedCasualtyHash = '';
-  _renderedDetailHash = '';
+  _renderedDetailId = null;
 }
 
 function handleGameStarted(payload) {
