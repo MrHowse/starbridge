@@ -15,16 +15,35 @@ from typing import Any
 from server.models.comms import (
     BASE_DECODE_SPEED,
     CHANNEL_DEFAULTS,
+    CONTACT_SOURCE_CIVILIAN,
+    CONTACT_SOURCE_DATA_BURST,
+    CONTACT_SOURCE_DISTRESS,
+    CONTACT_SOURCE_FLEET,
+    CONTACT_SOURCE_INTERCEPT,
+    CONTACT_SOURCE_NAVIGATION,
+    CONTACT_SOURCE_STATION,
+    CONTACT_SOURCE_TRAP,
     DEADLINE_DEMAND,
     DEADLINE_DISTRESS,
     DEADLINE_HAIL,
+    DECODE_CONTACT_THRESHOLD,
+    DECODE_DETAIL_THRESHOLD,
     DECODE_FACTION_BONUS,
+    DECODE_FINAL_THRESHOLD,
+    DECODE_POSITION_THRESHOLD,
+    DEFAULT_CONTACT_EXPIRY_TICKS,
     NPC_REPLY_TEMPLATES,
     PASSIVE_DECODE_MULT,
     PRIORITY_ORDER,
     RESPONSE_TEMPLATES,
+    STALENESS_DOWNGRADE_THRESHOLD,
     STANDING_EFFECTS,
+    UNCERTAINTY_RADIUS_25,
+    UNCERTAINTY_RADIUS_50,
+    UNCERTAINTY_RADIUS_75,
+    UNCERTAINTY_RADIUS_100,
     Channel,
+    CommsContact,
     FactionStanding,
     Signal,
     TranslationMatrix,
@@ -76,6 +95,16 @@ _pending_npc_responses: list[dict] = []
 _active_probes: dict[str, float] = {}  # target_id → remaining_seconds
 PROBE_DURATION: float = 15.0
 
+# Comms contacts — intelligence contacts derived from decoded signals
+_comms_contacts: list[CommsContact] = []
+_contact_counter: int = 0
+
+# Pending contact updates (consumed by game_loop for broadcast)
+_pending_contact_updates: list[dict] = []
+
+# Signal → contact mapping: signal_id → contact_id (for progressive updates)
+_signal_contact_map: dict[str, str] = {}
+
 # Legacy compat
 _transmissions: list[dict] = []
 _interception_timer: float = 0.0
@@ -91,12 +120,13 @@ _tick: int = 0
 def reset() -> None:
     """Clear all comms state. Called at game start."""
     global _active_frequency, _signal_counter, _active_decode_id
-    global _interception_timer, _tick
+    global _interception_timer, _tick, _contact_counter
     _active_frequency = 0.15
     _signal_counter = 0
     _active_decode_id = None
     _interception_timer = 0.0
     _tick = 0
+    _contact_counter = 0
     _signals.clear()
     _factions.clear()
     _channels.clear()
@@ -108,6 +138,9 @@ def reset() -> None:
     _pending_npc_responses.clear()
     _active_probes.clear()
     _transmissions.clear()
+    _comms_contacts.clear()
+    _pending_contact_updates.clear()
+    _signal_contact_map.clear()
 
     # Set up default channels
     for name, status, cost in CHANNEL_DEFAULTS:
@@ -182,6 +215,7 @@ def add_signal(
     threat_level: str = "unknown",
     intel_value: str = "",
     intel_category: str = "",
+    location_data: dict | None = None,
 ) -> Signal:
     """Add a new signal to the queue. Returns the created signal."""
     sig = Signal(
@@ -204,6 +238,7 @@ def add_signal(
         intel_value=intel_value,
         intel_category=intel_category,
         decode_progress=1.0 if auto_decoded else 0.0,
+        location_data=location_data,
     )
 
     # Auto-decoded signals get full content and response options immediately
@@ -212,6 +247,11 @@ def add_signal(
         _generate_response_options(sig)
 
     _signals.append(sig)
+
+    # Auto-decoded signals with location data create contacts immediately
+    if auto_decoded and location_data is not None:
+        create_comms_contact(sig, partial=False)
+
     return sig
 
 
@@ -275,6 +315,8 @@ def _tick_decode(dt: float, crew_factor: float, bandwidth_quality: float) -> lis
         if sig.dismissed or not sig.requires_decode or sig.decode_progress >= 1.0:
             continue
 
+        old_progress = sig.decode_progress
+
         # Calculate decode rate
         is_active = sig.decoding_active and sig.id == _active_decode_id
         base_rate = BASE_DECODE_SPEED
@@ -291,6 +333,10 @@ def _tick_decode(dt: float, crew_factor: float, bandwidth_quality: float) -> lis
 
         # Update decoded content based on progress
         _update_decoded_content(sig)
+
+        # Progressive contact creation from signals with location data
+        if sig.location_data is not None:
+            _handle_decode_contact_progress(sig, old_progress)
 
         # Check completion
         if sig.decode_progress >= 1.0:
@@ -311,6 +357,36 @@ def _tick_decode(dt: float, crew_factor: float, bandwidth_quality: float) -> lis
             })
 
     return events
+
+
+def _handle_decode_contact_progress(sig: Signal, old_progress: float) -> None:
+    """Create or update a comms contact as signal decode progresses."""
+    progress = sig.decode_progress
+
+    # Threshold: 25% — first appearance
+    if old_progress < DECODE_CONTACT_THRESHOLD <= progress:
+        create_comms_contact(sig, partial=True)
+        return
+
+    # Threshold: 50% — position narrows
+    if old_progress < DECODE_POSITION_THRESHOLD <= progress:
+        if sig.id not in _signal_contact_map:
+            create_comms_contact(sig, partial=True)
+        else:
+            update_contact_from_decode(sig)
+        return
+
+    # Threshold: 75% — details filled in
+    if old_progress < DECODE_DETAIL_THRESHOLD <= progress:
+        if sig.id not in _signal_contact_map:
+            create_comms_contact(sig, partial=True)
+        else:
+            update_contact_from_decode(sig)
+        return
+
+    # Threshold: 100% — full intelligence
+    if old_progress < DECODE_FINAL_THRESHOLD <= progress:
+        finalise_contact(sig)
 
 
 def _update_decoded_content(sig: Signal) -> None:
@@ -632,6 +708,398 @@ def _tick_probes(dt: float) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Comms contacts — intelligence contacts from decoded signals
+# ---------------------------------------------------------------------------
+
+def _next_contact_id() -> str:
+    global _contact_counter
+    _contact_counter += 1
+    return f"cc_{_contact_counter}"
+
+
+def _source_type_for_signal(sig: Signal) -> str:
+    """Derive the contact source type from signal metadata."""
+    if sig.signal_type == "distress":
+        return CONTACT_SOURCE_DISTRESS
+    if sig.signal_type == "encrypted" and sig.threat_level == "hostile":
+        return CONTACT_SOURCE_INTERCEPT
+    if sig.signal_type == "broadcast":
+        if sig.intel_category == "navigation":
+            return CONTACT_SOURCE_NAVIGATION
+        if sig.intel_category == "fleet":
+            return CONTACT_SOURCE_FLEET
+        return CONTACT_SOURCE_STATION
+    if sig.signal_type == "hail":
+        if sig.faction == "civilian":
+            return CONTACT_SOURCE_CIVILIAN
+        return CONTACT_SOURCE_CIVILIAN
+    if sig.signal_type == "data_burst":
+        return CONTACT_SOURCE_DATA_BURST
+    return CONTACT_SOURCE_CIVILIAN
+
+
+def _icon_for_source(source_type: str, threat_level: str) -> str:
+    """Determine map icon type from source and threat."""
+    icons = {
+        CONTACT_SOURCE_DISTRESS: "distress",
+        CONTACT_SOURCE_INTERCEPT: "hostile",
+        CONTACT_SOURCE_NAVIGATION: "hazard",
+        CONTACT_SOURCE_FLEET: "fleet",
+        CONTACT_SOURCE_CIVILIAN: "civilian",
+        CONTACT_SOURCE_STATION: "station",
+        CONTACT_SOURCE_TRAP: "distress",  # looks like distress
+        CONTACT_SOURCE_DATA_BURST: "data",
+    }
+    return icons.get(source_type, "unknown")
+
+
+def _visible_roles_for_source(source_type: str) -> list[str]:
+    """Determine which stations can see this contact type."""
+    role_map = {
+        CONTACT_SOURCE_DISTRESS: ["captain", "helm", "science", "weapons"],
+        CONTACT_SOURCE_INTERCEPT: ["captain", "weapons", "helm", "science"],
+        CONTACT_SOURCE_NAVIGATION: ["helm", "science", "captain"],
+        CONTACT_SOURCE_FLEET: ["captain", "weapons"],
+        CONTACT_SOURCE_CIVILIAN: [
+            "captain", "helm", "science", "weapons", "comms",
+        ],
+        CONTACT_SOURCE_STATION: [
+            "captain", "helm", "science", "weapons", "comms",
+        ],
+        CONTACT_SOURCE_TRAP: ["captain", "helm", "science", "weapons"],
+        CONTACT_SOURCE_DATA_BURST: ["captain", "science"],
+    }
+    return role_map.get(source_type, ["captain", "helm"])
+
+
+def _entity_type_for_source(source_type: str) -> str:
+    """Default entity type for a contact source."""
+    etype_map = {
+        CONTACT_SOURCE_DISTRESS: "ship",
+        CONTACT_SOURCE_INTERCEPT: "fleet",
+        CONTACT_SOURCE_NAVIGATION: "hazard",
+        CONTACT_SOURCE_FLEET: "fleet",
+        CONTACT_SOURCE_CIVILIAN: "ship",
+        CONTACT_SOURCE_STATION: "station",
+        CONTACT_SOURCE_TRAP: "ship",
+        CONTACT_SOURCE_DATA_BURST: "unknown",
+    }
+    return etype_map.get(source_type, "unknown")
+
+
+def _confidence_for_source(source_type: str) -> str:
+    """Default confidence level for a contact source."""
+    conf_map = {
+        CONTACT_SOURCE_DISTRESS: "confirmed",
+        CONTACT_SOURCE_INTERCEPT: "probable",
+        CONTACT_SOURCE_NAVIGATION: "confirmed",
+        CONTACT_SOURCE_FLEET: "probable",
+        CONTACT_SOURCE_CIVILIAN: "confirmed",
+        CONTACT_SOURCE_STATION: "confirmed",
+        CONTACT_SOURCE_TRAP: "confirmed",
+        CONTACT_SOURCE_DATA_BURST: "unverified",
+    }
+    return conf_map.get(source_type, "unverified")
+
+
+def _uncertainty_for_progress(progress: float) -> float:
+    """Return uncertainty radius based on decode progress."""
+    if progress >= DECODE_FINAL_THRESHOLD:
+        return UNCERTAINTY_RADIUS_100
+    if progress >= DECODE_DETAIL_THRESHOLD:
+        return UNCERTAINTY_RADIUS_75
+    if progress >= DECODE_POSITION_THRESHOLD:
+        return UNCERTAINTY_RADIUS_50
+    return UNCERTAINTY_RADIUS_25
+
+
+def _accuracy_for_source(source_type: str, progress: float) -> str:
+    """Determine position accuracy from source type and decode progress."""
+    if progress < DECODE_FINAL_THRESHOLD:
+        return "approximate"
+    exact_sources = {
+        CONTACT_SOURCE_DISTRESS, CONTACT_SOURCE_CIVILIAN,
+        CONTACT_SOURCE_STATION, CONTACT_SOURCE_TRAP,
+    }
+    if source_type in exact_sources:
+        return "exact"
+    if source_type == CONTACT_SOURCE_NAVIGATION:
+        return "region"
+    return "approximate"
+
+
+def create_comms_contact(sig: Signal, partial: bool = False) -> CommsContact | None:
+    """Create a CommsContact from a decoded (or partially decoded) signal.
+
+    Returns None if the signal has no location data.
+    """
+    loc = sig.location_data
+    if loc is None:
+        return None
+
+    source_type = _source_type_for_signal(sig)
+    progress = sig.decode_progress
+    pos = (float(loc["position"][0]), float(loc["position"][1]))
+
+    # For partial contacts, use large uncertainty
+    if partial or progress < DECODE_FINAL_THRESHOLD:
+        accuracy = "approximate"
+        radius = _uncertainty_for_progress(progress)
+    else:
+        accuracy = _accuracy_for_source(source_type, progress)
+        radius = loc.get("radius", 0.0) if accuracy != "exact" else 0.0
+
+    # Override radius for region-type contacts
+    if source_type == CONTACT_SOURCE_NAVIGATION:
+        radius = max(radius, loc.get("radius", 10000.0))
+        accuracy = "region"
+
+    # Override for intercepts — always approximate with base uncertainty
+    if source_type == CONTACT_SOURCE_INTERCEPT:
+        radius = max(radius, random.uniform(5000.0, 15000.0))
+        accuracy = "approximate"
+
+    contact = CommsContact(
+        id=_next_contact_id(),
+        source_signal_id=sig.id,
+        source_type=source_type,
+        position=pos,
+        position_accuracy=accuracy,
+        position_radius=radius,
+        name=sig.source_name,
+        entity_type=loc.get("entity_type", _entity_type_for_source(source_type)),
+        faction=sig.faction,
+        threat_level=sig.threat_level if sig.threat_level != "unknown" else (
+            "distress" if sig.signal_type == "distress" else "unknown"
+        ),
+        confidence=_confidence_for_source(source_type),
+        staleness=0.0,
+        last_updated_tick=_tick,
+        icon=_icon_for_source(source_type, sig.threat_level),
+        visible_to=_visible_roles_for_source(source_type),
+        expires_tick=sig.expires_tick or (_tick + DEFAULT_CONTACT_EXPIRY_TICKS),
+        decode_progress=progress,
+        _is_trap=loc.get("is_trap", False),
+    )
+
+    _comms_contacts.append(contact)
+    _signal_contact_map[sig.id] = contact.id
+
+    _pending_contact_updates.append({
+        "event": "new",
+        "contact": contact.to_dict(),
+    })
+
+    return contact
+
+
+def update_contact_from_decode(sig: Signal) -> None:
+    """Update an existing contact as decode progresses."""
+    contact_id = _signal_contact_map.get(sig.id)
+    if contact_id is None:
+        return
+
+    contact = get_comms_contact(contact_id)
+    if contact is None:
+        return
+
+    loc = sig.location_data
+    if loc is None:
+        return
+
+    progress = sig.decode_progress
+    old_accuracy = contact.position_accuracy
+
+    # Narrow uncertainty as decode progresses
+    contact.position_radius = _uncertainty_for_progress(progress)
+    contact.position_accuracy = _accuracy_for_source(
+        contact.source_type, progress
+    )
+    contact.decode_progress = progress
+    contact.staleness = 0.0
+    contact.last_updated_tick = _tick
+
+    # Update name if we now know more
+    if progress >= DECODE_DETAIL_THRESHOLD and contact.name == "Unknown Contact":
+        contact.name = sig.source_name
+
+    # Update position if we have better data
+    if progress >= DECODE_POSITION_THRESHOLD:
+        contact.position = (float(loc["position"][0]), float(loc["position"][1]))
+
+    if contact.position_accuracy != old_accuracy:
+        _pending_contact_updates.append({
+            "event": "updated",
+            "contact": contact.to_dict(),
+        })
+
+
+def finalise_contact(sig: Signal) -> None:
+    """Finalise a contact after full decode."""
+    contact_id = _signal_contact_map.get(sig.id)
+    if contact_id is None:
+        # Create new contact if it didn't exist
+        create_comms_contact(sig, partial=False)
+        return
+
+    contact = get_comms_contact(contact_id)
+    if contact is None:
+        return
+
+    loc = sig.location_data
+    if loc is None:
+        return
+
+    source_type = contact.source_type
+    contact.position = (float(loc["position"][0]), float(loc["position"][1]))
+    contact.position_accuracy = _accuracy_for_source(source_type, 1.0)
+    contact.position_radius = loc.get("radius", 0.0) if contact.position_accuracy != "exact" else 0.0
+    contact.name = sig.source_name
+    contact.decode_progress = 1.0
+    contact.staleness = 0.0
+    contact.last_updated_tick = _tick
+
+    # Region contacts keep their specified radius
+    if source_type == CONTACT_SOURCE_NAVIGATION:
+        contact.position_radius = max(contact.position_radius, loc.get("radius", 10000.0))
+
+    _pending_contact_updates.append({
+        "event": "finalised",
+        "contact": contact.to_dict(),
+    })
+
+
+def get_comms_contact(contact_id: str) -> CommsContact | None:
+    """Find a comms contact by ID."""
+    for c in _comms_contacts:
+        if c.id == contact_id:
+            return c
+    return None
+
+
+def get_comms_contacts() -> list[CommsContact]:
+    """Return all active (non-expired) comms contacts."""
+    return list(_comms_contacts)
+
+
+def get_comms_contacts_for_role(role: str) -> list[dict]:
+    """Return contact dicts visible to a specific station role."""
+    return [
+        c.to_dict() for c in _comms_contacts
+        if role in c.visible_to
+    ]
+
+
+def merge_with_sensor(contact_id: str, sensor_entity_id: str) -> bool:
+    """Merge a comms contact with a sensor-detected entity.
+
+    Updates the contact to mark it as sensor-confirmed.
+    Returns True if merge occurred.
+    """
+    contact = get_comms_contact(contact_id)
+    if contact is None or contact.merged_sensor_id is not None:
+        return False
+
+    contact.merged_sensor_id = sensor_entity_id
+    contact.confidence = "confirmed"
+    contact.position_accuracy = "exact"
+    contact.position_radius = 0.0
+    contact.staleness = 0.0
+    contact.last_updated_tick = _tick
+
+    _pending_contact_updates.append({
+        "event": "merged",
+        "contact": contact.to_dict(),
+        "sensor_entity_id": sensor_entity_id,
+    })
+    return True
+
+
+def try_merge_contacts_with_sensors(sensor_contacts: list[dict]) -> list[dict]:
+    """Check all comms contacts against sensor contacts for merge opportunities.
+
+    Returns list of merge event dicts.
+    """
+    merge_events: list[dict] = []
+    sensor_positions: dict[str, tuple[float, float]] = {}
+    for sc in sensor_contacts:
+        sensor_positions[sc["id"]] = (sc["x"], sc["y"])
+
+    for contact in _comms_contacts:
+        if contact.merged_sensor_id is not None:
+            continue
+        cx, cy = contact.position
+        for sid, (sx, sy) in sensor_positions.items():
+            dist = ((cx - sx) ** 2 + (cy - sy) ** 2) ** 0.5
+            merge_radius = max(contact.position_radius, 5000.0)
+            if dist <= merge_radius:
+                if merge_with_sensor(contact.id, sid):
+                    # Update position to sensor (more accurate)
+                    contact.position = (sx, sy)
+                    merge_events.append({
+                        "contact_id": contact.id,
+                        "sensor_entity_id": sid,
+                        "contact_name": contact.name,
+                    })
+                break  # only one merge per contact
+
+    return merge_events
+
+
+def _tick_contacts(dt: float) -> None:
+    """Advance contact staleness and handle expiry/confidence downgrade."""
+    to_remove: list[str] = []
+
+    for contact in _comms_contacts:
+        # Don't age merged contacts (sensor keeps them current)
+        if contact.merged_sensor_id is not None:
+            continue
+
+        contact.staleness += dt
+
+        # Downgrade confidence after threshold
+        if (contact.staleness >= STALENESS_DOWNGRADE_THRESHOLD
+                and contact.confidence == "probable"):
+            contact.confidence = "unverified"
+            _pending_contact_updates.append({
+                "event": "stale",
+                "contact": contact.to_dict(),
+            })
+
+        # Check expiry
+        if contact.expires_tick is not None and _tick >= contact.expires_tick:
+            to_remove.append(contact.id)
+
+    if to_remove:
+        remove_set = set(to_remove)
+        _comms_contacts[:] = [c for c in _comms_contacts if c.id not in remove_set]
+        # Clean up signal→contact mapping
+        for sig_id, cid in list(_signal_contact_map.items()):
+            if cid in remove_set:
+                del _signal_contact_map[sig_id]
+
+
+def pop_pending_contact_updates() -> list[dict]:
+    """Drain and return pending contact update events."""
+    updates = list(_pending_contact_updates)
+    _pending_contact_updates.clear()
+    return updates
+
+
+def remove_comms_contact(contact_id: str) -> bool:
+    """Remove a specific comms contact. Returns True if found."""
+    for i, c in enumerate(_comms_contacts):
+        if c.id == contact_id:
+            _comms_contacts.pop(i)
+            # Clean up signal mapping
+            for sig_id, cid in list(_signal_contact_map.items()):
+                if cid == contact_id:
+                    del _signal_contact_map[sig_id]
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Distress assessment
 # ---------------------------------------------------------------------------
 
@@ -715,7 +1183,10 @@ def tick_comms(dt: float, crew_factor: float = 1.0) -> list[dict]:
     # 4. Tick probes
     probe_events = _tick_probes(dt)
 
-    # 5. Legacy passive interception (kept for backward compat)
+    # 5. Tick comms contacts (staleness, expiry, confidence downgrade)
+    _tick_contacts(dt)
+
+    # 6. Legacy passive interception (kept for backward compat)
     faction = get_tuned_faction()
     if faction in ("imperial", "rebel"):
         _interception_timer += dt
@@ -854,6 +1325,10 @@ def build_comms_state(world: object | None = None) -> dict:
                 "communication_progress": round(creature.communication_progress, 1),
             })
     state["creatures"] = creatures_data
+
+    # Comms contacts (intelligence contacts from decoded signals)
+    state["comms_contacts"] = [c.to_dict() for c in _comms_contacts]
+
     return state
 
 
@@ -878,13 +1353,16 @@ def serialise() -> dict:
         "transmissions": list(_transmissions),
         "interception_timer": _interception_timer,
         "active_probes": dict(_active_probes),
+        "comms_contacts": [c.to_dict() for c in _comms_contacts],
+        "contact_counter": _contact_counter,
+        "signal_contact_map": dict(_signal_contact_map),
     }
 
 
 def deserialise(data: dict) -> None:
     """Restore comms state from save."""
     global _active_frequency, _signal_counter, _active_decode_id
-    global _interception_timer
+    global _interception_timer, _contact_counter
 
     _active_frequency = data.get("active_frequency", 0.15)
     _signal_counter = data.get("signal_counter", 0)
@@ -918,3 +1396,12 @@ def deserialise(data: dict) -> None:
 
     _active_probes.clear()
     _active_probes.update(data.get("active_probes", {}))
+
+    _comms_contacts.clear()
+    for cd in data.get("comms_contacts", []):
+        _comms_contacts.append(CommsContact.from_dict(cd))
+
+    _contact_counter = data.get("contact_counter", 0)
+
+    _signal_contact_map.clear()
+    _signal_contact_map.update(data.get("signal_contact_map", {}))

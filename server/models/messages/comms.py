@@ -12,7 +12,10 @@ class CommsTuneFrequencyPayload(BaseModel):
 
 class CommsHailPayload(BaseModel):
     contact_id: str
-    message_type: Literal["negotiate", "demand", "bluff"] = "negotiate"
+    message_type: Literal[
+        "identify", "warning", "negotiate", "distress",
+        "deception", "broadcast", "surrender", "demand", "bluff",
+    ] = "identify"
     frequency: float | None = None
     hail_type: Literal[
         "identify", "warning", "negotiate", "distress",

@@ -99,6 +99,7 @@ export class MapRenderer {
     this._contacts     = [];
     this._torpedoes    = [];
     this._hazards      = [];
+    this._commsContacts = [];
     this._torpedoTrails = new Map();
 
     // Camera override (for sector-centred view — ship drawn at world position).
@@ -117,6 +118,10 @@ export class MapRenderer {
 
   updateShipState(state) {
     this._shipState = state;
+  }
+
+  updateCommsContacts(contacts = []) {
+    this._commsContacts = contacts;
   }
 
   updateContacts(contacts = [], torpedoes = []) {
@@ -287,6 +292,7 @@ export class MapRenderer {
     if (this._showRangeRings) this._drawRangeRings(ctx, cw, ch);
     if (this._hazards.length) this._drawHazards(ctx, cw, ch, camX, camY, zoom);
     this._drawTorpedoes(ctx, cw, ch, camX, camY, zoom, now);
+    this._drawCommsContacts(ctx, cw, ch, camX, camY, zoom, now);
     this._drawContacts(ctx, cw, ch, camX, camY, zoom, now);
 
     if (isHeadingUp) ctx.restore();
@@ -476,6 +482,23 @@ export class MapRenderer {
       ctx.beginPath();
       ctx.arc(sx, sy, 3, 0, Math.PI * 2);
       ctx.fill();
+    }
+  }
+
+  _drawCommsContacts(ctx, cw, ch, camX, camY, zoom, now) {
+    const MARGIN = 20;
+    for (const cc of this._commsContacts) {
+      const px = cc.position?.[0] ?? 0;
+      const py = cc.position?.[1] ?? 0;
+      const sx = cw / 2 + (px - camX) / zoom;
+      const sy = ch / 2 + (py - camY) / zoom;
+      const onScreen = sx >= -MARGIN && sx <= cw + MARGIN && sy >= -MARGIN && sy <= ch + MARGIN;
+
+      if (onScreen) {
+        _drawCommsContact(ctx, sx, sy, cc, zoom, now);
+      } else {
+        _drawCommsOffScreenArrow(ctx, cw, ch, sx, sy, cc, this._shipState);
+      }
     }
   }
 
@@ -688,6 +711,205 @@ function _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact, shipState) {
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${km}km`, lx, ly);
+    ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Comms contact rendering (intelligence overlay — dashed/outlined)
+// ---------------------------------------------------------------------------
+
+const CC_COLORS = {
+  distress: '#ff8800',  // orange
+  hostile:  '#ff4040',  // red
+  friendly: '#00ff41',  // green
+  neutral:  '#ffaa00',  // amber
+  unknown:  '#ffffff',  // white
+};
+const CC_ICONS = {
+  ship:    'diamond',
+  station: 'square',
+  hazard:  'region',
+  fleet:   'triangle',
+  convoy:  'diamond',
+  debris:  'region',
+  anomaly: 'circle',
+  unknown: 'circle',
+  data:    'circle',
+};
+
+function _drawCommsContact(ctx, sx, sy, cc, zoom, now) {
+  const threat = cc.threat_level || 'unknown';
+  const color  = CC_COLORS[threat] || CC_COLORS.unknown;
+  const icon   = CC_ICONS[cc.entity_type] || CC_ICONS.unknown;
+  const merged = !!cc.merged_sensor_id;
+  const conf   = cc.confidence || 'unverified';
+
+  // Unverified/rumour contacts pulse
+  let alpha = 1.0;
+  if (conf === 'unverified' || conf === 'rumour') {
+    alpha = 0.4 + 0.4 * Math.sin(now * 0.004);
+  }
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Uncertainty radius circle (dashed)
+  const radius = cc.position_radius || 0;
+  if (radius > 0 && !merged) {
+    const screenRadius = radius / zoom;
+    if (screenRadius > 2) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(sx, sy, screenRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  // Icon — dashed outline unless merged with sensor (then solid)
+  const s = 7;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = merged ? 2 : 1.5;
+  if (!merged) ctx.setLineDash([3, 3]);
+
+  if (icon === 'diamond') {
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - s); ctx.lineTo(sx + s, sy);
+    ctx.lineTo(sx, sy + s); ctx.lineTo(sx - s, sy);
+    ctx.closePath(); ctx.stroke();
+  } else if (icon === 'square') {
+    ctx.strokeRect(sx - s, sy - s, s * 2, s * 2);
+  } else if (icon === 'triangle') {
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - s);
+    ctx.lineTo(sx + s * 0.866, sy + s * 0.5);
+    ctx.lineTo(sx - s * 0.866, sy + s * 0.5);
+    ctx.closePath(); ctx.stroke();
+  } else if (icon === 'region') {
+    // Filled translucent region
+    const regionR = (radius > 0 ? radius / zoom : 12);
+    ctx.fillStyle = color.replace(')', ', 0.12)').replace('rgb', 'rgba');
+    ctx.beginPath();
+    ctx.arc(sx, sy, Math.max(regionR, 8), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    // Circle (anomaly, unknown, data)
+    ctx.beginPath();
+    ctx.arc(sx, sy, s, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+
+  // Centre dot
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // "INTEL" label (unless merged)
+  const labelY = sy + s + 3;
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  if (merged) {
+    ctx.fillStyle = '#00ff41';
+    ctx.fillText('CONFIRMED', sx, labelY);
+  } else {
+    ctx.fillStyle = color;
+    ctx.globalAlpha = alpha * 0.7;
+    ctx.fillText('INTEL', sx, labelY);
+  }
+
+  // Contact name below INTEL label
+  if (cc.name && cc.name !== 'Unknown Contact') {
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.fillText(cc.name, sx, labelY + 9);
+  }
+
+  // "?" overlay for unverified/rumour
+  if (conf === 'unverified' || conf === 'rumour') {
+    ctx.font = 'bold 10px "Share Tech Mono", monospace';
+    ctx.fillStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.fillText('?', sx, sy - s - 8);
+  }
+
+  // Distress icon: pulsing triangle
+  if (cc.icon === 'distress') {
+    const pulse = 0.7 + 0.3 * Math.sin(now * 0.006);
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = CC_COLORS.distress;
+    ctx.font = 'bold 10px "Share Tech Mono", monospace';
+    ctx.fillText('\u26A0', sx + s + 3, sy - 2);
+  }
+
+  ctx.restore();
+}
+
+function _drawCommsOffScreenArrow(ctx, cw, ch, sx, sy, cc, shipState) {
+  const cx = cw / 2;
+  const cy = ch / 2;
+  const dx = sx - cx;
+  const dy = sy - cy;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1) return;
+
+  const threat = cc.threat_level || 'unknown';
+  const color = CC_COLORS[threat] || CC_COLORS.unknown;
+
+  const M = 20;
+  const scale = Math.min(
+    (cw / 2 - M) / Math.abs(dx || 1),
+    (ch / 2 - M) / Math.abs(dy || 1),
+  );
+  const ax = cx + dx * scale;
+  const ay = cy + dy * scale;
+  const angle = Math.atan2(dy, dx);
+
+  ctx.save();
+  ctx.translate(ax, ay);
+  ctx.rotate(angle);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.globalAlpha = 0.7;
+  // Dashed triangle (distinct from sensor contact solid arrows)
+  ctx.beginPath();
+  ctx.moveTo(7, 0);
+  ctx.lineTo(-4, -5);
+  ctx.lineTo(-4, 5);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Distance + name label
+  if (shipState?.position) {
+    const px = cc.position?.[0] ?? 0;
+    const py = cc.position?.[1] ?? 0;
+    const worldDist = Math.hypot(px - shipState.position.x, py - shipState.position.y);
+    const km = (worldDist / 1000).toFixed(0);
+    const label = cc.icon === 'distress'
+      ? `\u26A0 ${cc.name || 'Distress'} — ${km}km`
+      : `${cc.name || 'INTEL'} — ${km}km`;
+
+    const lx = ax - Math.cos(angle) * 14;
+    const ly = ay - Math.sin(angle) * 14;
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.6;
+    ctx.font = '7px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, lx, ly - 6);
     ctx.restore();
   }
 }

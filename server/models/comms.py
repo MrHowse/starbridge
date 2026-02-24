@@ -86,6 +86,43 @@ DEADLINE_HAIL: float = 60.0
 DEADLINE_DISTRESS: float = 90.0
 DEADLINE_DEMAND: float = 45.0
 
+# Comms contact constants
+POSITION_ACCURACIES = ("exact", "approximate", "region")
+ENTITY_TYPES = (
+    "ship", "station", "hazard", "convoy", "debris",
+    "anomaly", "fleet", "unknown",
+)
+CONFIDENCE_LEVELS = ("confirmed", "probable", "unverified", "rumour")
+CONTACT_THREAT_LEVELS = (
+    "friendly", "neutral", "hostile", "unknown", "distress",
+)
+# Staleness threshold (seconds) before confidence downgrades
+STALENESS_DOWNGRADE_THRESHOLD: float = 120.0
+# Default contact expiry (seconds) — overridden per source type
+DEFAULT_CONTACT_EXPIRY_TICKS: int = 3000  # 300s at 10 Hz
+
+# Decode progress thresholds for progressive contact creation
+DECODE_CONTACT_THRESHOLD: float = 0.25   # contact first appears
+DECODE_POSITION_THRESHOLD: float = 0.50  # position narrows
+DECODE_DETAIL_THRESHOLD: float = 0.75    # details filled in
+DECODE_FINAL_THRESHOLD: float = 1.0      # full intelligence
+
+# Uncertainty radius by decode progress
+UNCERTAINTY_RADIUS_25: float = 20000.0   # very large circle
+UNCERTAINTY_RADIUS_50: float = 10000.0   # moderate
+UNCERTAINTY_RADIUS_75: float = 5000.0    # narrowing
+UNCERTAINTY_RADIUS_100: float = 0.0      # exact
+
+# Source types that generate contacts
+CONTACT_SOURCE_DISTRESS = "distress_decode"
+CONTACT_SOURCE_INTERCEPT = "enemy_intercept"
+CONTACT_SOURCE_NAVIGATION = "navigation_broadcast"
+CONTACT_SOURCE_FLEET = "fleet_movement"
+CONTACT_SOURCE_CIVILIAN = "civilian_hail"
+CONTACT_SOURCE_STATION = "station_broadcast"
+CONTACT_SOURCE_TRAP = "trap_signal"
+CONTACT_SOURCE_DATA_BURST = "data_burst"
+
 
 # ---------------------------------------------------------------------------
 # Signal
@@ -130,6 +167,9 @@ class Signal:
     response_options: list[dict] = field(default_factory=list)
     dismissed: bool = False
 
+    # Location data for contact generation (optional)
+    location_data: dict | None = None  # {type, position, radius, entity_ref}
+
     def to_dict(self) -> dict:
         """Serialise for broadcast or save."""
         return {
@@ -159,6 +199,7 @@ class Signal:
             "decoding_active": self.decoding_active,
             "response_options": self.response_options,
             "dismissed": self.dismissed,
+            "location_data": self.location_data,
         }
 
     @staticmethod
@@ -188,6 +229,7 @@ class Signal:
             decoding_active=d.get("decoding_active", False),
             response_options=d.get("response_options", []),
             dismissed=d.get("dismissed", False),
+            location_data=d.get("location_data"),
         )
 
 
@@ -314,6 +356,108 @@ class TranslationMatrix:
             language=d["language"],
             progress=d.get("progress", 0.0),
             words_decoded=d.get("words_decoded", 0),
+        )
+
+
+# ---------------------------------------------------------------------------
+# CommsContact
+# ---------------------------------------------------------------------------
+
+@dataclass
+class CommsContact:
+    """A map contact derived from communications intelligence."""
+
+    id: str
+    source_signal_id: str           # Signal that generated this contact
+    source_type: str                # CONTACT_SOURCE_* constant
+
+    # Position
+    position: tuple[float, float]   # World coordinates (x, y)
+    position_accuracy: str          # "exact", "approximate", "region"
+    position_radius: float          # Uncertainty radius (0 for exact)
+
+    # Identity
+    name: str                       # "ISS Valiant", "Reported Pirate Activity"
+    entity_type: str                # "ship", "station", "hazard", etc.
+    faction: str                    # Faction ID
+    threat_level: str               # "friendly", "neutral", "hostile", etc.
+
+    # Intelligence quality
+    confidence: str                 # "confirmed", "probable", "unverified", "rumour"
+    staleness: float = 0.0          # Seconds since intel was current
+    last_updated_tick: int = 0
+
+    # Display
+    icon: str = "unknown"           # Map icon type
+    visible_to: list[str] = field(default_factory=lambda: [
+        "captain", "helm", "science", "weapons",
+    ])
+    expires_tick: int | None = None  # Contact fades after this tick
+
+    # Mission link
+    mission_id: str | None = None   # Associated dynamic mission
+
+    # Merge tracking
+    merged_sensor_id: str | None = None  # Sensor contact ID after merge
+    decode_progress: float = 1.0    # Mirrors signal decode for partial contacts
+
+    # Trap flag (server-side only — never sent to client)
+    _is_trap: bool = field(default=False, repr=False)
+
+    # Assessment (if Comms assessed distress)
+    assessment: dict | None = None  # {authenticity, risk_level, factors}
+
+    def to_dict(self) -> dict:
+        """Serialise for broadcast or save."""
+        return {
+            "id": self.id,
+            "source_signal_id": self.source_signal_id,
+            "source_type": self.source_type,
+            "position": list(self.position),
+            "position_accuracy": self.position_accuracy,
+            "position_radius": round(self.position_radius, 1),
+            "name": self.name,
+            "entity_type": self.entity_type,
+            "faction": self.faction,
+            "threat_level": self.threat_level,
+            "confidence": self.confidence,
+            "staleness": round(self.staleness, 1),
+            "last_updated_tick": self.last_updated_tick,
+            "icon": self.icon,
+            "visible_to": list(self.visible_to),
+            "expires_tick": self.expires_tick,
+            "mission_id": self.mission_id,
+            "merged_sensor_id": self.merged_sensor_id,
+            "decode_progress": round(self.decode_progress, 3),
+            "assessment": self.assessment,
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> CommsContact:
+        """Deserialise from save/broadcast dict."""
+        pos = d.get("position", [0.0, 0.0])
+        return CommsContact(
+            id=d["id"],
+            source_signal_id=d.get("source_signal_id", ""),
+            source_type=d.get("source_type", "unknown"),
+            position=(float(pos[0]), float(pos[1])),
+            position_accuracy=d.get("position_accuracy", "approximate"),
+            position_radius=d.get("position_radius", 10000.0),
+            name=d.get("name", "Unknown Contact"),
+            entity_type=d.get("entity_type", "unknown"),
+            faction=d.get("faction", "unknown"),
+            threat_level=d.get("threat_level", "unknown"),
+            confidence=d.get("confidence", "unverified"),
+            staleness=d.get("staleness", 0.0),
+            last_updated_tick=d.get("last_updated_tick", 0),
+            icon=d.get("icon", "unknown"),
+            visible_to=d.get("visible_to", ["captain", "helm", "science", "weapons"]),
+            expires_tick=d.get("expires_tick"),
+            mission_id=d.get("mission_id"),
+            merged_sensor_id=d.get("merged_sensor_id"),
+            decode_progress=d.get("decode_progress", 1.0),
+            assessment=d.get("assessment"),
+            _is_trap=d.get("_is_trap", False),
         )
 
 

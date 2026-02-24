@@ -1058,6 +1058,12 @@ async def _loop() -> None:
                 # Create a Signal object in the comms system
                 _sb_faction = sb_evt["faction"]
                 _sb_hint = sb_evt["message_hint"]
+                # Generate a location near the ship for fleet-movement intel
+                import math as _math_sb
+                _sb_tx_angle = random.uniform(0.0, 360.0)
+                _sb_tx_dist = random.uniform(20000.0, 50000.0)
+                _sb_tx_x = _world.ship.x + _math_sb.cos(_math_sb.radians(_sb_tx_angle)) * _sb_tx_dist
+                _sb_tx_y = _world.ship.y + _math_sb.sin(_math_sb.radians(_sb_tx_angle)) * _sb_tx_dist
                 glco.add_signal(
                     source=f"sb_{_sb_faction}_vessel",
                     source_name=f"{_sb_faction.title()} Vessel",
@@ -1070,6 +1076,12 @@ async def _loop() -> None:
                     faction=_sb_faction,
                     threat_level="unknown",
                     expires_ticks=3000,
+                    intel_category="fleet",
+                    location_data={
+                        "type": "approximate",
+                        "position": [round(_sb_tx_x, 1), round(_sb_tx_y, 1)],
+                        "radius": random.uniform(8000.0, 15000.0),
+                    },
                 )
                 await _manager.broadcast_to_roles(
                     ["comms"],
@@ -1135,6 +1147,12 @@ async def _loop() -> None:
                     faction="unknown",
                     threat_level="unknown",
                     response_deadline=90.0,
+                    location_data={
+                        "type": "exact",
+                        "position": [_sb_dx, _sb_dy],
+                        "radius": 0.0,
+                        "entity_type": "ship",
+                    },
                 )
                 await _manager.broadcast_to_roles(
                     ["comms", "helm", "captain"],
@@ -1172,10 +1190,34 @@ async def _loop() -> None:
             ["helm", "engineering", "captain", "viewscreen"],
             glm.build_world_entities(_world),
         )
+        _sensor_contacts_payload = glm.build_sensor_contacts(_world, _world.ship)
         await _manager.broadcast_to_roles(
             ["weapons", "science"],
-            glm.build_sensor_contacts(_world, _world.ship),
+            _sensor_contacts_payload,
         )
+
+        # 11b2. Comms intelligence contacts — broadcast to relevant stations.
+        glco.pop_pending_contact_updates()  # drain update queue
+        _all_comms_contacts = glco.get_comms_contacts()
+        if _all_comms_contacts:
+            # Try merging comms contacts with sensor contacts
+            _sc_list = _sensor_contacts_payload.payload.get("contacts", [])
+            _merge_events = glco.try_merge_contacts_with_sensors(_sc_list)
+            for _me in _merge_events:
+                await _manager.broadcast_to_roles(
+                    ["captain", "helm", "science", "weapons"],
+                    Message.build("comms.contact_merged", _me),
+                )
+
+            # Build per-role contact lists and broadcast
+            _comms_roles = {"captain", "helm", "science", "weapons", "comms"}
+            for _cr in _comms_roles:
+                _role_contacts = glco.get_comms_contacts_for_role(_cr)
+                if _role_contacts:
+                    await _manager.broadcast_to_roles(
+                        [_cr],
+                        Message.build("comms.contacts", {"contacts": _role_contacts}),
+                    )
 
         # 11c. Scan progress.
         scan_progress = sensors.get_scan_progress()

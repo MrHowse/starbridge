@@ -207,6 +207,8 @@ function init() {
   on('docking.service_complete',      handleDockingServiceComplete);
   on('weapons.auto_fire_status',      handleAutoFireStatus);
   on('crew.roster',                   handleCrewRoster);
+  on('comms.contacts',                handleCommsContacts);
+  on('comms.contact_merged',          handleCommsContactMerged);
 
   // Docking controls
   if (undockBtn) {
@@ -484,6 +486,20 @@ function handleWorldEntities(payload) {
     mapRenderer.updateContacts(payload.enemies || [], payload.torpedoes || []);
     mapRenderer.updateHazards(payload.hazards || []);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Comms intelligence contacts
+// ---------------------------------------------------------------------------
+
+function handleCommsContacts(payload) {
+  if (mapRenderer) {
+    mapRenderer.updateCommsContacts(payload.contacts || []);
+  }
+}
+
+function handleCommsContactMerged(payload) {
+  // Visual feedback could be added here (flash effect, notification)
 }
 
 // ---------------------------------------------------------------------------

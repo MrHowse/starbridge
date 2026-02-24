@@ -208,6 +208,7 @@ function init() {
   on('weapons.targeting_denied',       handleTargetingDenied);
   on('weapons.diplomatic_incident',    handleDiplomaticIncident);
   on('game.over',                      handleGameOver);
+  on('comms.contacts',                 handleCommsContacts);
 
   initPuzzleRenderer(send);
   setupControls();
@@ -363,6 +364,11 @@ function handleSensorContacts(payload) {
 
   if (radarRenderer) radarRenderer.updateContacts(contacts, torpedoes);
   updateTargetPanel();
+}
+
+function handleCommsContacts(payload) {
+  if (!gameActive) return;
+  if (radarRenderer) radarRenderer.updateCommsContacts(payload.contacts || []);
 }
 
 function handleHullHit() {

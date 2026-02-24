@@ -227,6 +227,7 @@ function init() {
   on('mission.signal_bearing',         handleSignalBearing);
   on('ship.hull_hit',                  handleHullHit);
   on('game.over',                      handleGameOver);
+  on('comms.contacts',                 handleCommsContacts);
 
   initPuzzleRenderer(send);
   setupControls();
@@ -498,6 +499,15 @@ function handleGameOver(payload) {
   SoundBank.play(payload.result === 'victory' ? 'victory' : 'defeat');
   SoundBank.stopAmbient('sensor_sweep');
   showGameOver(payload.result, payload.stats || {});
+}
+
+// ---------------------------------------------------------------------------
+// Comms intelligence contacts
+// ---------------------------------------------------------------------------
+
+function handleCommsContacts() {
+  // Science station doesn't render a map — comms contacts are informational
+  // and could be used to annotate the contact list in future.
 }
 
 // ---------------------------------------------------------------------------

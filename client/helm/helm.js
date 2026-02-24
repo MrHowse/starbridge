@@ -180,6 +180,7 @@ function init() {
   on('docking.approach_info', (info) => { _approachInfo = info; });
   on('docking.complete',      ({ station_name }) => { _approachInfo = null; console.log('[helm] Docked at', station_name); });
   on('docking.undocked',      () => { _dockedAt = null; });
+  on('comms.contacts',        (p) => { if (_mapRenderer) _mapRenderer.updateCommsContacts(p.contacts || []); });
 
   initPuzzleRenderer(send);
   setupKeyboard();
