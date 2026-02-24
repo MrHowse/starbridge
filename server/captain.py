@@ -6,20 +6,32 @@ handles them directly (not via the game loop queue). Alert level changes are
 broadcast immediately to all connected clients — this is intentional: the
 Captain's colour-shift command must feel instant.
 
-Call init(manager, ship) from main.py before the game starts.
+Messages that need game-loop state (authorize, add_log, undock) are forwarded
+to the shared input queue for processing during the next tick.
+
+Call init(manager, ship, queue) from main.py before the game starts.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Protocol
+from typing import Any, Protocol
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from server.game_logger import log_event as _log
 from server.models.messages import CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload, Message, VALID_SYSTEMS, validate_payload
 from server.models.ship import Ship
 
 logger = logging.getLogger("starbridge.captain")
+
+# Message types that should be forwarded to the game loop queue rather than
+# handled directly.  These need access to world state, weapons module, etc.
+_QUEUE_FORWARDED_TYPES = frozenset({
+    "captain.authorize",
+    "captain.add_log",
+    "captain.undock",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +50,7 @@ class _ManagerProtocol(Protocol):
 
 _manager: _ManagerProtocol | None = None
 _ship: Ship | None = None
+_queue: asyncio.Queue[tuple[str, Any]] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -45,11 +58,12 @@ _ship: Ship | None = None
 # ---------------------------------------------------------------------------
 
 
-def init(manager: _ManagerProtocol, ship: Ship) -> None:
-    """Inject manager and ship reference. Call once from main.py on startup."""
-    global _manager, _ship
+def init(manager: _ManagerProtocol, ship: Ship, queue: asyncio.Queue[tuple[str, Any]] | None = None) -> None:
+    """Inject manager, ship, and optional input queue. Call once from main.py."""
+    global _manager, _ship, _queue
     _manager = manager
     _ship = ship
+    _queue = queue
 
 
 async def handle_captain_message(connection_id: str, message: Message) -> None:
@@ -73,6 +87,15 @@ async def handle_captain_message(connection_id: str, message: Message) -> None:
         logger.warning(
             "Unhandled captain message type '%s' from %s", message.type, connection_id
         )
+        return
+
+    # Forward queue-bound messages to the game loop for tick-synchronised handling.
+    if message.type in _QUEUE_FORWARDED_TYPES:
+        if _queue is not None:
+            await _queue.put((message.type, payload))
+            logger.debug("Forwarded %s from %s to game loop queue", message.type, connection_id)
+        else:
+            logger.warning("No queue available to forward %s from %s", message.type, connection_id)
         return
 
     if message.type == "captain.set_alert" and isinstance(payload, CaptainSetAlertPayload):
