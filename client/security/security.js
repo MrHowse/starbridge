@@ -126,6 +126,12 @@ let selectedTeamId = null;
 let selectedRoomId = null;
 let selectedSquadId = null;  // legacy
 
+// Hash guards — skip DOM rebuild when data hasn't changed.
+let _lastTeamsJson = '';
+let _lastAlertsJson = '';
+let _lastBoardingJson = '';
+let _lastStatusJson = '';
+
 // ---------------------------------------------------------------------------
 // Geometry helpers
 // ---------------------------------------------------------------------------
@@ -351,7 +357,11 @@ function draw() {
 // Sidebar rendering
 // ---------------------------------------------------------------------------
 
-function renderAlerts() {
+function renderAlerts(force = false) {
+  const alertsKey = JSON.stringify(deckAlerts);
+  if (!force && alertsKey === _lastAlertsJson) return;
+  _lastAlertsJson = alertsKey;
+
   alertListEl.innerHTML = '';
   const deckNames = { 1: 'Bridge', 2: 'Operations', 3: 'Combat', 4: 'Medical', 5: 'Engineering' };
   for (let d = 1; d <= 5; d++) {
@@ -371,7 +381,11 @@ function renderAlerts() {
   }
 }
 
-function renderTeams() {
+function renderTeams(force = false) {
+  const teamsKey = JSON.stringify({ marineTeams, squads, selectedTeamId, selectedSquadId });
+  if (!force && teamsKey === _lastTeamsJson) return;
+  _lastTeamsJson = teamsKey;
+
   teamListEl.innerHTML = '';
   if (marineTeams.length === 0) {
     // Fall back to legacy squads
@@ -387,7 +401,7 @@ function renderTeams() {
         </div>
         <div class="team-card__location text-label text-dim">${roomName.toUpperCase()}</div>
       `;
-      if (sq.count > 0) card.addEventListener('click', () => { selectedSquadId = isSel ? null : sq.id; draw(); renderTeams(); });
+      if (sq.count > 0) card.addEventListener('click', () => { selectedSquadId = isSel ? null : sq.id; draw(); renderTeams(true); });
       teamListEl.appendChild(card);
     }
     return;
@@ -437,7 +451,7 @@ function renderTeams() {
         btnResp.addEventListener('click', (e) => {
           e.stopPropagation();
           selectedTeamId = team.id;
-          draw(); renderTeams();
+          draw(); renderTeams(true);
         });
         actions.appendChild(btnResp);
 
@@ -450,13 +464,17 @@ function renderTeams() {
     }
 
     if (!isIncap) {
-      card.addEventListener('click', () => { selectedTeamId = isSel ? null : team.id; draw(); renderTeams(); });
+      card.addEventListener('click', () => { selectedTeamId = isSel ? null : team.id; draw(); renderTeams(true); });
     }
     teamListEl.appendChild(card);
   }
 }
 
-function renderBoardingIntel() {
+function renderBoardingIntel(force = false) {
+  const boardingKey = JSON.stringify({ boardingParties, intruders });
+  if (!force && boardingKey === _lastBoardingJson) return;
+  _lastBoardingJson = boardingKey;
+
   boardingListEl.innerHTML = '';
   const parties = boardingParties.length > 0 ? boardingParties : [];
   if (parties.length === 0 && intruders.length === 0) {
@@ -503,7 +521,14 @@ function renderBoardingIntel() {
   }
 }
 
-function renderStatusBar() {
+function renderStatusBar(force = false) {
+  const statusKey = JSON.stringify({
+    bp: boardingParties.length, mt: marineTeams.map(t => t.status),
+    ld: lockedDoors.length, ad: armedDecks, ss: sensorStatus, ib: isBoarding,
+  });
+  if (!force && statusKey === _lastStatusJson) return;
+  _lastStatusJson = statusKey;
+
   const boardingCount = boardingParties.length;
   const engagedCount = marineTeams.filter(t => t.status === 'engaging').length;
   const totalTeams = marineTeams.length;
@@ -529,12 +554,12 @@ function renderStatusBar() {
     ? 'text-data c-hostile boarding-active' : 'text-data text-dim';
 }
 
-function renderAll() {
+function renderAll(force = false) {
   draw();
-  renderAlerts();
-  renderTeams();
-  renderBoardingIntel();
-  renderStatusBar();
+  renderAlerts(force);
+  renderTeams(force);
+  renderBoardingIntel(force);
+  renderStatusBar(force);
 }
 
 // ---------------------------------------------------------------------------
@@ -555,7 +580,7 @@ canvas.addEventListener('click', (e) => {
   if (selectedTeamId) {
     send('security.send_team', { team_id: selectedTeamId, destination: roomId });
     selectedTeamId = null;
-    renderAll();
+    renderAll(true);
     return;
   }
 
@@ -563,13 +588,13 @@ canvas.addEventListener('click', (e) => {
   if (selectedSquadId) {
     send('security.move_squad', { squad_id: selectedSquadId, room_id: roomId });
     selectedSquadId = null;
-    renderAll();
+    renderAll(true);
     return;
   }
 
   // Select room
   selectedRoomId = selectedRoomId === roomId ? null : roomId;
-  renderAll();
+  renderAll(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -657,7 +682,7 @@ document.addEventListener('keydown', (e) => {
       if (marineTeams.length > 0) {
         const idx = marineTeams.findIndex(t => t.id === selectedTeamId);
         selectedTeamId = marineTeams[(idx + 1) % marineTeams.length].id;
-        renderAll();
+        renderAll(true);
       }
       break;
   }
@@ -674,7 +699,7 @@ function handleGameStarted(payload) {
   if (payload.interior_layout) layout = payload.interior_layout;
   showBriefing(payload.mission_name, payload.briefing_text);
   populateSelects();
-  renderAll();
+  renderAll(true);
 }
 
 function handleInteriorState(payload) {
