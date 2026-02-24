@@ -63,7 +63,8 @@ export class RangeControl {
     this._ranges     = opts.ranges ?? ['50', '100'];
     this._default    = opts.defaultRange ?? this._ranges[0];
     this._onChange    = opts.onChange ?? (() => {});
-    this._current    = this._default;
+    this._stationId  = opts.stationId ?? null;
+    this._current    = this._restoreRange() ?? this._default;
     this._buttons    = [];
 
     // Sector bounds for SEC auto-calc.
@@ -85,6 +86,8 @@ export class RangeControl {
     this._renderButtons();
     this._keyHandler = (e) => this._handleKey(e);
     document.addEventListener('keydown', this._keyHandler);
+    // Fire onChange with the restored range so the station initialises correctly.
+    this._onChange(this._current, this.currentRangeUnits());
   }
 
   /** Remove keyboard listener. */
@@ -115,6 +118,7 @@ export class RangeControl {
   setRange(key) {
     if (!this._ranges.includes(key)) return;
     this._current = key;
+    this._saveRange(key);
     this._updateUI();
     this._onChange(key, this.currentRangeUnits());
   }
@@ -195,5 +199,18 @@ export class RangeControl {
   _handleKey(e) {
     if (e.key === '[') { this.step(-1); e.preventDefault(); }
     if (e.key === ']') { this.step(1);  e.preventDefault(); }
+  }
+
+  _saveRange(key) {
+    if (!this._stationId) return;
+    try { sessionStorage.setItem(`starbridge_range_${this._stationId}`, key); } catch (_) { /* ignore */ }
+  }
+
+  _restoreRange() {
+    if (!this._stationId) return null;
+    try {
+      const saved = sessionStorage.getItem(`starbridge_range_${this._stationId}`);
+      return saved && this._ranges.includes(saved) ? saved : null;
+    } catch (_) { return null; }
   }
 }

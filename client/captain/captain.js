@@ -291,6 +291,7 @@ function handleGameStarted(payload) {
     const cfg = STATION_RANGES.captain;
     _rangeControl = new RangeControl({
       container:    rangeBarEl,
+      stationId:    'captain',
       ranges:       cfg.available,
       defaultRange: cfg.default,
       onChange:      _onCaptainRangeChange,

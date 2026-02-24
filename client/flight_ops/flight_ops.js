@@ -86,6 +86,7 @@ initSharedUI({
       const cfg = STATION_RANGES.flight_ops;
       _foRangeControl = new RangeControl({
         container:    rangeBarEl,
+        stationId:    'flight_ops',
         ranges:       cfg.available,
         defaultRange: cfg.default,
         onChange:      (key, worldUnits) => { _mapWorldRadius = worldUnits; renderMap(); },

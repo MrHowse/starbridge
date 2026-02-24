@@ -279,6 +279,7 @@ function handleGameStarted(payload) {
   const sciRanges = STATION_RANGES.science;
   rangeControl = new RangeControl({
     container:    rangeBarEl,
+    stationId:    'science',
     ranges:       sciRanges.available,
     defaultRange: sciRanges.default,
     onChange:      _onRangeChange,
@@ -895,18 +896,12 @@ function drawScannedContact(ctx, sx, sy, type, selected, modeColor = C_SCANNED) 
 // ---------------------------------------------------------------------------
 
 /**
- * Filter the raw contacts list to only those detectable in the current mode.
- * EM:   all contacts.
- * GRAV: heavy-mass ships only (cruiser + destroyer — scouts too small).
- * BIO:  bio-signatures require an initial EM lock → only scanned contacts.
- * SUB:  wide-aperture detection — all contacts (same as EM, different rendering).
+ * Return all contacts — every mode now shows all contacts on the map and
+ * in the contact list.  Scan mode affects the label / icon styling in the
+ * contact list (handled by renderContactList), not visibility.
  */
 function filterContactsForMode(raw) {
-  switch (scanMode) {
-    case 'grav': return raw.filter(c => c.type === 'cruiser' || c.type === 'destroyer');
-    case 'bio':  return raw.filter(c => c.scan_state === 'scanned');
-    default:     return raw;  // em, sub
-  }
+  return raw;
 }
 
 /**

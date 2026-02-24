@@ -106,6 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cfg = STATION_RANGES.tactical;
     _rangeControl = new RangeControl({
       container:    rangeBarEl,
+      stationId:    'tactical',
       ranges:       cfg.available,
       defaultRange: cfg.default,
       onChange:      (key, worldUnits) => { _mapWorldRadius = worldUnits; },

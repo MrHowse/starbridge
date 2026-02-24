@@ -204,23 +204,24 @@ def test_contact_within_range_is_included():
     assert contacts[0]["id"] == enemy.id
 
 
-def test_contact_beyond_range_is_excluded():
+def test_contact_beyond_sensor_range_still_included():
+    """Distance filtering was removed — all enemies appear in contacts."""
     _fresh_sensors()
     world, enemy, ship = _make_world_with_enemy(dist=sensors.BASE_SENSOR_RANGE + 1_000.0)
     contacts = sensors.build_sensor_contacts(world, ship)
-    assert contacts == []
+    assert len(contacts) == 1
+    assert contacts[0]["id"] == enemy.id
 
 
-def test_range_scales_with_sensor_efficiency():
+def test_contacts_independent_of_sensor_efficiency():
+    """All enemies included regardless of sensor efficiency (no range filter)."""
     _fresh_sensors()
-    # Place enemy at exactly 20k — within full-power range (30k) but beyond half-power range (15k).
     world, enemy, ship = _make_world_with_enemy(dist=20_000.0)
-    ship.systems["sensors"].health = 50.0  # efficiency = 0.5 → range = 15k
+    ship.systems["sensors"].health = 50.0  # efficiency = 0.5
 
     contacts = sensors.build_sensor_contacts(world, ship)
-    assert contacts == []
+    assert len(contacts) == 1
 
-    # Restore full efficiency — enemy should now be visible.
     ship.systems["sensors"].health = 100.0
     contacts = sensors.build_sensor_contacts(world, ship)
     assert len(contacts) == 1

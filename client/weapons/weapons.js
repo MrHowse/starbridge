@@ -236,6 +236,7 @@ function handleGameStarted(payload) {
   const wpnRanges = STATION_RANGES.weapons;
   rangeControl = new RangeControl({
     container:    rangeBarEl,
+    stationId:    'weapons',
     ranges:       wpnRanges.available,
     defaultRange: wpnRanges.default,
     onChange:      _onRangeChange,

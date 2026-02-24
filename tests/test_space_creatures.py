@@ -568,17 +568,15 @@ class TestCreatureSensors:
         assert ct["kind"] == "creature"
         assert ct["creature_type"] == "void_whale"
 
-    def test_creature_out_of_range_not_in_contacts(self):
+    def test_detected_creature_always_in_contacts(self):
+        """Detected creatures included regardless of distance (no range filter)."""
         world = fresh_world()
-        # Place creature very far away
         c = spawn_creature("w1", "void_whale", 0.0, 0.0)
         c.detected = True
         world.creatures.append(c)
-        # Sensor range at 100% efficiency = BASE_SENSOR_RANGE = 30000
-        # Distance from (50000,50000) to (0,0) = ~70711 > 30000
         contacts = build_sensor_contacts(world, world.ship)
         ids = [ct["id"] for ct in contacts]
-        assert "w1" not in ids
+        assert "w1" in ids
 
     def test_undetected_leech_not_in_contacts(self):
         world = fresh_world()

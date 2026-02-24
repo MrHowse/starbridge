@@ -540,13 +540,12 @@ class TestSensorRangeModifier:
         nebula_range = sensors.sensor_range(ship, hazard_modifier=NEBULA_ENTITY_SENSOR_MODIFIER)
         assert nebula_range < full_range
 
-    def test_build_sensor_contacts_excludes_out_of_hazard_range(self):
-        """Enemy inside normal range but outside nebula-reduced range is hidden."""
+    def test_build_sensor_contacts_ignores_hazard_modifier(self):
+        """Contacts are no longer range-filtered — hazard_modifier has no effect."""
         from server.models.world import World
         w = World()
         w.enemies.clear()
         w.torpedoes.clear()
-        # Place ship at origin; enemy at 20k units (inside 30k normal range).
         w.ship.x = 0.0
         w.ship.y = 0.0
         w.ship.systems["sensors"].power = 100.0
@@ -556,9 +555,9 @@ class TestSensorRangeModifier:
         full_contacts = sensors.build_sensor_contacts(w, w.ship, hazard_modifier=1.0)
         assert any(c["id"] == "e1" for c in full_contacts)
 
-        # With 0.5 modifier: range = 15k; enemy at 20k is now outside range.
+        # hazard_modifier no longer filters contacts — enemy still visible.
         reduced_contacts = sensors.build_sensor_contacts(w, w.ship, hazard_modifier=0.5)
-        assert not any(c["id"] == "e1" for c in reduced_contacts)
+        assert any(c["id"] == "e1" for c in reduced_contacts)
 
 
 # ---------------------------------------------------------------------------

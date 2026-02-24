@@ -149,11 +149,11 @@ class TestServerConstants:
 
 
 class TestSensorContactFiltering:
-    """build_sensor_contacts() filters by server sensor range, not viewport."""
+    """build_sensor_contacts() includes ALL enemies — no distance filtering."""
 
     def test_enemy_within_sensor_range_included(self):
         ship = _make_ship(x=50_000, y=50_000)
-        enemy = _make_enemy(x=50_000 + 20_000, y=50_000)  # 20k away, within 30k range
+        enemy = _make_enemy(x=50_000 + 20_000, y=50_000)
         world = _make_world(ship)
         world.enemies.append(enemy)
 
@@ -161,68 +161,64 @@ class TestSensorContactFiltering:
         assert len(contacts) == 1
         assert contacts[0]["id"] == "e1"
 
-    def test_enemy_exactly_at_sensor_range_included(self):
+    def test_enemy_far_away_still_included(self):
+        """No distance filter — enemies at any range appear in contacts."""
         ship = _make_ship(x=50_000, y=50_000)
-        enemy = _make_enemy(x=50_000 + 30_000, y=50_000)  # exactly 30k
+        enemy = _make_enemy(x=50_000 + 100_000, y=50_000)  # 100k away
         world = _make_world(ship)
         world.enemies.append(enemy)
 
         contacts = build_sensor_contacts(world, ship)
         assert len(contacts) == 1
 
-    def test_enemy_beyond_sensor_range_excluded(self):
-        ship = _make_ship(x=50_000, y=50_000)
-        enemy = _make_enemy(x=50_000 + 35_000, y=50_000)  # 35k away, beyond 30k range
-        world = _make_world(ship)
-        world.enemies.append(enemy)
-
-        contacts = build_sensor_contacts(world, ship)
-        assert len(contacts) == 0
-
-    def test_multiple_enemies_mixed_range(self):
-        """Only in-range enemies appear in contacts."""
+    def test_multiple_enemies_all_included(self):
+        """All enemies included regardless of distance."""
         ship = _make_ship(x=50_000, y=50_000)
         near = _make_enemy(eid="near", x=50_000 + 10_000, y=50_000)
-        far = _make_enemy(eid="far", x=50_000 + 50_000, y=50_000)
+        mid  = _make_enemy(eid="mid",  x=50_000 + 40_000, y=50_000)
+        far  = _make_enemy(eid="far",  x=50_000 + 100_000, y=50_000)
         world = _make_world(ship)
-        world.enemies.extend([near, far])
+        world.enemies.extend([near, mid, far])
 
         contacts = build_sensor_contacts(world, ship)
-        assert len(contacts) == 1
-        assert contacts[0]["id"] == "near"
+        ids = {c["id"] for c in contacts}
+        assert ids == {"near", "mid", "far"}
 
-    def test_reduced_efficiency_shrinks_detection(self):
-        """Half sensor efficiency → 15k range → enemy at 20k excluded."""
+    def test_contacts_independent_of_sensor_efficiency(self):
+        """Sensor efficiency no longer filters contacts."""
         ship = _make_ship(x=50_000, y=50_000, sensor_efficiency=0.5)
         enemy = _make_enemy(x=50_000 + 20_000, y=50_000)
         world = _make_world(ship)
         world.enemies.append(enemy)
 
         contacts = build_sensor_contacts(world, ship)
-        assert len(contacts) == 0
+        assert len(contacts) == 1
 
-    def test_hazard_modifier_shrinks_detection(self):
-        """Hazard modifier 0.5 → 15k range → enemy at 20k excluded."""
+    def test_hazard_modifier_no_longer_filters(self):
+        """Hazard modifier accepted but does not filter contacts."""
         ship = _make_ship(x=50_000, y=50_000)
         enemy = _make_enemy(x=50_000 + 20_000, y=50_000)
         world = _make_world(ship)
         world.enemies.append(enemy)
 
         contacts = build_sensor_contacts(world, ship, hazard_modifier=0.5)
-        assert len(contacts) == 0
+        assert len(contacts) == 1
 
-    def test_extra_bubbles_extend_detection(self):
-        """Drone/probe detection bubble picks up enemy beyond sensor range."""
+    def test_extra_bubbles_accepted_for_compat(self):
+        """extra_bubbles param accepted but no longer needed for detection."""
         ship = _make_ship(x=50_000, y=50_000)
-        enemy = _make_enemy(x=90_000, y=50_000)  # 40k away, beyond 30k sensor range
+        enemy = _make_enemy(x=90_000, y=50_000)
         world = _make_world(ship)
         world.enemies.append(enemy)
 
-        # Drone at (80_000, 50_000) with 15k range → enemy at 90k is 10k from drone
-        bubbles = [(80_000.0, 50_000.0, 15_000.0)]
-        contacts = build_sensor_contacts(world, ship, extra_bubbles=bubbles)
+        # Enemy visible without bubbles
+        contacts = build_sensor_contacts(world, ship)
         assert len(contacts) == 1
-        assert contacts[0]["id"] == "e1"
+
+        # Also visible with bubbles (same result)
+        bubbles = [(80_000.0, 50_000.0, 15_000.0)]
+        contacts_b = build_sensor_contacts(world, ship, extra_bubbles=bubbles)
+        assert len(contacts_b) == 1
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -278,9 +274,9 @@ class TestContactData:
 
 
 class TestCreatureContacts:
-    """Creature contacts filtered by sensor range and detection status."""
+    """Creature contacts filtered by detection status only (no range filter)."""
 
-    def test_detected_creature_in_range_included(self):
+    def test_detected_creature_included(self):
         ship = _make_ship(x=50_000, y=50_000)
         creature = _make_creature(x=55_000, y=50_000, detected=True)
         world = _make_world(ship)
@@ -299,23 +295,14 @@ class TestCreatureContacts:
         contacts = build_sensor_contacts(world, ship)
         assert len(contacts) == 0
 
-    def test_creature_beyond_sensor_range_excluded(self):
+    def test_detected_creature_far_away_still_included(self):
+        """No distance filter — detected creatures always appear."""
         ship = _make_ship(x=50_000, y=50_000)
-        creature = _make_creature(x=50_000 + 35_000, y=50_000, detected=True)
+        creature = _make_creature(x=50_000 + 100_000, y=50_000, detected=True)
         world = _make_world(ship)
         world.creatures.append(creature)
 
         contacts = build_sensor_contacts(world, ship)
-        assert len(contacts) == 0
-
-    def test_creature_in_extra_bubble_included(self):
-        ship = _make_ship(x=50_000, y=50_000)
-        creature = _make_creature(x=90_000, y=50_000, detected=True)
-        world = _make_world(ship)
-        world.creatures.append(creature)
-
-        bubbles = [(85_000.0, 50_000.0, 10_000.0)]
-        contacts = build_sensor_contacts(world, ship, extra_bubbles=bubbles)
         assert len(contacts) == 1
 
 
@@ -356,14 +343,15 @@ class TestStationContacts:
         assert len(contacts) == 1
         assert contacts[0]["classification"] == "friendly"
 
-    def test_station_beyond_sensor_range_excluded(self):
+    def test_station_far_away_still_included(self):
+        """No distance filter — visible stations always appear."""
         ship = _make_ship(x=50_000, y=50_000)
-        station = _make_station(x=50_000 + 35_000, y=50_000, faction="hostile")
+        station = _make_station(x=50_000 + 100_000, y=50_000, faction="hostile")
         world = _make_world(ship)
         world.stations.append(station)
 
         contacts = build_sensor_contacts(world, ship)
-        assert len(contacts) == 0
+        assert len(contacts) == 1
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -446,8 +434,7 @@ class TestViewportIndependence:
     """
 
     def test_contacts_same_regardless_of_hypothetical_viewport(self):
-        """build_sensor_contacts returns the same contacts no matter what
-        viewport range the client might be using."""
+        """build_sensor_contacts returns ALL enemies — no distance filtering."""
         ship = _make_ship(x=50_000, y=50_000)
         near  = _make_enemy(eid="near",  x=55_000, y=50_000)   # 5k away
         mid   = _make_enemy(eid="mid",   x=70_000, y=50_000)   # 20k away
@@ -458,8 +445,8 @@ class TestViewportIndependence:
         contacts = build_sensor_contacts(world, ship)
         ids = {c["id"] for c in contacts}
 
-        # Sensor range is 30k: near (5k) and mid (20k) in range; far (40k) out.
-        assert ids == {"near", "mid"}
+        # All enemies included regardless of distance.
+        assert ids == {"near", "mid", "far"}
 
     def test_sensor_range_is_game_mechanic_not_ui_zoom(self):
         """Sensor range (detection) is independent of any client-side zoom.

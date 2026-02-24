@@ -213,6 +213,7 @@ function handleGameStarted(payload) {
   const helmRanges = STATION_RANGES.helm;
   _rangeControl = new RangeControl({
     container:    document.getElementById('range-bar'),
+    stationId:    'helm',
     ranges:       helmRanges.available,
     defaultRange: helmRanges.default,
     onChange:      _onHelmRangeChange,

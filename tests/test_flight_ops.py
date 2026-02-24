@@ -477,15 +477,14 @@ def test_build_state_drone_has_fuel_field():
 # ---------------------------------------------------------------------------
 
 
-def test_sensor_contacts_with_extra_bubble():
-    """Enemy outside ship sensor range but inside a probe bubble is detected."""
+def test_sensor_contacts_include_all_enemies():
+    """All enemies appear in sensor contacts regardless of range or bubbles."""
     from server.systems import sensors as sen
     from server.models.world import World, Enemy
 
     ship = Ship()
     ship.x = 50_000.0
     ship.y = 50_000.0
-    # Set sensors to minimum so nothing is in range by default
     ship.systems["sensors"].power = 1.0
     ship.systems["sensors"].health = 1.0
 
@@ -493,15 +492,15 @@ def test_sensor_contacts_with_extra_bubble():
     e = Enemy(id="e1", type="scout", x=70_000.0, y=50_000.0)
     world.enemies.append(e)
 
-    # Confirm not in normal sensor range
-    contacts_no_bubble = sen.build_sensor_contacts(world, ship)
-    assert len(contacts_no_bubble) == 0
+    # All enemies included — no range filtering
+    contacts = sen.build_sensor_contacts(world, ship)
+    assert len(contacts) == 1
+    assert contacts[0]["id"] == "e1"
 
-    # Probe at enemy location
+    # extra_bubbles accepted but ignored (API compat)
     bubble = [(70_000.0, 50_000.0, 8_000.0)]
     contacts_with_bubble = sen.build_sensor_contacts(world, ship, extra_bubbles=bubble)
     assert len(contacts_with_bubble) == 1
-    assert contacts_with_bubble[0]["id"] == "e1"
 
 
 # ---------------------------------------------------------------------------

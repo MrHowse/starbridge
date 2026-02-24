@@ -17,7 +17,6 @@ from dataclasses import dataclass
 
 from server.models.world import ENEMY_TYPE_PARAMS, Enemy, World
 from server.models.ship import Ship
-from server.utils.math_helpers import distance
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -123,29 +122,22 @@ def build_sensor_contacts(
 ) -> list[dict]:
     """Build the sensor.contacts payload for Weapons / Science clients.
 
-    Only includes enemies within effective sensor range OR within any of the
-    extra_bubbles provided by drones / probes [(x, y, range), ...].
+    Includes ALL enemies, detected creatures, and visible stations — no
+    distance filtering.  Science and Weapons receive the same contacts as
+    Helm/Captain so that zooming out reveals the full battlefield.
+
     For unscanned contacts, type and shield/hull details are omitted —
     the client sees a bearing and position but no identity.
     For scanned contacts, full details plus a computed weakness hint are
     included.
 
-    *hazard_modifier* reduces sensor range when environmental hazards are active.
+    *extra_bubbles* and *hazard_modifier* are accepted for API compatibility
+    but no longer used for contact filtering.  ``sensor_range()`` remains
+    available for the sensor-range ring display on the Science client.
     """
-    range_ = sensor_range(ship, hazard_modifier)
     contacts: list[dict] = []
 
     for enemy in world.enemies:
-        dist = distance(ship.x, ship.y, enemy.x, enemy.y)
-        in_range = dist <= range_
-        if not in_range and extra_bubbles:
-            for bx, by, br in extra_bubbles:
-                if distance(bx, by, enemy.x, enemy.y) <= br:
-                    in_range = True
-                    break
-        if not in_range:
-            continue
-
         contact: dict = {
             "id": enemy.id,
             "x": round(enemy.x, 1),
@@ -162,18 +154,9 @@ def build_sensor_contacts(
 
         contacts.append(contact)
 
-    # Creatures (v0.05k) — only include detected creatures within sensor range.
+    # Creatures (v0.05k) — include all detected creatures (no distance filter).
     for creature in world.creatures:
         if not creature.detected:
-            continue
-        dist = distance(ship.x, ship.y, creature.x, creature.y)
-        in_range = dist <= range_
-        if not in_range and extra_bubbles:
-            for bx, by, br in extra_bubbles:
-                if distance(bx, by, creature.x, creature.y) <= br:
-                    in_range = True
-                    break
-        if not in_range:
             continue
         contacts.append({
             "id": creature.id,
@@ -192,18 +175,9 @@ def build_sensor_contacts(
             "classification": "unknown",
         })
 
-    # Stations (v0.06) — hostile stations always detectable; others require transponder.
+    # Stations — hostile stations always visible; others require transponder.
     for station in world.stations:
         if station.faction != "hostile" and not station.transponder_active:
-            continue
-        dist = distance(ship.x, ship.y, station.x, station.y)
-        in_range = dist <= range_
-        if not in_range and extra_bubbles:
-            for bx, by, br in extra_bubbles:
-                if distance(bx, by, station.x, station.y) <= br:
-                    in_range = True
-                    break
-        if not in_range:
             continue
         faction = station.faction
         if faction == "hostile":

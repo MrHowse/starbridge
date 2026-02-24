@@ -110,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cfg = STATION_RANGES.electronic_warfare;
     _ewRangeControl = new RangeControl({
       container:    rangeBarEl,
+      stationId:    'electronic_warfare',
       ranges:       cfg.available,
       defaultRange: cfg.default,
       onChange:      (key, worldUnits) => { _mapWorldRadius = worldUnits; },

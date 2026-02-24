@@ -1102,11 +1102,9 @@ async def _loop() -> None:
             ["helm", "engineering", "captain", "viewscreen"],
             glm.build_world_entities(_world),
         )
-        _flight_deck_eff = _world.ship.systems["flight_deck"].efficiency
-        _detection_bubbles = glfo.get_detection_bubbles(_flight_deck_eff)
         await _manager.broadcast_to_roles(
             ["weapons", "science"],
-            glm.build_sensor_contacts(_world, _world.ship, extra_bubbles=_detection_bubbles, hazard_modifier=_hazard_sensor_mod),
+            glm.build_sensor_contacts(_world, _world.ship),
         )
 
         # 11c. Scan progress.
