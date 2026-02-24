@@ -35,69 +35,70 @@
     <!-- ─── Main layout ─────────────────────────────────────────────────── -->
     <main class="fo-main" data-fo-main style="display:none">
 
-      <!-- Left: sector map -->
-      <section class="fo-map-panel panel" id="fo-map-panel" aria-label="Sector map">
+      <!-- Left: tactical map -->
+      <section class="fo-map-panel panel" id="fo-map-panel" aria-label="Tactical map">
         <div class="panel__header">
-          <span class="text-header">SECTOR MAP</span>
+          <span class="text-header">TACTICAL MAP</span>
           <span class="fo-map-label text-dim" id="fo-map-coord"></span>
         </div>
 
         <div class="fo-legend">
-          <div class="fo-legend-item">
-            <div class="fo-legend-dot" style="background:var(--primary)"></div>
-            <span>Ship</span>
-          </div>
-          <div class="fo-legend-item">
-            <div class="fo-legend-dot" style="background:#4fc3f7"></div>
-            <span>Drone</span>
-          </div>
-          <div class="fo-legend-item">
-            <div class="fo-legend-dot" style="background:#ffb000"></div>
-            <span>Probe</span>
-          </div>
+          <div class="fo-legend-item"><div class="fo-legend-dot" style="background:var(--primary)"></div><span>Ship</span></div>
+          <div class="fo-legend-item"><div class="fo-legend-dot" style="background:#ffcc00"></div><span>Scout</span></div>
+          <div class="fo-legend-item"><div class="fo-legend-dot" style="background:#ff4040"></div><span>Combat</span></div>
+          <div class="fo-legend-item"><div class="fo-legend-dot" style="background:#00cc66"></div><span>Rescue</span></div>
+          <div class="fo-legend-item"><div class="fo-legend-dot" style="background:#4fc3f7"></div><span>Survey</span></div>
+          <div class="fo-legend-item"><div class="fo-legend-dot" style="background:#cc66ff"></div><span>ECM</span></div>
+          <div class="fo-legend-item"><div class="fo-legend-dot" style="background:#ffb000"></div><span>Buoy</span></div>
         </div>
 
         <div id="range-bar" class="range-bar"></div>
         <div class="fo-map-canvas-wrap" id="fo-canvas-wrap">
           <canvas id="fo-map"></canvas>
-          <div class="fo-target-hint" id="fo-target-hint" style="display:none">
-            Click map to set drone target
-          </div>
+          <div class="fo-target-hint" id="fo-target-hint" style="display:none"></div>
+          <div class="fo-mode-indicator" id="fo-mode-indicator" style="display:none"></div>
         </div>
       </section>
 
-      <!-- Right: drone cards + probe panel -->
+      <!-- Right: drone status cards -->
       <aside class="fo-controls panel" aria-label="Flight operations controls">
-
         <div class="panel__header">
           <span class="text-header">DRONES</span>
         </div>
 
         <div class="fo-controls-scroll">
-          <!-- Drone cards injected here by JS -->
+          <!-- Active drone cards injected here -->
           <div id="fo-drone-cards"></div>
 
-          <!-- Probe panel -->
-          <div class="fo-probe-section">
+          <!-- Hangar section -->
+          <div class="fo-hangar-section">
             <div class="panel__header fo-section-header">
-              <span class="text-label">PROBES</span>
-              <span class="text-data text-dim" id="fo-probe-stock">STOCK: 0</span>
+              <span class="text-label">HANGAR</span>
             </div>
-            <div class="fo-probe-stock-row">
-              <button class="fo-btn" id="fo-deploy-btn">Deploy Probe</button>
-              <span class="text-dim text-label" id="fo-probe-mode-hint" style="display:none">
-                click map →
-              </span>
-            </div>
-            <div class="fo-probe-list" id="fo-probe-list">
-              <p class="text-dim fo-no-probes">No probes deployed.</p>
-            </div>
+            <div id="fo-hangar-cards"></div>
           </div>
 
+          <!-- Expendables -->
+          <div class="fo-expendables-section">
+            <div class="panel__header fo-section-header">
+              <span class="text-label">EXPENDABLES</span>
+              <span class="text-data text-dim" id="fo-decoy-stock">DECOYS: 0</span>
+            </div>
+            <div class="fo-expendables-row">
+              <button class="fo-btn" id="fo-deploy-decoy-btn">Deploy Decoy</button>
+            </div>
+            <div id="fo-buoy-list"></div>
+          </div>
         </div>
       </aside>
 
     </main>
+
+    <!-- ─── Bottom status bar ──────────────────────────────────────────── -->
+    <footer class="fo-status-bar panel" data-fo-status style="display:none">
+      <div class="fo-status-bar__inner" id="fo-status-bar"></div>
+    </footer>
+
   </div>
   <script type="module" src="flight_ops.js"></script>
   <script type="module" src="../shared/a11y_widget.js"></script>
