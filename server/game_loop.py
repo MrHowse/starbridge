@@ -1229,7 +1229,11 @@ async def _loop() -> None:
         for _gen_mission in glco.pop_pending_generated_missions():
             gldm.offer_mission(_gen_mission)
         # Tick mission timers and auto-complete objectives.
-        gldm.tick_missions(_world.ship.x, _world.ship.y, TICK_DT)
+        gldm.tick_missions(
+            _world.ship.x, _world.ship.y, TICK_DT,
+            enemy_ids=frozenset(e.id for e in _world.enemies),
+            docked_station_id=gldo.get_docked_station_id(),
+        )
         # Broadcast mission events to captain.
         _dm_events = gldm.pop_pending_mission_events()
         for _dme in _dm_events:
@@ -1302,6 +1306,8 @@ async def _loop() -> None:
                     "results": sensors.build_scan_result(ce),
                 }))
                 gl.log_event("science", "scan_completed", {"entity_id": cid})
+            # Notify dynamic missions of scan completion.
+            gldm.notify_scan_completed(cid)
 
         # 11e. Security interior state (always broadcast so Security can show the map).
         await _manager.broadcast_to_roles(
@@ -1925,6 +1931,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             glco.start_decode(payload.signal_id)
         elif msg_type == "comms.respond" and isinstance(payload, CommsRespondPayload):
             glco.respond_to_signal(payload.signal_id, payload.response_id)
+            gldm.notify_signal_responded(payload.signal_id)
         elif msg_type == "comms.route_intel" and isinstance(payload, CommsRouteIntelPayload):
             glco.route_intel(payload.signal_id, payload.target_station)
         elif msg_type == "comms.set_channel" and isinstance(payload, CommsSetChannelPayload):

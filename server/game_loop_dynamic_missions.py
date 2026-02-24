@@ -256,10 +256,22 @@ def complete_objective(mission_id: str, objective_id: str) -> bool:
 # Tick — auto-check objectives and deadlines
 # ---------------------------------------------------------------------------
 
-def tick_missions(ship_x: float, ship_y: float, dt: float) -> None:
+def tick_missions(
+    ship_x: float,
+    ship_y: float,
+    dt: float,
+    *,
+    enemy_ids: frozenset[str] | None = None,
+    docked_station_id: str | None = None,
+) -> None:
     """Advance mission state each tick.
 
-    Checks navigate_to proximity, accept deadlines, completion deadlines.
+    Checks navigate_to proximity, destroy targets, accept deadlines,
+    completion deadlines.
+
+    Args:
+        enemy_ids: set of alive enemy IDs (for destroy objective checks).
+        docked_station_id: station ID currently docked with (for dock objectives).
     """
     for mission in _missions:
         # Skip terminal states
@@ -295,6 +307,14 @@ def tick_missions(ship_x: float, ship_y: float, dt: float) -> None:
             # Auto-check survive objectives
             _check_survive_objectives(mission)
 
+            # Auto-check destroy objectives (target absent from alive enemies)
+            if enemy_ids is not None:
+                _check_destroy_objectives(mission, enemy_ids)
+
+            # Auto-check dock objectives
+            if docked_station_id is not None:
+                _check_dock_objectives(mission, docked_station_id)
+
 
 def _check_navigate_objectives(mission: DynamicMission, ship_x: float, ship_y: float) -> None:
     """Complete navigate_to objectives when ship is close enough."""
@@ -317,6 +337,58 @@ def _check_survive_objectives(mission: DynamicMission) -> None:
             continue
         if obj.target_tick is not None and _tick >= obj.target_tick:
             complete_objective(mission.id, obj.id)
+
+
+def _check_destroy_objectives(mission: DynamicMission, alive_enemy_ids: frozenset[str]) -> None:
+    """Complete destroy objectives when target is no longer alive."""
+    for obj in mission.objectives:
+        if obj.completed or obj.objective_type != "destroy":
+            continue
+        if obj.target_id and obj.target_id not in alive_enemy_ids:
+            complete_objective(mission.id, obj.id)
+
+
+def _check_dock_objectives(mission: DynamicMission, docked_station_id: str) -> None:
+    """Complete dock objectives when docked with target station."""
+    for obj in mission.objectives:
+        if obj.completed or obj.objective_type != "dock":
+            continue
+        if obj.target_id and obj.target_id == docked_station_id:
+            complete_objective(mission.id, obj.id)
+
+
+# ---------------------------------------------------------------------------
+# Notification-based objective completion
+# ---------------------------------------------------------------------------
+
+def notify_scan_completed(entity_id: str) -> None:
+    """Called when a science scan finishes on an entity.
+
+    Completes any active 'scan' objective targeting that entity.
+    """
+    for mission in _missions:
+        if not mission.is_active:
+            continue
+        for obj in mission.objectives:
+            if obj.completed or obj.objective_type != "scan":
+                continue
+            if obj.target_id == entity_id:
+                complete_objective(mission.id, obj.id)
+
+
+def notify_signal_responded(signal_id: str) -> None:
+    """Called when a diplomatic response is sent to a signal.
+
+    Completes any active 'negotiate' objective targeting that signal.
+    """
+    for mission in _missions:
+        if not mission.is_active:
+            continue
+        for obj in mission.objectives:
+            if obj.completed or obj.objective_type != "negotiate":
+                continue
+            if obj.target_id == signal_id:
+                complete_objective(mission.id, obj.id)
 
 
 # ---------------------------------------------------------------------------
