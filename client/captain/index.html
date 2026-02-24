@@ -170,6 +170,48 @@
           </div>
         </div>
 
+        <!-- Dynamic missions panel (shown when missions exist) -->
+        <div id="missions-panel" style="display:none" class="missions-panel">
+          <div class="panel-header missions-header">
+            <span>MISSIONS</span>
+            <span id="missions-count" class="text-dim"></span>
+          </div>
+
+          <!-- Mission offer card (shown for incoming offers) -->
+          <div id="mission-offer" style="display:none" class="mission-offer">
+            <div class="mission-offer__type" id="offer-type-badge">RESCUE</div>
+            <div class="mission-offer__title" id="offer-title">—</div>
+            <div class="mission-offer__briefing" id="offer-briefing"></div>
+            <div class="mission-offer__section">
+              <span class="mission-offer__label">OBJECTIVES</span>
+              <div id="offer-objectives" class="mission-offer__objectives"></div>
+            </div>
+            <div class="mission-offer__section">
+              <span class="mission-offer__label">REWARDS</span>
+              <div id="offer-rewards" class="text-dim"></div>
+            </div>
+            <div id="offer-assessment" style="display:none" class="mission-offer__section">
+              <span class="mission-offer__label">COMMS ASSESSMENT</span>
+              <div id="offer-assessment-text" class="mission-offer__assessment"></div>
+            </div>
+            <div class="mission-offer__meta">
+              <span class="mission-offer__difficulty" id="offer-difficulty"></span>
+              <span class="mission-offer__deadline" id="offer-deadline"></span>
+            </div>
+            <div id="offer-consequences" style="display:none" class="mission-offer__consequences">
+              <span class="mission-offer__label">IF DECLINED</span>
+              <span id="offer-decline-text" class="text-dim"></span>
+            </div>
+            <div class="mission-offer__buttons">
+              <button id="accept-mission-btn" class="btn btn--primary">ACCEPT MISSION</button>
+              <button id="decline-mission-btn" class="btn btn--secondary">DECLINE</button>
+            </div>
+          </div>
+
+          <!-- Active missions tracker -->
+          <div id="active-missions-list" class="active-missions-list"></div>
+        </div>
+
         <!-- Captain's log -->
         <div class="panel-header log-header"><span>CAPTAIN'S LOG</span></div>
         <div id="log-list" class="log-list"></div>

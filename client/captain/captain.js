@@ -111,6 +111,25 @@ const dockingServicesList = document.getElementById('docking-services-list');
 const undockBtn          = document.getElementById('undock-btn');
 const emergencyUndockBtn = document.getElementById('emergency-undock-btn');
 
+// Missions panel
+const missionsPanel       = document.getElementById('missions-panel');
+const missionsCount       = document.getElementById('missions-count');
+const missionOffer        = document.getElementById('mission-offer');
+const offerTypeBadge      = document.getElementById('offer-type-badge');
+const offerTitle          = document.getElementById('offer-title');
+const offerBriefing       = document.getElementById('offer-briefing');
+const offerObjectives     = document.getElementById('offer-objectives');
+const offerRewards        = document.getElementById('offer-rewards');
+const offerAssessment     = document.getElementById('offer-assessment');
+const offerAssessmentText = document.getElementById('offer-assessment-text');
+const offerDifficulty     = document.getElementById('offer-difficulty');
+const offerDeadline       = document.getElementById('offer-deadline');
+const offerConsequences   = document.getElementById('offer-consequences');
+const offerDeclineText    = document.getElementById('offer-decline-text');
+const acceptMissionBtn    = document.getElementById('accept-mission-btn');
+const declineMissionBtn   = document.getElementById('decline-mission-btn');
+const activeMissionsList  = document.getElementById('active-missions-list');
+
 // Log
 const logList   = document.getElementById('log-list');
 const logInput  = document.getElementById('log-input');
@@ -136,6 +155,11 @@ let mapRenderer  = null;
 let _sectorMap   = null;
 let _pendingAuthId = null;
 const _logEntries  = [];
+
+// Dynamic missions state
+let _currentOffer = null;   // Currently displayed offer mission dict
+let _activeMissions = [];   // Active/offered missions from server
+let _missionWaypoints = []; // Waypoints to draw on tactical map
 
 // Viewport mode controls
 let _vpMode      = 'quad';
@@ -209,6 +233,26 @@ function init() {
   on('crew.roster',                   handleCrewRoster);
   on('comms.contacts',                handleCommsContacts);
   on('comms.contact_merged',          handleCommsContactMerged);
+  on('mission.dynamic_list',          handleDynamicMissionList);
+  on('mission.mission_offered',       handleMissionOffered);
+  on('mission.mission_accepted',      handleMissionAccepted);
+  on('mission.mission_declined',      handleMissionDeclined);
+  on('mission.mission_completed',     handleMissionCompleted);
+  on('mission.mission_failed',        handleMissionFailed);
+  on('mission.mission_expired',       handleMissionExpired);
+  on('mission.objective_completed',   handleMissionObjectiveCompleted);
+
+  // Mission accept/decline buttons
+  if (acceptMissionBtn) {
+    acceptMissionBtn.addEventListener('click', () => {
+      if (_currentOffer) send('captain.accept_mission', { mission_id: _currentOffer.id });
+    });
+  }
+  if (declineMissionBtn) {
+    declineMissionBtn.addEventListener('click', () => {
+      if (_currentOffer) send('captain.decline_mission', { mission_id: _currentOffer.id });
+    });
+  }
 
   // Docking controls
   if (undockBtn) {
@@ -500,6 +544,200 @@ function handleCommsContacts(payload) {
 
 function handleCommsContactMerged(payload) {
   // Visual feedback could be added here (flash effect, notification)
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic missions
+// ---------------------------------------------------------------------------
+
+const DIFFICULTY_BARS = {
+  easy: '██░░░', moderate: '███░░', hard: '████░', dangerous: '█████', unknown: '??░░░',
+};
+
+const TYPE_LABELS = {
+  rescue: 'RESCUE', escort: 'ESCORT', investigate: 'INVESTIGATE', intercept: 'INTERCEPT',
+  patrol: 'PATROL', salvage: 'SALVAGE', trade: 'TRADE', diplomatic: 'DIPLOMATIC',
+};
+
+function handleDynamicMissionList({ missions }) {
+  if (!missions || !missionsPanel) return;
+  _activeMissions = missions;
+
+  const offered = missions.filter(m => m.status === 'offered');
+  const active  = missions.filter(m => m.status === 'active' || m.status === 'accepted');
+
+  // Show/hide panel
+  missionsPanel.style.display = missions.length > 0 ? '' : 'none';
+  if (missionsCount) {
+    missionsCount.textContent = active.length > 0 ? `${active.length} ACTIVE` : '';
+  }
+
+  // Show first offered mission if no current offer displayed
+  if (offered.length > 0 && (!_currentOffer || !offered.find(m => m.id === _currentOffer.id))) {
+    _showMissionOffer(offered[0]);
+  } else if (offered.length === 0) {
+    _hideMissionOffer();
+  }
+
+  // Update deadlines on current offer
+  if (_currentOffer) {
+    const offerData = offered.find(m => m.id === _currentOffer.id);
+    if (offerData && offerDeadline) {
+      _updateOfferDeadline(offerData);
+    }
+  }
+
+  // Render active missions tracker
+  _renderActiveMissions(active);
+
+  // Update waypoints for map
+  _missionWaypoints = active
+    .filter(m => m.waypoint)
+    .map(m => ({ x: m.waypoint[0], y: m.waypoint[1], name: m.waypoint_name || m.title }));
+}
+
+function _showMissionOffer(m) {
+  _currentOffer = m;
+  if (!missionOffer) return;
+  missionOffer.style.display = '';
+
+  // Type badge
+  if (offerTypeBadge) {
+    offerTypeBadge.textContent = TYPE_LABELS[m.mission_type] || m.mission_type.toUpperCase();
+    offerTypeBadge.className = `mission-offer__type mission-offer__type--${m.mission_type}`;
+  }
+
+  // Title & briefing
+  if (offerTitle) offerTitle.textContent = m.title;
+  if (offerBriefing) offerBriefing.textContent = m.briefing;
+
+  // Objectives
+  if (offerObjectives) {
+    offerObjectives.innerHTML = (m.objectives || []).map((o, i) => {
+      const opt = o.optional ? ' <span class="text-dim">(optional)</span>' : '';
+      return `<div>${i + 1}. ${o.description}${opt}</div>`;
+    }).join('');
+  }
+
+  // Rewards
+  if (offerRewards && m.rewards) {
+    offerRewards.textContent = m.rewards.description || 'Unknown rewards';
+  }
+
+  // Comms assessment
+  if (offerAssessment && offerAssessmentText) {
+    if (m.comms_assessment) {
+      offerAssessment.style.display = '';
+      offerAssessmentText.textContent = `"${m.comms_assessment}"`;
+    } else {
+      offerAssessment.style.display = 'none';
+    }
+  }
+
+  // Difficulty
+  if (offerDifficulty) {
+    const bars = DIFFICULTY_BARS[m.estimated_difficulty] || '??░░░';
+    offerDifficulty.textContent = `${bars} ${(m.estimated_difficulty || 'unknown').toUpperCase()}`;
+  }
+
+  // Deadline
+  _updateOfferDeadline(m);
+
+  // Decline consequences
+  if (offerConsequences && offerDeclineText) {
+    const dc = m.decline_consequences;
+    if (dc && dc.description) {
+      offerConsequences.style.display = '';
+      offerDeclineText.textContent = dc.description;
+    } else {
+      offerConsequences.style.display = 'none';
+    }
+  }
+}
+
+function _updateOfferDeadline(m) {
+  if (!offerDeadline) return;
+  if (m.accept_deadline != null && m.accept_deadline > 0) {
+    const secs = Math.ceil(m.accept_deadline);
+    const mm = Math.floor(secs / 60);
+    const ss = (secs % 60).toString().padStart(2, '0');
+    offerDeadline.textContent = `DEADLINE: ${mm}:${ss}`;
+    offerDeadline.className = secs <= 15
+      ? 'mission-offer__deadline mission-offer__deadline--urgent'
+      : 'mission-offer__deadline';
+  } else {
+    offerDeadline.textContent = '';
+  }
+}
+
+function _hideMissionOffer() {
+  _currentOffer = null;
+  if (missionOffer) missionOffer.style.display = 'none';
+}
+
+function _renderActiveMissions(active) {
+  if (!activeMissionsList) return;
+  if (active.length === 0) {
+    activeMissionsList.innerHTML = '';
+    return;
+  }
+  activeMissionsList.innerHTML = active.map(m => {
+    const objs = (m.objectives || []).map(o => {
+      const done = o.completed;
+      return `<div class="active-mission__obj ${done ? 'active-mission__obj--done' : 'active-mission__obj--pending'}">
+        <span class="obj-check">${done ? '✓' : '○'}</span>
+        <span>${o.description}${o.optional ? ' (opt)' : ''}</span>
+      </div>`;
+    }).join('');
+
+    let timer = '';
+    if (m.completion_deadline != null && m.completion_deadline > 0) {
+      const secs = Math.ceil(m.completion_deadline);
+      const mm = Math.floor(secs / 60);
+      const ss = (secs % 60).toString().padStart(2, '0');
+      const cls = secs <= 30 ? 'active-mission__timer active-mission__timer--urgent' : 'active-mission__timer';
+      timer = `<span class="${cls}">${mm}:${ss}</span>`;
+    }
+
+    return `<div class="active-mission">
+      <div class="active-mission__header">
+        <span class="active-mission__title">${m.title}</span>
+        ${timer}
+      </div>
+      ${objs}
+    </div>`;
+  }).join('');
+}
+
+function handleMissionOffered({ mission }) {
+  if (!mission) return;
+  _showMissionOffer(mission);
+  if (missionsPanel) missionsPanel.style.display = '';
+}
+
+function handleMissionAccepted({ mission }) {
+  _hideMissionOffer();
+}
+
+function handleMissionDeclined({ mission_id }) {
+  if (_currentOffer && _currentOffer.id === mission_id) _hideMissionOffer();
+}
+
+function handleMissionCompleted({ mission_id, title, rewards }) {
+  if (_currentOffer && _currentOffer.id === mission_id) _hideMissionOffer();
+  // Could add notification toast here
+}
+
+function handleMissionFailed({ mission_id, title, reason }) {
+  if (_currentOffer && _currentOffer.id === mission_id) _hideMissionOffer();
+}
+
+function handleMissionExpired({ mission_id }) {
+  if (_currentOffer && _currentOffer.id === mission_id) _hideMissionOffer();
+}
+
+function handleMissionObjectiveCompleted({ mission_id, objective_id, description }) {
+  // Active missions list will re-render on next dynamic_list tick
 }
 
 // ---------------------------------------------------------------------------
@@ -839,6 +1077,32 @@ function _tacticalLoop() {
       mapCtx.textAlign    = 'center';
       mapCtx.textBaseline = 'top';
       mapCtx.fillText(`HDG ${hdg}°`, W / 2, H / 2 + 14);
+    }
+    // Mission waypoint markers.
+    if (mapCtx && mapRenderer && _missionWaypoints.length > 0) {
+      const pulse = 0.5 + 0.5 * Math.sin(now / 600);
+      mapCtx.save();
+      for (const wp of _missionWaypoints) {
+        const sp = mapRenderer.worldToCanvas(wp.x, wp.y);
+        if (sp.x < -20 || sp.x > mapCanvas.width + 20 ||
+            sp.y < -20 || sp.y > mapCanvas.height + 20) continue;
+        const s = 6;
+        const alpha = 0.5 + 0.4 * pulse;
+        mapCtx.strokeStyle = `rgba(255,176,0,${alpha})`;
+        mapCtx.lineWidth = 1.5;
+        mapCtx.beginPath();
+        mapCtx.moveTo(sp.x, sp.y - s); mapCtx.lineTo(sp.x + s, sp.y);
+        mapCtx.lineTo(sp.x, sp.y + s); mapCtx.lineTo(sp.x - s, sp.y);
+        mapCtx.closePath();
+        mapCtx.stroke();
+        // Label
+        mapCtx.font         = '8px "Share Tech Mono",monospace';
+        mapCtx.textAlign    = 'center';
+        mapCtx.textBaseline = 'bottom';
+        mapCtx.fillStyle    = `rgba(255,176,0,${alpha})`;
+        mapCtx.fillText(wp.name || 'WAYPOINT', sp.x, sp.y - s - 3);
+      }
+      mapCtx.restore();
     }
   }
   // Science scan indicator overlay.
