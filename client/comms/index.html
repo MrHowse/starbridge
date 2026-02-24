@@ -18,30 +18,76 @@
 
     <main class="comms-main">
 
-      <!-- ── Left: Frequency scanner ──────────────────────────────────────── -->
-      <section class="scanner-panel">
-        <div class="scanner-panel__header">
-          <span class="label-sm">FREQUENCY SCANNER</span>
-          <span class="freq-readout" id="freq-readout">0.150</span>
-          <span class="faction-badge" id="faction-badge"></span>
+      <!-- ── Left column: Signal queue + Active dialogue ───────────────────── -->
+      <section class="comms-left">
+
+        <!-- Signal queue header -->
+        <div class="signal-queue-header">
+          <span class="label-sm">SIGNAL QUEUE</span>
+          <span class="signal-count" id="signal-count">0</span>
+          <span class="bandwidth-indicator" id="bandwidth-indicator">BW 100%</span>
         </div>
-        <div class="canvas-wrap">
-          <canvas id="scanner-canvas"></canvas>
+
+        <!-- Signal cards list -->
+        <div class="signal-queue" id="signal-queue">
+          <p class="queue-empty label-sm c-dim">No signals detected.</p>
         </div>
-        <div class="freq-control">
-          <label class="label-sm" for="freq-slider">TUNE</label>
-          <input
-            type="range" id="freq-slider"
-            min="0" max="1000" value="150" step="1"
-          />
+
+        <!-- Active dialogue / decode panel -->
+        <div class="dialogue-panel" id="dialogue-panel" style="display:none">
+          <div class="dialogue-header">
+            <span class="label-sm" id="dialogue-source">—</span>
+            <button class="btn btn--sm" id="dialogue-close" aria-label="Close dialogue">CLOSE</button>
+          </div>
+          <div class="decode-bar-wrap" id="decode-bar-wrap" style="display:none">
+            <div class="label-sm">DECODING</div>
+            <div class="gauge"><div class="gauge__fill" id="decode-fill" style="width:0%"></div></div>
+            <span class="decode-pct" id="decode-pct">0%</span>
+          </div>
+          <div class="dialogue-content" id="dialogue-content"></div>
+          <div class="response-options" id="response-options"></div>
+          <div class="dialogue-actions" id="dialogue-actions"></div>
         </div>
+
       </section>
 
-      <!-- ── Right: Sidebar ───────────────────────────────────────────────── -->
-      <aside class="comms-sidebar">
+      <!-- ── Right column: Spectrum + Channels + Factions + Hailing ────────── -->
+      <aside class="comms-right">
 
-        <!-- Hailing interface -->
-        <section class="sidebar-section sidebar-section--hail">
+        <!-- Frequency spectrum / scanner -->
+        <section class="panel-section panel-section--scanner">
+          <div class="section-header">
+            <span class="label-sm">FREQUENCY SCANNER</span>
+            <span class="freq-readout" id="freq-readout">0.150</span>
+            <span class="faction-badge" id="faction-badge">—</span>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="scanner-canvas" aria-label="Frequency spectrum scanner"></canvas>
+          </div>
+          <div class="freq-control">
+            <label class="label-sm" for="freq-slider">TUNE</label>
+            <input type="range" id="freq-slider" min="0" max="1000" value="150" step="1" aria-label="Frequency tuner" />
+          </div>
+        </section>
+
+        <!-- Channel management -->
+        <section class="panel-section panel-section--channels">
+          <div class="section-header">
+            <span class="label-sm">CHANNELS</span>
+          </div>
+          <div class="channel-grid" id="channel-grid"></div>
+        </section>
+
+        <!-- Faction standing -->
+        <section class="panel-section panel-section--factions">
+          <div class="section-header">
+            <span class="label-sm">FACTION STANDING</span>
+          </div>
+          <div class="faction-list" id="faction-list"></div>
+        </section>
+
+        <!-- Hailing controls -->
+        <section class="panel-section panel-section--hail">
           <div class="section-header">
             <span class="label-sm">HAILING</span>
             <span class="hail-status" id="hail-status">NO CONTACT</span>
@@ -50,27 +96,18 @@
             <p class="hail-hint">Tune to a faction frequency to hail.</p>
           </div>
           <div class="hail-controls" id="hail-controls" style="display:none">
-            <input type="text" id="contact-id-input" value="unknown_vessel" class="contact-input" placeholder="Contact ID" />
+            <input type="text" id="contact-id-input" value="unknown_vessel" class="contact-input" placeholder="Contact ID" aria-label="Contact ID" />
             <div class="hail-btn-row">
-              <button class="btn btn--sm btn--primary" data-msg="negotiate">NEGOTIATE</button>
-              <button class="btn btn--sm btn--warn" data-msg="demand">DEMAND</button>
-              <button class="btn btn--sm btn--danger" data-msg="bluff">BLUFF</button>
+              <button class="btn btn--sm btn--primary" data-hail="identify">IDENTIFY</button>
+              <button class="btn btn--sm btn--primary" data-hail="negotiate">NEGOTIATE</button>
+              <button class="btn btn--sm btn--warn" data-hail="warning">WARNING</button>
+              <button class="btn btn--sm btn--danger" data-hail="demand">DEMAND</button>
             </div>
           </div>
         </section>
 
-        <!-- Transmission log -->
-        <section class="sidebar-section sidebar-section--log">
-          <div class="section-header">
-            <span class="label-sm">TRANSMISSION LOG</span>
-          </div>
-          <div class="transmission-log" id="transmission-log">
-            <p class="log-empty label-sm c-dim">No transmissions received.</p>
-          </div>
-        </section>
-
         <!-- Creature communication -->
-        <section class="sidebar-section sidebar-section--creatures" id="creature-section" style="display:none">
+        <section class="panel-section panel-section--creatures" id="creature-section" style="display:none">
           <div class="section-header">
             <span class="label-sm">CREATURE COMMUNICATION</span>
             <span class="label-sm c-dim" id="creature-comm-count">0</span>
@@ -78,7 +115,7 @@
           <div id="creature-comm-list"></div>
         </section>
 
-        <!-- Assist panel (shown when a cross-station assist is available) -->
+        <!-- Assist panel -->
         <div class="assist-panel" id="assist-panel" style="display:none">
           <span class="label-sm">ASSIST AVAILABLE</span>
           <p id="assist-instructions"></p>

@@ -955,3 +955,229 @@ class TestReset:
         c.tune(0.8)
         c.reset()
         assert abs(c.get_active_frequency() - 0.15) < 0.001
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SANDBOX SIGNAL GENERATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestSandboxSignals:
+    """Sandbox events should create Signal objects via add_signal()."""
+
+    def test_add_signal_for_incoming_transmission(self):
+        c = fresh_comms()
+        c.add_signal(
+            source="sb_imperial_vessel",
+            source_name="Imperial Vessel",
+            frequency=0.15,
+            signal_type="broadcast",
+            priority="medium",
+            raw_content="scrambled signal",
+            requires_decode=True,
+            faction="imperial",
+            threat_level="unknown",
+            expires_ticks=3000,
+        )
+        signals = c.get_signals()
+        assert len(signals) == 1
+        assert signals[0].signal_type == "broadcast"
+        assert signals[0].faction == "imperial"
+        assert signals[0].requires_decode is True
+        assert signals[0].decode_progress == 0.0
+
+    def test_add_signal_for_distress(self):
+        c = fresh_comms()
+        c.add_signal(
+            source="distress_beacon",
+            source_name="Distress Beacon",
+            frequency=0.90,
+            signal_type="distress",
+            priority="critical",
+            raw_content="EMERGENCY — vessel in distress",
+            auto_decoded=True,
+            requires_decode=False,
+            faction="unknown",
+            threat_level="unknown",
+            response_deadline=90.0,
+        )
+        signals = c.get_signals()
+        assert len(signals) == 1
+        assert signals[0].signal_type == "distress"
+        assert signals[0].priority == "critical"
+        assert signals[0].auto_decoded is True
+        assert signals[0].response_deadline == 90.0
+        assert len(signals[0].response_options) > 0  # auto-decoded gets options
+
+    def test_sandbox_signals_appear_in_state(self):
+        c = fresh_comms()
+        c.add_signal(
+            source="sb_rebel_vessel",
+            source_name="Rebel Vessel",
+            frequency=0.42,
+            signal_type="broadcast",
+            priority="medium",
+            raw_content="patrol coordinates",
+            faction="rebel",
+        )
+        state = c.build_comms_state()
+        assert state["signal_count"] == 1
+        assert len(state["signals"]) == 1
+        assert state["signals"][0]["faction"] == "rebel"
+
+    def test_sandbox_distress_has_response_options(self):
+        """Distress signals should have response options (acknowledge, etc.)."""
+        c = fresh_comms()
+        sig = c.add_signal(
+            source="distress_beacon",
+            source_name="Distress Beacon",
+            frequency=0.90,
+            signal_type="distress",
+            priority="critical",
+            raw_content="EMERGENCY",
+            auto_decoded=True,
+            requires_decode=False,
+            faction="unknown",
+            threat_level="unknown",
+            response_deadline=90.0,
+        )
+        # Distress with unknown threat level should have response options
+        assert len(sig.response_options) > 0
+        option_ids = [o["id"] for o in sig.response_options]
+        assert "acknowledge" in option_ids
+
+    def test_multiple_sandbox_signals_sorted_by_priority(self):
+        c = fresh_comms()
+        c.add_signal(source="low", source_name="Low", priority="low",
+                     raw_content="a", faction="civilian")
+        c.add_signal(source="crit", source_name="Crit", priority="critical",
+                     raw_content="b", faction="imperial")
+        c.add_signal(source="med", source_name="Med", priority="medium",
+                     raw_content="c", faction="rebel")
+        signals = c.get_signals()
+        assert signals[0].priority == "critical"
+        assert signals[1].priority == "medium"
+        assert signals[2].priority == "low"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CROSS-STATION INTEGRATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestCrossStationIntegration:
+    """Intel routing, standing changes, and NPC responses drain correctly."""
+
+    def test_intel_route_populates_pending(self):
+        c = fresh_comms()
+        sig = c.add_signal(
+            raw_content="Enemy fleet at 7-7",
+            auto_decoded=True,
+            requires_decode=False,
+            faction="rebel",
+            intel_value="Fleet position at grid 7-7",
+            intel_category="tactical",
+        )
+        c.route_intel(sig.id, "weapons")
+        routes = c.pop_pending_intel_routes()
+        assert len(routes) == 1
+        assert routes[0]["target_station"] == "weapons"
+        assert routes[0]["intel_value"] == "Fleet position at grid 7-7"
+        # Second pop is empty
+        assert c.pop_pending_intel_routes() == []
+
+    def test_standing_change_on_response(self):
+        c = fresh_comms()
+        sig = c.add_signal(
+            signal_type="distress",
+            raw_content="Help!",
+            auto_decoded=True,
+            requires_decode=False,
+            faction="civilian",
+            threat_level="unknown",
+            response_deadline=90.0,
+        )
+        c.respond_to_signal(sig.id, "acknowledge")
+        changes = c.pop_pending_standing_changes()
+        assert len(changes) >= 1
+        assert changes[0]["faction_id"] == "civilian"
+        assert changes[0]["amount"] > 0  # positive for helping
+
+    def test_npc_response_on_respond(self):
+        c = fresh_comms()
+        sig = c.add_signal(
+            signal_type="hail",
+            raw_content="Identify yourself",
+            auto_decoded=True,
+            requires_decode=False,
+            faction="imperial",
+            threat_level="unknown",
+        )
+        reply = c.respond_to_signal(sig.id, "comply")
+        assert reply is not None
+        assert reply["faction"] == "imperial"
+        assert reply["response_text"]  # non-empty
+
+    def test_deadline_expiry_adjusts_standing(self):
+        """Letting a signal deadline expire should negatively affect standing."""
+        c = fresh_comms()
+        c.add_signal(
+            signal_type="hail",
+            raw_content="Respond!",
+            auto_decoded=True,
+            requires_decode=False,
+            faction="imperial",
+            threat_level="unknown",
+            response_deadline=1.0,
+        )
+        # Tick past deadline
+        c.tick_comms(2.0)
+        changes = c.pop_pending_standing_changes()
+        assert len(changes) >= 1
+        assert changes[0]["amount"] < 0  # negative for ignoring
+
+    def test_probe_completes_after_duration(self):
+        c = fresh_comms()
+        c.start_probe("enemy_ship_01")
+        assert "enemy_ship_01" in c._active_probes
+        # Tick past probe duration (15s)
+        c.tick_comms(16.0)
+        assert "enemy_ship_01" not in c._active_probes
+
+    def test_full_decode_reveal_respond_flow(self):
+        """End-to-end: add signal → decode → respond → intel route."""
+        c = fresh_comms()
+        sig = c.add_signal(
+            source="patrol_ship",
+            source_name="ISS Valiant",
+            frequency=0.15,
+            signal_type="hail",
+            priority="high",
+            raw_content="Unidentified vessel, identify yourself immediately.",
+            requires_decode=True,
+            faction="imperial",
+            threat_level="hostile",
+            intel_value="Patrol route information",
+            intel_category="tactical",
+        )
+
+        # Start active decode
+        assert c.start_decode(sig.id) is True
+
+        # Tick until fully decoded (at base speed ~0.05/s → ~20s)
+        for _ in range(25):
+            c.tick_comms(1.0)
+
+        sig_after = c.get_signal(sig.id)
+        assert sig_after.decode_progress >= 1.0
+        assert len(sig_after.response_options) > 0
+
+        # Respond
+        opt_id = sig_after.response_options[0]["id"]
+        reply = c.respond_to_signal(sig.id, opt_id)
+        assert reply is not None
+
+        # Route intel
+        assert c.route_intel(sig.id, "captain") is True
+        routes = c.pop_pending_intel_routes()
+        assert len(routes) == 1

@@ -1055,15 +1055,31 @@ async def _loop() -> None:
                         "intruder_count": len(sb_evt["intruders"]),
                     })
             elif _sb_type == "incoming_transmission":
+                # Create a Signal object in the comms system
+                _sb_faction = sb_evt["faction"]
+                _sb_hint = sb_evt["message_hint"]
+                glco.add_signal(
+                    source=f"sb_{_sb_faction}_vessel",
+                    source_name=f"{_sb_faction.title()} Vessel",
+                    frequency=sb_evt["frequency"],
+                    signal_type="broadcast",
+                    priority="medium",
+                    raw_content=_sb_hint,
+                    decoded_content="",
+                    requires_decode=True,
+                    faction=_sb_faction,
+                    threat_level="unknown",
+                    expires_ticks=3000,
+                )
                 await _manager.broadcast_to_roles(
                     ["comms"],
                     Message.build("comms.incoming_transmission", {
-                        "faction":      sb_evt["faction"],
+                        "faction":      _sb_faction,
                         "frequency":    sb_evt["frequency"],
-                        "message_hint": sb_evt["message_hint"],
+                        "message_hint": _sb_hint,
                     }),
                 )
-                gl.log_event("sandbox", "incoming_transmission", {"faction": sb_evt["faction"]})
+                gl.log_event("sandbox", "incoming_transmission", {"faction": _sb_faction})
             elif _sb_type == "hull_micro_damage":
                 _world.ship.hull = max(0.0, _world.ship.hull - sb_evt["amount"])
                 await _manager.broadcast(Message.build(
@@ -1104,16 +1120,32 @@ async def _loop() -> None:
                 )
                 gl.log_event("sandbox", "enemy_jamming", {"strength": sb_evt["strength"]})
             elif _sb_type == "distress_signal":
+                # Create a distress Signal in the comms system
+                _sb_dx, _sb_dy = sb_evt["x"], sb_evt["y"]
+                glco.add_signal(
+                    source="distress_beacon",
+                    source_name="Distress Beacon",
+                    frequency=sb_evt["frequency"],
+                    signal_type="distress",
+                    priority="critical",
+                    raw_content=f"EMERGENCY — vessel in distress at ({int(_sb_dx)}, {int(_sb_dy)}). Requesting immediate assistance.",
+                    decoded_content="",
+                    auto_decoded=True,
+                    requires_decode=False,
+                    faction="unknown",
+                    threat_level="unknown",
+                    response_deadline=90.0,
+                )
                 await _manager.broadcast_to_roles(
                     ["comms", "helm", "captain"],
                     Message.build("comms.distress_signal", {
-                        "x":         sb_evt["x"],
-                        "y":         sb_evt["y"],
+                        "x":         _sb_dx,
+                        "y":         _sb_dy,
                         "frequency": sb_evt["frequency"],
                     }),
                 )
                 gl.log_event("sandbox", "distress_signal", {
-                    "x": sb_evt["x"], "y": sb_evt["y"],
+                    "x": _sb_dx, "y": _sb_dy,
                 })
             elif _sb_type == "spawn_creature":
                 _world.creatures.append(
@@ -1230,6 +1262,25 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(
                 ["comms"],
                 Message.build("comms.npc_response", npc_resp),
+            )
+
+        # 11f2. Intel routes → broadcast to target stations.
+        for intel_route in glco.pop_pending_intel_routes():
+            _target = intel_route.get("target_station", "captain")
+            await _manager.broadcast_to_roles(
+                [_target],
+                Message.build("comms.intel_routed", intel_route),
+            )
+            gl.log_event("comms", "intel_routed", {
+                "target": _target,
+                "signal_id": intel_route.get("signal_id"),
+            })
+
+        # 11f3. Standing changes → broadcast to comms + captain.
+        for sc in glco.pop_pending_standing_changes():
+            await _manager.broadcast_to_roles(
+                ["comms", "captain"],
+                Message.build("comms.standing_changed", sc),
             )
 
         # 11g. Medical disease state + spread events.
