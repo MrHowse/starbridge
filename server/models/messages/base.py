@@ -7,7 +7,17 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from server.models.messages.captain import CaptainAddLogPayload, CaptainAuthorizePayload, CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
-from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPayload
+from server.models.messages.comms import (
+    CommsAssessDistressPayload,
+    CommsDecodeSignalPayload,
+    CommsDismissSignalPayload,
+    CommsHailPayload,
+    CommsProbePayload,
+    CommsRespondPayload,
+    CommsRouteIntelPayload,
+    CommsSetChannelPayload,
+    CommsTuneFrequencyPayload,
+)
 from server.models.messages.medical import (
     MedicalAdmitPayload,
     MedicalCancelTreatmentPayload,
@@ -202,8 +212,15 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "security.quarantine_room": SecurityQuarantineRoomPayload,
     "security.lift_quarantine": SecurityLiftQuarantinePayload,
     # Comms
-    "comms.tune_frequency": CommsTuneFrequencyPayload,
-    "comms.hail": CommsHailPayload,
+    "comms.tune_frequency":    CommsTuneFrequencyPayload,
+    "comms.hail":              CommsHailPayload,
+    "comms.decode_signal":     CommsDecodeSignalPayload,
+    "comms.respond":           CommsRespondPayload,
+    "comms.route_intel":       CommsRouteIntelPayload,
+    "comms.set_channel":       CommsSetChannelPayload,
+    "comms.probe":             CommsProbePayload,
+    "comms.assess_distress":   CommsAssessDistressPayload,
+    "comms.dismiss_signal":    CommsDismissSignalPayload,
     # Puzzle
     "puzzle.submit": PuzzleSubmitPayload,
     "puzzle.request_assist": PuzzleAssistPayload,

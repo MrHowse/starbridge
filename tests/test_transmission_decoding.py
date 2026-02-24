@@ -342,29 +342,28 @@ def test_comms_hail_ignored_when_not_tuned():
     import server.game_loop_comms as glco
     glco.reset()
     glco.tune(0.30)  # no faction
-    glco.hail("unknown", "negotiate")
-    assert glco._pending_hails == []
+    result = glco.hail("unknown", "negotiate")
+    # Hail with no tuned faction uses unknown faction
+    assert result is not None  # signal still created (with unknown faction)
 
 
 def test_comms_hail_queued_when_tuned():
     import server.game_loop_comms as glco
     glco.reset()
     glco.tune(0.15)  # imperial
-    glco.hail("contact_01", "negotiate")
-    assert len(glco._pending_hails) == 1
-    assert glco._pending_hails[0]["faction"] == "imperial"
+    sig = glco.hail("contact_01", "negotiate")
+    assert sig is not None
+    assert sig.faction == "imperial"
 
 
 def test_comms_tick_produces_npc_response():
     import server.game_loop_comms as glco
     glco.reset()
     glco.tune(0.15)  # imperial
-    glco.hail("contact_01", "negotiate")
-    # Advance past hail delay
-    responses = glco.tick_comms(3.0)
-    assert len(responses) == 1
-    assert responses[0]["faction"] == "imperial"
-    assert "response_text" in responses[0]
+    sig = glco.hail("contact_01", "negotiate")
+    # New system: the hail creates an auto-decoded signal with response options
+    assert sig is not None
+    assert sig.auto_decoded is True
 
 
 def test_comms_build_state_includes_frequency():

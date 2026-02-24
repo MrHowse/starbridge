@@ -108,7 +108,17 @@ from server.models.messages.security import (
 from server.models.messages.crew import CrewNotifyPayload
 
 # Comms
-from server.models.messages.comms import CommsHailPayload, CommsTuneFrequencyPayload
+from server.models.messages.comms import (
+    CommsAssessDistressPayload,
+    CommsDecodeSignalPayload,
+    CommsDismissSignalPayload,
+    CommsHailPayload,
+    CommsProbePayload,
+    CommsRespondPayload,
+    CommsRouteIntelPayload,
+    CommsSetChannelPayload,
+    CommsTuneFrequencyPayload,
+)
 
 # Puzzle
 from server.models.messages.puzzle import PuzzleAssistPayload, PuzzleCancelPayload, PuzzleSubmitPayload
@@ -245,6 +255,13 @@ __all__ = [
     # comms
     "CommsTuneFrequencyPayload",
     "CommsHailPayload",
+    "CommsDecodeSignalPayload",
+    "CommsRespondPayload",
+    "CommsRouteIntelPayload",
+    "CommsSetChannelPayload",
+    "CommsProbePayload",
+    "CommsAssessDistressPayload",
+    "CommsDismissSignalPayload",
     # puzzle
     "PuzzleSubmitPayload",
     "PuzzleAssistPayload",

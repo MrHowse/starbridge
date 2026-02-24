@@ -25,7 +25,14 @@ from server.models.messages import (
     CaptainAddLogPayload,
     CaptainAuthorizePayload,
     CaptainUndockPayload,
+    CommsAssessDistressPayload,
+    CommsDecodeSignalPayload,
+    CommsDismissSignalPayload,
     CommsHailPayload,
+    CommsProbePayload,
+    CommsRespondPayload,
+    CommsRouteIntelPayload,
+    CommsSetChannelPayload,
     CommsTuneFrequencyPayload,
     CreatureCommProgressPayload,
     CreatureEWDisruptPayload,
@@ -653,6 +660,7 @@ async def _loop() -> None:
         combat_events = gls.tick_combat(_world.ship.interior, _world.ship, TICK_DT)
         security_events.extend(combat_events)
         station_boarding_events = gls.tick_station_boarding(_world.ship, TICK_DT)
+        glco.set_tick(_tick_count)
         comms_responses = glco.tick_comms(TICK_DT)
         hazard_events = hazard_system.tick_hazards(_world, _world.ship, TICK_DT)
         _hazard_sensor_mod = hazard_system.get_sensor_modifier()
@@ -1776,8 +1784,25 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             glco.tune(payload.frequency)
             _set_training_flag(glm, "comms_frequency_tuned")
         elif msg_type == "comms.hail" and isinstance(payload, CommsHailPayload):
-            glco.hail(payload.contact_id, payload.message_type)
+            glco.hail(payload.contact_id, payload.message_type,
+                       frequency=payload.frequency, hail_type=payload.hail_type)
             _set_training_flag(glm, "comms_hail_sent")
+        elif msg_type == "comms.decode_signal" and isinstance(payload, CommsDecodeSignalPayload):
+            glco.start_decode(payload.signal_id)
+        elif msg_type == "comms.respond" and isinstance(payload, CommsRespondPayload):
+            glco.respond_to_signal(payload.signal_id, payload.response_id)
+        elif msg_type == "comms.route_intel" and isinstance(payload, CommsRouteIntelPayload):
+            glco.route_intel(payload.signal_id, payload.target_station)
+        elif msg_type == "comms.set_channel" and isinstance(payload, CommsSetChannelPayload):
+            glco.set_channel_status(payload.channel, payload.status)
+        elif msg_type == "comms.probe" and isinstance(payload, CommsProbePayload):
+            glco.start_probe(payload.target_id)
+        elif msg_type == "comms.assess_distress" and isinstance(payload, CommsAssessDistressPayload):
+            assessment = glco.assess_distress(payload.signal_id)
+            if assessment:
+                events.append(("comms.distress_assessment", assessment))
+        elif msg_type == "comms.dismiss_signal" and isinstance(payload, CommsDismissSignalPayload):
+            glco.dismiss_signal(payload.signal_id)
         elif msg_type == "puzzle.submit" and isinstance(payload, PuzzleSubmitPayload):
             _puzzle_engine.submit(payload.puzzle_id, payload.submission)
         elif msg_type == "puzzle.request_assist" and isinstance(payload, PuzzleAssistPayload):
