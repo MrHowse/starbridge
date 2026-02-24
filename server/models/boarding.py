@@ -260,7 +260,7 @@ def generate_boarding_party(
     # Calculate path if interior available
     path: list[str] = []
     if interior is not None and hasattr(interior, "find_path"):
-        full_path = interior.find_path(entry_point, objective_room)
+        full_path = interior.find_path(entry_point, objective_room, ignore_sealed=True)
         if full_path:
             path = full_path
 

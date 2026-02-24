@@ -16,6 +16,16 @@ Public API (called by game_loop.py):
     is_boarding_active() → bool
     build_interior_state(interior, ship) → dict
 
+Enhanced combat API (v0.06.3):
+    init_marine_teams(ship_class, crew_ids)  — called at game start
+    start_enhanced_boarding(interior, ...)    — create boarding party
+    send_team(team_id, destination)           — player: move team
+    set_team_patrol(team_id, route)           — player: patrol route
+    assign_escort(team_id, repair_team_id)    — player: escort duty
+    tick_combat(interior, ship, dt)           — enhanced combat tick
+    get_marine_teams() → list[MarineTeam]
+    get_boarding_parties() → list[BoardingParty]
+
 Broadcast format for security events (returned from tick_security):
     Each item is (event_type: str, payload: dict), broadcast to ["security"].
     Event types:
@@ -23,15 +33,36 @@ Broadcast format for security events (returned from tick_security):
         "security.intruder_defeated"           — intruder health reached zero
         "security.squad_casualty"              — squad lost a member in combat
         "security.squad_eliminated"            — squad count reached zero
+        "security.boarding_alert"              — new boarding party detected
+        "security.party_eliminated"            — boarding party wiped out
+        "security.party_retreating"            — boarding party retreating
+        "security.sabotage_started"            — boarders sabotaging objective
+        "security.sabotage_complete"           — sabotage succeeded
+        "security.room_secured"               — room cleared of hostiles
+        "security.team_arrived"               — marine team reached destination
+        "security.team_engaging"              — marine team engaging boarders
 """
 from __future__ import annotations
 
+import random as _random
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass  # ShipInterior used below via string annotations
 
+from server.models.boarding import (
+    ADVANCE_TIME_PER_ROOM,
+    BREACH_TIME,
+    SABOTAGE_RATE,
+    BoardingParty,
+    generate_boarding_party,
+)
 from server.models.interior import ShipInterior
+from server.models.marine_teams import (
+    TRAVEL_TIME_PER_ROOM as MARINE_TRAVEL_TIME,
+    MarineTeam,
+    generate_marine_teams,
+)
 from server.models.security import (
     MARINE_DAMAGE_PER_TICK,
     INTRUDER_DAMAGE_PER_TICK,
@@ -53,15 +84,32 @@ _station_boarding_active: bool = False
 _station_boarding_interior: "ShipInterior | None" = None
 _station_eliminated_reported: set[str] = set()
 
+# v0.06.3 — enhanced combat state
+_marine_teams: list[MarineTeam] = []
+_boarding_parties: list[BoardingParty] = []
+_next_party_id: int = 0
+_damage_accum: dict[str, float] = {}  # entity_id -> fractional damage
+
+# Crew combat constants
+CREW_FIREPOWER: float = 0.15       # per crew member (untrained)
+ARMED_CREW_FIREPOWER: float = 0.25 # armed crew (armoury issued)
+MARINE_ARMOUR_MULT: float = 0.5    # marines take 50% less damage
+BASE_CASUALTIES_PER_TICK: float = 0.3
+
 
 def reset() -> None:
     """Clear all boarding state. Called at game start."""
     global _boarding_active, _station_boarding_active, _station_boarding_interior
+    global _next_party_id
     _boarding_active = False
     _eliminated_reported.clear()
     _station_boarding_active = False
     _station_boarding_interior = None
     _station_eliminated_reported.clear()
+    _marine_teams.clear()
+    _boarding_parties.clear()
+    _next_party_id = 0
+    _damage_accum.clear()
 
 
 
@@ -72,11 +120,15 @@ def serialise() -> dict:
         "eliminated_reported": list(_eliminated_reported),
         "station_boarding_active": _station_boarding_active,
         "station_eliminated_reported": list(_station_eliminated_reported),
+        "marine_teams": [t.to_dict() for t in _marine_teams],
+        "boarding_parties": [p.to_dict() for p in _boarding_parties],
+        "next_party_id": _next_party_id,
     }
 
 
 def deserialise(data: dict) -> None:
     global _boarding_active, _station_boarding_active, _station_boarding_interior
+    global _next_party_id
     _boarding_active = data.get("boarding_active", False)
     _eliminated_reported.clear()
     _eliminated_reported.update(data.get("eliminated_reported", []))
@@ -84,6 +136,14 @@ def deserialise(data: dict) -> None:
     _station_boarding_active = False
     _station_boarding_interior = None
     _station_eliminated_reported.clear()
+    # Restore enhanced combat state.
+    _marine_teams.clear()
+    for td in data.get("marine_teams", []):
+        _marine_teams.append(MarineTeam.from_dict(td))
+    _boarding_parties.clear()
+    for pd in data.get("boarding_parties", []):
+        _boarding_parties.append(BoardingParty.from_dict(pd))
+    _next_party_id = data.get("next_party_id", 0)
 
 
 # ---------------------------------------------------------------------------
@@ -529,4 +589,476 @@ def build_interior_state(interior: ShipInterior, ship: Ship) -> dict:
         "squads": squads,
         "intruders": intruders,
         "rooms": rooms,
+        "marine_teams": [t.to_dict() for t in _marine_teams],
+        "boarding_parties": [
+            {
+                "id": p.id, "location": p.location,
+                "members": p.members, "max_members": p.max_members,
+                "objective": p.objective, "status": p.status,
+                "morale": round(p.morale, 2),
+                "sabotage_progress": round(p.sabotage_progress, 2),
+            }
+            for p in _boarding_parties
+            if not p.is_eliminated
+        ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Enhanced combat system (v0.06.3)
+# ---------------------------------------------------------------------------
+
+
+def init_marine_teams(
+    ship_class: str = "frigate",
+    crew_member_ids: list[str] | None = None,
+) -> list[MarineTeam]:
+    """Create marine teams at game start based on ship class.
+
+    Returns the created teams (also stored in module state).
+    """
+    _marine_teams.clear()
+    teams = generate_marine_teams(ship_class, crew_member_ids)
+    _marine_teams.extend(teams)
+    return list(_marine_teams)
+
+
+def get_marine_teams() -> list[MarineTeam]:
+    """Return current marine teams (read-only view)."""
+    return list(_marine_teams)
+
+
+def get_boarding_parties() -> list[BoardingParty]:
+    """Return current boarding parties (read-only view)."""
+    return list(_boarding_parties)
+
+
+def start_enhanced_boarding(
+    interior: ShipInterior,
+    entry_point: str = "cargo_hold",
+    difficulty_scale: float = 1.0,
+    objective_override: str | None = None,
+    rng: _random.Random | None = None,
+) -> BoardingParty:
+    """Create and register a new boarding party.
+
+    Returns the created party. Activates boarding mode.
+    """
+    global _boarding_active, _next_party_id
+    _next_party_id += 1
+    party_id = f"bp_{_next_party_id:03d}"
+    party = generate_boarding_party(
+        party_id,
+        entry_point=entry_point,
+        difficulty_scale=difficulty_scale,
+        rng=rng,
+        objective_override=objective_override,
+        interior=interior,
+    )
+    _boarding_parties.append(party)
+    _boarding_active = True
+    return party
+
+
+# ---------------------------------------------------------------------------
+# Player commands (enhanced)
+# ---------------------------------------------------------------------------
+
+
+def send_team(team_id: str, destination: str) -> bool:
+    """Order a marine team to respond to a room.
+
+    Returns False if team not found or unavailable.
+    """
+    team = next((t for t in _marine_teams if t.id == team_id), None)
+    if team is None or team.is_incapacitated:
+        return False
+    team.order_respond(destination)
+    return True
+
+
+def set_team_patrol(team_id: str, route: list[str]) -> bool:
+    """Set a patrol route for a marine team.
+
+    Returns False if team not found or route empty.
+    """
+    if not route:
+        return False
+    team = next((t for t in _marine_teams if t.id == team_id), None)
+    if team is None or team.is_incapacitated:
+        return False
+    team.order_patrol(route)
+    return True
+
+
+def station_team(team_id: str) -> bool:
+    """Order a marine team to hold its current position."""
+    team = next((t for t in _marine_teams if t.id == team_id), None)
+    if team is None or team.is_incapacitated:
+        return False
+    team.order_station()
+    return True
+
+
+def assign_escort(team_id: str, repair_team_id: str) -> bool:
+    """Assign a marine team to escort a repair team."""
+    team = next((t for t in _marine_teams if t.id == team_id), None)
+    if team is None or team.is_incapacitated:
+        return False
+    team.order_escort(repair_team_id)
+    return True
+
+
+def disengage_team(team_id: str) -> bool:
+    """Order a marine team to break contact and retreat."""
+    team = next((t for t in _marine_teams if t.id == team_id), None)
+    if team is None:
+        return False
+    if team.status != "engaging":
+        return False
+    team.disengage()
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Enhanced tick — boarding party movement
+# ---------------------------------------------------------------------------
+
+
+def _tick_boarding_parties(
+    interior: ShipInterior,
+    dt: float,
+    events: list[tuple[str, dict]],
+) -> None:
+    """Advance boarding parties: movement, breaching, sabotage."""
+    for party in _boarding_parties:
+        if party.is_eliminated:
+            continue
+
+        if party.status == "advancing":
+            _advance_party(party, interior, dt, events)
+        elif party.status == "sabotaging":
+            party.sabotage_progress += SABOTAGE_RATE * dt
+            if party.sabotage_progress >= 1.0:
+                events.append((
+                    "security.sabotage_complete",
+                    {"party_id": party.id, "objective": party.objective,
+                     "room_id": party.location},
+                ))
+                party.status = "retreating"
+        elif party.status == "retreating":
+            _retreat_party(party, interior, dt, events)
+
+        # Morale check
+        if party.check_morale():
+            events.append((
+                "security.party_retreating",
+                {"party_id": party.id, "reason": "morale"},
+            ))
+
+
+def _advance_party(
+    party: BoardingParty,
+    interior: ShipInterior,
+    dt: float,
+    events: list[tuple[str, dict]],
+) -> None:
+    """Move a boarding party one step toward its objective."""
+    if party.is_at_objective:
+        # At objective — start sabotaging
+        party.status = "sabotaging"
+        events.append((
+            "security.sabotage_started",
+            {"party_id": party.id, "objective": party.objective,
+             "room_id": party.location},
+        ))
+        return
+
+    # Check if there's a calculated path to follow
+    if party.path and party.path_index < len(party.path) - 1:
+        next_room_id = party.path[party.path_index + 1]
+    else:
+        # Recalculate path
+        path = interior.find_path(party.location, party.objective_room, ignore_sealed=True)
+        if not path or len(path) < 2:
+            return  # stuck
+        party.path = path
+        party.path_index = 0
+        next_room_id = path[1]
+
+    # Check for locked door
+    next_room = interior.rooms.get(next_room_id)
+    if next_room and next_room.door_sealed:
+        # Breach
+        party.breach_progress += dt
+        if party.breach_progress >= BREACH_TIME:
+            next_room.door_sealed = False  # door breached open
+            party.breach_progress = 0.0
+            events.append((
+                "security.door_breached",
+                {"party_id": party.id, "room_id": next_room_id},
+            ))
+        return
+
+    # Advance
+    party.advance_progress += dt
+    if party.advance_progress >= ADVANCE_TIME_PER_ROOM:
+        party.advance_progress = 0.0
+        party.location = next_room_id
+        party.path_index += 1
+
+        if party.is_at_objective:
+            party.status = "sabotaging"
+            events.append((
+                "security.sabotage_started",
+                {"party_id": party.id, "objective": party.objective,
+                 "room_id": party.location},
+            ))
+
+
+def _retreat_party(
+    party: BoardingParty,
+    interior: ShipInterior,
+    dt: float,
+    events: list[tuple[str, dict]],
+) -> None:
+    """Move a retreating boarding party back toward entry point."""
+    if party.location == party.entry_point:
+        # Escaped
+        party.status = "eliminated"
+        events.append((
+            "security.party_escaped",
+            {"party_id": party.id},
+        ))
+        return
+
+    path = interior.find_path(party.location, party.entry_point)
+    if not path or len(path) < 2:
+        return
+    party.advance_progress += dt
+    if party.advance_progress >= ADVANCE_TIME_PER_ROOM:
+        party.advance_progress = 0.0
+        party.location = path[1]
+
+
+# ---------------------------------------------------------------------------
+# Enhanced tick — marine team movement
+# ---------------------------------------------------------------------------
+
+
+def _tick_marine_teams(
+    interior: ShipInterior,
+    dt: float,
+    events: list[tuple[str, dict]],
+) -> None:
+    """Advance marine teams: respond, patrol, arrive."""
+    for team in _marine_teams:
+        if team.is_incapacitated:
+            continue
+
+        if team.status == "responding" and team.destination:
+            _move_team_toward(team, team.destination, interior, dt)
+            if team.location == team.destination:
+                team.order_station()
+                events.append((
+                    "security.team_arrived",
+                    {"team_id": team.id, "room_id": team.location},
+                ))
+                # Check if boarders here — auto-engage
+                party_here = _get_boarder_at(team.location)
+                if party_here:
+                    team.engage(party_here.id)
+                    party_here.status = "engaging"
+                    party_here.engaged_by = team.id
+                    events.append((
+                        "security.team_engaging",
+                        {"team_id": team.id, "party_id": party_here.id,
+                         "room_id": team.location},
+                    ))
+
+        elif team.status == "patrolling":
+            if not team.patrol_route:
+                team.order_station()
+                continue
+            dest = team.patrol_route[team.patrol_index % len(team.patrol_route)]
+            _move_team_toward(team, dest, interior, dt)
+            if team.location == dest:
+                team.patrol_index = (team.patrol_index + 1) % len(team.patrol_route)
+                next_dest = team.patrol_route[team.patrol_index]
+                team.destination = next_dest
+                team.travel_progress = 0.0
+                # Check for boarders
+                party_here = _get_boarder_at(team.location)
+                if party_here:
+                    team.engage(party_here.id)
+                    party_here.status = "engaging"
+                    party_here.engaged_by = team.id
+                    events.append((
+                        "security.team_engaging",
+                        {"team_id": team.id, "party_id": party_here.id,
+                         "room_id": team.location},
+                    ))
+
+        # Decay suppression when not engaging
+        if team.status != "engaging":
+            team.decay_suppression()
+
+
+def _move_team_toward(
+    team: MarineTeam,
+    destination: str,
+    interior: ShipInterior,
+    dt: float,
+) -> None:
+    """Advance a marine team one step toward destination."""
+    if team.location == destination:
+        return
+    path = interior.find_path(team.location, destination)
+    if not path or len(path) < 2:
+        return
+    team.travel_progress += dt
+    if team.travel_progress >= MARINE_TRAVEL_TIME:
+        team.travel_progress = 0.0
+        team.location = path[1]
+
+
+def _get_boarder_at(room_id: str) -> BoardingParty | None:
+    """Return the first active boarding party at a room, or None."""
+    for p in _boarding_parties:
+        if p.location == room_id and not p.is_eliminated and p.status != "retreating":
+            return p
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Enhanced tick — room combat resolution
+# ---------------------------------------------------------------------------
+
+
+def _tick_room_combat(
+    dt: float,
+    events: list[tuple[str, dict]],
+) -> None:
+    """Resolve combat in rooms where marines and boarders coexist."""
+    # Collect contested rooms
+    contested: set[str] = set()
+    for party in _boarding_parties:
+        if party.is_eliminated:
+            continue
+        for team in _marine_teams:
+            if team.is_incapacitated:
+                continue
+            if team.location == party.location:
+                contested.add(party.location)
+                # Ensure both sides are in engaging status
+                if team.status != "engaging":
+                    team.engage(party.id)
+                if party.status not in ("engaging", "retreating"):
+                    party.status = "engaging"
+                    party.engaged_by = team.id
+
+    for room_id in contested:
+        boarders = [p for p in _boarding_parties
+                    if p.location == room_id and not p.is_eliminated]
+        marines = [t for t in _marine_teams
+                   if t.location == room_id and not t.is_incapacitated]
+
+        if not boarders or not marines:
+            continue
+
+        # Calculate combat power
+        attacker_power = sum(p.combat_power for p in boarders)
+        defender_power = sum(t.firepower * t.size for t in marines)
+
+        if attacker_power <= 0 and defender_power <= 0:
+            continue
+
+        total_power = attacker_power + defender_power
+        attacker_ratio = attacker_power / total_power
+        defender_ratio = defender_power / total_power
+
+        # Casualties (scaled by dt for frame-rate independence)
+        base_cas = BASE_CASUALTIES_PER_TICK * dt * 10  # normalise to 10Hz
+
+        # Boarder losses (accumulate fractional damage)
+        boarder_losses = base_cas * defender_ratio
+        for party in boarders:
+            share = party.combat_power / max(attacker_power, 0.01)
+            acc = _damage_accum.get(party.id, 0.0) + boarder_losses * share
+            losses = int(acc)
+            _damage_accum[party.id] = acc - losses
+            if losses > 0:
+                party.apply_casualties(losses)
+                if party.is_eliminated:
+                    events.append((
+                        "security.party_eliminated",
+                        {"party_id": party.id, "room_id": room_id},
+                    ))
+
+        # Marine losses (reduced by armour, accumulate fractional damage)
+        marine_losses = base_cas * attacker_ratio * MARINE_ARMOUR_MULT
+        for team in marines:
+            share = (team.firepower * team.size) / max(defender_power, 0.01)
+            acc = _damage_accum.get(team.id, 0.0) + marine_losses * share
+            losses = int(acc)
+            _damage_accum[team.id] = acc - losses
+            if losses > 0:
+                actual = team.apply_casualties(losses)
+                if actual > 0:
+                    events.append((
+                        "security.squad_casualty",
+                        {"squad_id": team.id, "count": team.size},
+                    ))
+            team.consume_ammo()
+
+        # Suppression
+        if defender_power > attacker_power * 1.5:
+            for party in boarders:
+                party.morale = max(0.0, party.morale - 0.02 * dt * 10)
+
+        # Room secured check
+        all_eliminated = all(p.is_eliminated for p in boarders)
+        if all_eliminated:
+            for team in marines:
+                if team.status == "engaging":
+                    team.order_station()
+            events.append((
+                "security.room_secured",
+                {"room_id": room_id},
+            ))
+
+
+# ---------------------------------------------------------------------------
+# Enhanced tick — main entry point
+# ---------------------------------------------------------------------------
+
+
+def tick_combat(
+    interior: ShipInterior,
+    ship: Ship,
+    dt: float,
+) -> list[tuple[str, dict]]:
+    """Run one tick of the enhanced combat system.
+
+    Returns events to broadcast. Should be called each tick alongside
+    tick_security (which handles the legacy system).
+    """
+    if not _marine_teams and not _boarding_parties:
+        return []
+
+    events: list[tuple[str, dict]] = []
+
+    _tick_boarding_parties(interior, dt, events)
+    _tick_marine_teams(interior, dt, events)
+    _tick_room_combat(dt, events)
+
+    # Clean up eliminated parties
+    _boarding_parties[:] = [p for p in _boarding_parties if not p.is_eliminated]
+
+    # If no more boarding parties, deactivate (but keep marine teams)
+    if not _boarding_parties and _boarding_active:
+        # Only deactivate if legacy intruders are also gone
+        if not interior.intruders:
+            pass  # Keep boarding_active managed by legacy system
+
+    return events

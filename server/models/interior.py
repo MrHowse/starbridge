@@ -48,12 +48,18 @@ class ShipInterior:
     marine_squads: list[MarineSquad] = field(default_factory=list)
     intruders: list[Intruder] = field(default_factory=list)
 
-    def find_path(self, from_id: str, to_id: str) -> list[str]:
+    def find_path(
+        self,
+        from_id: str,
+        to_id: str,
+        ignore_sealed: bool = False,
+    ) -> list[str]:
         """BFS shortest path between two rooms.
 
         Returns list of room IDs (inclusive of start and end).
         Returns empty list if no path exists or rooms are unknown.
-        Sealed rooms and decompressed rooms block traversal.
+        Sealed rooms and decompressed rooms block traversal unless
+        *ignore_sealed* is True (used by boarding parties that breach doors).
         """
         if from_id not in self.rooms or to_id not in self.rooms:
             return []
@@ -74,7 +80,9 @@ class ShipInterior:
                 next_room = self.rooms.get(next_id)
                 if next_room is None:
                     continue
-                if next_room.door_sealed or next_room.state == "decompressed":
+                if next_room.state == "decompressed":
+                    continue
+                if next_room.door_sealed and not ignore_sealed:
                     continue
                 new_path = path + [next_id]
                 if next_id == to_id:
