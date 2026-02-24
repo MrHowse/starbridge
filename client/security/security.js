@@ -13,8 +13,6 @@
  *
  * Server messages sent:
  *   lobby.claim_role          { role: 'security', player_name }
- *   security.move_squad       { squad_id, room_id }  (legacy)
- *   security.toggle_door      { squad_id, room_id }  (legacy)
  *   security.send_team        { team_id, destination }
  *   security.set_patrol       { team_id, route: [room_ids] }
  *   security.station_team     { team_id }

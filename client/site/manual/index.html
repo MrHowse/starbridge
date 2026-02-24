@@ -464,31 +464,53 @@
         <h3 class="station__heading">SECURITY</h3>
         <div class="station-body">
           <p><em>Role summary:</em> You coordinate internal ship defence against
-          boarding parties. You deploy marine squads to intercept intruders, seal doors
-          to control movement, and track enemy positions through the ship's interior.
-          Boarding events are time-critical — set up before the intruders arrive.</p>
+          boarding parties and manage ship security systems. You command marine teams
+          to intercept intruders, control door locks and deck lockdowns, manage
+          emergency bulkheads, set alert levels, arm crew, and quarantine rooms.</p>
 
-          <p><strong>Controls</strong></p>
+          <p><strong>Ship Interior Canvas</strong></p>
           <ul>
-            <li><strong>Ship interior canvas:</strong> A 5-deck × 4-room grid showing
-            all rooms, doors, marine squads, and visible intruder positions. Fog of war
-            applies beyond sensor range.</li>
-            <li><strong>Move Squad:</strong> Select a marine squad then click an
-            adjacent room to order a move. Costs 3 action points (AP).</li>
-            <li><strong>Toggle Door:</strong> Seal or unseal a door. Sealed doors block
-            movement for all units (including intruders). Costs 2 AP.</li>
-            <li><strong>AP gauge:</strong> Each squad has 10 AP; regeneration rate is
-            0.2 AP/tick. Tactical decisions require managing this budget.</li>
-            <li><strong>Tactical Positioning puzzle:</strong> Pre-boarding squad
-            deployment optimisation. Solve it to place squads in ideal intercept
-            positions before the boarding alarm sounds.</li>
+            <li>5-deck × 4-room grid showing all rooms, door status, marine teams
+            (blue ▲), and visible boarding parties (red ✕).</li>
+            <li>Click rooms to select; click with a marine team selected to send them
+            there.</li>
+            <li>Deck tabs filter view to a single deck or show all.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
-          <div class="tip"><strong>Tips:</strong> Intruders move every 30 seconds and
-          target key objectives. Seal corridor doors to funnel them into rooms where your
-          squads have AP remaining. Set up your squads during the pre-boarding window —
-          you cannot reposition without AP cost after the alarm.</div>
+          <p><strong>Marine Teams</strong></p>
+          <ul>
+            <li><strong>SEND:</strong> Select a team, click a room to dispatch them.
+            Teams travel room-by-room and engage boarders automatically.</li>
+            <li><strong>PATROL:</strong> Assign a patrol route — team cycles through
+            rooms continuously.</li>
+            <li><strong>STATION:</strong> Order a team to hold position.</li>
+            <li><strong>DISENGAGE:</strong> Break contact during combat.</li>
+            <li><strong>ESCORT:</strong> Assign a team to escort an Engineering repair
+            team through hazardous areas.</li>
+          </ul>
+
+          <p><strong>Ship Security Systems</strong></p>
+          <ul>
+            <li><strong>Door Control (L/U):</strong> Lock or unlock individual room
+            doors. Locked doors block movement.</li>
+            <li><strong>Lockdown:</strong> Lock all doors on a deck or ship-wide.
+            Lift lockdown per-deck or all at once.</li>
+            <li><strong>Bulkheads:</strong> Seal emergency bulkheads between adjacent
+            decks to prevent inter-deck movement. Unsealing takes 30 seconds.</li>
+            <li><strong>Alert Levels:</strong> Set per-deck: NORMAL, CAUTION, COMBAT
+            (halves casualties), EVACUATE (reduces crew factor to 10%).</li>
+            <li><strong>Armoury:</strong> Arm crew on up to 2 decks with sidearms for
+            increased firepower against boarders.</li>
+            <li><strong>Quarantine (Q):</strong> Seal a room and mark it quarantined.
+            Blocks pathfinding through the room.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> L — lock door, U — unlock door,
+          Q — quarantine, Tab — cycle teams, F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Use bulkheads to isolate decks during
+          boarding. Set COMBAT alert on threatened decks to halve casualties. Arm crew
+          on decks with active boarders. Coordinate with Comms — intercepted boarder
+          communications reveal their objectives.</div>
         </div>
       </div>
 
