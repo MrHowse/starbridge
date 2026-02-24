@@ -989,7 +989,10 @@ async def _loop() -> None:
                 )
 
         # 8.72. Sandbox activity events (free-play only).
-        for sb_evt in glsb.tick(_world, TICK_DT, difficulty=_world.ship.difficulty):
+        for sb_evt in glsb.tick(
+            _world, TICK_DT, difficulty=_world.ship.difficulty,
+            active_mission_count=len(gldm.get_active_missions()),
+        ):
             _sb_type = sb_evt["type"]
             if _sb_type == "spawn_enemy":
                 _sb_enemy = spawn_enemy(sb_evt["enemy_type"], sb_evt["x"], sb_evt["y"], sb_evt["id"])
@@ -1176,6 +1179,11 @@ async def _loop() -> None:
                 )
                 gl.log_event("sandbox", "creature_spawned", {
                     "type": sb_evt["creature_type"], "id": sb_evt["id"],
+                })
+            elif _sb_type == "mission_signal":
+                glco.add_signal(**sb_evt["signal_params"])
+                gl.log_event("sandbox", "mission_signal", {
+                    "mission_type": sb_evt["mission_type"],
                 })
 
         # 9. Hull check (safety net when no mission engine).

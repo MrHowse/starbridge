@@ -9,6 +9,7 @@ Events returned from tick():
   {"type": "system_damage", "system": str, "amount": float}
   {"type": "crew_casualty", "deck": str, "count": int}
   {"type": "start_boarding","intruders": list[dict]}
+  {"type": "mission_signal","mission_type": str, "signal_params": dict}
 """
 from __future__ import annotations
 
@@ -52,6 +53,43 @@ CREATURE_TYPE_POOL: list[str] = [
     "hull_leech",                     # rare but persistently annoying
     "swarm",                          # EW + science challenge
 ]
+
+# ---------------------------------------------------------------------------
+# Mission signal generation (dynamic mission pipeline)
+# ---------------------------------------------------------------------------
+
+# Seconds between mission-bearing signals (min, max) — scaled by difficulty.
+MISSION_SIGNAL_INTERVAL: tuple[float, float] = (90.0, 180.0)
+
+# Hard cap on simultaneous active dynamic missions before suppressing new signals.
+MAX_SANDBOX_MISSIONS: int = 3
+
+# Mission type budget: (type_key, base_weight, max_per_session).
+MISSION_TYPE_BUDGET: list[tuple[str, float, int]] = [
+    ("rescue",        2.0, 3),
+    ("investigation", 2.0, 2),
+    ("escort",        1.5, 2),
+    ("trade",         1.5, 2),
+    ("diplomatic",    1.0, 1),
+    ("intercept",     0.5, 1),
+    ("trap",          1.5, 2),
+]
+
+# Vessel name pool for generated mission signals.
+_MISSION_VESSEL_NAMES: list[str] = [
+    "ISS Valiant", "CSV Horizon", "SS Wanderer", "MSV Pathfinder",
+    "TCS Endurance", "RFS Resolute", "CSV Liberty", "MSV Fortune",
+    "SS Meridian", "TCS Discovery",
+]
+
+# Faction → frequency mapping for mission signals.
+_MISSION_FACTION_FREQ: dict[str, float] = {
+    "civilian": 0.55,
+    "federation": 0.65,
+    "imperial": 0.15,
+    "pirate": 0.08,
+    "rebel": 0.42,
+}
 
 # Systems eligible for environmental damage events (Engineering / DC work).
 DAMAGEABLE_SYSTEMS: list[str] = [
@@ -113,6 +151,7 @@ SPAWN_DIST_MAX: float = 35_000.0
 _active: bool = False
 _timers: dict[str, float] = {}
 _entity_counter: int = 0   # offset counter for unique IDs
+_mission_type_counts: dict[str, int] = {}  # per-session mission variety tracking
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -125,6 +164,7 @@ def reset(active: bool = False) -> None:
     _active = active
     _entity_counter = 1000    # offset well above mission-spawned entity IDs
     _timers.clear()
+    _mission_type_counts.clear()
     if active:
         # Stagger initial timers so all events don't fire simultaneously.
         _timers["enemy_spawn"]          = random.uniform(30.0,  60.0)   # first wave sooner
@@ -138,6 +178,7 @@ def reset(active: bool = False) -> None:
         _timers["enemy_jamming"]        = random.uniform(60.0,  90.0)
         _timers["distress_signal"]      = random.uniform(90.0, 120.0)
         _timers["creature_spawn"]       = random.uniform(120.0, 180.0)  # first one sooner
+        _timers["mission_signal"]       = random.uniform(60.0,  90.0)   # first mission sooner
 
 
 def is_active() -> bool:
@@ -145,10 +186,203 @@ def is_active() -> bool:
     return _active
 
 
-def tick(world: "World", dt: float, difficulty: object | None = None) -> list[dict]:
+# ---------------------------------------------------------------------------
+# Mission signal helpers (used by tick)
+# ---------------------------------------------------------------------------
+
+
+def _pick_mission_type() -> str | None:
+    """Select a mission type via weighted random, respecting per-session caps."""
+    candidates: list[tuple[str, float]] = []
+    for type_key, weight, max_count in MISSION_TYPE_BUDGET:
+        current = _mission_type_counts.get(type_key, 0)
+        if current >= max_count:
+            continue
+        candidates.append((type_key, weight))
+
+    if not candidates:
+        return None
+
+    total = sum(w for _, w in candidates)
+    roll = random.uniform(0, total)
+    cumulative = 0.0
+    for type_key, weight in candidates:
+        cumulative += weight
+        if roll <= cumulative:
+            return type_key
+
+    return candidates[-1][0]
+
+
+def _build_mission_signal(mission_type: str, world: "World") -> dict | None:
+    """Build a ``mission_signal`` event dict for the given mission type.
+
+    Returns None if the type is unrecognised.
+    """
+    global _entity_counter
+    _entity_counter += 1
+    entity_id = f"sb_m{_entity_counter}"
+
+    ship = world.ship
+    angle = random.uniform(0.0, 360.0)
+    dist = random.uniform(25_000.0, 55_000.0)
+    px = max(5_000.0, min(world.width - 5_000.0,
+                          ship.x + math.cos(math.radians(angle)) * dist))
+    py = max(5_000.0, min(world.height - 5_000.0,
+                          ship.y + math.sin(math.radians(angle)) * dist))
+
+    vessel_name = random.choice(_MISSION_VESSEL_NAMES)
+    loc: dict = {"position": [round(px, 1), round(py, 1)], "entity_type": "ship"}
+
+    params: dict
+
+    if mission_type == "rescue":
+        faction = random.choice(["civilian", "federation", "imperial"])
+        params = dict(
+            source="distress_beacon",
+            source_name=vessel_name,
+            frequency=0.90,
+            signal_type="distress",
+            priority="critical",
+            raw_content=f"MAYDAY — {vessel_name} under attack. Requesting immediate assistance.",
+            decoded_content=f"MAYDAY — {vessel_name} under attack. Requesting immediate assistance.",
+            auto_decoded=True,
+            requires_decode=False,
+            faction=faction,
+            threat_level="distress",
+            location_data=loc,
+        )
+
+    elif mission_type == "investigation":
+        params = dict(
+            source=f"unknown_{entity_id}",
+            source_name="Unknown Source",
+            frequency=round(random.uniform(0.2, 0.8), 3),
+            signal_type="data_burst",
+            priority="medium",
+            raw_content="Automated data transmission from uncharted coordinates. Source unknown. Pattern non-standard.",
+            requires_decode=True,
+            faction="unknown",
+            threat_level="unknown",
+            intel_value="possible_tech",
+            intel_category="science",
+            location_data={**loc, "entity_type": "unknown"},
+        )
+
+    elif mission_type == "escort":
+        params = dict(
+            source=f"civilian_{entity_id}",
+            source_name=vessel_name,
+            frequency=_MISSION_FACTION_FREQ["civilian"],
+            signal_type="hail",
+            priority="medium",
+            raw_content=f"This is {vessel_name}. Hostile contacts detected in our path. Requesting escort.",
+            decoded_content=f"This is {vessel_name}. Hostile contacts detected in our path. Requesting escort.",
+            auto_decoded=True,
+            requires_decode=False,
+            faction="civilian",
+            threat_level="unknown",
+            location_data=loc,
+        )
+
+    elif mission_type == "trade":
+        faction = random.choice(["federation", "imperial"])
+        params = dict(
+            source=f"merchant_{entity_id}",
+            source_name=vessel_name,
+            frequency=_MISSION_FACTION_FREQ.get(faction, 0.55),
+            signal_type="hail",
+            priority="low",
+            raw_content=f"This is {vessel_name}. Supplies available for trade. Interested in sensor data exchange.",
+            decoded_content=f"This is {vessel_name}. Supplies available for trade. Interested in sensor data exchange.",
+            auto_decoded=True,
+            requires_decode=False,
+            faction=faction,
+            threat_level="unknown",
+            location_data=loc,
+        )
+
+    elif mission_type == "diplomatic":
+        faction = "pirate"
+        params = dict(
+            source=f"{faction}_envoy_{entity_id}",
+            source_name=f"{faction.title()} Envoy",
+            frequency=_MISSION_FACTION_FREQ.get(faction, 0.08),
+            signal_type="hail",
+            priority="high",
+            raw_content=f"The {faction.title()} Clan proposes a meeting to discuss terms.",
+            decoded_content=f"The {faction.title()} Clan proposes a meeting to discuss terms.",
+            auto_decoded=True,
+            requires_decode=False,
+            faction=faction,
+            threat_level="unknown",
+            location_data=loc,
+        )
+
+    elif mission_type == "intercept":
+        faction = random.choice(["pirate", "rebel"])
+        params = dict(
+            source=f"{faction}_comms_{entity_id}",
+            source_name=f"{faction.title()} Fleet",
+            frequency=_MISSION_FACTION_FREQ.get(faction, 0.15),
+            signal_type="encrypted",
+            priority="high",
+            raw_content="Supply convoy departing sector grid. Escort: light. Manifest: munitions and fuel.",
+            requires_decode=True,
+            faction=faction,
+            threat_level="hostile",
+            intel_value="convoy_route",
+            intel_category="military",
+            location_data={**loc, "entity_type": "fleet"},
+        )
+
+    elif mission_type == "trap":
+        faction = random.choice(["civilian", "unknown"])
+        souls = random.randint(5, 20)
+        params = dict(
+            source="distress_beacon",
+            source_name=vessel_name,
+            frequency=0.90,
+            signal_type="distress",
+            priority="critical",
+            raw_content=f"MAYDAY — {vessel_name} losing life support. {souls} souls aboard.",
+            decoded_content=f"MAYDAY — {vessel_name} losing life support. {souls} souls aboard.",
+            auto_decoded=True,
+            requires_decode=False,
+            faction=faction,
+            threat_level="distress",
+            location_data={**loc, "is_trap": True},
+        )
+
+    else:
+        return None
+
+    _mission_type_counts[mission_type] = _mission_type_counts.get(mission_type, 0) + 1
+
+    return {
+        "type": "mission_signal",
+        "mission_type": mission_type,
+        "signal_params": params,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tick
+# ---------------------------------------------------------------------------
+
+
+def tick(
+    world: "World",
+    dt: float,
+    difficulty: object | None = None,
+    *,
+    active_mission_count: int = 0,
+) -> list[dict]:
     """Advance all timers by *dt* seconds.  Return event dicts to process.
 
     *difficulty* — when provided, scales event intervals and boarding frequency.
+    *active_mission_count* — current dynamic mission count (suppresses new
+        mission signals when at capacity).
     """
     if not _active:
         return []
@@ -292,6 +526,20 @@ def tick(world: "World", dt: float, difficulty: object | None = None) -> list[di
             })
         _timers["creature_spawn"] = random.uniform(*CREATURE_SPAWN_INTERVAL) * _evt_mult
 
+    # --- Mission-bearing signal generation (dynamic mission pipeline) ----
+    if _timers.get("mission_signal", 1.0) <= 0.0:
+        _can_gen = (
+            active_mission_count < MAX_SANDBOX_MISSIONS
+            and len(world.enemies) < 3   # suppress during heavy combat
+        )
+        if _can_gen:
+            _mtype = _pick_mission_type()
+            if _mtype is not None:
+                _mevt = _build_mission_signal(_mtype, world)
+                if _mevt is not None:
+                    events.append(_mevt)
+        _timers["mission_signal"] = random.uniform(*MISSION_SIGNAL_INTERVAL) * _evt_mult
+
     # --- Distress signal — emergency broadcast (Comms / Helm / Captain) --
     if _timers.get("distress_signal", 1.0) <= 0.0:
         angle = random.uniform(0.0, 360.0)
@@ -309,6 +557,12 @@ def tick(world: "World", dt: float, difficulty: object | None = None) -> list[di
         _timers["distress_signal"] = random.uniform(*DISTRESS_SIGNAL_INTERVAL) * _evt_mult
 
     return events
+
+
+
+def get_mission_type_counts() -> dict[str, int]:
+    """Return a copy of the per-session mission type generation counts."""
+    return dict(_mission_type_counts)
 
 
 def setup_world(world: "World") -> None:

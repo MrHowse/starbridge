@@ -257,8 +257,10 @@ def add_signal(
     _signals.append(sig)
 
     # Auto-decoded signals with location data create contacts immediately
+    # and may also generate missions via the decode pipeline.
     if auto_decoded and location_data is not None:
         create_comms_contact(sig, partial=False)
+        _try_generate_mission_from_signal(sig)
 
     return sig
 
