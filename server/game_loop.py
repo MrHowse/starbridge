@@ -24,7 +24,6 @@ from pydantic import BaseModel
 from server.models.messages import (
     CaptainAddLogPayload,
     CaptainAuthorizePayload,
-    CaptainReassignCrewPayload,
     CaptainUndockPayload,
     CommsHailPayload,
     CommsTuneFrequencyPayload,
@@ -1674,18 +1673,6 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             entry = glcap.add_log_entry(payload.text)
             events.append(("captain.log_entry", {"text": entry["text"], "timestamp": entry["timestamp"]}))
             _set_training_flag(glm, "captain_log_added")
-        elif msg_type == "captain.reassign_crew" and isinstance(payload, CaptainReassignCrewPayload):
-            _roster = glmed.get_roster()
-            if _roster is not None:
-                result = _roster.reassign_crew(payload.crew_id, payload.new_duty_station)
-                if result.get("ok"):
-                    gl.log_event("captain", "crew_reassigned", {
-                        "crew_id": payload.crew_id,
-                        "to_station": payload.new_duty_station,
-                    })
-                    events.append(("crew.reassignment_started", result))
-                else:
-                    events.append(("crew.reassignment_error", {"error": result.get("error", "Unknown error")}))
         elif msg_type == "comms.tune_frequency" and isinstance(payload, CommsTuneFrequencyPayload):
             glco.tune(payload.frequency)
             _set_training_flag(glm, "comms_frequency_tuned")

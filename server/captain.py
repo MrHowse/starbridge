@@ -16,7 +16,7 @@ from typing import Protocol
 from pydantic import ValidationError
 
 from server.game_logger import log_event as _log
-from server.models.messages import CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload, Message, VALID_SYSTEMS, validate_payload
+from server.models.messages import CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload, Message, VALID_SYSTEMS, validate_payload
 from server.models.ship import Ship
 
 logger = logging.getLogger("starbridge.captain")
@@ -97,6 +97,31 @@ async def handle_captain_message(connection_id: str, message: Message) -> None:
             Message.build("captain.override_changed", {"system": system, "online": payload.online})
         )
         logger.info("Captain set system '%s' online=%s from %s", system, payload.online, connection_id)
+
+    elif message.type == "captain.reassign_crew" and isinstance(payload, CaptainReassignCrewPayload):
+        import server.game_loop_medical_v2 as _glmed
+        _roster = _glmed.get_roster()
+        if _roster is None:
+            await _manager.send(
+                connection_id,
+                Message.build("error.state", {"message": "No crew roster available.", "original_type": message.type}),
+            )
+            return
+        result = _roster.reassign_crew(payload.crew_id, payload.new_duty_station)
+        if result.get("ok"):
+            _log("captain", "crew_reassigned", {
+                "crew_id": payload.crew_id,
+                "to_station": payload.new_duty_station,
+            })
+            await _manager.broadcast(
+                Message.build("crew.reassignment_started", result),
+            )
+            logger.info("Crew %s reassigned to %s by %s", payload.crew_id, payload.new_duty_station, connection_id)
+        else:
+            await _manager.send(
+                connection_id,
+                Message.build("crew.reassignment_error", {"error": result.get("error", "Unknown error")}),
+            )
 
     elif message.type == "captain.save_game" and isinstance(payload, CaptainSaveGamePayload):
         import server.game_loop as _gl
