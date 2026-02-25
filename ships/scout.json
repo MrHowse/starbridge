@@ -16,5 +16,12 @@
     "heavy": 0, "proximity": 2, "nuclear": 0, "experimental": 0
   },
   "min_crew": 3,
-  "max_crew": 4
+  "max_crew": 4,
+  "power_grid": {
+    "reactor_max": 300,
+    "battery_capacity": 150,
+    "battery_charge_rate": 30,
+    "battery_discharge_rate": 60,
+    "emergency_reserve": 60
+  }
 }

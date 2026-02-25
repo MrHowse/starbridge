@@ -60,6 +60,9 @@ class ShipClass(BaseModel):
     handling_trait:    str   = "clean" # affects helm feel — see VALID_HANDLING_TRAITS
     decks:            int   = 5       # number of physical decks
 
+    # --- Power grid (v0.07 §1.4) ---
+    power_grid:       dict | None = None     # {reactor_max, battery_capacity, ...}
+
     # --- Legacy / weapons ---
     torpedo_ammo:     int   = 12             # legacy field (kept for save-compat)
     torpedo_loadout:  dict[str, int] | None = None  # per-type magazine (v0.05g)

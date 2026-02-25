@@ -524,7 +524,8 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     for _dk_name, _dk in _world.ship.crew.decks.items():
         for _ci in range(_dk.total):
             _crew_ids.append(f"{_dk_name}_{_ci}")
-    gle.init(_world.ship, crew_member_ids=_crew_ids)
+    gle.init(_world.ship, crew_member_ids=_crew_ids,
+             power_grid_config=sc.power_grid)
 
     # v0.06.3: Initialise marine teams for security station.
     gls.init_marine_teams(ship_class, crew_member_ids=_crew_ids)
