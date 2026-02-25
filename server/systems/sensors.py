@@ -80,7 +80,8 @@ def sensor_range(ship: Ship, hazard_modifier: float = 1.0) -> float:
     hazards such as nebulae or radiation zones are active.
     """
     diff_mult = getattr(ship.difficulty, "sensor_range_multiplier", 1.0)
-    return BASE_SENSOR_RANGE * ship.systems["sensors"].efficiency * hazard_modifier * diff_mult
+    base = getattr(ship, "sensor_range_base", BASE_SENSOR_RANGE)
+    return base * ship.systems["sensors"].efficiency * hazard_modifier * diff_mult
 
 
 def tick(world: World, ship: Ship, dt: float) -> list[str]:

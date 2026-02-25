@@ -151,6 +151,9 @@ class Ship:
     # --- Docking ---
     docked_at: str | None = None  # station ID while docked, None otherwise
 
+    # --- Sensors (v0.07 §1.7 — set from ship class at game start) ---
+    sensor_range_base: float = 30_000.0   # world units at 100% sensor efficiency (default = legacy BASE_SENSOR_RANGE)
+
     # --- Shields (v0.07 §1.6 — capacity/recharge set from ship class) ---
     shield_capacity: float = 200.0        # total shield HP pool (default = legacy TOTAL_SHIELD_CAPACITY)
     shield_recharge_rate: float = 5.0     # HP/sec at full shield efficiency (default = legacy 0.5/tick × 10Hz)

@@ -25,6 +25,9 @@
     "torpedo_tubes": 3,
     "point_defence_turrets": 3
   },
+  "sensors": {
+    "range": 35000
+  },
   "shields": {
     "capacity": 120,
     "recharge_rate": 6.0
