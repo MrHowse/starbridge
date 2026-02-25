@@ -473,5 +473,5 @@ class TestViewportIndependence:
         import inspect
         sig = inspect.signature(build_sensor_contacts)
         param_names = set(sig.parameters.keys())
-        # Should only have: world, ship, extra_bubbles, hazard_modifier
-        assert param_names == {"world", "ship", "extra_bubbles", "hazard_modifier"}
+        # Should only have: world, ship, extra_bubbles, hazard_modifier, ghost_contacts
+        assert param_names == {"world", "ship", "extra_bubbles", "hazard_modifier", "ghost_contacts"}

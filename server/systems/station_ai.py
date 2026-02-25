@@ -42,11 +42,15 @@ def tick_station_ai(
     world: World,
     dt: float,
     station_attacked_ids: set[str],
+    freq_locked_ids: set[str] | None = None,
 ) -> tuple[list[BeamHitEvent], list[Enemy], list[str]]:
     """Simulate all active enemy station components for one tick.
 
     *station_attacked_ids* is the set of station IDs that the player hit
     this tick (triggers sensor-array distress calls).
+
+    *freq_locked_ids* — stations under corvette frequency lock cannot send
+    distress calls (reinforcements blocked).
 
     Returns (beam_hits, launched_fighters, reinforcement_calls).
     """
@@ -124,7 +128,8 @@ def tick_station_ai(
 
         # -- Sensor array -----------------------------------------------------
         sa = defenses.sensor_array
-        if sa.active and not sa.jammed and not sa.distress_sent:
+        freq_blocked = freq_locked_ids is not None and station.id in freq_locked_ids
+        if sa.active and not sa.jammed and not sa.distress_sent and not freq_blocked:
             if station.id in station_attacked_ids:
                 sa.distress_sent = True
                 reinforcement_calls.append(station.id)

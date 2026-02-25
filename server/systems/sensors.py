@@ -120,6 +120,7 @@ def build_sensor_contacts(
     ship: Ship,
     extra_bubbles: list[tuple[float, float, float]] | None = None,
     hazard_modifier: float = 1.0,
+    ghost_contacts: list[dict] | None = None,
 ) -> list[dict]:
     """Build the sensor.contacts payload for Weapons / Science clients.
 
@@ -137,6 +138,7 @@ def build_sensor_contacts(
     *hazard_modifier* is accepted for API compatibility but no longer used
     for contact filtering.  ``sensor_range()`` remains available for the
     sensor-range ring display on the Science client.
+    *ghost_contacts* — corvette ECM ghost contacts injected as fake enemies.
     """
     contacts: list[dict] = []
 
@@ -214,6 +216,10 @@ def build_sensor_contacts(
             "hull": round(station.hull, 1),
             "hull_max": round(station.hull_max, 1),
         })
+
+    # Corvette ECM ghost contacts — injected as fake enemy contacts.
+    if ghost_contacts:
+        contacts.extend(ghost_contacts)
 
     return contacts
 

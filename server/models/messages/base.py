@@ -70,6 +70,10 @@ from server.models.messages.ew import (
     EWSetJamTargetPayload,
     EWToggleCountermeasuresPayload,
     EWToggleStealthPayload,
+    EWDeployGhostPayload,
+    EWRecallGhostPayload,
+    EWSetGhostClassPayload,
+    EWSetFreqLockPayload,
     EWBeginIntrusionPayload,
 )
 from server.models.messages.tactical import (
@@ -264,6 +268,10 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "ew.toggle_countermeasures": EWToggleCountermeasuresPayload,
     "ew.begin_intrusion":        EWBeginIntrusionPayload,
     "ew.toggle_stealth":         EWToggleStealthPayload,
+    "ew.deploy_ghost":           EWDeployGhostPayload,
+    "ew.recall_ghost":           EWRecallGhostPayload,
+    "ew.set_ghost_class":        EWSetGhostClassPayload,
+    "ew.set_freq_lock":          EWSetFreqLockPayload,
     # Tactical Officer
     "tactical.set_engagement_priority": TacticalSetEngagementPriorityPayload,
     "tactical.set_intercept_target":    TacticalSetInterceptTargetPayload,

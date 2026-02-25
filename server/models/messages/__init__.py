@@ -146,6 +146,10 @@ from server.models.messages.flight_ops import (
 # Electronic Warfare
 from server.models.messages.ew import (
     EWBeginIntrusionPayload,
+    EWDeployGhostPayload,
+    EWRecallGhostPayload,
+    EWSetFreqLockPayload,
+    EWSetGhostClassPayload,
     EWSetJamTargetPayload,
     EWToggleCountermeasuresPayload,
     EWToggleStealthPayload,
@@ -309,6 +313,10 @@ __all__ = [
     "EWSetJamTargetPayload",
     "EWToggleCountermeasuresPayload",
     "EWToggleStealthPayload",
+    "EWDeployGhostPayload",
+    "EWRecallGhostPayload",
+    "EWSetGhostClassPayload",
+    "EWSetFreqLockPayload",
     "EWBeginIntrusionPayload",
     # tactical officer
     "TacticalSetEngagementPriorityPayload",

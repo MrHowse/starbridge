@@ -15,6 +15,8 @@ Constants are tuned for a 10 Hz game loop (TICK_DT = 0.1 s).
 """
 from __future__ import annotations
 
+import random as _rng
+
 from server.models.ship import Ship
 from server.models.world import World
 from server.utils.math_helpers import distance
@@ -48,6 +50,24 @@ STEALTH_DETECT_RANGE_MULT: float = 0.30
 #: Maximum throttle (%) before stealth auto-breaks.
 STEALTH_ENGINE_LIMIT: float = 50.0
 
+# --- Corvette Advanced ECM (v0.07 §2.2) ---
+#: Maximum simultaneous ghost contacts.
+GHOST_MAX_COUNT: int = 3
+#: Seconds before a ghost contact auto-expires.
+GHOST_LIFETIME: float = 120.0
+#: Seconds between passive comm intercept attempts.
+INTERCEPT_SCAN_INTERVAL: float = 15.0
+#: Probability per enemy per attempt of intercepting a signal.
+INTERCEPT_CHANCE: float = 0.40
+#: Valid ship classes for ghost mimic / sensor ghosting.
+GHOST_CLASS_OPTIONS: list[str] = [
+    "fighter", "scout", "cruiser", "destroyer", "freighter", "transport", "battleship",
+]
+#: Seconds to fully establish a frequency lock.
+FREQ_LOCK_ENGAGE_TIME: float = 5.0
+#: Base range for frequency lock (scales with ECM efficiency).
+FREQ_LOCK_RANGE: float = 20_000.0
+
 
 # ---------------------------------------------------------------------------
 # Module-level state
@@ -63,6 +83,17 @@ _stealth_timer: float = 0.0           # seconds elapsed in current transition
 _stealth_capable: bool = False         # True only for scout class
 _stealth_break_reason: str | None = None  # set when stealth is force-broken
 
+# --- Corvette Advanced ECM state ---
+_corvette_ecm: bool = False
+_ghosts: list[dict] = []               # [{id, x, y, mimic_class, lifetime_remaining}]
+_ghost_counter: int = 0
+_intercept_timer: float = 0.0
+_intercepted_signals: list[dict] = []
+_ghost_class: str | None = None
+_freq_lock_target_id: str | None = None
+_freq_lock_progress: float = 0.0
+_freq_lock_active: bool = False
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -73,6 +104,9 @@ def reset(ship_class: str = "") -> None:
     """Reset EW state to defaults. Called at game start."""
     global _jam_target_id, _intrusion_target_id, _intrusion_target_system
     global _stealth_state, _stealth_timer, _stealth_capable, _stealth_break_reason
+    global _corvette_ecm, _ghosts, _ghost_counter, _intercept_timer
+    global _intercepted_signals, _ghost_class
+    global _freq_lock_target_id, _freq_lock_progress, _freq_lock_active
     _jam_target_id = None
     _intrusion_target_id = None
     _intrusion_target_system = None
@@ -80,6 +114,16 @@ def reset(ship_class: str = "") -> None:
     _stealth_timer = 0.0
     _stealth_capable = (ship_class == "scout")
     _stealth_break_reason = None
+    # Corvette ECM
+    _corvette_ecm = (ship_class == "corvette")
+    _ghosts = []
+    _ghost_counter = 0
+    _intercept_timer = INTERCEPT_SCAN_INTERVAL
+    _intercepted_signals = []
+    _ghost_class = None
+    _freq_lock_target_id = None
+    _freq_lock_progress = 0.0
+    _freq_lock_active = False
 
 
 def set_jam_target(entity_id: str | None) -> None:
@@ -200,6 +244,219 @@ def pop_stealth_break_reason() -> str | None:
     return reason
 
 
+# ---------------------------------------------------------------------------
+# Corvette Advanced ECM (v0.07 §2.2)
+# ---------------------------------------------------------------------------
+
+
+def is_corvette_ecm() -> bool:
+    """True when the current ship class has advanced ECM (corvette only)."""
+    return _corvette_ecm
+
+
+# --- Signal Spoofing (§2.2.2) ---
+
+def deploy_ghost(x: float, y: float, mimic_class: str) -> dict:
+    """Deploy a ghost contact at (x, y) mimicking the given class."""
+    global _ghost_counter
+    if not _corvette_ecm:
+        return {"ok": False, "reason": "not_capable"}
+    if len(_ghosts) >= GHOST_MAX_COUNT:
+        return {"ok": False, "reason": "max_ghosts"}
+    if mimic_class not in GHOST_CLASS_OPTIONS:
+        return {"ok": False, "reason": "invalid_class"}
+    _ghost_counter += 1
+    ghost_id = f"ghost_{_ghost_counter}"
+    _ghosts.append({
+        "id": ghost_id,
+        "x": x,
+        "y": y,
+        "mimic_class": mimic_class,
+        "lifetime_remaining": GHOST_LIFETIME,
+    })
+    return {"ok": True, "id": ghost_id}
+
+
+def recall_ghost(ghost_id: str) -> dict:
+    """Remove a specific ghost by ID."""
+    for i, g in enumerate(_ghosts):
+        if g["id"] == ghost_id:
+            _ghosts.pop(i)
+            return {"ok": True}
+    return {"ok": False, "reason": "not_found"}
+
+
+def recall_all_ghosts() -> None:
+    """Remove all active ghosts."""
+    _ghosts.clear()
+
+
+def get_ghosts() -> list[dict]:
+    """Return the current ghost list."""
+    return list(_ghosts)
+
+
+def get_ghost_contacts() -> list[dict]:
+    """Return ghost contacts formatted for sensor contact injection."""
+    return [
+        {
+            "id": g["id"],
+            "x": g["x"],
+            "y": g["y"],
+            "heading": 0.0,
+            "kind": "enemy",
+            "classification": "unknown",
+            "scan_state": "unknown",
+            "type": g["mimic_class"],
+        }
+        for g in _ghosts
+    ]
+
+
+# --- Comm Interception (§2.2.3) ---
+
+def pop_intercepted_signals() -> list[dict]:
+    """Drain and return intercepted signal parameter dicts."""
+    global _intercepted_signals
+    signals = _intercepted_signals
+    _intercepted_signals = []
+    return signals
+
+
+# --- Sensor Ghosting (§2.2.4) ---
+
+def set_ghost_class(class_name: str | None) -> dict:
+    """Set what the corvette appears as on enemy sensors. None = true identity."""
+    global _ghost_class
+    if not _corvette_ecm:
+        return {"ok": False, "reason": "not_capable"}
+    if class_name is not None and class_name not in GHOST_CLASS_OPTIONS:
+        return {"ok": False, "reason": "invalid_class"}
+    _ghost_class = class_name
+    return {"ok": True, "ghost_class": _ghost_class}
+
+
+def get_ghost_class() -> str | None:
+    """Return the current sensor disguise class, or None."""
+    return _ghost_class
+
+
+# --- Frequency Lock (§2.2.5) ---
+
+def set_freq_lock_target(entity_id: str | None, frequency: str | None = None) -> dict:
+    """Begin or cancel a frequency lock."""
+    global _freq_lock_target_id, _freq_lock_progress, _freq_lock_active
+    if not _corvette_ecm:
+        return {"ok": False, "reason": "not_capable"}
+    if entity_id is None:
+        _freq_lock_target_id = None
+        _freq_lock_progress = 0.0
+        _freq_lock_active = False
+        return {"ok": True, "state": "cancelled"}
+    _freq_lock_target_id = entity_id
+    _freq_lock_progress = 0.0
+    _freq_lock_active = False
+    return {"ok": True, "state": "engaging", "target": entity_id}
+
+
+def is_freq_locked(entity_id: str) -> bool:
+    """Return True if the given entity is under a full frequency lock."""
+    return _freq_lock_active and _freq_lock_target_id == entity_id
+
+
+def is_freq_lock_active() -> bool:
+    """Return True if a frequency lock is fully established."""
+    return _freq_lock_active
+
+
+def get_freq_locked_ids() -> set[str]:
+    """Return set of entity IDs under frequency lock (for station_ai)."""
+    if _freq_lock_active and _freq_lock_target_id is not None:
+        return {_freq_lock_target_id}
+    return set()
+
+
+# --- Corvette ECM tick helpers ---
+
+def _tick_ghosts(dt: float) -> None:
+    """Decay ghost lifetimes, remove expired ghosts."""
+    for g in _ghosts:
+        g["lifetime_remaining"] -= dt
+    _ghosts[:] = [g for g in _ghosts if g["lifetime_remaining"] > 0]
+
+
+def _tick_interception(world: World, ship: Ship, dt: float) -> None:
+    """Periodically scan enemies in sensor range and generate intercept signals."""
+    global _intercept_timer
+    ecm_eff = ship.systems["ecm_suite"].efficiency
+    if ecm_eff <= 0.0:
+        return
+    _intercept_timer -= dt
+    if _intercept_timer > 0.0:
+        return
+    _intercept_timer = INTERCEPT_SCAN_INTERVAL
+    # Check each enemy within sensor range
+    from server.systems.sensors import sensor_range
+    sr = sensor_range(ship)
+    for enemy in world.enemies:
+        dist = distance(ship.x, ship.y, enemy.x, enemy.y)
+        if dist <= sr and _rng.random() < INTERCEPT_CHANCE:
+            freq_hint = ""
+            if enemy.scan_state == "scanned":
+                freq_hint = f" [FREQ: {enemy.shield_frequency.upper()}]"
+            _intercepted_signals.append({
+                "source": f"intercept_{enemy.id}",
+                "source_name": f"Intercepted {enemy.type.title()} Comms",
+                "frequency": 0.5,
+                "signal_type": "encrypted",
+                "priority": "medium",
+                "raw_content": f"[ENCRYPTED TACTICAL DATA]{freq_hint}",
+                "decoded_content": f"Enemy {enemy.type} tactical transmission.{freq_hint} Position: ({int(enemy.x)}, {int(enemy.y)}).",
+                "requires_decode": True,
+                "faction": "hostile",
+                "threat_level": "medium",
+                "intel_value": f"enemy_{enemy.type}_position",
+                "intel_category": "tactical",
+            })
+
+
+def _tick_freq_lock(world: World, ship: Ship, dt: float) -> None:
+    """Advance frequency lock engagement progress."""
+    global _freq_lock_progress, _freq_lock_active, _freq_lock_target_id
+    if _freq_lock_target_id is None:
+        return
+    ecm_eff = ship.systems["ecm_suite"].efficiency
+    effective_lock_range = FREQ_LOCK_RANGE * ecm_eff
+    # Find target (enemy or station)
+    target_pos = None
+    for enemy in world.enemies:
+        if enemy.id == _freq_lock_target_id:
+            target_pos = (enemy.x, enemy.y)
+            break
+    if target_pos is None:
+        for station in world.stations:
+            if station.id == _freq_lock_target_id:
+                target_pos = (station.x, station.y)
+                break
+    if target_pos is None:
+        # Target gone — cancel lock
+        _freq_lock_target_id = None
+        _freq_lock_progress = 0.0
+        _freq_lock_active = False
+        return
+    dist = distance(ship.x, ship.y, target_pos[0], target_pos[1])
+    if dist > effective_lock_range:
+        # Out of range — decay progress
+        _freq_lock_progress = max(0.0, _freq_lock_progress - dt / FREQ_LOCK_ENGAGE_TIME)
+        if _freq_lock_active:
+            _freq_lock_active = False
+        return
+    if not _freq_lock_active:
+        _freq_lock_progress = min(1.0, _freq_lock_progress + dt / FREQ_LOCK_ENGAGE_TIME)
+        if _freq_lock_progress >= 1.0:
+            _freq_lock_active = True
+
+
 def tick(world: World, ship: Ship, dt: float) -> None:
     """Update jam_factor on all enemies each tick.
 
@@ -269,6 +526,12 @@ def tick(world: World, ship: Ship, dt: float) -> None:
                 if sa.jammed and (_jam_target_id is None or sa.id != _jam_target_id):
                     sa.jammed = False
 
+    # --- Corvette ECM tick ---
+    if _corvette_ecm:
+        _tick_ghosts(dt)
+        _tick_interception(world, ship, dt)
+        _tick_freq_lock(world, ship, dt)
+
 
 def build_state(world: World, ship: Ship) -> dict:
     """Serialise EW state for broadcast to the electronic_warfare role."""
@@ -316,6 +579,19 @@ def build_state(world: World, ship: Ship) -> dict:
         "stealth_state": _stealth_state,
         "stealth_timer": round(_stealth_timer, 2),
         "stealth_capable": _stealth_capable,
+        # Corvette ECM (v0.07 §2.2)
+        "corvette_ecm": _corvette_ecm,
+        "ghosts": [
+            {"id": g["id"], "x": g["x"], "y": g["y"],
+             "mimic_class": g["mimic_class"],
+             "lifetime": round(g["lifetime_remaining"], 1)}
+            for g in _ghosts
+        ],
+        "ghost_class": _ghost_class,
+        "freq_lock_target_id": _freq_lock_target_id,
+        "freq_lock_progress": round(_freq_lock_progress, 3),
+        "freq_lock_active": _freq_lock_active,
+        "intercept_timer": round(_intercept_timer, 1),
     }
 
 
@@ -327,12 +603,24 @@ def serialise() -> dict:
         "stealth_state": _stealth_state,
         "stealth_timer": _stealth_timer,
         "stealth_capable": _stealth_capable,
+        # Corvette ECM
+        "corvette_ecm": _corvette_ecm,
+        "ghosts": list(_ghosts),
+        "ghost_counter": _ghost_counter,
+        "intercept_timer": _intercept_timer,
+        "ghost_class": _ghost_class,
+        "freq_lock_target_id": _freq_lock_target_id,
+        "freq_lock_progress": _freq_lock_progress,
+        "freq_lock_active": _freq_lock_active,
     }
 
 
 def deserialise(data: dict) -> None:
     global _jam_target_id, _intrusion_target_id, _intrusion_target_system
     global _stealth_state, _stealth_timer, _stealth_capable, _stealth_break_reason
+    global _corvette_ecm, _ghosts, _ghost_counter, _intercept_timer
+    global _intercepted_signals, _ghost_class
+    global _freq_lock_target_id, _freq_lock_progress, _freq_lock_active
     _jam_target_id           = data.get("jam_target_id")
     _intrusion_target_id     = data.get("intrusion_target_id")
     _intrusion_target_system = data.get("intrusion_target_system")
@@ -340,3 +628,13 @@ def deserialise(data: dict) -> None:
     _stealth_timer           = data.get("stealth_timer", 0.0)
     _stealth_capable         = data.get("stealth_capable", False)
     _stealth_break_reason    = None
+    # Corvette ECM
+    _corvette_ecm            = data.get("corvette_ecm", False)
+    _ghosts                  = list(data.get("ghosts", []))
+    _ghost_counter           = data.get("ghost_counter", 0)
+    _intercept_timer         = data.get("intercept_timer", INTERCEPT_SCAN_INTERVAL)
+    _intercepted_signals     = []
+    _ghost_class             = data.get("ghost_class")
+    _freq_lock_target_id     = data.get("freq_lock_target_id")
+    _freq_lock_progress      = data.get("freq_lock_progress", 0.0)
+    _freq_lock_active        = data.get("freq_lock_active", False)

@@ -329,11 +329,13 @@ def build_sensor_contacts(
     ship: object,
     extra_bubbles: list[tuple[float, float, float]] | None = None,
     hazard_modifier: float = 1.0,
+    ghost_contacts: list[dict] | None = None,
 ) -> Message:
     """Build the sensor.contacts message for Weapons / Science clients.
 
     *hazard_modifier* reduces the effective sensor range when environmental
     hazards are active (e.g. 0.5 inside a nebula sector).
+    *ghost_contacts* — corvette ECM ghost contacts to inject.
     """
     torpedoes = [
         {
@@ -348,7 +350,7 @@ def build_sensor_contacts(
     return Message.build(
         "sensor.contacts",
         {
-            "contacts": sensors.build_sensor_contacts(world, ship, extra_bubbles, hazard_modifier),  # type: ignore[arg-type]
+            "contacts": sensors.build_sensor_contacts(world, ship, extra_bubbles, hazard_modifier, ghost_contacts=ghost_contacts),  # type: ignore[arg-type]
             "torpedoes": torpedoes,
         },
     )

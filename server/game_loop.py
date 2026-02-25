@@ -48,6 +48,10 @@ from server.models.messages import (
     EWSetJamTargetPayload,
     EWToggleCountermeasuresPayload,
     EWToggleStealthPayload,
+    EWDeployGhostPayload,
+    EWRecallGhostPayload,
+    EWSetGhostClassPayload,
+    EWSetFreqLockPayload,
     TacticalSetEngagementPriorityPayload,
     TacticalSetInterceptTargetPayload,
     TacticalAddAnnotationPayload,
@@ -777,6 +781,9 @@ async def _loop() -> None:
         _stealth_break = glew.pop_stealth_break_reason()
         if _stealth_break:
             await _manager.broadcast(Message.build("ew.stealth_broken", {"reason": _stealth_break}))
+        # Corvette ECM: forward intercepted signals to comms station.
+        for _isig in glew.pop_intercepted_signals():
+            glco.add_signal(**_isig)
         gltac.tick(_world, _world.ship, TICK_DT)
         # Tick crew reassignment timers before updating crew factors.
         _reassignment_roster = glmed.get_roster()
@@ -845,12 +852,16 @@ async def _loop() -> None:
         beam_hit_events = tick_enemies(
             _world.enemies, _world.ship, TICK_DT, stations,
             sensor_modifier=_stealth_sensor_mod, difficulty=_world.ship.difficulty,
+            ghosts=glew.get_ghosts() if glew.is_corvette_ecm() else None,
+            ghost_class=glew.get_ghost_class() if glew.is_corvette_ecm() else None,
+            freq_lock_target_ids=glew.get_freq_locked_ids() if glew.is_corvette_ecm() else None,
         )
 
         # 5.5 Station AI — turrets, launchers, fighter bays, sensor arrays.
         _station_attacked_ids = glw.pop_stations_attacked()
         station_beam_hits, launched_fighters, reinforcement_calls = tick_station_ai(
             _world.stations, _world.ship, _world, TICK_DT, _station_attacked_ids,
+            freq_locked_ids=glew.get_freq_locked_ids() if glew.is_corvette_ecm() else None,
         )
         for fighter in launched_fighters:
             _world.enemies.append(fighter)
@@ -1344,8 +1355,10 @@ async def _loop() -> None:
         _detection_bubbles = glfo.get_detection_bubbles(
             _world.ship.systems["flight_deck"].efficiency
         )
+        _ghost_contacts = glew.get_ghost_contacts() if glew.is_corvette_ecm() else None
         _sensor_contacts_payload = glm.build_sensor_contacts(
             _world, _world.ship, extra_bubbles=_detection_bubbles,
+            ghost_contacts=_ghost_contacts,
         )
         await _manager.broadcast_to_roles(
             ["weapons", "science"],
@@ -2244,6 +2257,18 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "ew.toggle_stealth" and isinstance(payload, EWToggleStealthPayload):
             result = glew.toggle_stealth(payload.active)
             gl.log_event("ew", "stealth_toggled", {"active": payload.active, **result})
+        elif msg_type == "ew.deploy_ghost" and isinstance(payload, EWDeployGhostPayload):
+            result = glew.deploy_ghost(payload.x, payload.y, payload.mimic_class)
+            gl.log_event("ew", "ghost_deployed", result)
+        elif msg_type == "ew.recall_ghost" and isinstance(payload, EWRecallGhostPayload):
+            result = glew.recall_ghost(payload.ghost_id)
+            gl.log_event("ew", "ghost_recalled", {"ghost_id": payload.ghost_id, **result})
+        elif msg_type == "ew.set_ghost_class" and isinstance(payload, EWSetGhostClassPayload):
+            result = glew.set_ghost_class(payload.ship_class)
+            gl.log_event("ew", "ghost_class_set", result)
+        elif msg_type == "ew.set_freq_lock" and isinstance(payload, EWSetFreqLockPayload):
+            result = glew.set_freq_lock_target(payload.entity_id, payload.frequency)
+            gl.log_event("ew", "freq_lock_set", result)
         elif msg_type == "tactical.set_engagement_priority" and isinstance(payload, TacticalSetEngagementPriorityPayload):
             gltac.set_engagement_priority(payload.entity_id, payload.priority)
             gl.log_event("tactical", "engagement_priority_set", {
@@ -2470,6 +2495,10 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             # v0.07 §2.1: Stealth status.
             "stealth_state": glew.get_stealth_state(),
             "stealth_capable": glew.is_stealth_capable(),
+            # v0.07 §2.2: Corvette ECM status.
+            "corvette_ecm": glew.is_corvette_ecm(),
+            "ghost_class": glew.get_ghost_class(),
+            "freq_lock_active": glew.is_freq_lock_active(),
         },
         tick=tick,
     )

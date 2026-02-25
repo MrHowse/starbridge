@@ -60,6 +60,9 @@ def tick_enemies(
     sensor_modifier: float = 1.0,
     *,
     difficulty: object | None = None,
+    ghosts: list[dict] | None = None,
+    ghost_class: str | None = None,
+    freq_lock_target_ids: set[str] | None = None,
 ) -> list[BeamHitEvent]:
     """Update all enemy AI states and movement; return any beam hit events.
 
@@ -72,6 +75,13 @@ def tick_enemies(
     *difficulty* — a DifficultyPreset object. When provided, ``enemy_accuracy``
     scales beam hit probability and ``enemy_ai_aggression`` adjusts the flee
     threshold (higher = enemies stay in the fight longer).
+
+    *ghosts* — ghost contacts deployed by corvette ECM. Enemies may target
+    ghosts instead of the player.
+
+    *ghost_class* — sensor disguise. Certain classes alter enemy AI behaviour.
+
+    *freq_lock_target_ids* — entities under frequency lock; suffer accuracy debuff.
     """
     import random as _rng_mod
     from server.systems.combat import calculate_effective_profile
@@ -94,11 +104,23 @@ def tick_enemies(
             target_x, target_y, target_id = nearest.x, nearest.y, nearest.id
         else:
             target_x, target_y, target_id = ship.x, ship.y, "player"
+            # Corvette ECM: ghosts act as alternate targets
+            if ghosts:
+                candidates: list[tuple[float, float, float, str]] = [
+                    (ship.x, ship.y, distance(enemy.x, enemy.y, ship.x, ship.y), "player"),
+                ]
+                for g in ghosts:
+                    gd = distance(enemy.x, enemy.y, g["x"], g["y"])
+                    if gd <= eff_detect_range:
+                        candidates.append((g["x"], g["y"], gd, g["id"]))
+                nearest_c = min(candidates, key=lambda c: c[2])
+                target_x, target_y, target_id = nearest_c[0], nearest_c[1], nearest_c[3]
 
         dist = distance(enemy.x, enemy.y, target_x, target_y)
 
         # ── State transitions ─────────────────────────────────────────────
-        _update_state(enemy, params, dist, eff_detect_range, aggression=aggression)
+        _update_state(enemy, params, dist, eff_detect_range, aggression=aggression,
+                       ghost_class=ghost_class)
 
         # ── Despawn check (fleeing enemy too far away) ────────────────────
         if enemy.ai_state == "flee" and dist > 2.0 * eff_detect_range:
@@ -128,6 +150,9 @@ def tick_enemies(
                 # Target profile only applies vs player ship, not stations.
                 profile = effective_profile if target_id == "player" else 1.0
                 hit_chance = min(1.0, accuracy_mult * profile)
+                # Frequency lock debuff: 15% accuracy penalty on locked enemies.
+                if freq_lock_target_ids and enemy.id in freq_lock_target_ids:
+                    hit_chance *= 0.85
                 if hit_chance < 1.0 and _rng_mod.random() > hit_chance:
                     enemy.beam_cooldown = params["beam_cooldown"]
                     continue  # miss
@@ -165,6 +190,7 @@ def _update_state(
     dist: float,
     detect_range: float | None = None,
     aggression: float = 0.75,
+    ghost_class: str | None = None,
 ) -> None:
     """Apply state-machine transitions.
 
@@ -173,14 +199,25 @@ def _update_state(
 
     *aggression* scales the flee threshold: higher values (closer to 1.0) mean
     the enemy stays in the fight longer (flees at lower HP fraction).
+
+    *ghost_class* — corvette sensor disguise. "battleship"/"destroyer" cause
+    enemies to flee on detection; "freighter"/"transport" increase the detect
+    range threshold by 50% (enemies less alert to civilians).
     """
     state = enemy.ai_state
     max_hull = params["hull"]
     eff_detect = detect_range if detect_range is not None else params["detect_range"]
+    # Ghost class influence on detection threshold.
+    if ghost_class in ("freighter", "transport"):
+        eff_detect *= 1.5
 
     if state == "idle":
         if dist < eff_detect:
-            enemy.ai_state = "chase"
+            # Ghost class bluff: enemies flee from large warship signatures.
+            if ghost_class in ("battleship", "destroyer"):
+                enemy.ai_state = "flee"
+            else:
+                enemy.ai_state = "chase"
 
     elif state == "chase":
         if dist < params["weapon_range"]:
