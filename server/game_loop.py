@@ -656,7 +656,26 @@ async def _loop() -> None:
         gltr.auto_helm_tick(_world.ship, TICK_DT)
         gltr.auto_engineering_tick(_world.ship, TICK_DT)
         gldc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty)
-        glfo.tick(_world.ship, TICK_DT)
+        # Build lightweight contact list for drone AI from world entities.
+        _fo_contacts: list[dict] = []
+        for _foe in _world.enemies:
+            _fo_contacts.append({
+                "id": _foe.id, "x": _foe.x, "y": _foe.y,
+                "heading": _foe.heading, "kind": "enemy",
+                "classification": "hostile", "hull": _foe.hull,
+            })
+        for _sta in getattr(_world, "stations", []):
+            _fo_contacts.append({
+                "id": _sta.id, "x": _sta.x, "y": _sta.y,
+                "heading": 0.0, "kind": "station",
+                "classification": "hostile" if getattr(_sta, "faction", "hostile") == "hostile" else "neutral",
+            })
+        _fo_events = glfo.tick(
+            _world.ship, TICK_DT,
+            contacts=_fo_contacts,
+            in_combat=bool(_world.enemies),
+            tick_num=_tick_count,
+        )
         glew.tick(_world, _world.ship, TICK_DT)
         gltac.tick(_world, _world.ship, TICK_DT)
         # Tick crew reassignment timers before updating crew factors.
@@ -1478,6 +1497,13 @@ async def _loop() -> None:
             ["flight_ops"],
             Message.build("flight_ops.state", glfo.build_state(_world.ship)),
         )
+
+        # 11j-b. Flight ops events (launch, recovery, bingo, etc.).
+        if _fo_events:
+            await _manager.broadcast_to_roles(
+                ["flight_ops"],
+                Message.build("flight_ops.events", {"events": _fo_events}),
+            )
 
         # 11k. EW state → Electronic Warfare station.
         await _manager.broadcast_to_roles(

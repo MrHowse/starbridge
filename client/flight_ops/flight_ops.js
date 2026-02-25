@@ -172,6 +172,28 @@ on('flight_ops.state', payload => {
   renderMap();
 });
 
+on('flight_ops.events', ({ events }) => {
+  if (!events) return;
+  for (const ev of events) {
+    switch (ev.type) {
+      case 'drone_launched':
+        SoundBank.play('scan_complete');
+        break;
+      case 'drone_destroyed':
+      case 'drone_lost':
+        SoundBank.play('hull_hit');
+        break;
+      case 'bingo_fuel':
+        SoundBank.play('warning');
+        break;
+      case 'launch_failure':
+      case 'bolter':
+        SoundBank.play('warning');
+        break;
+    }
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Canvas resize
 // ---------------------------------------------------------------------------
