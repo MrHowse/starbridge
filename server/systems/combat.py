@@ -37,6 +37,9 @@ FREQ_MISMATCH_MULT: float = 0.5  # mismatched frequency → 50% penalty
 # Target profile (v0.07)
 SPEED_EVASION_FACTOR: float = 0.3  # max profile reduction at full speed
 
+# Armour (v0.07 §1.3)
+ARMOUR_FIELD_REPAIR_CAP: float = 0.75  # max fraction of armour_max repairable in the field
+
 
 # ---------------------------------------------------------------------------
 # Target profile (v0.07 — hit probability mechanics)
@@ -56,6 +59,24 @@ def calculate_effective_profile(ship: Ship) -> float:
         return ship.target_profile
     speed_factor = min(1.0, ship.velocity / ship.max_speed_base)
     return ship.target_profile * (1.0 - speed_factor * SPEED_EVASION_FACTOR)
+
+
+# ---------------------------------------------------------------------------
+# Armour field repair (v0.07 §1.3.3)
+# ---------------------------------------------------------------------------
+
+
+def repair_armour(ship: Ship, amount: float) -> float:
+    """Repair armour up to the field-repair cap (75% of armour_max).
+
+    Returns the amount actually restored.  Full repair (100%) requires docking.
+    """
+    cap = ship.armour_max * ARMOUR_FIELD_REPAIR_CAP
+    if ship.armour >= cap:
+        return 0.0
+    restored = min(amount, cap - ship.armour)
+    ship.armour += restored
+    return restored
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +131,7 @@ class CombatHitResult:
     """Result from apply_hit_to_player — system damage + crew casualties."""
     damaged_systems: list[tuple[str, float]] = field(default_factory=list)
     casualties: list[CombatCasualty] = field(default_factory=list)
+    armour_absorbed: float = 0.0  # damage soaked by armour this hit (v0.07)
 
 
 # Map old crew deck names to physical deck numbers for injury generation.
@@ -160,6 +182,16 @@ def apply_hit_to_player(
         ship.countermeasure_charges = max(0, ship.countermeasure_charges - 1)
         if ship.countermeasure_charges == 0:
             ship.ew_countermeasure_active = False
+
+    # 2.5. Armour absorption — sits between shields and hull (v0.07 §1.3).
+    # Armour absorbs up to its current value per hit.  Degrades by 1 per hit.
+    armour_absorbed = 0.0
+    if hull_damage > 0.0 and ship.armour > 0.0:
+        armour_absorbed = min(ship.armour, hull_damage)
+        hull_damage -= armour_absorbed
+        ship.armour = max(0.0, ship.armour - 1.0)
+
+    result.armour_absorbed = armour_absorbed
 
     # 3. Hull damage + optional system damage roll + crew casualties.
     if hull_damage > 0:

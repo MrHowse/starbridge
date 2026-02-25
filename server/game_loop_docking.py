@@ -140,6 +140,11 @@ def _apply_service(service: str, world, ship) -> dict:
         ship.hull = ship.hull_max
         effects["hull"] = ship.hull
         effects["hull_restored"] = round(restored, 1)
+        # Full armour restoration at dock (v0.07 §1.3.3).
+        if hasattr(ship, "armour_max") and ship.armour < ship.armour_max:
+            armour_restored = ship.armour_max - ship.armour
+            ship.armour = ship.armour_max
+            effects["armour_restored"] = round(armour_restored, 1)
 
     elif service == "torpedo_resupply":
         import server.game_loop_weapons as glw

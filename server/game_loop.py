@@ -2391,6 +2391,8 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
                 for name, s in ship.systems.items()
             },
             "hull_max": ship.hull_max,
+            "armour": ship.armour,
+            "armour_max": ship.armour_max,
             "docked_at": ship.docked_at,
             "docking_phase": gldo.get_state(),
             "active_services": {
