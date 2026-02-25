@@ -422,6 +422,27 @@ body {
   100% { opacity: 1; }
 }
 
+/* ── Volume panel overrides (match clipboard aesthetic) ─────────────────── */
+
+:root {
+  --border-primary: rgba(90,74,58,0.5);
+  --text-dim: #8a7a60;
+  --text-bright: #3a2e1f;
+  --text-normal: #5a4a3a;
+  --bg-panel: #f5ecd5;
+  --primary-glow: rgba(90,74,58,0.15);
+  --primary: #5a4a3a;
+  --hostile: #cc3333;
+}
+
+.sb-vol-toggle {
+  font-family: "Courier New", Courier, monospace;
+}
+
+.sb-vol-slider {
+  accent-color: #5a4a3a;
+}
+
 /* ── Responsive / text overrides ────────────────────────────────────────── */
 
 .text-dim {

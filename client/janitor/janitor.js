@@ -9,6 +9,10 @@
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot } from '../shared/ui_components.js';
 import { initRoleBar } from '../shared/role_bar.js';
+import { SoundBank, getCtx } from '../shared/audio.js';
+import '../shared/audio_ambient.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -59,6 +63,11 @@ function init() {
   const statusDotEl   = document.querySelector('[data-status-dot]');
   const statusLabelEl = document.querySelector('[data-status-label]');
 
+  // Audio setup — standard controls + background MP3 loop.
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
+  _startBackgroundAudio();
+
   onStatusChange((status) => {
     setStatusDot(statusDotEl, status);
     if (statusLabelEl) statusLabelEl.textContent = status.toUpperCase();
@@ -82,6 +91,28 @@ function init() {
       send('lobby.claim_role', { role: 'janitor', player_name: name });
     }, 500);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Background audio — fluorescent light hum (MP3 loop via Web Audio API)
+// ---------------------------------------------------------------------------
+
+function _startBackgroundAudio() {
+  const ctx = getCtx();
+  const ambientGain = SoundBank.getCategoryGain('ambient');
+  if (!ambientGain) return;
+
+  fetch('/assets/fluro.mp3')
+    .then(res => res.arrayBuffer())
+    .then(buf => ctx.decodeAudioData(buf))
+    .then(audioBuffer => {
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuffer;
+      src.loop = true;
+      src.connect(ambientGain);
+      src.start(0);
+    })
+    .catch(() => { /* asset missing or decode failure — silent fallback */ });
 }
 
 // ---------------------------------------------------------------------------

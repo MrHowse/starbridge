@@ -102,6 +102,10 @@ game_loop.register_game_end_callback(lobby.on_game_end)
 CLIENT_DIR = Path(__file__).parent.parent / "client"
 app.mount("/client", StaticFiles(directory=str(CLIENT_DIR), html=True), name="client")
 
+ASSETS_DIR = Path(__file__).parent.parent / "assets"
+if ASSETS_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+
 MISSIONS_DIR = Path(__file__).parent.parent / "missions"
 SITE_DIR     = Path(__file__).parent.parent / "client" / "site"
 
