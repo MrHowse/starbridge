@@ -25,6 +25,10 @@
     "torpedo_tubes": 2,
     "point_defence_turrets": 2
   },
+  "shields": {
+    "capacity": 80,
+    "recharge_rate": 5.0
+  },
   "power_grid": {
     "reactor_max": 700,
     "battery_capacity": 500,

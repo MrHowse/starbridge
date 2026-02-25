@@ -496,6 +496,14 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.ship.beam_count = int(_wep.get("beam_count", 1))
     _world.ship.torpedo_tube_count = int(_wep.get("torpedo_tubes", 2))
     _world.ship.pd_turret_count = int(_wep.get("point_defence_turrets", 2))
+    # v0.07 §1.6: Shield configuration from ship class.
+    _shd = sc.shields or {}
+    _world.ship.shield_capacity = float(_shd.get("capacity", 200.0))
+    _world.ship.shield_recharge_rate = float(_shd.get("recharge_rate", 5.0))
+    # Initialise shield facings to match capacity × distribution.
+    for _facing in ("fore", "aft", "port", "starboard"):
+        _frac = _world.ship.shield_distribution[_facing]
+        setattr(_world.ship.shields, _facing, _world.ship.shield_capacity * _frac)
     _world.ship.docked_at = None
     _world.ship.crew = CrewRoster()
     _world.ship.interior = make_default_interior()
@@ -2405,6 +2413,8 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "beam_count": ship.beam_count,
             "torpedo_tube_count": ship.torpedo_tube_count,
             "pd_turret_count": ship.pd_turret_count,
+            "shield_capacity": ship.shield_capacity,
+            "shield_recharge_rate": ship.shield_recharge_rate,
             "docked_at": ship.docked_at,
             "docking_phase": gldo.get_state(),
             "active_services": {

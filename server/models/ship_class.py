@@ -60,6 +60,9 @@ class ShipClass(BaseModel):
     handling_trait:    str   = "clean" # affects helm feel — see VALID_HANDLING_TRAITS
     decks:            int   = 5       # number of physical decks
 
+    # --- Shields (v0.07 §1.6) ---
+    shields:          dict | None = None     # {capacity, recharge_rate}
+
     # --- Weapons loadout (v0.07 §1.5) ---
     weapons:          dict | None = None     # {beam_damage, beam_fire_rate, beam_arc, ...}
 

@@ -270,12 +270,15 @@ def regenerate_shields(ship: Ship, hazard_modifier: float = 1.0) -> None:
     """Regenerate player shields each tick, scaled by shield system efficiency.
 
     Each facing regenerates toward its distribution-based maximum.
+    Uses ship.shield_capacity (v0.07 §1.6) and ship.shield_recharge_rate
+    instead of the old TOTAL_SHIELD_CAPACITY / SHIELD_REGEN_PER_TICK constants.
     *hazard_modifier* reduces the regen rate when inside a nebula (0.5 = 50%
     slower).  Defaults to 1.0 (no reduction).
     """
-    from server.models.ship import TOTAL_SHIELD_CAPACITY
-    regen = SHIELD_REGEN_PER_TICK * ship.systems["shields"].efficiency * hazard_modifier
+    capacity = getattr(ship, "shield_capacity", 200.0)
+    recharge_per_tick = getattr(ship, "shield_recharge_rate", 5.0) / 10.0  # HP/tick (10 Hz)
+    regen = recharge_per_tick * ship.systems["shields"].efficiency * hazard_modifier
     for facing in ("fore", "aft", "port", "starboard"):
-        max_hp  = TOTAL_SHIELD_CAPACITY * ship.shield_distribution[facing]
+        max_hp  = capacity * ship.shield_distribution[facing]
         current = getattr(ship.shields, facing)
         setattr(ship.shields, facing, min(max_hp, current + regen))

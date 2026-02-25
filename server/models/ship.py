@@ -151,7 +151,9 @@ class Ship:
     # --- Docking ---
     docked_at: str | None = None  # station ID while docked, None otherwise
 
-    # --- Shields ---
+    # --- Shields (v0.07 §1.6 — capacity/recharge set from ship class) ---
+    shield_capacity: float = 200.0        # total shield HP pool (default = legacy TOTAL_SHIELD_CAPACITY)
+    shield_recharge_rate: float = 5.0     # HP/sec at full shield efficiency (default = legacy 0.5/tick × 10Hz)
     shields: Shields = field(default_factory=Shields)
     shield_focus:        dict = field(default_factory=lambda: {"x": 0.0, "y": 0.0})
     shield_distribution: dict = field(default_factory=lambda: {
