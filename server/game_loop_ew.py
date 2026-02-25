@@ -38,6 +38,16 @@ COUNTERMEASURE_DEFAULT_CHARGES: int = 10
 #: How long a successful network intrusion stuns enemy beam fire (ticks at 10 Hz).
 INTRUSION_STUN_DURATION: int = 30  # 3 seconds
 
+# --- Silent Running (v0.07 §2.1 — Scout only) ---
+#: Seconds to fully engage stealth after toggle.
+STEALTH_ACTIVATION_TIME: float = 5.0
+#: Seconds to fully disengage stealth.
+STEALTH_DEACTIVATION_TIME: float = 3.0
+#: Enemy detection range multiplier when stealth is fully active.
+STEALTH_DETECT_RANGE_MULT: float = 0.30
+#: Maximum throttle (%) before stealth auto-breaks.
+STEALTH_ENGINE_LIMIT: float = 50.0
+
 
 # ---------------------------------------------------------------------------
 # Module-level state
@@ -47,18 +57,29 @@ _jam_target_id: str | None = None
 _intrusion_target_id: str | None = None
 _intrusion_target_system: str | None = None
 
+# --- Silent Running state ---
+_stealth_state: str = "inactive"      # inactive | activating | active | deactivating
+_stealth_timer: float = 0.0           # seconds elapsed in current transition
+_stealth_capable: bool = False         # True only for scout class
+_stealth_break_reason: str | None = None  # set when stealth is force-broken
+
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 
-def reset() -> None:
+def reset(ship_class: str = "") -> None:
     """Reset EW state to defaults. Called at game start."""
     global _jam_target_id, _intrusion_target_id, _intrusion_target_system
+    global _stealth_state, _stealth_timer, _stealth_capable, _stealth_break_reason
     _jam_target_id = None
     _intrusion_target_id = None
     _intrusion_target_system = None
+    _stealth_state = "inactive"
+    _stealth_timer = 0.0
+    _stealth_capable = (ship_class == "scout")
+    _stealth_break_reason = None
 
 
 def set_jam_target(entity_id: str | None) -> None:
@@ -97,13 +118,120 @@ def apply_intrusion_success(entity_id: str, world: World) -> None:
             break
 
 
+# ---------------------------------------------------------------------------
+# Silent Running (v0.07 §2.1)
+# ---------------------------------------------------------------------------
+
+
+def toggle_stealth(active: bool) -> dict:
+    """Start or stop silent running. Returns status dict."""
+    global _stealth_state, _stealth_timer
+    if not _stealth_capable:
+        return {"ok": False, "reason": "not_capable"}
+    if active:
+        if _stealth_state in ("activating", "active"):
+            return {"ok": False, "reason": "already_engaged"}
+        _stealth_state = "activating"
+        _stealth_timer = 0.0
+        return {"ok": True, "state": "activating"}
+    else:
+        if _stealth_state == "inactive":
+            return {"ok": False, "reason": "not_engaged"}
+        if _stealth_state == "deactivating":
+            return {"ok": False, "reason": "already_deactivating"}
+        _stealth_state = "deactivating"
+        _stealth_timer = 0.0
+        return {"ok": True, "state": "deactivating"}
+
+
+def break_stealth(reason: str) -> None:
+    """Force-break stealth from activating/active to deactivating."""
+    global _stealth_state, _stealth_timer, _stealth_break_reason
+    if _stealth_state in ("activating", "active"):
+        _stealth_state = "deactivating"
+        _stealth_timer = 0.0
+        _stealth_break_reason = reason
+
+
+def is_stealth_active() -> bool:
+    """True when stealth is fully active (invisible to passive sensors)."""
+    return _stealth_state == "active"
+
+
+def is_stealth_engaged() -> bool:
+    """True when any stealth state is non-inactive (activating/active/deactivating)."""
+    return _stealth_state != "inactive"
+
+
+def is_stealth_capable() -> bool:
+    """True when the current ship class supports silent running (scout only)."""
+    return _stealth_capable
+
+
+def get_stealth_state() -> str:
+    """Return current stealth state string."""
+    return _stealth_state
+
+
+def get_stealth_sensor_modifier() -> float:
+    """Return the enemy detection range multiplier due to stealth.
+
+    1.0 when inactive, interpolates toward STEALTH_DETECT_RANGE_MULT during
+    activation, STEALTH_DETECT_RANGE_MULT when fully active, interpolates back
+    during deactivation.
+    """
+    if _stealth_state == "inactive":
+        return 1.0
+    if _stealth_state == "active":
+        return STEALTH_DETECT_RANGE_MULT
+    if _stealth_state == "activating":
+        progress = min(_stealth_timer / STEALTH_ACTIVATION_TIME, 1.0)
+        return 1.0 - progress * (1.0 - STEALTH_DETECT_RANGE_MULT)
+    # deactivating — interpolate back toward 1.0
+    progress = min(_stealth_timer / STEALTH_DEACTIVATION_TIME, 1.0)
+    return STEALTH_DETECT_RANGE_MULT + progress * (1.0 - STEALTH_DETECT_RANGE_MULT)
+
+
+def pop_stealth_break_reason() -> str | None:
+    """Return and clear the stealth break reason, if any."""
+    global _stealth_break_reason
+    reason = _stealth_break_reason
+    _stealth_break_reason = None
+    return reason
+
+
 def tick(world: World, ship: Ship, dt: float) -> None:
     """Update jam_factor on all enemies each tick.
 
     The active jam target builds up toward JAM_MAX_FACTOR; all other enemies
     decay toward 0. Both the buildup rate and effective range scale with the
     ECM suite's efficiency (power × health).
+
+    Also advances the stealth state machine timer and enforces stealth constraints.
     """
+    global _stealth_state, _stealth_timer
+    # --- Silent Running timer ---
+    if _stealth_state == "activating":
+        _stealth_timer += dt
+        if _stealth_timer >= STEALTH_ACTIVATION_TIME:
+            _stealth_state = "active"
+            _stealth_timer = 0.0
+        # Enforce: shields forced to 0 during activation
+        for facing in ("fore", "aft", "port", "starboard"):
+            setattr(ship.shields, facing, 0.0)
+    elif _stealth_state == "active":
+        # Enforce: shields forced to 0 while stealthed
+        for facing in ("fore", "aft", "port", "starboard"):
+            setattr(ship.shields, facing, 0.0)
+        # Break stealth if throttle exceeds engine limit
+        if ship.throttle > STEALTH_ENGINE_LIMIT:
+            break_stealth("engine_power")
+    elif _stealth_state == "deactivating":
+        _stealth_timer += dt
+        if _stealth_timer >= STEALTH_DEACTIVATION_TIME:
+            _stealth_state = "inactive"
+            _stealth_timer = 0.0
+
     ecm_eff = ship.systems["ecm_suite"].efficiency  # 0.0–1.5
     # Effective range and buildup both scale with ECM efficiency.
     # Use at least 0.01 guard so ecm_eff=0 gives zero effective range.
@@ -185,6 +313,9 @@ def build_state(world: World, ship: Ship) -> dict:
         "creatures": creatures_data,
         "intrusion_target_id": _intrusion_target_id,
         "intrusion_target_system": _intrusion_target_system,
+        "stealth_state": _stealth_state,
+        "stealth_timer": round(_stealth_timer, 2),
+        "stealth_capable": _stealth_capable,
     }
 
 
@@ -193,11 +324,19 @@ def serialise() -> dict:
         "jam_target_id": _jam_target_id,
         "intrusion_target_id": _intrusion_target_id,
         "intrusion_target_system": _intrusion_target_system,
+        "stealth_state": _stealth_state,
+        "stealth_timer": _stealth_timer,
+        "stealth_capable": _stealth_capable,
     }
 
 
 def deserialise(data: dict) -> None:
     global _jam_target_id, _intrusion_target_id, _intrusion_target_system
+    global _stealth_state, _stealth_timer, _stealth_capable, _stealth_break_reason
     _jam_target_id           = data.get("jam_target_id")
     _intrusion_target_id     = data.get("intrusion_target_id")
     _intrusion_target_system = data.get("intrusion_target_system")
+    _stealth_state           = data.get("stealth_state", "inactive")
+    _stealth_timer           = data.get("stealth_timer", 0.0)
+    _stealth_capable         = data.get("stealth_capable", False)
+    _stealth_break_reason    = None

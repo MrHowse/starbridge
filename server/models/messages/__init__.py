@@ -148,6 +148,7 @@ from server.models.messages.ew import (
     EWBeginIntrusionPayload,
     EWSetJamTargetPayload,
     EWToggleCountermeasuresPayload,
+    EWToggleStealthPayload,
 )
 
 # Tactical Officer
@@ -307,6 +308,7 @@ __all__ = [
     # electronic warfare
     "EWSetJamTargetPayload",
     "EWToggleCountermeasuresPayload",
+    "EWToggleStealthPayload",
     "EWBeginIntrusionPayload",
     # tactical officer
     "TacticalSetEngagementPriorityPayload",

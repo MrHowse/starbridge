@@ -14,6 +14,10 @@ class EWToggleCountermeasuresPayload(BaseModel):
     active: bool
 
 
+class EWToggleStealthPayload(BaseModel):
+    active: bool
+
+
 class EWBeginIntrusionPayload(BaseModel):
     entity_id: str
     target_system: Literal["shields", "weapons", "engines"]

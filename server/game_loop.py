@@ -47,6 +47,7 @@ from server.models.messages import (
     EWBeginIntrusionPayload,
     EWSetJamTargetPayload,
     EWToggleCountermeasuresPayload,
+    EWToggleStealthPayload,
     TacticalSetEngagementPriorityPayload,
     TacticalSetInterceptTargetPayload,
     TacticalAddAnnotationPayload,
@@ -450,7 +451,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     glcap.reset()
     gldc.reset()
     glfo.reset(ship_class)
-    glew.reset()
+    glew.reset(ship_class)
     gltac.reset()
     gltr.reset()
     gldo.reset()
@@ -773,6 +774,9 @@ async def _loop() -> None:
                     glmed.admit_survivors(_surv_count, _world.ship)
 
         glew.tick(_world, _world.ship, TICK_DT)
+        _stealth_break = glew.pop_stealth_break_reason()
+        if _stealth_break:
+            await _manager.broadcast(Message.build("ew.stealth_broken", {"reason": _stealth_break}))
         gltac.tick(_world, _world.ship, TICK_DT)
         # Tick crew reassignment timers before updating crew factors.
         _reassignment_roster = glmed.get_roster()
@@ -837,9 +841,10 @@ async def _loop() -> None:
             )
         torpedo_events = glw.tick_torpedoes(_world, _world.ship)
         stations = _world.stations if _world.stations else None
+        _stealth_sensor_mod = _hazard_sensor_mod * glew.get_stealth_sensor_modifier()
         beam_hit_events = tick_enemies(
             _world.enemies, _world.ship, TICK_DT, stations,
-            sensor_modifier=_hazard_sensor_mod, difficulty=_world.ship.difficulty,
+            sensor_modifier=_stealth_sensor_mod, difficulty=_world.ship.difficulty,
         )
 
         # 5.5 Station AI — turrets, launchers, fighter bays, sensor arrays.
@@ -907,7 +912,11 @@ async def _loop() -> None:
             list(beam_hit_events) + list(station_beam_hits) + creature_beam_hits, _world, _manager
         )
         gldc.apply_hull_damage(_hull_before_combat - _world.ship.hull, _world.ship.interior)
-        regenerate_shields(_world.ship, hazard_modifier=_hazard_shield_mod)
+        # v0.07 §2.1: Break stealth on damage; suppress shield regen during active stealth.
+        if _world.ship.hull < _hull_before_combat and glew.is_stealth_engaged():
+            glew.break_stealth("damage")
+        if not glew.is_stealth_active() and glew.get_stealth_state() != "activating":
+            regenerate_shields(_world.ship, hazard_modifier=_hazard_shield_mod)
         scan_completed = sensors.tick(_world, _world.ship, TICK_DT)
         await gldo.tick(_world, _world.ship, _manager, TICK_DT)
         glw.tick_cooldowns(TICK_DT)
@@ -1952,7 +1961,9 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                 gl.log_event("weapons", "target_selected", {"target_id": payload.entity_id})
                 _set_training_flag(glm, "weapons_target_selected")
         elif msg_type == "weapons.fire_beams" and isinstance(payload, WeaponsFireBeamsPayload):
-            if world is not None:
+            if glew.is_stealth_engaged():
+                events.append(("ew.stealth_blocked", {"action": "fire_beams"}))
+            elif world is not None:
                 evt = glw.fire_player_beams(ship, world, beam_frequency=payload.beam_frequency)
                 if evt:
                     events.append(evt)
@@ -1974,6 +1985,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             gl.log_event("weapons", "shield_focus_changed", {"x": payload.x, "y": payload.y})
             _set_training_flag(glm, "weapons_shield_focus_set")
         elif msg_type == "science.start_scan" and isinstance(payload, ScienceStartScanPayload):
+            if glew.is_stealth_engaged():
+                glew.break_stealth("active_scan")
             if glm.is_signal_scan(payload.entity_id):
                 events.append(("signal.scan_result", {"ship_x": ship.x, "ship_y": ship.y}))
             else:
@@ -2118,6 +2131,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             glco.tune(payload.frequency)
             _set_training_flag(glm, "comms_frequency_tuned")
         elif msg_type == "comms.hail" and isinstance(payload, CommsHailPayload):
+            if glew.is_stealth_engaged():
+                glew.break_stealth("comms_transmit")
             glco.hail(payload.contact_id, payload.message_type,
                        frequency=payload.frequency, hail_type=payload.hail_type)
             _set_training_flag(glm, "comms_hail_sent")
@@ -2126,6 +2141,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             glco.start_decode(payload.signal_id)
             gl.log_event("comms", "decode_started", {"signal_id": payload.signal_id})
         elif msg_type == "comms.respond" and isinstance(payload, CommsRespondPayload):
+            if glew.is_stealth_engaged():
+                glew.break_stealth("comms_transmit")
             glco.respond_to_signal(payload.signal_id, payload.response_id)
             gldm.notify_signal_responded(payload.signal_id)
             gl.log_event("comms", "diplomatic_response", {
@@ -2136,6 +2153,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "comms.set_channel" and isinstance(payload, CommsSetChannelPayload):
             glco.set_channel_status(payload.channel, payload.status)
         elif msg_type == "comms.probe" and isinstance(payload, CommsProbePayload):
+            if glew.is_stealth_engaged():
+                glew.break_stealth("comms_transmit")
             glco.start_probe(payload.target_id)
         elif msg_type == "comms.assess_distress" and isinstance(payload, CommsAssessDistressPayload):
             assessment = glco.assess_distress(payload.signal_id)
@@ -2222,6 +2241,9 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                         "target_id": payload.entity_id,
                         "target_system": payload.target_system,
                     })
+        elif msg_type == "ew.toggle_stealth" and isinstance(payload, EWToggleStealthPayload):
+            result = glew.toggle_stealth(payload.active)
+            gl.log_event("ew", "stealth_toggled", {"active": payload.active, **result})
         elif msg_type == "tactical.set_engagement_priority" and isinstance(payload, TacticalSetEngagementPriorityPayload):
             gltac.set_engagement_priority(payload.entity_id, payload.priority)
             gl.log_event("tactical", "engagement_priority_set", {
@@ -2445,6 +2467,9 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "sensor_coverage": round(gls.get_sensor_coverage(ship.interior), 3),
             # v0.06.5 Part 7: Drone summary for Captain display.
             "drone_summary": glfo.build_drone_summary(),
+            # v0.07 §2.1: Stealth status.
+            "stealth_state": glew.get_stealth_state(),
+            "stealth_capable": glew.is_stealth_capable(),
         },
         tick=tick,
     )

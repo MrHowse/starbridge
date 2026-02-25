@@ -69,6 +69,7 @@ from server.models.messages.flight_ops import (
 from server.models.messages.ew import (
     EWSetJamTargetPayload,
     EWToggleCountermeasuresPayload,
+    EWToggleStealthPayload,
     EWBeginIntrusionPayload,
 )
 from server.models.messages.tactical import (
@@ -262,6 +263,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "ew.set_jam_target":         EWSetJamTargetPayload,
     "ew.toggle_countermeasures": EWToggleCountermeasuresPayload,
     "ew.begin_intrusion":        EWBeginIntrusionPayload,
+    "ew.toggle_stealth":         EWToggleStealthPayload,
     # Tactical Officer
     "tactical.set_engagement_priority": TacticalSetEngagementPriorityPayload,
     "tactical.set_intercept_target":    TacticalSetInterceptTargetPayload,
