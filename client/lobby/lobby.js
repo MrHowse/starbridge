@@ -238,8 +238,16 @@ function handleLobbyState(payload) {
     claimBtn.disabled = Boolean(blocked);
   }
 
+  // Janitor card is injected dynamically — detect claim via occupant element.
+  const janitorOccupant = document.querySelector('[data-occupant="janitor"]');
+  if (janitorOccupant && callsign) {
+    const jName = janitorOccupant.textContent.trim();
+    if (jName === callsign) myRole = 'janitor';
+  }
+
   // Enable launch if host and at least one role is claimed (reserved don't count)
-  const anyRoleClaimed = Object.values(roles).some(v => v !== null && !String(v).startsWith('DISCONNECTED:'));
+  const anyRoleClaimed = Object.values(roles).some(v => v !== null && !String(v).startsWith('DISCONNECTED:'))
+    || (myRole === 'janitor');
   launchBtnEl.disabled = !(isHost && anyRoleClaimed);
 }
 
@@ -275,6 +283,13 @@ function handleJanitorAvailable() {
     const callsign = callsignInput.value.trim();
     if (!callsign) return;
     send('lobby.claim_role', { role: 'janitor', player_name: callsign });
+    // Optimistically update card — janitor is excluded from lobby.state broadcasts.
+    const occ = card.querySelector('[data-occupant="janitor"]');
+    if (occ) occ.textContent = callsign;
+    card.classList.add('role-card--occupied', 'role-card--mine');
+    myRole = 'janitor';
+    // Re-enable launch button if host.
+    if (myConnectionId) launchBtnEl.disabled = false;
   });
 
   rolesGridEl.appendChild(card);
