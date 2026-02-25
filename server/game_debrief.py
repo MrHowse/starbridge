@@ -53,7 +53,7 @@ _AWARD_DEFS: list[tuple[str, str, str, int, str]] = [
     ("electronic_warfare", "Ghost",           "Jammed {n} target(s)",             1,  "jam_target_set"),
     ("tactical",         "Mastermind",        "Created {n} strike plan(s)",       1,  "strike_plan_created"),
     ("captain",          "Decisive Leader",   "Changed alert level {n} time(s)",  1,  "alert_changed"),
-    ("janitor",          "Employee of the Month", "Completed {n} maintenance task(s)", 1, "general"),
+    ("janitor",          "Employee of the Month (14 months running)", "Toilets fixed, floors mopped, coffee restocked. {n} task(s) completed. Nobody will ever know.", 1, "general"),
 ]
 
 

@@ -17,6 +17,7 @@
         <div class="janitor-locked__sign">
           <p>JANITORIAL SUPPLIES</p>
           <p class="janitor-locked__sub">AUTHORISED PERSONNEL ONLY</p>
+          <p class="janitor-locked__sub">This door is locked. You don't have the key.</p>
         </div>
         <div class="janitor-locked__handle"></div>
       </div>
@@ -28,8 +29,10 @@
 
       <!-- Header -->
       <header class="janitor-header">
-        <span class="janitor-header__title">MAINTENANCE CLIPBOARD</span>
-        <div class="janitor-header__status">
+        <div class="janitor-header__left">
+          <span class="janitor-header__title">JANITORIAL SUPPLIES &mdash; DUTY ROSTER</span>
+        </div>
+        <div class="janitor-header__right">
           <span class="status-dot status-dot--disconnected" data-status-dot></span>
           <span class="text-label" data-status-label>CONNECTING</span>
         </div>
@@ -40,10 +43,13 @@
         <div class="janitor-crawl__text" id="crawl-text"></div>
       </div>
 
-      <!-- Stats banner -->
+      <!-- Flavoured stats banner -->
       <div class="janitor-stats" id="stats-bar">
-        <span>TASKS COMPLETED: <strong id="stat-total">0</strong></span>
-        <span>ACTIVE BUFFS: <strong id="stat-buffs">0</strong></span>
+        <span>Toilets fixed: <strong id="stat-toilets">0</strong></span>
+        <span>Floors mopped: <strong id="stat-floors">0</strong></span>
+        <span>Coffee restocked: <strong id="stat-coffee">0</strong></span>
+        <span>Rat traps set: <strong id="stat-rats">0</strong></span>
+        <span class="janitor-stats__award">"Employee of the Month: The Janitor (14 months running)"</span>
       </div>
 
       <!-- Content grid -->
@@ -52,15 +58,30 @@
         <!-- Left: Task list (clipboard) -->
         <section class="janitor-clipboard" aria-label="Task list">
           <div class="janitor-clipboard__header">
-            <span>WORK ORDERS</span>
+            <span>TODAY'S TASKS</span>
           </div>
           <div class="janitor-clipboard__body" id="task-list">
             <p class="text-dim">Loading tasks...</p>
           </div>
         </section>
 
-        <!-- Right: Sticky notes + buff status -->
-        <aside class="janitor-sidebar" aria-label="Notes and status">
+        <!-- Right: Ship condition clipboard + sticky notes -->
+        <aside class="janitor-sidebar" aria-label="Clipboard and notes">
+
+          <!-- Ship condition -->
+          <div class="janitor-section">
+            <div class="janitor-section__header">THE CLIPBOARD</div>
+            <div class="janitor-section__body">
+              <div class="janitor-condition__label">SHIP CONDITION:</div>
+              <div id="deck-conditions" class="janitor-condition-list">
+                <p class="text-dim">Assessing...</p>
+              </div>
+              <div class="janitor-condition__label" style="margin-top:8px">SUPPLIES:</div>
+              <div id="supply-status" class="janitor-supply-list">
+                <p class="text-dim">Checking stock...</p>
+              </div>
+            </div>
+          </div>
 
           <!-- Active buffs -->
           <div class="janitor-section">

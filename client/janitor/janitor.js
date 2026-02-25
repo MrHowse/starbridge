@@ -16,20 +16,19 @@ import { initRoleBar } from '../shared/role_bar.js';
 
 const JANITOR_NAMES = ['the janitor', 'thejanitor'];
 
-const WELCOME_TEXT = `You are THE JANITOR.
+const WELCOME_TEXT = `Welcome to Janitorial Supplies.
 
-Nobody asked for you. Nobody knows you're here.
-But this ship would fall apart without you.
+You are the Janitor.
 
-The toilets need fixing. The floors need mopping.
-Someone keeps leaving coffee cups on the reactor.
+Your mop is your sceptre. Your plunger is your sword.
+Your supply closet is your throne room.
 
-You are the most important person on this ship.
-And nobody will ever know.
+The crew thinks you're nobody. They're wrong.
 
-...
+Everything on this ship flows through the pipes.
+And you control the pipes.
 
-Good luck.`;
+Good luck. The toilets on Deck 3 are backed up again.`;
 
 // ---------------------------------------------------------------------------
 // Auth check
@@ -118,6 +117,7 @@ function showWelcomeCrawl() {
 /** Hash guards — skip sections whose data hasn't changed. */
 let _lastBuffsJson   = '';
 let _lastStickyJson  = '';
+let _lastCondJson    = '';
 
 function handleState(state) {
   updateTasks(state.tasks || [], state.urgent_tasks || []);
@@ -134,17 +134,43 @@ function handleState(state) {
     renderStickies(state.sticky_notes || []);
   }
 
+  const condJson = JSON.stringify(state.deck_conditions || []);
+  if (condJson !== _lastCondJson) {
+    _lastCondJson = condJson;
+    renderDeckConditions(state.deck_conditions || []);
+  }
+
+  updateSupplyStatus(state);
   updateStats(state);
 }
 
+/** Show task result message as a brief toast. */
 function handleTaskResult(result) {
   if (!result.ok) return;
   // Brief flash on the task card.
   const card = document.querySelector(`[data-task-id="${result.task_id}"]`);
   if (card) {
     card.style.background = '#d4ecd4';
-    setTimeout(() => { card.style.background = ''; }, 800);
+    setTimeout(() => { card.style.background = ''; }, 1200);
   }
+  // Show result message as toast.
+  if (result.message) _showToast(result.message);
+}
+
+function _showToast(msg) {
+  let toast = document.getElementById('janitor-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'janitor-toast';
+    toast.className = 'janitor-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('janitor-toast--visible');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => {
+    toast.classList.remove('janitor-toast--visible');
+  }, 3000);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +181,7 @@ const CATEGORY_LABELS = {
   plumbing:     'PLUMBING',
   mopping:      'MOPPING',
   restocking:   'RESTOCKING',
-  maintenance:  'MAINTENANCE',
+  maintenance:  'MAINTENANCE TUNNELS',
   pest_control: 'PEST CONTROL',
   special:      'SPECIAL',
 };
@@ -234,7 +260,9 @@ function _buildTaskList(listEl, tasks, urgents) {
     for (const u of urgents) {
       const card = document.createElement('div');
       card.className = 'janitor-task janitor-task--urgent';
-      card.innerHTML = `<span class="janitor-task__label">${_esc(u.label)}</span>`;
+      card.innerHTML =
+        `<span class="janitor-task__label">${_esc(u.label)}</span>` +
+        (u.flavour ? `<span class="janitor-task__flavour">${_esc(u.flavour)}</span>` : '');
       section.appendChild(card);
     }
     listEl.appendChild(section);
@@ -262,10 +290,16 @@ function _buildTaskList(listEl, tasks, urgents) {
       const countText = task.times_performed > 0
         ? `<span class="janitor-task__count">x${task.times_performed}</span>`
         : '';
+      const flavourHtml = task.flavour
+        ? `<span class="janitor-task__flavour">${_esc(task.flavour)}</span>`
+        : '';
 
       card.innerHTML =
-        `<span class="janitor-task__label">${_esc(task.label)}${countText}</span>` +
-        `<span class="janitor-task__status">${cdText}</span>`;
+        `<div class="janitor-task__top">` +
+          `<span class="janitor-task__label">${_esc(task.label)}${countText}</span>` +
+          `<span class="janitor-task__status">${cdText}</span>` +
+        `</div>` +
+        flavourHtml;
 
       // Click handler — always attached; checks cooldown at click time.
       card.addEventListener('click', () => {
@@ -284,6 +318,62 @@ function _createCategory(label) {
   div.className = 'janitor-task-category';
   div.innerHTML = `<div class="janitor-task-category__label">${_esc(label)}</div>`;
   return div;
+}
+
+// ---------------------------------------------------------------------------
+// Deck condition rendering
+// ---------------------------------------------------------------------------
+
+const CONDITION_ICONS = {
+  tidy:      '\u2713',  // ✓
+  disaster:  '\u2715',  // ✕
+  biohazard: '\u2623',  // ☣
+  fire:      '\u{1F525}', // 🔥
+};
+
+function renderDeckConditions(conditions) {
+  const el = document.getElementById('deck-conditions');
+  if (!el) return;
+
+  if (conditions.length === 0) {
+    el.innerHTML = '<p class="text-dim">No deck data.</p>';
+    return;
+  }
+
+  el.innerHTML = '';
+  for (const c of conditions) {
+    const row = document.createElement('div');
+    row.className = `janitor-condition janitor-condition--${c.icon}`;
+    const icon = CONDITION_ICONS[c.icon] || '?';
+    row.innerHTML =
+      `<span class="janitor-condition__deck">Deck ${_esc(c.deck)}:</span>` +
+      `<span class="janitor-condition__status">${_esc(c.status)} ${icon}</span>`;
+    el.appendChild(row);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Supply status rendering
+// ---------------------------------------------------------------------------
+
+function updateSupplyStatus(state) {
+  const el = document.getElementById('supply-status');
+  if (!el) return;
+
+  const stats = state.stats || {};
+  const tp = stats.toilets_fixed || 0;
+  const coffee = stats.coffee_restocked || 0;
+  const buffs = (state.active_buffs || []).length;
+
+  // Supplies deplete as you use them, regenerate slowly.
+  // This is cosmetic — just a fun display.
+  const tpLevel = Math.max(0, 100 - tp * 12);
+  const coffeeLevel = Math.max(0, 100 - coffee * 20);
+
+  el.innerHTML =
+    `<div class="janitor-supply">Coffee: <strong>${coffeeLevel > 50 ? 'OK' : coffeeLevel > 20 ? 'Running low' : 'EMPTY!'}</strong></div>` +
+    `<div class="janitor-supply">TP: <strong>${tpLevel > 50 ? 'Stocked' : tpLevel > 20 ? 'LOW' : 'CRITICAL LOW'}</strong></div>` +
+    `<div class="janitor-supply">Active repairs: <strong>${buffs}</strong></div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -339,14 +429,19 @@ function renderStickies(notes) {
 }
 
 // ---------------------------------------------------------------------------
-// Stats
+// Flavoured stats bar
 // ---------------------------------------------------------------------------
 
 function updateStats(state) {
-  const totalEl = document.getElementById('stat-total');
-  const buffsEl = document.getElementById('stat-buffs');
-  if (totalEl) totalEl.textContent = state.total_tasks_completed || 0;
-  if (buffsEl) buffsEl.textContent = (state.active_buffs || []).length;
+  const stats = state.stats || {};
+  const toiletsEl = document.getElementById('stat-toilets');
+  const floorsEl  = document.getElementById('stat-floors');
+  const coffeeEl  = document.getElementById('stat-coffee');
+  const ratsEl    = document.getElementById('stat-rats');
+  if (toiletsEl) toiletsEl.textContent = stats.toilets_fixed || 0;
+  if (floorsEl)  floorsEl.textContent  = stats.floors_mopped || 0;
+  if (coffeeEl)  coffeeEl.textContent  = stats.coffee_restocked || 0;
+  if (ratsEl)    ratsEl.textContent    = stats.rat_traps_set || 0;
 }
 
 // ---------------------------------------------------------------------------

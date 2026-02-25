@@ -100,12 +100,20 @@ body {
 
 .janitor-stats {
   display: flex;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
   padding: 6px 16px;
   background: #6a5a48;
   color: #e8d5b0;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   border-bottom: 2px solid #3a2e1f;
+}
+
+.janitor-stats__award {
+  margin-left: auto;
+  font-style: italic;
+  color: #c8b890;
+  font-size: 0.72rem;
 }
 
 /* ── Content grid ───────────────────────────────────────────────────────── */
@@ -164,8 +172,7 @@ body {
 
 .janitor-task {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   padding: 6px 10px;
   margin: 2px 0;
   background: #faf3e0;
@@ -177,6 +184,12 @@ body {
 
 .janitor-task:hover {
   background: #f0e8d0;
+}
+
+.janitor-task__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .janitor-task--cooldown {
@@ -196,11 +209,19 @@ body {
   flex: 1;
 }
 
+.janitor-task__flavour {
+  font-size: 0.72rem;
+  font-style: italic;
+  color: #8a7a60;
+  margin-top: 2px;
+}
+
 .janitor-task__status {
   font-size: 0.75rem;
   color: #8a7a60;
   min-width: 60px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .janitor-task__count {
@@ -237,6 +258,51 @@ body {
   font-size: 0.8rem;
   font-weight: bold;
   letter-spacing: 0.1em;
+}
+
+.janitor-section__body {
+  padding: 8px 10px;
+}
+
+/* ── Deck conditions ───────────────────────────────────────────────────── */
+
+.janitor-condition__label {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #8a7a60;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.janitor-condition-list {
+  margin-top: 4px;
+}
+
+.janitor-condition {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 0.8rem;
+}
+
+.janitor-condition__deck {
+  font-weight: bold;
+}
+
+.janitor-condition--tidy .janitor-condition__status { color: #4a8c4a; }
+.janitor-condition--disaster .janitor-condition__status { color: #cc3333; }
+.janitor-condition--biohazard .janitor-condition__status { color: #cc6600; }
+.janitor-condition--fire .janitor-condition__status { color: #ff3300; font-weight: bold; }
+
+/* ── Supply status ─────────────────────────────────────────────────────── */
+
+.janitor-supply-list {
+  margin-top: 4px;
+}
+
+.janitor-supply {
+  font-size: 0.8rem;
+  padding: 1px 0;
 }
 
 /* ── Active buffs ───────────────────────────────────────────────────────── */
@@ -297,6 +363,33 @@ body {
   font-size: 0.7rem;
   border: none;
   background: transparent;
+}
+
+/* ── Toast (task result message) ───────────────────────────────────────── */
+
+.janitor-toast {
+  position: fixed;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #5a4a3a;
+  color: #e8d5b0;
+  padding: 10px 24px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-style: italic;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 900;
+  pointer-events: none;
+  max-width: 80%;
+  text-align: center;
+}
+
+.janitor-toast--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* ── Welcome crawl ──────────────────────────────────────────────────────── */

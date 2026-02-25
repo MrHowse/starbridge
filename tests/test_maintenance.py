@@ -180,8 +180,8 @@ class TestCooldowns:
         ship = fresh_ship()
         glj.perform_task("fix_toilet_deck1", ship)
 
-        # Tick past the 30s cooldown.
-        for _ in range(310):
+        # Tick past the 180s cooldown.
+        for _ in range(1810):
             glj.tick(ship, 0.1)
 
         result = glj.perform_task("fix_toilet_deck1", ship)
@@ -204,8 +204,8 @@ class TestBuffLifecycle:
         glj.apply_buffs(ship)
         assert ship.systems["sensors"]._maintenance_buff > 0
 
-        # Tick past the 60s duration.
-        for _ in range(610):
+        # Tick past the 120s duration.
+        for _ in range(1210):
             glj.tick(ship, 0.1)
         glj.apply_buffs(ship)
         assert ship.systems["sensors"]._maintenance_buff == 0
@@ -325,7 +325,7 @@ class TestDebrief:
         awards = result["awards"]
         janitor_awards = [a for a in awards if a["role"] == "janitor"]
         assert len(janitor_awards) == 1
-        assert janitor_awards[0]["award"] == "Employee of the Month"
+        assert janitor_awards[0]["award"] == "Employee of the Month (14 months running)"
 
 
 # ---------------------------------------------------------------------------
@@ -469,3 +469,131 @@ class TestPredictDamage:
         result = glj.perform_task("plumbers_intuition", ship)
         assert result["ok"] is True
         assert "sensors" in result["message"]
+
+    def test_plumbers_intuition_includes_lore(self):
+        """Result should include pipe lore text."""
+        ship = fresh_ship()
+        result = glj.perform_task("plumbers_intuition", ship)
+        # The result message should be a lore string + system info.
+        assert "(" in result["message"]  # "(system_name at N%)"
+
+
+# ---------------------------------------------------------------------------
+# Deck conditions (2 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestDeckConditions:
+    def setup_method(self):
+        glj.reset()
+
+    def test_build_state_includes_deck_conditions(self):
+        """build_state should include deck_conditions list."""
+        ship = fresh_ship()
+        state = glj.build_state(ship)
+        assert "deck_conditions" in state
+        assert isinstance(state["deck_conditions"], list)
+        assert len(state["deck_conditions"]) > 0
+        # Each condition has deck, status, icon.
+        for cond in state["deck_conditions"]:
+            assert "deck" in cond
+            assert "status" in cond
+            assert "icon" in cond
+
+    def test_fire_shows_as_fire_condition(self):
+        """A room with fire should report as FIRE! condition."""
+        ship = fresh_ship()
+        room = list(ship.interior.rooms.values())[0]
+        room.fire = True
+        conditions = glj._build_deck_conditions(ship)
+        fire_conds = [c for c in conditions if c["icon"] == "fire"]
+        assert len(fire_conds) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Stats in state (2 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestStatsInState:
+    def setup_method(self):
+        glj.reset()
+
+    def test_build_state_includes_stats(self):
+        """build_state should include a stats dict with category counts."""
+        ship = fresh_ship()
+        state = glj.build_state(ship)
+        assert "stats" in state
+        stats = state["stats"]
+        assert "toilets_fixed" in stats
+        assert "floors_mopped" in stats
+        assert "coffee_restocked" in stats
+        assert "rat_traps_set" in stats
+
+    def test_stats_increment_on_task(self):
+        """Performing a toilet task should increment toilets_fixed stat."""
+        ship = fresh_ship()
+        glj.perform_task("fix_toilet_deck1", ship)
+        state = glj.build_state(ship)
+        assert state["stats"]["toilets_fixed"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Flavour text (1 test)
+# ---------------------------------------------------------------------------
+
+
+class TestFlavourText:
+    def setup_method(self):
+        glj.reset()
+
+    def test_tasks_have_flavour(self):
+        """Task state should include flavour text from the action map."""
+        ship = fresh_ship()
+        state = glj.build_state(ship)
+        for task in state["tasks"]:
+            assert "flavour" in task
+        # fix_toilet_deck1 has flavour text
+        deck1 = next(t for t in state["tasks"] if t["id"] == "fix_toilet_deck1")
+        assert "Captain" in deck1["flavour"]
+
+
+# ---------------------------------------------------------------------------
+# All-clean trigger (1 test)
+# ---------------------------------------------------------------------------
+
+
+class TestAllClean:
+    def setup_method(self):
+        glj.reset()
+
+    def test_all_clean_sticky_fires(self):
+        """Completing all toilets and mops should trigger the all-clean sticky note."""
+        ship = fresh_ship()
+        toilet_ids = ["fix_toilet_deck1", "fix_toilet_deck2", "fix_toilet_deck3"]
+        mop_ids = ["mop_deck1", "mop_deck2", "mop_deck3"]
+        for tid in toilet_ids + mop_ids:
+            glj._cooldowns.pop(tid, None)
+            glj.perform_task(tid, ship)
+        state = glj.build_state(ship)
+        all_clean_notes = [n for n in state["sticky_notes"] if n.get("source") == "all_clean"]
+        assert len(all_clean_notes) == 1
+        assert "CLEAN" in all_clean_notes[0]["text"]
+
+
+# ---------------------------------------------------------------------------
+# Result messages (1 test)
+# ---------------------------------------------------------------------------
+
+
+class TestResultMessages:
+    def setup_method(self):
+        glj.reset()
+
+    def test_result_message_is_flavourful(self):
+        """Task results should use _RESULT_MESSAGES, not generic text."""
+        ship = fresh_ship()
+        result = glj.perform_task("fix_toilet_deck1", ship)
+        assert result["ok"] is True
+        # Should be one of the flavourful messages, not "Done: Fix..."
+        assert not result["message"].startswith("Done:")

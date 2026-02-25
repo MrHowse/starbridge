@@ -22,9 +22,9 @@ from server.models.ship import Ship
 JANITOR_NAMES: frozenset[str] = frozenset({"the janitor", "thejanitor"})
 
 #: Default cooldown for each task in seconds.
-DEFAULT_COOLDOWN: float = 30.0
+DEFAULT_COOLDOWN: float = 180.0
 #: Default buff duration in seconds.
-DEFAULT_BUFF_DURATION: float = 60.0
+DEFAULT_BUFF_DURATION: float = 120.0
 
 # ---------------------------------------------------------------------------
 # Buff tracking
@@ -41,57 +41,159 @@ class TemporaryBuff:
 
 
 # ---------------------------------------------------------------------------
-# Action map — {task_id: {label, category, cooldown, effect_type, ...}}
+# Action map — {task_id: {label, flavour, category, cooldown, effect_type, ...}}
 # ---------------------------------------------------------------------------
 
 JANITOR_ACTION_MAP: dict[str, dict] = {
-    # Plumbing
-    "fix_toilet_deck1":     {"label": "Fix Toilet (Deck 1)", "category": "plumbing", "cooldown": 30.0,
-                             "effect": "boost_system", "system": "sensors", "amount": 0.05, "duration": 60.0},
-    "fix_toilet_deck2":     {"label": "Fix Toilet (Deck 2)", "category": "plumbing", "cooldown": 30.0,
-                             "effect": "boost_system", "system": "beams", "amount": 0.05, "duration": 60.0},
-    "fix_toilet_deck3":     {"label": "Fix Toilet (Deck 3)", "category": "plumbing", "cooldown": 30.0,
-                             "effect": "boost_system", "system": "engines", "amount": 0.05, "duration": 60.0},
-    "unclog_main_sewage":   {"label": "Unclog Main Sewage Line", "category": "plumbing", "cooldown": 45.0,
-                             "effect": "boost_system", "system": "engines", "amount": 0.10, "duration": 45.0},
-    # Mopping
-    "mop_deck1":            {"label": "Mop Deck 1", "category": "mopping", "cooldown": 25.0,
-                             "effect": "reduce_hazard", "hazard": "radiation", "reduction": 0.10},
-    "mop_deck2":            {"label": "Mop Deck 2", "category": "mopping", "cooldown": 25.0,
-                             "effect": "reduce_hazard", "hazard": "fire", "reduction": 0.10},
-    "mop_deck3":            {"label": "Mop Deck 3", "category": "mopping", "cooldown": 25.0,
-                             "effect": "reduce_hazard", "hazard": "coolant", "reduction": 0.10},
-    "clean_biohazard":      {"label": "Clean Biohazard", "category": "mopping", "cooldown": 40.0,
-                             "effect": "reduce_contagion", "reduction": 0.25},
-    # Restocking
-    "restock_toilet_paper": {"label": "Restock Toilet Paper", "category": "restocking", "cooldown": 35.0,
-                             "effect": "crew_morale_boost", "system": "all", "amount": 0.03, "duration": 90.0},
-    "restock_coffee":       {"label": "Restock Coffee Machine", "category": "restocking", "cooldown": 35.0,
-                             "effect": "boost_system", "system": "engines", "amount": 0.08, "duration": 60.0},
-    "restock_snacks":       {"label": "Restock Bridge Snacks", "category": "restocking", "cooldown": 35.0,
-                             "effect": "boost_system", "system": "sensors", "amount": 0.08, "duration": 60.0},
-    "restock_medical_soap": {"label": "Restock Medical Soap", "category": "restocking", "cooldown": 35.0,
-                             "effect": "medical_supplies", "amount": 2},
-    # Maintenance
-    "inspect_ventilation":  {"label": "Inspect Ventilation Ducts", "category": "maintenance", "cooldown": 60.0,
-                             "effect": "detect_boarders", "duration": 30.0},
-    "check_cable_runs":     {"label": "Check Cable Runs", "category": "maintenance", "cooldown": 45.0,
-                             "effect": "intel_boost", "duration": 30.0},
-    "maintenance_tunnel_shortcut": {"label": "Open Maintenance Tunnel Shortcut", "category": "maintenance", "cooldown": 60.0,
-                             "effect": "repair_team_boost", "amount": 0.30, "duration": 30.0},
-    # Pest Control
-    "set_rat_traps":        {"label": "Set Rat Traps", "category": "pest_control", "cooldown": 50.0,
-                             "effect": "boost_system", "system": "torpedoes", "amount": 0.05, "duration": 60.0},
-    "fumigate_deck":        {"label": "Fumigate Deck", "category": "pest_control", "cooldown": 60.0,
-                             "effect": "damage_boarders", "damage": 10},
-    # Special
-    "fix_everything":       {"label": "\"Fix Everything\"", "category": "special", "cooldown": 120.0,
-                             "effect": "global_boost", "amount": 0.03, "duration": 30.0},
-    "plumbers_intuition":   {"label": "Plumber's Intuition", "category": "special", "cooldown": 90.0,
-                             "effect": "predict_damage"},
-    "the_secret_stash":     {"label": "The Secret Stash", "category": "special", "cooldown": 120.0,
-                             "effect": "random_bonus"},
+    # === PLUMBING === (maps to Engineering/Power)
+    "fix_toilet_deck1": {
+        "label": "Fix the toilet on Deck 1 (Bridge)",
+        "flavour": "The Captain has been complaining again.",
+        "category": "plumbing", "cooldown": 180.0,
+        "effect": "boost_system", "system": "sensors", "amount": 0.05, "duration": 120.0,
+    },
+    "fix_toilet_deck2": {
+        "label": "Fix the toilet on Deck 2 (Weapons)",
+        "flavour": "Something is very wrong in there.",
+        "category": "plumbing", "cooldown": 180.0,
+        "effect": "boost_system", "system": "beams", "amount": 0.05, "duration": 120.0,
+    },
+    "fix_toilet_deck3": {
+        "label": "Fix the toilet on Deck 3 (Engineering)",
+        "flavour": "The U-bend is making ominous noises.",
+        "category": "plumbing", "cooldown": 180.0,
+        "effect": "boost_system", "system": "engines", "amount": 0.05, "duration": 120.0,
+    },
+    "unclog_main_sewage": {
+        "label": "Unclog the main sewage line",
+        "flavour": "Nobody else is going to do this.",
+        "category": "plumbing", "cooldown": 240.0,
+        "effect": "boost_system", "system": "engines", "amount": 0.10, "duration": 120.0,
+    },
+    # === MOPPING === (maps to Hazard Clearance)
+    "mop_deck1": {
+        "label": "Mop the Bridge corridor",
+        "flavour": "Someone tracked nebula residue everywhere.",
+        "category": "mopping", "cooldown": 120.0,
+        "effect": "reduce_hazard", "hazard": "radiation", "reduction": 0.20,
+    },
+    "mop_deck2": {
+        "label": "Mop the Weapons bay floor",
+        "flavour": "Torpedo lubricant everywhere. Again.",
+        "category": "mopping", "cooldown": 120.0,
+        "effect": "reduce_hazard", "hazard": "fire", "reduction": 0.15,
+    },
+    "mop_deck3": {
+        "label": "Mop Engineering",
+        "flavour": "Coolant leak. Smells like regret.",
+        "category": "mopping", "cooldown": 120.0,
+        "effect": "reduce_hazard", "hazard": "coolant", "reduction": 0.20,
+    },
+    "clean_biohazard": {
+        "label": "Clean up the biohazard in Medical",
+        "flavour": "You don't want to know. Trust me.",
+        "category": "mopping", "cooldown": 180.0,
+        "effect": "reduce_contagion", "reduction": 0.25,
+    },
+    # === RESTOCKING === (maps to Resources/Morale)
+    "restock_toilet_paper": {
+        "label": "Restock toilet paper (ALL decks)",
+        "flavour": "The most critical supply on the ship.",
+        "category": "restocking", "cooldown": 300.0,
+        "effect": "crew_morale_boost", "system": "all", "amount": 0.03, "duration": 180.0,
+    },
+    "restock_coffee": {
+        "label": "Restock the coffee machine",
+        "flavour": "Engineering has been through 40 cups today.",
+        "category": "restocking", "cooldown": 180.0,
+        "effect": "boost_system", "system": "engines", "amount": 0.08, "duration": 120.0,
+    },
+    "restock_snacks": {
+        "label": "Restock the Bridge snack drawer",
+        "flavour": "The Captain gets cranky without biscuits.",
+        "category": "restocking", "cooldown": 180.0,
+        "effect": "boost_system", "system": "sensors", "amount": 0.08, "duration": 120.0,
+    },
+    "restock_medical_soap": {
+        "label": "Restock antibacterial soap in Medical",
+        "flavour": "Hygiene is the first line of defence.",
+        "category": "restocking", "cooldown": 180.0,
+        "effect": "medical_supplies", "amount": 2,
+    },
+    # === MAINTENANCE TUNNELS === (maps to Intelligence)
+    "inspect_ventilation": {
+        "label": "Inspect the ventilation ducts",
+        "flavour": "Routine maintenance. Definitely not spying.",
+        "category": "maintenance", "cooldown": 120.0,
+        "effect": "detect_boarders", "duration": 30.0,
+    },
+    "check_cable_runs": {
+        "label": "Check the cable runs between decks",
+        "flavour": "Someone has been tapping the comms lines.",
+        "category": "maintenance", "cooldown": 240.0,
+        "effect": "intel_boost", "duration": 30.0,
+    },
+    "maintenance_tunnel_shortcut": {
+        "label": "Use the maintenance tunnels",
+        "flavour": "You know ways through this ship that the blueprints don't show.",
+        "category": "maintenance", "cooldown": 180.0,
+        "effect": "repair_team_boost", "amount": 0.30, "duration": 60.0,
+    },
+    # === PEST CONTROL === (maps to Creature/Boarding)
+    "set_rat_traps": {
+        "label": "Set rat traps in the cargo hold",
+        "flavour": "Something has been getting into the supplies.",
+        "category": "pest_control", "cooldown": 180.0,
+        "effect": "boost_system", "system": "torpedoes", "amount": 0.05, "duration": 120.0,
+    },
+    "fumigate_deck": {
+        "label": "Fumigate the lower decks",
+        "flavour": "The smell is... concerning.",
+        "category": "pest_control", "cooldown": 300.0,
+        "effect": "damage_boarders", "damage": 10,
+    },
+    # === THE BIG ONES === (powerful, long cooldown)
+    "fix_everything": {
+        "label": "The Big Clean",
+        "flavour": "Lock yourself in. Put on the music. Clean EVERYTHING.",
+        "category": "special", "cooldown": 600.0,
+        "effect": "global_boost", "amount": 0.03, "duration": 60.0,
+    },
+    "plumbers_intuition": {
+        "label": "Listen to the Pipes",
+        "flavour": "The pipes tell you things. Where the pressure is wrong. "
+                   "Where something is about to break.",
+        "category": "special", "cooldown": 300.0,
+        "effect": "predict_damage",
+    },
+    "the_secret_stash": {
+        "label": "Check The Secret Stash",
+        "flavour": "Behind the false wall in Supply Closet 3B. "
+                   "Every janitor knows about it. Nobody else does.",
+        "category": "special", "cooldown": 480.0,
+        "effect": "random_bonus",
+    },
 }
+
+# Lore text for "Listen to the Pipes" (rotated through).
+_PIPE_LORE: list[str] = [
+    "The pipes whisper of an attack from the north. They're never wrong.",
+    "Something is rattling in the port-side conduits. Shields, maybe.",
+    "The water pressure dropped on Deck 3. Something is pulling power.",
+    "You hear a faint hum. The engines are about to have a bad day.",
+    "The pipes are quiet. Too quiet. That's never good.",
+    "There's a vibration in the hull. Something big is coming.",
+]
+
+# Lore text for "The Secret Stash" (appended to result occasionally).
+_STASH_LORE: list[str] = [
+    " A note reads: 'Left by the previous Janitor. And the one before that. "
+    "And the one before that. The Janitor is eternal.'",
+    " Someone scratched into the wall: 'The Janitor sees all.'",
+    "",
+    "",
+    "",
+]
 
 # ---------------------------------------------------------------------------
 # Module-level state
@@ -137,6 +239,32 @@ def reset() -> None:
     _total_tasks_completed = 0
 
 
+# ---------------------------------------------------------------------------
+# Result message helpers (flavourful, in-character)
+# ---------------------------------------------------------------------------
+
+_RESULT_MESSAGES: dict[str, list[str]] = {
+    "fix_toilet_deck1":     ["Toilet fixed. You're a hero.", "The Captain will never know. Or thank you."],
+    "fix_toilet_deck2":     ["Fixed. The Weapons bay smells almost tolerable now.", "Plumbing restored. Nobody noticed."],
+    "fix_toilet_deck3":     ["U-bend secured. Engineering owes you one.", "Fixed. The ominous noises have stopped. For now."],
+    "unclog_main_sewage":   ["Main line clear. You don't want to know what was in there.", "Sewage flowing freely. You are a champion of infrastructure."],
+    "mop_deck1":            ["Floor mopped. Spotless.", "Bridge corridor gleaming. Someone will track mud through it in 5 minutes."],
+    "mop_deck2":            ["Torpedo lubricant cleaned up. Again.", "Floor's clean. They'll mess it up by next shift."],
+    "mop_deck3":            ["Coolant mopped. Your shoes may never recover.", "Engineering floor clean. Smells like regret and pine cleaner."],
+    "clean_biohazard":      ["Biohazard contained. You don't get paid enough for this.", "Medical bay sanitised. Please wash your hands. Twice."],
+    "restock_toilet_paper":  ["TP restocked on all decks. Crisis averted.", "The most important resupply mission of the war."],
+    "restock_coffee":       ["Coffee machine loaded. Engineering owes you one.", "40 cups and counting. They'd mutiny without you."],
+    "restock_snacks":       ["Snack drawer full. The Captain's mood will improve shortly.", "Biscuits deployed. Bridge morale holding."],
+    "restock_medical_soap": ["Soap restocked. Hygiene is the first line of defence.", "Medical supplies topped up. Doctor might actually say thank you. (They won't.)"],
+    "inspect_ventilation":  ["Ducts inspected. You see everything from up here.", "Routine maintenance. Definitely not spying."],
+    "check_cable_runs":     ["Cables checked. Someone HAS been tapping the comms lines.", "Found some interesting wiring. Comms should work better now."],
+    "maintenance_tunnel_shortcut": ["Shortcut opened. You know this ship better than the blueprints.", "Tunnel clear. The repair crews will thank you. (They won't know why.)"],
+    "set_rat_traps":        ["Traps set. Whatever's in the cargo hold, you'll get it.", "Rat traps deployed. The supplies should be safe now."],
+    "fumigate_deck":        ["Deck fumigated. Everything down there got a faceful.", "Lower decks fumigated. The smell will clear eventually."],
+    "fix_everything":       ["THE BIG CLEAN IS DONE. The ship has never been this clean.", "Everything. Is. Clean. For one perfect moment."],
+}
+
+
 def perform_task(task_id: str, ship: Ship, world: object | None = None) -> dict:
     """Execute a janitor action. Returns {ok, message} or {ok: False, error}."""
     global _intel_boost_remaining, _repair_boost_remaining
@@ -151,7 +279,10 @@ def perform_task(task_id: str, ship: Ship, world: object | None = None) -> dict:
         return {"ok": False, "error": "Task on cooldown.", "remaining": round(_cooldowns[task_id], 1)}
 
     effect = action["effect"]
-    result_msg = f"Completed: {action['label']}"
+
+    # Pick a flavourful result message.
+    msgs = _RESULT_MESSAGES.get(task_id)
+    result_msg = random.choice(msgs) if msgs else f"Done: {action['label']}"
 
     if effect == "boost_system":
         _buffs.append(TemporaryBuff(
@@ -159,7 +290,6 @@ def perform_task(task_id: str, ship: Ship, world: object | None = None) -> dict:
             amount=action["amount"],
             remaining=action.get("duration", DEFAULT_BUFF_DURATION),
         ))
-        result_msg = f"{action['label']} — {action['system']} +{int(action['amount']*100)}%"
 
     elif effect == "crew_morale_boost":
         _buffs.append(TemporaryBuff(
@@ -167,7 +297,6 @@ def perform_task(task_id: str, ship: Ship, world: object | None = None) -> dict:
             amount=action["amount"],
             remaining=action.get("duration", DEFAULT_BUFF_DURATION),
         ))
-        result_msg = f"{action['label']} — crew morale boosted"
 
     elif effect == "global_boost":
         for sys_name in ship.systems:
@@ -176,78 +305,87 @@ def perform_task(task_id: str, ship: Ship, world: object | None = None) -> dict:
                 amount=action["amount"],
                 remaining=action.get("duration", DEFAULT_BUFF_DURATION),
             ))
-        result_msg = f"{action['label']} — all systems +{int(action['amount']*100)}%"
 
     elif effect == "reduce_hazard":
-        # Reduce hazard effect — real effect tracked via buff on shields
         _buffs.append(TemporaryBuff(
             system="shields",
             amount=action.get("reduction", 0.05),
-            remaining=60.0,
+            remaining=DEFAULT_BUFF_DURATION,
         ))
-        result_msg = f"{action['label']} — {action['hazard']} hazard reduced"
 
     elif effect == "reduce_contagion":
-        # Add a medical buff as proxy for contagion reduction
         _buffs.append(TemporaryBuff(
             system="sensors",
             amount=0.05,
-            remaining=60.0,
+            remaining=DEFAULT_BUFF_DURATION,
         ))
-        result_msg = f"{action['label']} — contagion risk reduced by {int(action['reduction']*100)}%"
 
     elif effect == "medical_supplies":
         ship.medical_supplies = min(ship.medical_supplies + action["amount"], 50)
-        result_msg = f"{action['label']} — +{action['amount']} medical supplies"
 
     elif effect == "detect_boarders":
         _detect_boarders_remaining = action.get("duration", 30.0)
-        result_msg = f"{action['label']} — intruder detection active for {int(_detect_boarders_remaining)}s"
 
     elif effect == "intel_boost":
         _intel_boost_remaining = action.get("duration", 30.0)
-        result_msg = f"{action['label']} — decode speed boosted for {int(_intel_boost_remaining)}s"
 
     elif effect == "repair_team_boost":
-        _repair_boost_remaining = action.get("duration", 30.0)
+        _repair_boost_remaining = action.get("duration", 60.0)
         _repair_boost_amount = action.get("amount", 0.30)
-        result_msg = f"{action['label']} — repair teams +{int(_repair_boost_amount*100)}% speed"
 
     elif effect == "damage_boarders":
-        # Apply damage to boarders (if any exist on ship interior)
         damage = action.get("damage", 10)
         hit_count = 0
         for room in ship.interior.rooms.values():
             for intruder in getattr(room, "intruders", []):
                 intruder.health = max(0, intruder.health - damage)
                 hit_count += 1
-        result_msg = f"{action['label']} — {hit_count} intruder(s) fumigated ({damage} dmg each)"
+        if hit_count > 0:
+            result_msg = f"Deck fumigated. {hit_count} intruder(s) got a faceful."
+        else:
+            result_msg = "Deck fumigated. Nothing down there. This time."
 
     elif effect == "predict_damage":
-        # Peek at ship state — predict next system failure
         weakest = min(ship.systems.values(), key=lambda s: s.health)
-        result_msg = f"Plumber's Intuition: {weakest.name} looks dodgy ({weakest.health:.0f}% health)"
+        # Lore text + practical info
+        lore = random.choice(_PIPE_LORE)
+        result_msg = f"{lore} ({weakest.name} at {weakest.health:.0f}%)"
 
     elif effect == "random_bonus":
         bonus = random.choice(["hull", "medical", "torpedo", "morale"])
         if bonus == "hull":
             ship.hull = min(ship.hull + 5, ship.hull_max)
-            result_msg = "Found some spare hull plating! (+5 hull)"
+            result_msg = "Found some spare hull plating behind the boiler! (+5 hull)"
         elif bonus == "medical":
             ship.medical_supplies = min(ship.medical_supplies + 3, 50)
-            result_msg = "Found a first aid kit behind the pipes! (+3 medical supplies)"
+            result_msg = "Found a first aid kit wedged behind the pipes! (+3 medical supplies)"
         elif bonus == "torpedo":
-            result_msg = "Found... a torpedo? In the cleaning closet? (How did that get there?)"
+            result_msg = "Found... a torpedo? In the cleaning closet? How did that get there?"
         elif bonus == "morale":
-            _buffs.append(TemporaryBuff(system="all", amount=0.05, remaining=90.0))
-            result_msg = "Found a motivational poster. Crew morale improved!"
+            _buffs.append(TemporaryBuff(system="all", amount=0.05, remaining=120.0))
+            result_msg = "Found a motivational poster: 'YOU'RE DOING GREAT'. Crew morale surged!"
+        # Occasionally append lore note
+        result_msg += random.choice(_STASH_LORE)
 
     # Set cooldown and increment count.
     _cooldowns[task_id] = action.get("cooldown", DEFAULT_COOLDOWN)
     _task_counts[task_id] = _task_counts.get(task_id, 0) + 1
     _total_tasks_completed += 1
 
+    # Check for all-clean achievement.
+    _check_all_clean()
+
     return {"ok": True, "message": result_msg, "task_id": task_id}
+
+
+def _check_all_clean() -> None:
+    """If all toilets fixed and all decks mopped this session, generate the all-clean note."""
+    toilet_ids = {"fix_toilet_deck1", "fix_toilet_deck2", "fix_toilet_deck3"}
+    mop_ids = {"mop_deck1", "mop_deck2", "mop_deck3"}
+    all_done = all(_task_counts.get(tid, 0) > 0 for tid in toilet_ids | mop_ids)
+    # Only fire once — check if already posted.
+    if all_done and not any(n.get("source") == "all_clean" for n in _sticky_notes):
+        generate_sticky_note("all_clean")
 
 
 def tick(ship: Ship, dt: float, world: object | None = None) -> list[dict]:
@@ -329,16 +467,18 @@ def generate_urgent_tasks(ship: Ship, world: object | None = None) -> list[dict]
         if getattr(room, "fire", False):
             urgents.append({
                 "id": f"urgent_fire_{room.name}",
-                "label": f"URGENT: Fire extinguisher refill — {room.name}",
+                "label": f"URGENT: Fire extinguisher refill \u2014 {room.name}",
                 "category": "urgent",
             })
             break  # One fire alert is enough
 
-    # Low hull
+    # Low hull — "Hold It Together"
     if ship.hull < ship.hull_max * 0.20:
         urgents.append({
             "id": "urgent_low_hull",
-            "label": "URGENT: Hold It Together (+5% hull for 60s)",
+            "label": "URGENT: Hold It Together",
+            "flavour": "Sometimes, a ship survives because someone in the depths "
+                       "holds a pipe together with both hands and refuses to let go.",
             "category": "urgent",
         })
 
@@ -362,10 +502,18 @@ def generate_sticky_note(event_type: str, data: dict | None = None) -> dict:
     data = data or {}
 
     texts = {
-        "hull_hit":       "Dear Janitor, there's a mess on Deck {deck}. Please clean it up. — Bridge",
-        "system_damage":  "The {system} is acting up. Did you touch the cables? — Science",
-        "boarding":       "Lot of mess on Deck 2. Sorry. — Marine Alpha",
-        "all_clean":      "THE SHIP IS CLEAN. For a moment, everything is perfect.",
+        "hull_hit":       "Dear Janitor, there's a mess on Deck {deck}. Please clean it up. \u2014 Bridge",
+        "system_damage":  "The {system} is acting up. Did you touch the cables again? \u2014 Science Officer",
+        "boarding":       "Dear Janitor, there is a LOT of mess on Deck 2. Sorry. \u2014 Marine Alpha Squad",
+        "creature_attack": "What IS that smell on the hull? Can you do something? \u2014 Helm",
+        "coffee_request":  "The coffee machine on Deck 3 is making a sound like a dying whale. "
+                          "Please investigate. \u2014 Chief Engineer",
+        "airlock_note":    "To whoever keeps leaving the airlock inner door open: STOP. \u2014 Security",
+        "toilet_thanks":   "Thank you for fixing the toilet. You saved the ship today and "
+                          "nobody will ever know. \u2014 Anonymous",
+        "employee_month":  "EMPLOYEE OF THE MONTH: The Janitor (14 months running)",
+        "all_clean":       "THE SHIP IS CLEAN. For a moment, everything is perfect. "
+                          "The crew breathes easier. Nobody knows why.",
     }
 
     template = texts.get(event_type, "Maintenance requested.")
@@ -392,6 +540,7 @@ def build_state(ship: Ship, world: object | None = None) -> dict:
         tasks.append({
             "id": task_id,
             "label": action["label"],
+            "flavour": action.get("flavour", ""),
             "category": action["category"],
             "cooldown_remaining": round(max(0, cd), 1),
             "cooldown_total": action.get("cooldown", DEFAULT_COOLDOWN),
@@ -410,6 +559,17 @@ def build_state(ship: Ship, world: object | None = None) -> dict:
 
     urgents = generate_urgent_tasks(ship, world)
 
+    # Ship condition from the janitor's perspective.
+    deck_conditions = _build_deck_conditions(ship)
+
+    # Category-specific task counts for the flavoured stats bar.
+    toilets_fixed = sum(_task_counts.get(t, 0) for t in
+                        ("fix_toilet_deck1", "fix_toilet_deck2", "fix_toilet_deck3", "unclog_main_sewage"))
+    floors_mopped = sum(_task_counts.get(t, 0) for t in
+                        ("mop_deck1", "mop_deck2", "mop_deck3", "clean_biohazard"))
+    coffee_restocked = _task_counts.get("restock_coffee", 0)
+    rat_traps_set = _task_counts.get("set_rat_traps", 0)
+
     return {
         "tasks": tasks,
         "active_buffs": active_buffs,
@@ -419,7 +579,59 @@ def build_state(ship: Ship, world: object | None = None) -> dict:
         "intel_boost_active": _intel_boost_remaining > 0,
         "repair_boost_active": _repair_boost_remaining > 0,
         "detect_boarders_active": _detect_boarders_remaining > 0,
+        "deck_conditions": deck_conditions,
+        "stats": {
+            "toilets_fixed": toilets_fixed,
+            "floors_mopped": floors_mopped,
+            "coffee_restocked": coffee_restocked,
+            "rat_traps_set": rat_traps_set,
+        },
     }
+
+
+def _build_deck_conditions(ship: Ship) -> list[dict]:
+    """Build deck condition summary from ship state (janitor perspective)."""
+    conditions = []
+    # Group rooms by deck number (first char of room name if numeric, else "Other").
+    decks: dict[str, list] = {}
+    for room in ship.interior.rooms.values():
+        # Extract deck identifier from room name (e.g., "Deck 1 Bridge" → "1").
+        name = getattr(room, "name", "Unknown")
+        parts = name.split()
+        deck_num = "?"
+        for i, p in enumerate(parts):
+            if p.lower() == "deck" and i + 1 < len(parts):
+                deck_num = parts[i + 1]
+                break
+        decks.setdefault(deck_num, []).append(room)
+
+    for deck_id in sorted(decks.keys()):
+        rooms = decks[deck_id]
+        has_fire = any(getattr(r, "fire", False) for r in rooms)
+        has_intruders = any(getattr(r, "intruders", []) for r in rooms)
+        has_damage = any(getattr(r, "hull_breach", False) for r in rooms)
+
+        if has_fire:
+            status, icon = "FIRE!", "fire"
+        elif has_intruders:
+            status, icon = "Biohazard", "biohazard"
+        elif has_damage:
+            status, icon = "Disaster", "disaster"
+        else:
+            status, icon = "Tidy", "tidy"
+
+        conditions.append({
+            "deck": deck_id,
+            "status": status,
+            "icon": icon,
+        })
+
+    # If no deck info available, provide defaults.
+    if not conditions:
+        for i in range(1, 6):
+            conditions.append({"deck": str(i), "status": "Tidy", "icon": "tidy"})
+
+    return conditions
 
 
 def has_intel_boost() -> bool:
