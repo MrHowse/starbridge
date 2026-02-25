@@ -51,6 +51,9 @@ const ROLE_LABELS = {
   damage_control:     'DC',
 };
 
+// Janitor names that unlock the secret station.
+const _JANITOR_NAMES = ['the janitor', 'thejanitor'];
+
 // ---------------------------------------------------------------------------
 // Module state
 // ---------------------------------------------------------------------------
@@ -175,6 +178,31 @@ function _renderBar(players) {
     }
 
     _barEl.appendChild(pill);
+  }
+
+  // Dynamically add janitor pill for janitor players only.
+  if (_JANITOR_NAMES.includes(myName.toLowerCase())) {
+    const jRole = 'janitor';
+    const jUrl  = '/client/janitor/';
+    const jName = players[jRole] || null;
+    const jSelf = _currentRole === jRole;
+
+    const jPill = document.createElement('div');
+    jPill.className = [
+      'role-bar__pill',
+      jSelf ? 'role-bar__pill--self' : '',
+      jName === null ? 'role-bar__pill--open' : 'role-bar__pill--occupied',
+    ].join(' ').trim();
+    jPill.setAttribute('title', jSelf ? 'You are here — janitor' : 'Janitorial Supplies');
+    jPill.innerHTML =
+      `<span class="role-bar__pill-role" style="color:#8a7a60">JAN</span>` +
+      `<span class="role-bar__pill-player">${_esc(jName || '\u2014')}</span>`;
+
+    if (!jSelf) {
+      jPill.classList.add('role-bar__pill--clickable');
+      jPill.addEventListener('click', () => { window.location.href = jUrl; });
+    }
+    _barEl.appendChild(jPill);
   }
 }
 

@@ -82,6 +82,7 @@ function init() {
   on('lobby.state',   handleLobbyState);
   on('lobby.error',   handleLobbyError);
   on('game.started',  handleGameStarted);
+  on('lobby.janitor_available', handleJanitorAvailable);
 
   launchBtnEl.addEventListener('click', () => {
     const mission_id   = missionSelectEl ? missionSelectEl.value : 'sandbox';
@@ -237,6 +238,35 @@ function handleLobbyError(payload) {
   callsignInput.classList.add('lobby-input--error');
   setTimeout(() => callsignInput.classList.remove('lobby-input--error'), 1500);
   console.warn('[lobby] Error:', payload.message);
+}
+
+/** Handle janitor role availability hint */
+function handleJanitorAvailable() {
+  // Only inject if not already present.
+  if (document.querySelector('[data-role-card="janitor"]')) return;
+
+  const card = document.createElement('div');
+  card.className = 'role-card panel role-card--janitor';
+  card.dataset.roleCard = 'janitor';
+  card.innerHTML = `
+    <div class="panel__header role-card__header" style="background:#5a4a3a;color:#e8d5b0">
+      <span class="text-header">JANITORIAL SUPPLIES</span>
+    </div>
+    <div class="role-card__body">
+      <span class="role-card__occupant text-data" data-occupant="janitor">VACANT</span>
+      <div class="role-card__actions">
+        <button class="btn btn--primary role-card__claim" data-claim="janitor" aria-label="Claim JANITOR" style="background:#5a4a3a;border-color:#8a7a60">CLAIM</button>
+      </div>
+    </div>
+  `;
+
+  card.querySelector('[data-claim="janitor"]').addEventListener('click', () => {
+    const callsign = callsignInput.value.trim();
+    if (!callsign) return;
+    send('lobby.claim_role', { role: 'janitor', player_name: callsign });
+  });
+
+  rolesGridEl.appendChild(card);
 }
 
 /** @param {{ mission_id: string, mission_name: string, briefing_text: string }} payload */

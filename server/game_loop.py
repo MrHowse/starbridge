@@ -122,6 +122,8 @@ from server.models.messages import (
     WeaponsSetShieldFocusPayload,
     MapPlotRoutePayload,
     MapClearRoutePayload,
+    JanitorPerformTaskPayload,
+    JanitorDismissStickyPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -158,6 +160,7 @@ import server.game_loop_docking as gldo
 import server.game_loop_creatures as glc
 import server.game_loop_engineering as gle
 import server.game_loop_dynamic_missions as gldm
+import server.game_loop_janitor as glj
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -463,6 +466,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     sensors.reset()
     glc.reset()
     gle.reset()
+    glj.reset()
 
     if _task is not None and not _task.done():
         logger.warning("Game loop already running — stopping before restart")
@@ -745,6 +749,7 @@ async def _loop() -> None:
         _reassignment_roster = glmed.get_roster()
         _reassignment_events = _reassignment_roster.tick_reassignments(TICK_DT) if _reassignment_roster else []
         _world.ship.update_crew_factors(individual_roster=_reassignment_roster)
+        glj.apply_buffs(_world.ship)
         _crew_factor_events = _check_crew_factor_thresholds(_world.ship)
         glmed.tick_treatments(_world.ship, TICK_DT)
         disease_events = glmed.tick_disease(_world.ship.interior, TICK_DT)
@@ -762,6 +767,8 @@ async def _loop() -> None:
         hazard_events = hazard_system.tick_hazards(_world, _world.ship, TICK_DT)
         _hazard_sensor_mod = hazard_system.get_sensor_modifier()
         _hazard_shield_mod = hazard_system.get_shield_regen_modifier()
+        # 3.8b Janitor maintenance tick.
+        _janitor_events = glj.tick(_world.ship, TICK_DT, _world)
         # 3.8 Science sector scan.
         glss_events = glss.tick(TICK_DT, _world)
         # Advance creature study while BIO sector scan is active.
@@ -1622,6 +1629,19 @@ async def _loop() -> None:
                 Message.build("tactical.strike_countdown", _cdata),
             )
 
+        # 11m. Janitor state → janitor station (secret).
+        await _manager.broadcast_to_roles(
+            ["janitor"],
+            Message.build("janitor.state", glj.build_state(_world.ship, _world)),
+        )
+        # Forward janitor task results/errors to janitor station.
+        for _jevt in _janitor_events:
+            _jevt_type = _jevt.get("type", "janitor.event")
+            await _manager.broadcast_to_roles(
+                ["janitor"],
+                Message.build(_jevt_type, _jevt),
+            )
+
         # 12–15. Damage events, torpedo hits, action events, security events.
         # 12a. Overclock damage events (from gle.tick).
         for _oc_evt in _eng_result.overclock_events:
@@ -2268,6 +2288,15 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                     "creature_id": payload.creature_id,
                     "method": method,
                 })
+        elif msg_type == "janitor.perform_task" and isinstance(payload, JanitorPerformTaskPayload):
+            result = glj.perform_task(payload.task_id, ship, world)
+            if result.get("ok"):
+                events.append(("janitor.task_result", result))
+                gl.log_event("maintenance", "general", {"task_id": payload.task_id})
+            else:
+                events.append(("janitor.task_error", result))
+        elif msg_type == "janitor.dismiss_sticky" and isinstance(payload, JanitorDismissStickyPayload):
+            glj.dismiss_sticky(payload.sticky_id)
         else:
             logger.warning("Unrecognised queued input type: %s", msg_type)
 

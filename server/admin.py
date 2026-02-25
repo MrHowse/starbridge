@@ -67,7 +67,11 @@ def get_engagement_status(role: str) -> EngagementStatus:
 
 
 def build_engagement_report() -> dict[str, dict]:
-    """Return engagement status for all station roles."""
+    """Return engagement status for all station roles.
+
+    If the janitor role has engagement data, it is redacted as
+    '███████████' with status 'CLASSIFIED'.
+    """
     now = time.monotonic()
     report: dict[str, dict] = {}
     for role in ALL_STATION_ROLES:
@@ -80,5 +84,11 @@ def build_engagement_report() -> dict[str, dict]:
         report[role] = {
             "status": status,
             "seconds_since_last_action": elapsed if elapsed >= 0 else None,
+        }
+    # Redact janitor if present.
+    if "janitor" in _last_interaction:
+        report["\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588"] = {
+            "status": "CLASSIFIED",
+            "seconds_since_last_action": None,
         }
     return report

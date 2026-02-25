@@ -39,6 +39,7 @@ import server.game_loop_mission as glm
 import server.game_loop_docking as gldo
 import server.game_loop_engineering as gle
 import server.game_loop_dynamic_missions as gldm
+import server.game_loop_janitor as glj
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -462,6 +463,7 @@ def save_game(
             "docking": gldo.serialise(),
             "engineering": gle.serialise(),
             "dynamic_missions": gldm.serialise(),
+            "janitor": glj.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -555,6 +557,8 @@ def restore_game(save_id: str, world: World) -> dict:
         gle.deserialise(mods["engineering"], world.ship)
     if mods.get("dynamic_missions"):
         gldm.deserialise(mods["dynamic_missions"])
+    if mods.get("janitor"):
+        glj.deserialise(mods["janitor"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")

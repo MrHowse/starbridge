@@ -185,6 +185,12 @@ from server.models.messages.creatures import (
     CreatureLeeechRemovePayload,
 )
 
+# Janitor (secret station)
+from server.models.messages.janitor import (
+    JanitorPerformTaskPayload,
+    JanitorDismissStickyPayload,
+)
+
 __all__ = [
     # base
     "Message",
@@ -327,4 +333,7 @@ __all__ = [
     "CreatureEWDisruptPayload",
     "CreatureCommProgressPayload",
     "CreatureLeeechRemovePayload",
+    # janitor
+    "JanitorPerformTaskPayload",
+    "JanitorDismissStickyPayload",
 ]

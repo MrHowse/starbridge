@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — JANITORIAL SUPPLIES</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="../shared/accessibility.css">
+  <link rel="stylesheet" href="janitor.css">
+</head>
+<body>
+  <div class="station-container">
+
+    <!-- Locked door screen (shown to non-janitor players) -->
+    <div class="janitor-locked" id="locked-screen">
+      <div class="janitor-locked__door">
+        <div class="janitor-locked__sign">
+          <p>JANITORIAL SUPPLIES</p>
+          <p class="janitor-locked__sub">AUTHORISED PERSONNEL ONLY</p>
+        </div>
+        <div class="janitor-locked__handle"></div>
+      </div>
+      <a class="text-label janitor-locked__back" href="/client/lobby/">&larr; RETURN TO LOBBY</a>
+    </div>
+
+    <!-- Main janitor layout (hidden until authenticated) -->
+    <main class="janitor-main" id="janitor-main" style="display:none">
+
+      <!-- Header -->
+      <header class="janitor-header">
+        <span class="janitor-header__title">MAINTENANCE CLIPBOARD</span>
+        <div class="janitor-header__status">
+          <span class="status-dot status-dot--disconnected" data-status-dot></span>
+          <span class="text-label" data-status-label>CONNECTING</span>
+        </div>
+      </header>
+
+      <!-- Welcome crawl overlay -->
+      <div class="janitor-crawl" id="welcome-crawl" style="display:none">
+        <div class="janitor-crawl__text" id="crawl-text"></div>
+      </div>
+
+      <!-- Stats banner -->
+      <div class="janitor-stats" id="stats-bar">
+        <span>TASKS COMPLETED: <strong id="stat-total">0</strong></span>
+        <span>ACTIVE BUFFS: <strong id="stat-buffs">0</strong></span>
+      </div>
+
+      <!-- Content grid -->
+      <div class="janitor-grid">
+
+        <!-- Left: Task list (clipboard) -->
+        <section class="janitor-clipboard" aria-label="Task list">
+          <div class="janitor-clipboard__header">
+            <span>WORK ORDERS</span>
+          </div>
+          <div class="janitor-clipboard__body" id="task-list">
+            <p class="text-dim">Loading tasks...</p>
+          </div>
+        </section>
+
+        <!-- Right: Sticky notes + buff status -->
+        <aside class="janitor-sidebar" aria-label="Notes and status">
+
+          <!-- Active buffs -->
+          <div class="janitor-section">
+            <div class="janitor-section__header">ACTIVE EFFECTS</div>
+            <div id="buff-list" class="janitor-buff-list">
+              <p class="text-dim">No active effects.</p>
+            </div>
+          </div>
+
+          <!-- Sticky notes -->
+          <div class="janitor-section">
+            <div class="janitor-section__header">MESSAGES</div>
+            <div id="sticky-list" class="janitor-sticky-list">
+              <p class="text-dim">No messages.</p>
+            </div>
+          </div>
+
+        </aside>
+      </div>
+    </main>
+
+  </div>
+  <script type="module" src="janitor.js"></script>
+  <script type="module" src="../shared/a11y_widget.js"></script>
+</body>
+</html>

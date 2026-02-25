@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import ValidationError
 
-from server import captain, comms, damage_control, engineering, ew, flight_ops, game_loop, helm, lobby, medical, science, security, tactical, weapons
+from server import captain, comms, damage_control, engineering, ew, flight_ops, game_loop, helm, janitor, lobby, medical, science, security, tactical, weapons
 from server.mission_validator import validate_mission as _validate_mission
 from server.connections import ConnectionManager
 from server.models.messages import Message, VALID_SYSTEMS, validate_payload
@@ -80,6 +80,7 @@ flight_ops.init(manager, input_queue)
 ew.init(manager, input_queue)
 tactical.init(manager, input_queue)
 damage_control.init(manager, input_queue)
+janitor.init(manager, input_queue)
 game_loop.init(world, manager, input_queue)
 
 # When the host starts a game the lobby calls this wrapper, which captures the
@@ -163,6 +164,7 @@ _HANDLERS: dict[str, _MessageHandler] = {
     "ew": ew.handle_ew_message,
     "tactical": tactical.handle_tactical_message,
     "damage_control": damage_control.handle_damage_control_message,
+    "janitor": janitor.handle_janitor_message,
     # Generic queue-forwarded categories (handled in game_loop._drain_queue)
     "puzzle":   _queue_forward_handler,
     "creature": _queue_forward_handler,
@@ -214,7 +216,7 @@ async def _handle_message(connection_id: str, raw: str) -> None:
         return
 
     # Track last interaction per station role for admin engagement monitoring.
-    if category in _admin.ALL_STATION_ROLES:
+    if category in _admin.ALL_STATION_ROLES or category == "janitor":
         _admin.update_interaction(category)
 
     await handler(connection_id, message)

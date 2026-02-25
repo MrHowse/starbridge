@@ -1,0 +1,337 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Janitor Station — Clipboard Aesthetic
+   Completely different from the sci-fi theme: yellowed paper, brown tones,
+   handwritten-style layout. Feels like a maintenance closet, not a bridge.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Override sci-fi theme */
+body {
+  background: #d4c4a0;
+  color: #3a2e1f;
+  font-family: "Courier New", Courier, monospace;
+}
+
+.station-container {
+  background: #e8d5b0;
+  min-height: 100vh;
+}
+
+/* ── Locked door screen ─────────────────────────────────────────────────── */
+
+.janitor-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #2a2520;
+}
+
+.janitor-locked__door {
+  width: 280px;
+  height: 400px;
+  background: #5a4a3a;
+  border: 3px solid #3a2e1f;
+  border-radius: 4px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.janitor-locked__sign {
+  background: #e8d5b0;
+  border: 2px solid #8a7a60;
+  padding: 12px 20px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #3a2e1f;
+  letter-spacing: 0.1em;
+}
+
+.janitor-locked__sub {
+  font-size: 0.7rem;
+  font-weight: normal;
+  color: #8a7a60;
+  margin-top: 4px;
+}
+
+.janitor-locked__handle {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  width: 16px;
+  height: 40px;
+  background: #8a7a60;
+  border-radius: 3px;
+  border: 1px solid #5a4a3a;
+}
+
+.janitor-locked__back {
+  margin-top: 20px;
+  color: #8a7a60;
+  text-decoration: none;
+}
+.janitor-locked__back:hover {
+  color: #c8b890;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.janitor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #5a4a3a;
+  color: #e8d5b0;
+  border-bottom: 3px solid #3a2e1f;
+}
+
+.janitor-header__title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+}
+
+/* ── Stats bar ──────────────────────────────────────────────────────────── */
+
+.janitor-stats {
+  display: flex;
+  gap: 24px;
+  padding: 6px 16px;
+  background: #6a5a48;
+  color: #e8d5b0;
+  font-size: 0.8rem;
+  border-bottom: 2px solid #3a2e1f;
+}
+
+/* ── Content grid ───────────────────────────────────────────────────────── */
+
+.janitor-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  padding: 12px;
+  height: calc(100vh - 100px);
+  overflow: hidden;
+}
+
+/* ── Clipboard (task list) ──────────────────────────────────────────────── */
+
+.janitor-clipboard {
+  background: #f5ecd5;
+  border: 2px solid #8a7a60;
+  border-radius: 4px;
+  overflow-y: auto;
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.15);
+}
+
+.janitor-clipboard__header {
+  background: #5a4a3a;
+  color: #e8d5b0;
+  padding: 8px 12px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.janitor-clipboard__body {
+  padding: 8px;
+}
+
+/* ── Task cards ─────────────────────────────────────────────────────────── */
+
+.janitor-task-category {
+  margin-bottom: 12px;
+}
+
+.janitor-task-category__label {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #8a7a60;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 4px 0;
+  border-bottom: 1px dashed #c8b890;
+  margin-bottom: 4px;
+}
+
+.janitor-task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin: 2px 0;
+  background: #faf3e0;
+  border-left: 4px solid #4a8c4a;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.janitor-task:hover {
+  background: #f0e8d0;
+}
+
+.janitor-task--cooldown {
+  border-left-color: #999;
+  opacity: 0.6;
+  cursor: default;
+}
+
+.janitor-task--urgent {
+  border-left-color: #cc3333;
+  background: #fff0e0;
+  animation: janitor-pulse 1.5s infinite;
+}
+
+.janitor-task__label {
+  font-size: 0.85rem;
+  flex: 1;
+}
+
+.janitor-task__status {
+  font-size: 0.75rem;
+  color: #8a7a60;
+  min-width: 60px;
+  text-align: right;
+}
+
+.janitor-task__count {
+  font-size: 0.7rem;
+  color: #aaa;
+  margin-left: 8px;
+}
+
+@keyframes janitor-pulse {
+  0%, 100% { background: #fff0e0; }
+  50%      { background: #ffe0c0; }
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────── */
+
+.janitor-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.janitor-section {
+  background: #f5ecd5;
+  border: 2px solid #8a7a60;
+  border-radius: 4px;
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+}
+
+.janitor-section__header {
+  background: #6a5a48;
+  color: #e8d5b0;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+}
+
+/* ── Active buffs ───────────────────────────────────────────────────────── */
+
+.janitor-buff-list {
+  padding: 6px 10px;
+}
+
+.janitor-buff {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 0.8rem;
+  border-bottom: 1px dotted #c8b890;
+}
+
+.janitor-buff__system {
+  text-transform: uppercase;
+  font-weight: bold;
+  color: #4a8c4a;
+}
+
+.janitor-buff__timer {
+  color: #8a7a60;
+  font-size: 0.75rem;
+}
+
+/* ── Sticky notes ───────────────────────────────────────────────────────── */
+
+.janitor-sticky-list {
+  padding: 6px 10px;
+}
+
+.janitor-sticky {
+  background: #fff9a8;
+  padding: 8px 10px;
+  margin: 4px 0;
+  border: 1px solid #e0d880;
+  box-shadow: 1px 2px 4px rgba(0,0,0,0.1);
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #3a2e1f;
+  position: relative;
+  transform: rotate(-0.5deg);
+}
+
+.janitor-sticky:nth-child(even) {
+  transform: rotate(0.5deg);
+}
+
+.janitor-sticky__dismiss {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  cursor: pointer;
+  color: #aaa;
+  font-size: 0.7rem;
+  border: none;
+  background: transparent;
+}
+
+/* ── Welcome crawl ──────────────────────────────────────────────────────── */
+
+.janitor-crawl {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.janitor-crawl__text {
+  max-width: 600px;
+  color: #e8d5b0;
+  font-size: 1rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  text-align: center;
+  animation: janitor-fade-in 3s ease-in;
+}
+
+@keyframes janitor-fade-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ── Responsive / text overrides ────────────────────────────────────────── */
+
+.text-dim {
+  color: #999;
+  font-style: italic;
+}

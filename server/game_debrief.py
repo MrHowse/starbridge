@@ -35,6 +35,7 @@ _CAT_TO_ROLE: dict[str, str] = {
     "tactical":         "tactical",
     "captain":          "captain",
     "dynamic_mission":  "captain",  # mission events count toward captain
+    "maintenance":      "janitor",
 }
 
 # Award definitions: (role, award_name, description_template, min_count, event_key)
@@ -52,6 +53,7 @@ _AWARD_DEFS: list[tuple[str, str, str, int, str]] = [
     ("electronic_warfare", "Ghost",           "Jammed {n} target(s)",             1,  "jam_target_set"),
     ("tactical",         "Mastermind",        "Created {n} strike plan(s)",       1,  "strike_plan_created"),
     ("captain",          "Decisive Leader",   "Changed alert level {n} time(s)",  1,  "alert_changed"),
+    ("janitor",          "Employee of the Month", "Completed {n} maintenance task(s)", 1, "general"),
 ]
 
 

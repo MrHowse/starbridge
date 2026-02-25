@@ -20,6 +20,7 @@ from typing import Protocol
 from pydantic import ValidationError
 
 from server.game_logger import log_event as _log, start_logging
+from server.game_loop_janitor import is_janitor_name
 from server.missions.loader import load_mission
 from server.models.interior import make_default_interior
 from server.models.ship_class import list_ship_classes
@@ -65,7 +66,7 @@ class LobbySession:
     roles: dict[str, tuple[str, str] | None] = field(
         default_factory=lambda: {
             r: None
-            for r in ("captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "flight_ops", "electronic_warfare", "tactical", "damage_control")
+            for r in ("captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "flight_ops", "electronic_warfare", "tactical", "damage_control", "janitor")
         }
     )
     host_connection_id: str | None = None
@@ -154,9 +155,12 @@ def _roles_for_broadcast() -> dict[str, str | None]:
 
     Reserved (disconnected) roles are shown as 'DISCONNECTED:<player_name>'
     so the lobby UI can distinguish them from empty slots.
+    The janitor role is never shown in the public lobby state.
     """
     result: dict[str, str | None] = {}
     for role, occupant in _session.roles.items():
+        if role == "janitor":
+            continue  # Secret — never broadcast.
         if occupant is not None:
             result[role] = occupant[1]
         elif role in _reserved_roles:
@@ -296,6 +300,17 @@ async def _claim_role(connection_id: str, payload: LobbyClaimRolePayload) -> Non
         _manager.tag(connection_id, role=role)
         return
 
+    # Janitor role requires a matching callsign.
+    if role == "janitor" and not is_janitor_name(payload.player_name):
+        await _manager.send(
+            connection_id,
+            Message.build("lobby.error", {
+                "message": "Access denied.",
+                "code": "role_restricted",
+            }),
+        )
+        return
+
     occupant = _session.roles[role]
     if occupant is not None and occupant[0] != connection_id:
         # Another connection holds the role.
@@ -352,6 +367,13 @@ async def _claim_role(connection_id: str, payload: LobbyClaimRolePayload) -> Non
         connection_id, role, payload.player_name, payload.additional,
     )
     await _broadcast_lobby_state()
+
+    # If this player qualifies for the janitor role, unicast a hint.
+    if role != "janitor" and is_janitor_name(payload.player_name):
+        await _manager.send(
+            connection_id,
+            Message.build("lobby.janitor_available", {}),
+        )
 
 
 async def _release_role(connection_id: str) -> None:

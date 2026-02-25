@@ -37,6 +37,7 @@ class ShipSystem:
     health: float = 100.0        # 0-100 (%)
     _crew_factor: float = 1.0    # Updated each tick by Ship.update_crew_factors()
     _captain_offline: bool = False   # True = Captain has taken this system offline
+    _maintenance_buff: float = 0.0   # Additive bonus from janitor maintenance tasks
 
     @property
     def efficiency(self) -> float:
@@ -45,10 +46,12 @@ class ShipSystem:
         Multiplied by _crew_factor (0.0–1.0) so crew casualties reduce system output.
         _crew_factor defaults to 1.0 — existing behaviour is unchanged when crew is full.
         Returns 0.0 when _captain_offline is True (Captain has disabled the system).
+        _maintenance_buff is additive — janitor maintenance tasks can boost efficiency.
         """
         if self._captain_offline:
             return 0.0
-        return (self.power / 100.0) * (self.health / 100.0) * self._crew_factor
+        base = (self.power / 100.0) * (self.health / 100.0) * self._crew_factor
+        return base + self._maintenance_buff
 
 
 # ---------------------------------------------------------------------------
