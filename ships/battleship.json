@@ -25,6 +25,9 @@
     "torpedo_tubes": 4,
     "point_defence_turrets": 4
   },
+  "engines": {
+    "fuel_multiplier": 1.8
+  },
   "sensors": {
     "range": 25000
   },

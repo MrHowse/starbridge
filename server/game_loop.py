@@ -496,6 +496,9 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.ship.beam_count = int(_wep.get("beam_count", 1))
     _world.ship.torpedo_tube_count = int(_wep.get("torpedo_tubes", 2))
     _world.ship.pd_turret_count = int(_wep.get("point_defence_turrets", 2))
+    # v0.07 §1.8: Engine characteristics from ship class.
+    _eng = sc.engines or {}
+    _world.ship.fuel_multiplier = float(_eng.get("fuel_multiplier", 1.0))
     # v0.07 §1.7: Sensor range from ship class.
     _sen = sc.sensors or {}
     _world.ship.sensor_range_base = float(_sen.get("range", 30_000.0))
@@ -2416,6 +2419,7 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "beam_count": ship.beam_count,
             "torpedo_tube_count": ship.torpedo_tube_count,
             "pd_turret_count": ship.pd_turret_count,
+            "fuel_multiplier": ship.fuel_multiplier,
             "sensor_range_base": ship.sensor_range_base,
             "shield_capacity": ship.shield_capacity,
             "shield_recharge_rate": ship.shield_recharge_rate,

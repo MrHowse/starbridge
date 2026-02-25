@@ -151,6 +151,9 @@ class Ship:
     # --- Docking ---
     docked_at: str | None = None  # station ID while docked, None otherwise
 
+    # --- Engines (v0.07 §1.8 — set from ship class at game start) ---
+    fuel_multiplier: float = 1.0          # class-specific fuel consumption rate (1.0 = baseline)
+
     # --- Sensors (v0.07 §1.7 — set from ship class at game start) ---
     sensor_range_base: float = 30_000.0   # world units at 100% sensor efficiency (default = legacy BASE_SENSOR_RANGE)
 

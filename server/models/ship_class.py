@@ -60,6 +60,9 @@ class ShipClass(BaseModel):
     handling_trait:    str   = "clean" # affects helm feel — see VALID_HANDLING_TRAITS
     decks:            int   = 5       # number of physical decks
 
+    # --- Engines (v0.07 §1.8) ---
+    engines:          dict | None = None     # {fuel_multiplier}
+
     # --- Sensors (v0.07 §1.7) ---
     sensors:          dict | None = None     # {range}
 
