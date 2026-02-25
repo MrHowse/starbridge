@@ -339,6 +339,10 @@ def _tick_combat(
     """Combat AI: attack runs, escort formation, engagement rules."""
     events: list[DroneEvent] = []
 
+    # Tick down attack cooldown.
+    if drone.attack_cooldown_remaining > 0:
+        drone.attack_cooldown_remaining = max(0.0, drone.attack_cooldown_remaining - dt)
+
     if drone.ai_behaviour == "engage" and drone.contact_of_interest:
         # Find target in contacts.
         target = None
@@ -351,6 +355,7 @@ def _tick_combat(
             # Target lost or destroyed.
             drone.ai_behaviour = "loiter"
             drone.contact_of_interest = None
+            drone.attack_cooldown_remaining = 0.0
             events.append(DroneEvent(
                 event_type="target_lost",
                 drone_id=drone.id,
@@ -361,7 +366,14 @@ def _tick_combat(
         tx, ty = target.get("x", 0.0), target.get("y", 0.0)
         dist_to_target = _dist(drone.position, (tx, ty))
 
-        if dist_to_target > drone.weapon_range * 1.5:
+        if drone.attack_cooldown_remaining > 0:
+            # On cooldown — continue breaking away from target.
+            away = (_heading_to((tx, ty), drone.position)) % 360.0
+            _turn_toward(drone, away, dt)
+            drone.speed = drone.effective_max_speed
+            _apply_movement(drone, dt)
+
+        elif dist_to_target > drone.weapon_range * 1.5:
             # Close to engagement range.
             _navigate_to_waypoint(drone, (tx, ty), dt)
 
@@ -371,6 +383,7 @@ def _tick_combat(
                 damage = drone.effective_weapon_damage
                 drone.ammo = max(0.0, drone.ammo - ATTACK_AMMO_PER_PASS)
                 drone.damage_dealt += damage
+                drone.attack_cooldown_remaining = ATTACK_COOLDOWN
                 events.append(DroneEvent(
                     event_type="drone_attack",
                     drone_id=drone.id,

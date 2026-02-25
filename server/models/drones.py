@@ -235,6 +235,7 @@ class Drone:
     damage_dealt: float = 0.0
     contacts_found: int = 0
     survivors_rescued: int = 0
+    attack_cooldown_remaining: float = 0.0
 
     # -----------------------------------------------------------------------
     # Properties
@@ -474,6 +475,7 @@ def serialise_drone(drone: Drone) -> dict:
         "damage_dealt": drone.damage_dealt,
         "contacts_found": drone.contacts_found,
         "survivors_rescued": drone.survivors_rescued,
+        "attack_cooldown_remaining": drone.attack_cooldown_remaining,
     }
 
 
@@ -526,6 +528,7 @@ def deserialise_drone(data: dict) -> Drone:
     d.damage_dealt = data.get("damage_dealt", 0.0)
     d.contacts_found = data.get("contacts_found", 0)
     d.survivors_rescued = data.get("survivors_rescued", 0)
+    d.attack_cooldown_remaining = data.get("attack_cooldown_remaining", 0.0)
     return d
 
 

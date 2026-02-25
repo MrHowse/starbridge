@@ -16,8 +16,13 @@ from server.models.drone_missions import (
 )
 from server.systems.drone_ai import (
     ATTACK_AMMO_PER_PASS,
+    ATTACK_COOLDOWN,
     BINGO_AUTO_RECALL_DELAY,
+    CRITICAL_HEADING_DRIFT,
+    ECM_FUEL_MULTIPLIER,
+    ECM_JAM_RANGE,
     DroneWorldContext,
+    _orbit_point,
     apply_damage_to_drone,
     deploy_buoy,
     initiate_rtb,
@@ -25,6 +30,7 @@ from server.systems.drone_ai import (
     tick_decoys,
     tick_drone,
 )
+from server.models.drones import BINGO_FUEL_SAFETY_MARGIN
 
 
 # ---------------------------------------------------------------------------
@@ -616,3 +622,302 @@ class TestRTB:
         arrived = [e for e in all_events if e.event_type == "drone_rtb_arrived"]
         assert len(arrived) >= 1
         assert d.status == "rtb"
+
+
+# ---------------------------------------------------------------------------
+# Attack cooldown (Gaps 1-3)
+# ---------------------------------------------------------------------------
+
+class TestAttackCooldown:
+    def test_cooldown_prevents_consecutive_attacks(self):
+        """Combat drone should not attack on consecutive ticks."""
+        d = _make_combat(pos=(0.0, 0.0))
+        d.ai_behaviour = "engage"
+        d.contact_of_interest = "enemy_1"
+        contact = {"id": "enemy_1", "x": 5000.0, "y": 0.0}
+        ctx = _ctx(contacts=[contact])
+
+        # First tick — should attack.
+        events1 = tick_drone(d, 0.1, ctx)
+        attacks1 = [e for e in events1 if e.event_type == "drone_attack"]
+        assert len(attacks1) == 1
+
+        # Second tick immediately after — on cooldown, should NOT attack.
+        events2 = tick_drone(d, 0.1, ctx)
+        attacks2 = [e for e in events2 if e.event_type == "drone_attack"]
+        assert len(attacks2) == 0
+
+    def test_cooldown_expires_allows_reattack(self):
+        """After cooldown expires, drone can attack again."""
+        d = _make_combat(pos=(0.0, 0.0))
+        d.ai_behaviour = "engage"
+        d.contact_of_interest = "enemy_1"
+        contact = {"id": "enemy_1", "x": 5000.0, "y": 0.0}
+        ctx = _ctx(contacts=[contact])
+
+        # First attack.
+        tick_drone(d, 0.1, ctx)
+        assert d.attack_cooldown_remaining == pytest.approx(ATTACK_COOLDOWN)
+
+        # Manually expire cooldown and reset position near target.
+        d.attack_cooldown_remaining = 0.0
+        d.position = (0.0, 0.0)
+
+        events = tick_drone(d, 0.1, ctx)
+        attacks = [e for e in events if e.event_type == "drone_attack"]
+        assert len(attacks) == 1
+
+    def test_break_away_during_cooldown(self):
+        """During cooldown, drone should move away from target."""
+        d = _make_combat(pos=(5000.0, 0.0))
+        d.ai_behaviour = "engage"
+        d.contact_of_interest = "enemy_1"
+        contact = {"id": "enemy_1", "x": 5000.0, "y": 0.0}
+        ctx = _ctx(contacts=[contact])
+
+        # Fire first attack.
+        tick_drone(d, 0.1, ctx)
+        pos_after_attack = d.position
+
+        # Tick during cooldown — should continue moving away.
+        tick_drone(d, 1.0, ctx)
+        dist_before = _dist_helper(pos_after_attack, (5000.0, 0.0))
+        dist_after = _dist_helper(d.position, (5000.0, 0.0))
+        assert dist_after > dist_before
+
+    def test_cooldown_reset_on_target_lost(self):
+        """Cooldown should reset when target is lost."""
+        d = _make_combat(pos=(0.0, 0.0))
+        d.ai_behaviour = "engage"
+        d.contact_of_interest = "enemy_1"
+        contact = {"id": "enemy_1", "x": 5000.0, "y": 0.0}
+        ctx = _ctx(contacts=[contact])
+
+        # Attack to set cooldown.
+        tick_drone(d, 0.1, ctx)
+        assert d.attack_cooldown_remaining > 0
+
+        # Target disappears.
+        ctx_empty = _ctx(contacts=[])
+        tick_drone(d, 0.1, ctx_empty)
+        assert d.attack_cooldown_remaining == 0.0
+        assert d.ai_behaviour == "loiter"
+
+
+def _dist_helper(a, b):
+    import math
+    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+
+
+# ---------------------------------------------------------------------------
+# ECM fuel consumption (Gap 4)
+# ---------------------------------------------------------------------------
+
+class TestECMFuelConsumption:
+    def test_ecm_double_fuel_when_jamming(self):
+        """ECM drone should consume 2x fuel while actively jamming."""
+        d_jam = _make_ecm(pos=(0.0, 0.0), fuel=100.0)
+        d_idle = _make_ecm(pos=(0.0, 0.0), fuel=100.0)
+        d_idle.id = "drone_e2"
+
+        contact = {"id": "enemy_1", "x": 5000.0, "y": 0.0, "classification": "hostile"}
+        ctx_hostile = _ctx(contacts=[contact])
+        ctx_empty = _ctx(contacts=[])
+
+        tick_drone(d_jam, 1.0, ctx_hostile)
+        tick_drone(d_idle, 1.0, ctx_empty)
+
+        # Jamming drone should have consumed ~2x fuel vs idle drone.
+        fuel_used_jam = 100.0 - d_jam.fuel
+        fuel_used_idle = 100.0 - d_idle.fuel
+        assert fuel_used_jam == pytest.approx(fuel_used_idle * ECM_FUEL_MULTIPLIER, rel=0.01)
+
+
+# ---------------------------------------------------------------------------
+# Critical hull drift (Gap 5)
+# ---------------------------------------------------------------------------
+
+class TestCriticalDrift:
+    def test_critical_hull_causes_heading_drift(self):
+        """At <25% hull, heading should drift erratically each tick."""
+        d = _make_scout(pos=(0.0, 0.0))
+        d.hull = d.max_hull * 0.20  # 20% = critical
+        d.heading = 90.0
+        # No loiter point — isolate drift from orbit navigation.
+
+        import random
+        random.seed(42)
+        ctx = _ctx()
+
+        headings = [d.heading]
+        for _ in range(5):
+            tick_drone(d, 1.0, ctx)
+            headings.append(d.heading)
+
+        # Heading should change due to random critical drift.
+        diffs = [abs(headings[i + 1] - headings[i]) for i in range(len(headings) - 1)]
+        assert any(diff > 1.0 for diff in diffs)
+
+    def test_healthy_hull_no_drift(self):
+        """At >25% hull, heading should not have erratic drift."""
+        d = _make_scout(pos=(0.0, 0.0))
+        d.hull = d.max_hull  # 100% = healthy
+        d.heading = 0.0
+        # No loiter point, no waypoints — drone should just drift forward.
+        ctx = _ctx()
+
+        import random
+        random.seed(42)
+
+        heading_before = d.heading
+        tick_drone(d, 0.1, ctx)
+        # Without any target/loiter, heading stays the same (drift forward).
+        # The heading should NOT have random perturbation.
+        assert d.heading == pytest.approx(heading_before, abs=0.01)
+
+
+# ---------------------------------------------------------------------------
+# Combat break-away (Gap 6)
+# ---------------------------------------------------------------------------
+
+class TestCombatBreakAway:
+    def test_drone_moves_away_after_attack(self):
+        """After firing, the combat drone should move away from target."""
+        d = _make_combat(pos=(5000.0, 0.0))
+        d.ai_behaviour = "engage"
+        d.contact_of_interest = "enemy_1"
+        target_pos = (5000.0, 0.0)
+        contact = {"id": "enemy_1", "x": target_pos[0], "y": target_pos[1]}
+        ctx = _ctx(contacts=[contact])
+
+        # Place drone right at target to ensure in-range attack.
+        dist_before = _dist_helper(d.position, target_pos)
+        events = tick_drone(d, 1.0, ctx)
+        attacks = [e for e in events if e.event_type == "drone_attack"]
+        assert len(attacks) == 1
+
+        # After attack, drone should have moved away.
+        dist_after = _dist_helper(d.position, target_pos)
+        assert dist_after > dist_before
+
+
+# ---------------------------------------------------------------------------
+# Weapons tight ignores non-attacker (Gap 7)
+# ---------------------------------------------------------------------------
+
+class TestWeaponsTightNonAttacker:
+    def test_weapons_tight_ignores_hostile_not_targeting_escort(self):
+        """Weapons tight should not engage a hostile that isn't attacking the escort."""
+        d = _make_combat(pos=(10000.0, 0.0))
+        d.ai_behaviour = "escort"
+        d.escort_target = "friendly_1"
+        d.engagement_rules = "weapons_tight"
+        contacts = [
+            {"id": "friendly_1", "x": 10000.0, "y": 0.0},
+            # Hostile nearby but targeting something else, not our escort.
+            {"id": "enemy_1", "x": 12000.0, "y": 0.0, "classification": "hostile",
+             "target_id": "other_ship"},
+        ]
+        ctx = _ctx(contacts=contacts)
+        events = tick_drone(d, 0.1, ctx)
+        engage = [e for e in events if e.event_type == "engaging_threat"]
+        assert len(engage) == 0
+        assert d.ai_behaviour == "escort"
+
+    def test_weapons_tight_ignores_hostile_no_target(self):
+        """Weapons tight should not engage a hostile with no target_id."""
+        d = _make_combat(pos=(10000.0, 0.0))
+        d.ai_behaviour = "escort"
+        d.escort_target = "friendly_1"
+        d.engagement_rules = "weapons_tight"
+        contacts = [
+            {"id": "friendly_1", "x": 10000.0, "y": 0.0},
+            {"id": "enemy_1", "x": 12000.0, "y": 0.0, "classification": "hostile"},
+        ]
+        ctx = _ctx(contacts=contacts)
+        events = tick_drone(d, 0.1, ctx)
+        engage = [e for e in events if e.event_type == "engaging_threat"]
+        assert len(engage) == 0
+
+
+# ---------------------------------------------------------------------------
+# Orbit behaviour (Gap 8)
+# ---------------------------------------------------------------------------
+
+class TestOrbitBehaviour:
+    def test_orbit_too_far_flies_toward_centre(self):
+        """When far from orbit centre, drone should fly toward it."""
+        d = _make_scout(pos=(20000.0, 0.0))
+        d.heading = 0.0
+        d.speed = d.max_speed
+        centre = (0.0, 0.0)
+        _orbit_point(d, centre, 3000.0, 1.0)
+        # Should have moved closer to centre (20000 * 1.3 = 26000 > 20000, so "too far")
+        # Actually 20000 > 3000 * 1.3 = 3900, so definitely too far.
+        assert _dist_helper(d.position, centre) < 20000.0
+
+    def test_orbit_too_close_flies_away(self):
+        """When too close to orbit centre, drone should fly away."""
+        d = _make_scout(pos=(500.0, 0.0))
+        d.heading = 270.0  # facing west
+        d.speed = d.max_speed
+        centre = (0.0, 0.0)
+        # 500 < 3000 * 0.7 = 2100, so "too close"
+        _orbit_point(d, centre, 3000.0, 1.0)
+        assert _dist_helper(d.position, centre) > 500.0
+
+    def test_orbit_in_band_flies_tangent(self):
+        """When in the orbit band, drone should fly tangentially."""
+        d = _make_scout(pos=(3000.0, 0.0))
+        d.heading = 0.0  # facing north
+        d.speed = d.max_speed
+        centre = (0.0, 0.0)
+        # 3000 is between 3000*0.7=2100 and 3000*1.3=3900, so in-band.
+        _orbit_point(d, centre, 3000.0, 1.0)
+        # Bearing to centre from (3000,0) is 270° (west), tangent = 270+90=0° (north).
+        # Drone already facing north — should move north (y decreases).
+        assert d.position[1] < 0.0
+
+
+# ---------------------------------------------------------------------------
+# Bingo fuel calculation (Gap 9)
+# ---------------------------------------------------------------------------
+
+class TestBingoFuelCalculation:
+    def test_bingo_fuel_at_exact_threshold(self):
+        """Bingo should trigger when fuel equals return fuel + safety margin."""
+        d = _make_scout(pos=(10000.0, 0.0))
+        # Calculate exact bingo threshold.
+        dist = 10000.0
+        time_to_return = dist / d.max_speed
+        fuel_to_return = time_to_return * d.fuel_consumption
+        safety = fuel_to_return * BINGO_FUEL_SAFETY_MARGIN
+        bingo_threshold = fuel_to_return + safety
+
+        # Set fuel just at threshold — should be bingo.
+        d.fuel = bingo_threshold
+        assert d.is_bingo_fuel(0.0, 0.0) is True
+
+    def test_not_bingo_above_threshold(self):
+        """Should not be bingo when fuel is comfortably above threshold."""
+        d = _make_scout(pos=(10000.0, 0.0))
+        dist = 10000.0
+        time_to_return = dist / d.max_speed
+        fuel_to_return = time_to_return * d.fuel_consumption
+        safety = fuel_to_return * BINGO_FUEL_SAFETY_MARGIN
+        bingo_threshold = fuel_to_return + safety
+
+        d.fuel = bingo_threshold + 10.0
+        assert d.is_bingo_fuel(0.0, 0.0) is False
+
+    def test_bingo_safety_margin_applied(self):
+        """Bingo threshold should include the 20% safety margin."""
+        d = _make_scout(pos=(10000.0, 0.0))
+        dist = 10000.0
+        time_to_return = dist / d.max_speed
+        fuel_to_return = time_to_return * d.fuel_consumption
+
+        # Without safety margin, this fuel would be enough.
+        # With 20% margin, it should trigger bingo.
+        d.fuel = fuel_to_return + 0.01
+        assert d.is_bingo_fuel(0.0, 0.0) is True  # margin pushes threshold above bare minimum
