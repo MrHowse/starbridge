@@ -18,6 +18,12 @@ class FlightOpsSetWaypointPayload(BaseModel):
     y: float
 
 
+class FlightOpsSetLoiterPointPayload(BaseModel):
+    drone_id: str
+    x: float
+    y: float
+
+
 class FlightOpsSetWaypointsPayload(BaseModel):
     drone_id: str
     waypoints: list[list[float]]

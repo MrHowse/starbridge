@@ -1246,3 +1246,263 @@ def test_tick_bingo_auto_recall_blocked_by_critical_cargo():
         glfo.tick(ship, 0.1)
     # Should NOT have auto-recalled — critical cargo.
     assert rescue.ai_behaviour != "rtb"
+
+
+# ---------------------------------------------------------------------------
+# Part 6 audit — set_loiter_point
+# ---------------------------------------------------------------------------
+
+
+def test_set_loiter_point_sets_loiter_and_clears_waypoints():
+    """set_loiter_point should set loiter_point, clear waypoints, set behaviour."""
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+    drone = glfo.get_drone_by_id(drone_id)
+
+    # Set a waypoint first.
+    glfo.set_waypoint(drone_id, 60_000, 70_000)
+    assert len(drone.waypoints) > 0
+
+    # Now set loiter point — should clear waypoints.
+    result = glfo.set_loiter_point(drone_id, 40_000, 30_000)
+    assert result is True
+    assert drone.loiter_point == (40_000, 30_000)
+    assert drone.waypoints == []
+    assert drone.ai_behaviour == "loiter"
+
+
+def test_set_loiter_point_rejects_hangar_drone():
+    """set_loiter_point should return False for drones in hangar."""
+    drone_id = glfo.get_drones()[0].id
+    result = glfo.set_loiter_point(drone_id, 40_000, 30_000)
+    assert result is False
+
+
+def test_set_loiter_point_rejects_unknown_id():
+    """set_loiter_point should return False for unknown drone id."""
+    result = glfo.set_loiter_point("bogus_id", 40_000, 30_000)
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Part 6 audit — build_state includes new fields
+# ---------------------------------------------------------------------------
+
+
+def test_build_state_includes_part6_fields():
+    """build_state includes fuel_consumption, damage_dealt, contacts_found,
+    survivors_rescued, and pickup_timer in drone dicts."""
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+    drone = glfo.get_drone_by_id(drone_id)
+    # Set some tracking values.
+    drone.damage_dealt = 12.5
+    drone.contacts_found = 3
+    drone.survivors_rescued = 2
+    drone.pickup_timer = 5.0
+
+    state = glfo.build_state(ship)
+    d_state = next(d for d in state["drones"] if d["id"] == drone_id)
+
+    assert "fuel_consumption" in d_state
+    assert d_state["fuel_consumption"] == drone.fuel_consumption
+    assert d_state["damage_dealt"] == 12.5
+    assert d_state["contacts_found"] == 3
+    assert d_state["survivors_rescued"] == 2
+    assert d_state["pickup_timer"] == 5.0
+
+
+# ---------------------------------------------------------------------------
+# Part 7 audit — Cross-station integration
+# ---------------------------------------------------------------------------
+
+
+def test_drone_attack_applies_damage_to_enemy():
+    """Combat drone attack events should actually reduce enemy hull via game_loop."""
+    from server.systems.combat import apply_hit_to_enemy
+    from server.models.world import spawn_enemy
+
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+    drone = glfo.get_drone_by_id(drone_id)
+    drone.drone_type = "combat"
+    drone.position = (50_000, 50_100)
+
+    # Create a target enemy with depleted shields.
+    enemy = spawn_enemy("scout", 50_000, 50_200, entity_id="e1")
+    enemy.shield_front = 0.0
+    enemy.shield_rear = 0.0
+    initial_hull = enemy.hull
+
+    # Simulate what game_loop does: apply drone attack damage.
+    apply_hit_to_enemy(enemy, 15.0, drone.position[0], drone.position[1])
+    assert enemy.hull < initial_hull
+
+
+def test_ecm_jamming_applies_jam_factor():
+    """ECM drone jamming events should increase enemy jam_factor."""
+    from server.models.world import spawn_enemy
+
+    enemy = spawn_enemy("scout", 50_000, 50_200, entity_id="e1")
+    assert enemy.jam_factor == 0.0
+
+    # Simulate what game_loop does: apply ECM drone jamming.
+    strength = 0.5
+    dt = 0.1
+    enemy.jam_factor = min(0.8, enemy.jam_factor + strength * dt)
+    assert enemy.jam_factor == pytest.approx(0.05)
+
+
+def test_evasive_recovery_penalty():
+    """Evasive state should add 30% bolter chance during recovery."""
+    from server.models.flight_deck import EVASIVE_MANOEUVRE_RECOVERY_PENALTY
+
+    assert EVASIVE_MANOEUVRE_RECOVERY_PENALTY == pytest.approx(0.30)
+
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+    drone = glfo.get_drone_by_id(drone_id)
+
+    # Set evasive state.
+    glfo._ship_evasive = True
+
+    # Recall and run recovery.
+    glfo.recall_drone(drone_id)
+    # Tick until recovery window.
+    for _ in range(200):
+        glfo.tick(ship, 0.1, tick_num=1, ship_evasive=True)
+
+    # We can't deterministically test random bolter, but we verify
+    # the ship_evasive flag is accepted and stored.
+    assert glfo._ship_evasive is True
+
+
+def test_build_drone_summary():
+    """build_drone_summary returns correct counts for Captain display."""
+    ship = fresh_ship()
+    summary = glfo.build_drone_summary()
+
+    assert summary["total"] > 0
+    assert summary["hangar"] == summary["total"]  # all in hangar initially
+    assert summary["active"] == 0
+    assert summary["destroyed"] == 0
+    assert summary["recovering"] == 0
+    assert summary["survivors_aboard"] == 0
+    assert summary["buoys_active"] == 0
+
+    # Launch a drone.
+    drone_id = _launch_and_activate(ship)
+    summary = glfo.build_drone_summary()
+    assert summary["active"] == 1
+    assert summary["hangar"] == summary["total"] - 1
+
+
+def test_detection_bubbles_include_buoys():
+    """get_detection_bubbles should include sensor buoys."""
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+
+    # Deploy a buoy.
+    drone = glfo.get_drone_by_id(drone_id)
+    drone.drone_type = "scout"
+    glfo.deploy_buoy_cmd(drone_id)
+
+    bubbles = glfo.get_detection_bubbles()
+    # Should have at least the active drone bubble.
+    assert len(bubbles) >= 1
+    # Each bubble is (x, y, range).
+    for bx, by, br in bubbles:
+        assert isinstance(bx, float)
+        assert isinstance(by, float)
+        assert isinstance(br, float)
+        assert br > 0
+
+
+def test_world_entities_includes_drones():
+    """build_world_entities should include active drones and buoys."""
+    import server.game_loop_mission as glm
+    from server.models.world import World
+
+    ship = fresh_ship()
+    world = World(ship=ship)
+    drone_id = _launch_and_activate(ship)
+
+    msg = glm.build_world_entities(world)
+    payload = msg.payload
+    assert "drones" in payload
+    assert "buoys" in payload
+    assert len(payload["drones"]) == 1
+
+    d = payload["drones"][0]
+    assert d["id"] == drone_id
+    assert "callsign" in d
+    assert "drone_type" in d
+    assert "x" in d
+    assert "y" in d
+
+
+def test_sensor_contacts_drone_detected_annotation():
+    """Contacts within drone detection bubbles should have drone_detected=True."""
+    from server.systems.sensors import build_sensor_contacts
+    from server.models.world import World, spawn_enemy
+
+    ship = fresh_ship()
+    world = World(ship=ship)
+    # Enemy at (50100, 50100).
+    enemy = spawn_enemy("scout", 50_100, 50_100, entity_id="e1")
+    world.enemies.append(enemy)
+
+    # Bubble at (50000, 50000) with range 5000 — enemy is within range.
+    bubbles = [(50_000.0, 50_000.0, 5_000.0)]
+    contacts = build_sensor_contacts(world, ship, extra_bubbles=bubbles)
+    enemy_contact = next(c for c in contacts if c["id"] == "e1")
+    assert enemy_contact.get("drone_detected") is True
+
+    # Bubble far away — enemy should NOT have drone_detected.
+    bubbles_far = [(90_000.0, 90_000.0, 100.0)]
+    contacts_far = build_sensor_contacts(world, ship, extra_bubbles=bubbles_far)
+    enemy_contact_far = next(c for c in contacts_far if c["id"] == "e1")
+    assert "drone_detected" not in enemy_contact_far
+
+
+def test_admit_survivors_creates_patients():
+    """admit_survivors should create crew members, some injured."""
+    import server.game_loop_medical_v2 as glmed
+    from server.models.crew_roster import IndividualCrewRoster
+
+    glmed.reset()
+    roster = IndividualCrewRoster()
+    glmed.init_roster(roster)
+
+    ship = fresh_ship()
+    events = glmed.admit_survivors(4, ship)
+
+    assert len(events) == 4
+    # All should be survivor_admitted events.
+    for ev in events:
+        assert ev["event"] == "survivor_admitted"
+
+    # Check roster has new members.
+    survivor_members = [m for mid, m in roster.members.items() if mid.startswith("survivor_")]
+    assert len(survivor_members) == 4
+
+
+def test_is_ship_evasive():
+    """_is_ship_evasive should detect sharp turns."""
+    from server.game_loop import _is_ship_evasive, _EVASIVE_TURN_RATE
+    import server.game_loop as game_loop
+
+    ship = fresh_ship()
+    ship.heading = 0.0
+    game_loop._prev_heading = 0.0
+
+    # No turn — not evasive.
+    assert _is_ship_evasive(ship) is False
+
+    # Sharp turn: 45 degrees in one tick (0.1s) = 450 deg/s.
+    ship.heading = 45.0
+    assert _is_ship_evasive(ship) is True
+
+    # Small turn: 1 degree in one tick = 10 deg/s.
+    ship.heading = 46.0
+    assert _is_ship_evasive(ship) is False

@@ -131,11 +131,16 @@ def build_sensor_contacts(
     For scanned contacts, full details plus a computed weakness hint are
     included.
 
-    *extra_bubbles* and *hazard_modifier* are accepted for API compatibility
-    but no longer used for contact filtering.  ``sensor_range()`` remains
-    available for the sensor-range ring display on the Science client.
+    *extra_bubbles* provides (x, y, range) tuples from drones and sensor buoys.
+    Contacts within a bubble are annotated with ``drone_detected: True``.
+    *hazard_modifier* is accepted for API compatibility but no longer used
+    for contact filtering.  ``sensor_range()`` remains available for the
+    sensor-range ring display on the Science client.
     """
     contacts: list[dict] = []
+
+    # Pre-compute detection bubble set for annotation.
+    _bubbles = extra_bubbles or []
 
     for enemy in world.enemies:
         contact: dict = {
@@ -151,6 +156,14 @@ def build_sensor_contacts(
 
         if enemy.scan_state == "scanned":
             contact.update(build_scan_result(enemy))
+
+        # Annotate if within a drone/buoy detection bubble.
+        for bx, by, br in _bubbles:
+            dx = enemy.x - bx
+            dy = enemy.y - by
+            if dx * dx + dy * dy <= br * br:
+                contact["drone_detected"] = True
+                break
 
         contacts.append(contact)
 

@@ -83,6 +83,10 @@ let _sensorContacts = [];
 // Currently selected drone id.
 let _selectedDroneId = null;
 
+// Camera override: when set, map centres on this position instead of ship.
+let _cameraOverride = null; // { x, y } or null
+let _droneCentredView = false; // Space toggle: follow selected drone
+
 // Interaction mode:
 //   null                          — idle
 //   { type: 'waypoint' }          — click map to set waypoint
@@ -181,18 +185,43 @@ on('flight_ops.events', ({ events }) => {
   for (const ev of events) {
     switch (ev.type) {
       case 'drone_launched':
-        SoundBank.play('scan_complete');
+        SoundBank.play('drone_launch');          // catapult whoosh
+        break;
+      case 'drone_recovered':
+        SoundBank.play('drone_recovery');         // descending tone
         break;
       case 'drone_destroyed':
+        SoundBank.play('drone_destroyed');         // explosion + static
+        break;
       case 'drone_lost':
-        SoundBank.play('hull_hit');
+        SoundBank.play('drone_lost');              // solemn descending
         break;
       case 'bingo_fuel':
-        SoundBank.play('warning');
+        SoundBank.play('bingo_fuel');              // pulsing fuel alarm
         break;
       case 'launch_failure':
-      case 'bolter':
         SoundBank.play('warning');
+        break;
+      case 'bolter':
+        SoundBank.play('bolter');                  // buzzer
+        break;
+      case 'drone_crash_on_deck':
+        SoundBank.play('warning');
+        break;
+      case 'contact_detected':
+        SoundBank.play('contact_ping');            // proximity ping
+        break;
+      case 'target_destroyed':
+        SoundBank.play('torpedo_hit');             // confirmed kill
+        break;
+      case 'survivor_pickup':
+        SoundBank.play('survivor_pickup');          // positive chime
+        break;
+      case 'decoy_deployed':
+        SoundBank.play('decoy_deploy');            // electronic burst
+        break;
+      case 'buoy_deployed':
+        SoundBank.play('buoy_deploy');             // sonar ping
         break;
     }
   }
@@ -215,25 +244,38 @@ window.addEventListener('resize', resizeCanvas);
 // Coordinate conversion
 // ---------------------------------------------------------------------------
 
+function _getCamPos() {
+  if (!shipState) return { x: 0, y: 0 };
+  // Drone-centred view: follow selected drone if airborne.
+  if (_droneCentredView && _selectedDroneId && foState) {
+    const d = foState.drones.find(d => d.id === _selectedDroneId);
+    if (d && AIRBORNE_STATUSES.has(d.status)) return { x: d.x, y: d.y };
+  }
+  if (_cameraOverride) return _cameraOverride;
+  return shipState.position;
+}
+
 function worldToCanvas(wx, wy) {
   if (!shipState) return { cx: 0, cy: 0 };
+  const cam = _getCamPos();
   const w = mapCanvas.width;
   const h = mapCanvas.height;
   const scale = Math.min(w, h) / 2 / _mapWorldRadius;
   return {
-    cx: w / 2 + (wx - shipState.position.x) * scale,
-    cy: h / 2 + (wy - shipState.position.y) * scale,
+    cx: w / 2 + (wx - cam.x) * scale,
+    cy: h / 2 + (wy - cam.y) * scale,
   };
 }
 
 function canvasToWorld(px, py) {
   if (!shipState) return { wx: 0, wy: 0 };
+  const cam = _getCamPos();
   const w = mapCanvas.width;
   const h = mapCanvas.height;
   const scale = Math.min(w, h) / 2 / _mapWorldRadius;
   return {
-    wx: shipState.position.x + (px - w / 2) / scale,
-    wy: shipState.position.y + (py - h / 2) / scale,
+    wx: cam.x + (px - w / 2) / scale,
+    wy: cam.y + (py - h / 2) / scale,
   };
 }
 
@@ -263,7 +305,9 @@ function renderMap() {
   drawBuoys();
   drawDroneRoutes();
   drawDrones();
-  drawShip(w / 2, h / 2, shipState.heading);
+  drawRecoveryOrbit();
+  const shipScreen = worldToCanvas(shipState.position.x, shipState.position.y);
+  drawShip(shipScreen.cx, shipScreen.cy, shipState.heading);
   drawPatrolPreview();
   drawTargetingReticle(w, h);
 }
@@ -592,6 +636,24 @@ function drawShip(cx, cy, heading) {
   ctx.restore();
 }
 
+function drawRecoveryOrbit() {
+  if (!foState || !shipState) return;
+  const rtbDrones = foState.drones.filter(d => d.status === 'rtb' || d.status === 'recovering');
+  if (rtbDrones.length === 0) return;
+  const shipPos = worldToCanvas(shipState.position.x, shipState.position.y);
+  const orbitR = 3000 * worldScale();
+  if (orbitR < 3) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,176,0,0.25)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath();
+  ctx.arc(shipPos.cx, shipPos.cy, orbitR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 function drawPatrolPreview() {
   if (!_interactionMode || _interactionMode.type !== 'patrol') return;
   const pts = _interactionMode.points;
@@ -700,6 +762,20 @@ canvasWrap.addEventListener('click', e => {
     return;
   }
 
+  // Shift+click — set loiter point for selected drone.
+  if (e.shiftKey && _selectedDroneId && foState) {
+    const drone = foState.drones.find(d => d.id === _selectedDroneId);
+    if (drone && drone.status === 'active') {
+      send('flight_ops.set_loiter_point', {
+        drone_id: _selectedDroneId,
+        x: Math.round(wx),
+        y: Math.round(wy),
+      });
+      SoundBank.play('scan_complete');
+      return;
+    }
+  }
+
   // No mode active — check if clicking a drone icon.
   if (foState) {
     for (const d of foState.drones) {
@@ -738,6 +814,75 @@ canvasWrap.addEventListener('mousemove', e => {
 
 canvasWrap.addEventListener('mouseleave', () => {
   mapCoordEl.textContent = '';
+});
+
+// Right-click context menu.
+canvasWrap.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (!foState || !shipState) return;
+
+  // Remove any existing context menu.
+  const existing = document.getElementById('fo-ctx-menu');
+  if (existing) existing.remove();
+
+  const rect = canvasWrap.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  const { wx, wy } = canvasToWorld(px, py);
+  const worldX = Math.round(wx);
+  const worldY = Math.round(wy);
+
+  const menu = document.createElement('div');
+  menu.id = 'fo-ctx-menu';
+  menu.className = 'fo-ctx-menu';
+  menu.style.left = `${px}px`;
+  menu.style.top = `${py}px`;
+
+  const items = [];
+
+  if (_selectedDroneId) {
+    const drone = foState.drones.find(d => d.id === _selectedDroneId);
+    if (drone && drone.status === 'active') {
+      items.push({ label: 'Set Waypoint', action: () => {
+        send('flight_ops.set_waypoint', { drone_id: _selectedDroneId, x: worldX, y: worldY });
+      }});
+      items.push({ label: 'Set Loiter', action: () => {
+        send('flight_ops.set_loiter_point', { drone_id: _selectedDroneId, x: worldX, y: worldY });
+      }});
+      if (drone.drone_type === 'combat' || drone.drone_type === 'scout') {
+        items.push({ label: 'Designate Target', action: () => enterTargetMode() });
+      }
+      if (drone.drone_type === 'survey') {
+        items.push({ label: 'Deploy Buoy', action: () => {
+          send('flight_ops.deploy_buoy', { drone_id: _selectedDroneId });
+        }});
+      }
+    }
+  }
+  items.push({ label: 'Deploy Decoy', action: () => {
+    const dx = wx - shipState.position.x;
+    const dy = wy - shipState.position.y;
+    const direction = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
+    send('flight_ops.deploy_decoy', { direction: Math.round(direction) });
+  }});
+
+  for (const item of items) {
+    const el = document.createElement('div');
+    el.className = 'fo-ctx-menu__item';
+    el.textContent = item.label;
+    el.addEventListener('click', ev => {
+      ev.stopPropagation();
+      item.action();
+      menu.remove();
+    });
+    menu.appendChild(el);
+  }
+
+  canvasWrap.appendChild(menu);
+
+  // Close on next click anywhere.
+  const close = () => { menu.remove(); document.removeEventListener('click', close); };
+  setTimeout(() => document.addEventListener('click', close), 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -834,6 +979,9 @@ function renderDroneCards() {
     d.max_hull > 0 && (d.hull / d.max_hull * 100) <= HULL_LOW,
     d.contact_of_interest || '', d.escort_target || '',
     d.buoys_remaining, d.ecm_strength,
+    (d.waypoints || []).length, d.waypoint_index,
+    d.contacts_found, d.damage_dealt > 0, d.survivors_rescued,
+    d.pickup_timer > 0,
   ].join('|')).join(';');
 
   if (structKey === _prevDroneStructKey) {
@@ -854,6 +1002,10 @@ function renderDroneCards() {
     const isSelected = drone.id === _selectedDroneId;
     const isRecalled = drone.ai_behaviour === 'rtb';
     card.className = 'fo-drone-card';
+    // Status-based border colour per spec.
+    if (drone.status === 'emergency') card.classList.add('fo-drone-card--emergency');
+    else if (drone.status === 'rtb' || isRecalled) card.classList.add('fo-drone-card--rtb');
+    else card.classList.add(`fo-drone-card--${drone.drone_type}`);
     if (isSelected) card.classList.add('fo-drone-card--selected');
     card.addEventListener('click', e => {
       e.stopPropagation();
@@ -915,6 +1067,40 @@ function renderDroneCards() {
       card.appendChild(info);
     }
 
+    // Waypoint progress + time remaining + stats row.
+    const detail = document.createElement('div');
+    detail.className = 'fo-drone-card__info';
+    const wps = drone.waypoints || [];
+    if (wps.length > 0) {
+      const wpSpan = document.createElement('span');
+      wpSpan.textContent = `WP ${Math.min(drone.waypoint_index + 1, wps.length)}/${wps.length}`;
+      detail.appendChild(wpSpan);
+    }
+    if (drone.fuel_consumption > 0) {
+      const secs = drone.fuel / drone.fuel_consumption;
+      const mins = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      const timeSpan = document.createElement('span');
+      timeSpan.textContent = `\u23F1 ~${mins}:${s.toString().padStart(2, '0')}`;
+      detail.appendChild(timeSpan);
+    }
+    if (drone.drone_type === 'scout' && drone.contacts_found > 0) {
+      const cfSpan = document.createElement('span');
+      cfSpan.textContent = `Contacts: ${drone.contacts_found}`;
+      detail.appendChild(cfSpan);
+    }
+    if (drone.drone_type === 'combat' && drone.damage_dealt > 0) {
+      const ddSpan = document.createElement('span');
+      ddSpan.textContent = `Dmg dealt: ${drone.damage_dealt.toFixed(1)}`;
+      detail.appendChild(ddSpan);
+    }
+    if (drone.drone_type === 'rescue' && drone.survivors_rescued > 0) {
+      const srSpan = document.createElement('span');
+      srSpan.textContent = `Rescued: ${drone.survivors_rescued}`;
+      detail.appendChild(srSpan);
+    }
+    if (detail.childElementCount > 0) card.appendChild(detail);
+
     // Bars.
     const bars = document.createElement('div');
     bars.className = 'fo-drone-card__bars';
@@ -943,6 +1129,14 @@ function renderDroneCards() {
       const cargoPct = (drone.cargo_current / drone.cargo_capacity) * 100;
       bars.appendChild(makeBar('CARGO', cargoPct, 100, 'fo-bar-fill--cargo',
         `${drone.cargo_current}/${drone.cargo_capacity}`, `${drone.id}-cargo`));
+    }
+
+    // Pickup progress bar (rescue drones actively picking up).
+    if (drone.drone_type === 'rescue' && drone.pickup_timer > 0) {
+      const pickupMax = 15; // RESCUE_PICKUP_TIME from server
+      const pickupPct = (drone.pickup_timer / pickupMax) * 100;
+      bars.appendChild(makeBar('PICKUP', pickupPct, 100, 'fo-bar-fill--cargo',
+        `${Math.ceil(drone.pickup_timer)}/${pickupMax}s`, `${drone.id}-pickup`));
     }
 
     card.appendChild(bars);
@@ -1062,6 +1256,13 @@ function _updateDroneBarsInPlace(drones) {
       cargoFill.style.width = `${Math.max(0, Math.min(100, cargoPct))}%`;
       const pct = cargoFill.closest('.fo-bar-row').querySelector('.fo-bar-pct');
       if (pct) pct.textContent = `${d.cargo_current}/${d.cargo_capacity}`;
+    }
+    const pickupFill = droneCardsEl.querySelector(`[data-bar="${d.id}-pickup"]`);
+    if (pickupFill && d.pickup_timer > 0) {
+      const pickupPct = (d.pickup_timer / 15) * 100;
+      pickupFill.style.width = `${Math.max(0, Math.min(100, pickupPct))}%`;
+      const pct = pickupFill.closest('.fo-bar-row').querySelector('.fo-bar-pct');
+      if (pct) pct.textContent = `${Math.ceil(d.pickup_timer)}/15s`;
     }
   }
 }
@@ -1315,6 +1516,12 @@ document.addEventListener('keydown', e => {
       exitInteractionMode();
       return;
     }
+    if (_cameraOverride || _droneCentredView) {
+      _cameraOverride = null;
+      _droneCentredView = false;
+      renderMap();
+      return;
+    }
     if (_selectedDroneId) {
       _selectedDroneId = null;
       renderDroneCards();
@@ -1426,9 +1633,27 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // F — focus on selected drone.
-  if (key === 'f' && _selectedDroneId) {
-    // For now just re-render with selection highlight.
+  // F — focus on selected drone (centre map on drone position).
+  if (key === 'f' && _selectedDroneId && foState) {
+    const drone = foState.drones.find(d => d.id === _selectedDroneId);
+    if (drone && AIRBORNE_STATUSES.has(drone.status)) {
+      _cameraOverride = { x: drone.x, y: drone.y };
+      _droneCentredView = false;
+      renderMap();
+    }
+    return;
+  }
+
+  // Space — toggle between ship-centred and drone-centred map view.
+  if (e.key === ' ' || e.key === 'Space') {
+    e.preventDefault();
+    if (_droneCentredView) {
+      _droneCentredView = false;
+      _cameraOverride = null;
+    } else if (_selectedDroneId) {
+      _droneCentredView = true;
+      _cameraOverride = null;
+    }
     renderMap();
     return;
   }

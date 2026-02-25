@@ -17,6 +17,7 @@ from server.mission_graph import MissionGraph
 from server.missions.loader import load_mission, spawn_from_mission, spawn_wave
 from server.systems import sensors
 from server.utils.math_helpers import distance
+import server.game_loop_flight_ops as glfo
 
 # ---------------------------------------------------------------------------
 # Docking / resupply constants
@@ -450,6 +451,31 @@ def build_world_entities(world: World) -> Message:
         }
         for h in world.hazards
     ]
+    # v0.06.5 Part 7: Include active drones + buoys for Captain tactical map.
+    drones = []
+    for d in glfo.get_drones():
+        if d.status not in ("active", "recovering", "rtb"):
+            continue
+        drones.append({
+            "id": d.id,
+            "callsign": d.callsign,
+            "drone_type": d.drone_type,
+            "x": round(d.position[0], 1),
+            "y": round(d.position[1], 1),
+            "heading": round(d.heading, 1),
+            "hull": round(d.hull, 1),
+            "status": d.status,
+            "survivors": d.cargo_current if d.drone_type == "rescue" else 0,
+        })
+    buoys = []
+    for b in glfo.get_buoys():
+        if b.active:
+            buoys.append({
+                "id": b.id,
+                "x": round(b.position[0], 1),
+                "y": round(b.position[1], 1),
+                "sensor_range": round(b.sensor_range, 1),
+            })
     return Message.build(
         "world.entities",
         {
@@ -458,5 +484,7 @@ def build_world_entities(world: World) -> Message:
             "stations": stations,
             "asteroids": asteroids,
             "hazards": hazards,
+            "drones": drones,
+            "buoys": buoys,
         },
     )

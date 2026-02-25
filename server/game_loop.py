@@ -66,6 +66,7 @@ from server.models.messages import (
     FlightOpsRushTurnaroundPayload,
     FlightOpsSetBehaviourPayload,
     FlightOpsSetEngagementRulesPayload,
+    FlightOpsSetLoiterPointPayload,
     FlightOpsSetWaypointPayload,
     FlightOpsSetWaypointsPayload,
     EngineeringCancelDCTPayload,
@@ -134,7 +135,7 @@ from server.models.world import (
 )
 from server.systems import physics, sensors
 from server.systems.ai import tick_enemies
-from server.systems.combat import regenerate_shields
+from server.systems.combat import apply_hit_to_enemy, regenerate_shields
 from server.systems import hazards as hazard_system
 from server.systems.station_ai import tick_station_ai
 import server.game_logger as gl
@@ -209,6 +210,10 @@ _training_last_hint_idx: int = -1
 # Sensor-assist tracking: puzzle IDs that have already received the
 # Engineering sensor-boost assist (one application per puzzle lifetime).
 _applied_sensor_assists: set[str] = set()
+
+# Evasive manoeuvre detection: track heading change rate for Helm ↔ Flight Ops.
+_prev_heading: float = 0.0
+_EVASIVE_TURN_RATE: float = 30.0  # degrees/second to be considered evasive
 
 # Science → Medical triage assist tracking (one application per puzzle).
 _applied_science_medical_assists: set[str] = set()
@@ -416,8 +421,9 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
         sc = load_ship_class("frigate")
 
     global _paused, _last_dc_state_json, _current_sector_id
-    global _sector_grid_dirty, _last_sector_grid_json
+    global _sector_grid_dirty, _last_sector_grid_json, _prev_heading
     _paused = False  # always start unpaused
+    _prev_heading = 0.0
     _last_dc_state_json = ""
     _last_sector_grid_json = ""
     _current_sector_id = None
@@ -603,6 +609,26 @@ async def resume(
 
 
 # ---------------------------------------------------------------------------
+# Evasive manoeuvre detection (Helm ↔ Flight Ops)
+# ---------------------------------------------------------------------------
+
+
+def _is_ship_evasive(ship: Ship) -> bool:
+    """Return True if the ship is currently executing evasive manoeuvres.
+
+    Based on turn rate exceeding the threshold. Used to penalise drone
+    recovery attempts per spec Part 7 (Helm ↔ Flight Ops).
+    """
+    global _prev_heading
+    heading_delta = abs(ship.heading - _prev_heading)
+    if heading_delta > 180.0:
+        heading_delta = 360.0 - heading_delta
+    turn_rate = heading_delta / TICK_DT
+    _prev_heading = ship.heading
+    return turn_rate > _EVASIVE_TURN_RATE
+
+
+# ---------------------------------------------------------------------------
 # Loop internals
 # ---------------------------------------------------------------------------
 
@@ -677,7 +703,42 @@ async def _loop() -> None:
             contacts=_fo_contacts,
             in_combat=bool(_world.enemies),
             tick_num=_tick_count,
+            ship_evasive=_is_ship_evasive(_world.ship),
         )
+
+        # v0.06.5 Part 7: Process flight ops events for cross-station effects.
+        for _foe in _fo_events:
+            _foe_type = _foe.get("type", "")
+            # Combat drone damage → apply to enemy (Weapons integration).
+            if _foe_type == "drone_attack":
+                _target_id = _foe.get("target_id", "")
+                _dmg = _foe.get("damage", 0.0)
+                _drone_id = _foe.get("drone_id", "")
+                _atk_drone = glfo.get_drone_by_id(_drone_id)
+                if _atk_drone and _dmg > 0:
+                    for _enemy in _world.enemies:
+                        if _enemy.id == _target_id:
+                            apply_hit_to_enemy(
+                                _enemy, _dmg,
+                                _atk_drone.position[0], _atk_drone.position[1],
+                            )
+                            break
+            # ECM drone jamming → apply jam_factor buildup (EW integration).
+            elif _foe_type == "ecm_jamming":
+                _jam_tid = _foe.get("target_id", "")
+                _jam_str = _foe.get("strength", 0.0)
+                for _enemy in _world.enemies:
+                    if _enemy.id == _jam_tid:
+                        _enemy.jam_factor = min(
+                            0.8, _enemy.jam_factor + _jam_str * TICK_DT
+                        )
+                        break
+            # Rescue drone survivor delivery → Medical integration.
+            elif _foe_type == "survivors_transferred":
+                _surv_count = _foe.get("count", 0)
+                if _surv_count > 0:
+                    glmed.admit_survivors(_surv_count, _world.ship)
+
         glew.tick(_world, _world.ship, TICK_DT)
         gltac.tick(_world, _world.ship, TICK_DT)
         # Tick crew reassignment timers before updating crew factors.
@@ -1234,7 +1295,13 @@ async def _loop() -> None:
             ["helm", "engineering", "captain", "viewscreen"],
             glm.build_world_entities(_world),
         )
-        _sensor_contacts_payload = glm.build_sensor_contacts(_world, _world.ship)
+        # v0.06.5 Part 7: Wire drone/buoy detection bubbles into sensor contacts.
+        _detection_bubbles = glfo.get_detection_bubbles(
+            _world.ship.systems["flight_deck"].efficiency
+        )
+        _sensor_contacts_payload = glm.build_sensor_contacts(
+            _world, _world.ship, extra_bubbles=_detection_bubbles,
+        )
         await _manager.broadcast_to_roles(
             ["weapons", "science"],
             _sensor_contacts_payload,
@@ -1506,6 +1573,28 @@ async def _loop() -> None:
                 ["flight_ops"],
                 Message.build("flight_ops.events", {"events": _fo_events}),
             )
+            # v0.06.5 Part 7: Route relevant events to cross-stations.
+            _cross_events: dict[str, list[dict]] = {}
+            for _foe in _fo_events:
+                _foe_type = _foe.get("type", "")
+                _targets: list[str] = []
+                if _foe_type == "contact_detected":
+                    _targets = ["science"]
+                elif _foe_type == "drone_attack":
+                    _targets = ["weapons"]
+                elif _foe_type == "ecm_jamming":
+                    _targets = ["electronic_warfare"]
+                elif _foe_type == "survivors_transferred":
+                    _targets = ["medical", "captain"]
+                elif _foe_type in ("drone_destroyed", "drone_crash_on_deck"):
+                    _targets = ["captain"]
+                for _tgt in _targets:
+                    _cross_events.setdefault(_tgt, []).append(_foe)
+            for _role, _evts in _cross_events.items():
+                await _manager.broadcast_to_roles(
+                    [_role],
+                    Message.build("flight_ops.events", {"events": _evts}),
+                )
 
         # 11k. EW state → Electronic Warfare station.
         await _manager.broadcast_to_roles(
@@ -2028,6 +2117,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             _set_training_flag(glm, "flightops_drone_recalled")
         elif msg_type == "flight_ops.set_waypoint" and isinstance(payload, FlightOpsSetWaypointPayload):
             glfo.set_waypoint(payload.drone_id, payload.x, payload.y)
+        elif msg_type == "flight_ops.set_loiter_point" and isinstance(payload, FlightOpsSetLoiterPointPayload):
+            glfo.set_loiter_point(payload.drone_id, payload.x, payload.y)
         elif msg_type == "flight_ops.set_waypoints" and isinstance(payload, FlightOpsSetWaypointsPayload):
             wps = [(p[0], p[1]) for p in payload.waypoints if len(p) >= 2]
             glfo.set_waypoints(payload.drone_id, wps)
@@ -2285,6 +2376,8 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "sealed_bulkheads": [list(b) for b in gls.get_sealed_bulkheads()],
             "quarantined_rooms": sorted(gls.get_quarantined_rooms()),
             "sensor_coverage": round(gls.get_sensor_coverage(ship.interior), 3),
+            # v0.06.5 Part 7: Drone summary for Captain display.
+            "drone_summary": glfo.build_drone_summary(),
         },
         tick=tick,
     )

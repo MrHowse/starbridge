@@ -33,6 +33,7 @@ from server.models.drone_missions import (
     serialise_mission,
 )
 from server.models.flight_deck import (
+    EVASIVE_MANOEUVRE_RECOVERY_PENALTY,
     LAUNCH_PREP_TIME,
     LAUNCH_RETRY_DELAY,
     BOLTER_RETRY_DELAY,
@@ -83,6 +84,9 @@ _retry_delays: dict[str, float] = {}
 # Recovery timers: drone_id → seconds remaining in recovery.
 _recovery_timers: dict[str, float] = {}
 
+# Evasive state — set by tick() from game_loop, used by recovery logic.
+_ship_evasive: bool = False
+
 
 # ---------------------------------------------------------------------------
 # Public API — reset / init
@@ -94,6 +98,7 @@ def reset(ship_class_id: str = "frigate") -> None:
     global _drones, _flight_deck, _missions, _buoys, _decoys
     global _decoy_stock, _decoy_counter, _bingo_timers, _pending_events
     global _launch_timers, _launch_phases, _retry_delays, _recovery_timers
+    global _ship_evasive
 
     _drones = create_ship_drones(ship_class_id)
     _flight_deck = create_flight_deck(ship_class_id)
@@ -105,6 +110,7 @@ def reset(ship_class_id: str = "frigate") -> None:
     _bingo_timers = {}
     _pending_events = []
     _launch_timers = {}
+    _ship_evasive = False
     _launch_phases = {}
     _retry_delays = {}
     _recovery_timers = {}
@@ -211,6 +217,18 @@ def set_waypoint(drone_id: str, x: float, y: float) -> bool:
     drone.waypoints = [(x, y)]
     drone.waypoint_index = 0
     drone.loiter_point = (x, y)
+    return True
+
+
+def set_loiter_point(drone_id: str, x: float, y: float) -> bool:
+    """Set a loiter point for a drone (drone orbits at that location)."""
+    drone = get_drone_by_id(drone_id)
+    if drone is None or drone.status != "active":
+        return False
+    drone.loiter_point = (x, y)
+    drone.waypoints = []
+    drone.waypoint_index = 0
+    drone.ai_behaviour = "loiter"
     return True
 
 
@@ -340,11 +358,15 @@ def abort_landing(drone_id: str) -> bool:
 
 def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
          survivors: list[dict] | None = None, in_combat: bool = False,
-         tick_num: int = 0) -> list[dict]:
+         tick_num: int = 0, ship_evasive: bool = False) -> list[dict]:
     """Advance all flight ops state by dt seconds.
+
+    *ship_evasive* — True when helm is making sharp turns; penalises recovery.
 
     Returns a list of events for broadcast.
     """
+    global _ship_evasive
+    _ship_evasive = ship_evasive
     events: list[dict] = []
 
     # Build world context for drone AI.
@@ -662,7 +684,12 @@ def _tick_recoveries(ship: Ship, dt: float) -> list[dict]:
             continue
 
         # Roll for bolter.
-        if fd.roll_bolter():
+        _bolter = fd.roll_bolter()
+        # Evasive manoeuvre penalty: 30% extra bolter chance.
+        if not _bolter and _ship_evasive:
+            import random as _rng_mod
+            _bolter = _rng_mod.random() < EVASIVE_MANOEUVRE_RECOVERY_PENALTY
+        if _bolter:
             # Bolter — drone goes around, 15s penalty via delayed re-queue.
             drone.status = "recovering"
             _recovery_timers[drone_id] = BOLTER_RETRY_DELAY
@@ -670,6 +697,7 @@ def _tick_recoveries(ship: Ship, dt: float) -> list[dict]:
                 "type": "bolter",
                 "drone_id": drone_id,
                 "callsign": drone.callsign,
+                "cause": "evasive_manoeuvre" if _ship_evasive else "recovery_health",
             })
             continue
 
@@ -720,6 +748,29 @@ def get_detection_bubbles(deck_efficiency: float = 1.0) -> list[tuple[float, flo
 
 
 # ---------------------------------------------------------------------------
+# Drone summary (for Captain ship.state)
+# ---------------------------------------------------------------------------
+
+
+def build_drone_summary() -> dict:
+    """Build a compact drone summary for the Captain's ship.state display."""
+    active = sum(1 for d in _drones if d.status == "active")
+    hangar = sum(1 for d in _drones if d.status == "hangar")
+    destroyed = sum(1 for d in _drones if d.status == "destroyed")
+    recovering = sum(1 for d in _drones if d.status in ("recovering", "rtb"))
+    survivors_aboard = sum(d.cargo_current for d in _drones if d.drone_type == "rescue")
+    return {
+        "total": len(_drones),
+        "active": active,
+        "hangar": hangar,
+        "destroyed": destroyed,
+        "recovering": recovering,
+        "survivors_aboard": survivors_aboard,
+        "buoys_active": sum(1 for b in _buoys if b.active),
+    }
+
+
+# ---------------------------------------------------------------------------
 # State broadcast
 # ---------------------------------------------------------------------------
 
@@ -756,6 +807,11 @@ def build_state(ship: Ship) -> dict:
                 "cargo_current": d.cargo_current,
                 "cargo_capacity": d.cargo_capacity,
                 "bingo_acknowledged": d.bingo_acknowledged,
+                "fuel_consumption": d.fuel_consumption,
+                "damage_dealt": round(d.damage_dealt, 1),
+                "contacts_found": d.contacts_found,
+                "survivors_rescued": d.survivors_rescued,
+                "pickup_timer": round(d.pickup_timer, 1),
                 "waypoints": [list(wp) for wp in d.waypoints],
                 "waypoint_index": d.waypoint_index,
                 "loiter_point": list(d.loiter_point) if d.loiter_point else None,

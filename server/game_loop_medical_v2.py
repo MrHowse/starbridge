@@ -482,6 +482,76 @@ def notify_puzzle_complete(crew_id: str, success: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Survivor Admission (Flight Ops → Medical integration)
+# ---------------------------------------------------------------------------
+
+#: Chance each rescued survivor arrives injured.
+SURVIVOR_INJURY_CHANCE: float = 0.50
+
+_survivor_counter: int = 0
+
+
+def admit_survivors(count: int, ship: Ship) -> list[dict]:
+    """Admit rescued survivors from Flight Ops drones.
+
+    Each survivor has SURVIVOR_INJURY_CHANCE of arriving injured.
+    Injured survivors are added to the crew roster as patients.
+    Returns list of event dicts for broadcast.
+    """
+    global _survivor_counter
+
+    if _roster is None or count <= 0:
+        return []
+
+    events: list[dict] = []
+    for _ in range(count):
+        _survivor_counter += 1
+        sid = f"survivor_{_survivor_counter}"
+        injured = _rng.random() < SURVIVOR_INJURY_CHANCE
+        member = CrewMember(
+            id=sid,
+            first_name="Survivor",
+            surname=f"#{_survivor_counter}",
+            rank="Crewman",
+            rank_level=1,
+            deck=4,  # medical deck
+            duty_station="medical_bay",
+            status="injured" if injured else "active",
+            location="medical_bay",
+        )
+        _roster.members[sid] = member
+
+        if injured:
+            # Generate a moderate injury for the survivor.
+            injury = Injury(
+                id=f"surv_inj_{_survivor_counter}",
+                type="trauma",
+                body_region=_rng.choice(["torso", "left_arm", "right_arm", "left_leg", "right_leg"]),
+                severity=_rng.choice(["moderate", "serious"]),
+                description="Injuries sustained before rescue",
+                caused_by="rescue",
+                treatment_type="first_aid",
+                treatment_duration=15.0,
+            )
+            member.injuries.append(injury)
+            events.append({
+                "event": "survivor_admitted",
+                "crew_id": sid,
+                "injured": True,
+                "injury_id": injury.id,
+                "severity": injury.severity,
+            })
+        else:
+            events.append({
+                "event": "survivor_admitted",
+                "crew_id": sid,
+                "injured": False,
+            })
+
+    return events
+
+
+# ---------------------------------------------------------------------------
 # Per-tick Processing
 # ---------------------------------------------------------------------------
 

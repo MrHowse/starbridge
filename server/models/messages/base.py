@@ -62,6 +62,7 @@ from server.models.messages.flight_ops import (
     FlightOpsRushTurnaroundPayload,
     FlightOpsSetBehaviourPayload,
     FlightOpsSetEngagementRulesPayload,
+    FlightOpsSetLoiterPointPayload,
     FlightOpsSetWaypointPayload,
     FlightOpsSetWaypointsPayload,
 )
@@ -243,6 +244,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "flight_ops.launch_drone":          FlightOpsLaunchDronePayload,
     "flight_ops.recall_drone":          FlightOpsRecallDronePayload,
     "flight_ops.set_waypoint":          FlightOpsSetWaypointPayload,
+    "flight_ops.set_loiter_point":      FlightOpsSetLoiterPointPayload,
     "flight_ops.set_waypoints":         FlightOpsSetWaypointsPayload,
     "flight_ops.set_engagement_rules":  FlightOpsSetEngagementRulesPayload,
     "flight_ops.set_behaviour":         FlightOpsSetBehaviourPayload,

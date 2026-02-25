@@ -138,6 +138,7 @@ from server.models.messages.flight_ops import (
     FlightOpsRushTurnaroundPayload,
     FlightOpsSetBehaviourPayload,
     FlightOpsSetEngagementRulesPayload,
+    FlightOpsSetLoiterPointPayload,
     FlightOpsSetWaypointPayload,
     FlightOpsSetWaypointsPayload,
 )
@@ -283,6 +284,7 @@ __all__ = [
     # flight ops
     "FlightOpsLaunchDronePayload",
     "FlightOpsRecallDronePayload",
+    "FlightOpsSetLoiterPointPayload",
     "FlightOpsSetWaypointPayload",
     "FlightOpsSetWaypointsPayload",
     "FlightOpsSetEngagementRulesPayload",
