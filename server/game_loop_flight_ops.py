@@ -27,6 +27,7 @@ from server.models.drones import (
 )
 from server.models.drone_missions import (
     DroneMission,
+    create_patrol_mission,
     deserialise_mission,
     reset_mission_counter,
     serialise_mission,
@@ -190,10 +191,20 @@ def set_waypoint(drone_id: str, x: float, y: float) -> bool:
 
 
 def set_waypoints(drone_id: str, waypoints: list[tuple[float, float]]) -> bool:
-    """Set a waypoint route for a drone."""
+    """Set a patrol route for a drone by creating a patrol mission."""
     drone = get_drone_by_id(drone_id)
     if drone is None or drone.status != "active":
         return False
+    if len(waypoints) < 1:
+        return False
+    # Abort any existing mission before assigning the new patrol.
+    old_mission = _missions.get(drone_id)
+    if old_mission:
+        old_mission.abort()
+    mission = create_patrol_mission(drone_id, waypoints)
+    mission.activate()
+    _missions[drone_id] = mission
+    drone.mission_type = mission.mission_type
     drone.waypoints = list(waypoints)
     drone.waypoint_index = 0
     return True

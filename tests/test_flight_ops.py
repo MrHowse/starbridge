@@ -235,6 +235,12 @@ def test_set_waypoints_route():
     assert result is True
     assert len(drone.waypoints) == 2
     assert drone.waypoint_index == 0
+    # Should create a patrol mission so the AI actually follows the route.
+    assert drone.mission_type == "patrol"
+    missions = glfo.get_missions()
+    assert drone.id in missions
+    assert missions[drone.id].mission_type == "patrol"
+    assert len(missions[drone.id].waypoints) == 2
 
 
 # ---------------------------------------------------------------------------

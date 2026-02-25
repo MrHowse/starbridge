@@ -1079,6 +1079,7 @@ document.addEventListener('keydown', e => {
 
   // Enter — confirm patrol route.
   if (e.key === 'Enter' && _interactionMode?.type === 'patrol') {
+    e.preventDefault();
     confirmPatrolRoute();
     return;
   }
