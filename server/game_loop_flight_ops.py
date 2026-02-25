@@ -370,6 +370,50 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
                     **dev.data,
                 })
 
+                # Handle mission-completing events.
+                if dev.event_type in ("rescue_complete", "survey_complete"):
+                    if mission and mission.is_active:
+                        mission.complete()
+                        events.append({
+                            "type": "mission_complete",
+                            "drone_id": drone.id,
+                            "callsign": drone.callsign,
+                            "mission_type": mission.mission_type,
+                        })
+                elif dev.event_type == "winchester":
+                    # Out of ammo — mission effectively complete.
+                    if mission and mission.is_active:
+                        mission.complete()
+
+            # Check mission timeout.
+            if mission and mission.is_active and mission.timeout_tick is not None:
+                if tick_num >= mission.timeout_tick:
+                    mission.abort()
+                    ev = initiate_rtb(drone)
+                    events.append({
+                        "type": ev.event_type,
+                        "drone_id": ev.drone_id,
+                        "reason": "timeout",
+                        **ev.data,
+                    })
+
+            # Check mission route completion → auto-RTB.
+            if mission and mission.is_active and mission.route_complete:
+                if mission.all_required_complete:
+                    mission.complete()
+                    ev = initiate_rtb(drone)
+                    events.append({
+                        "type": "mission_complete",
+                        "drone_id": drone.id,
+                        "callsign": drone.callsign,
+                        "mission_type": mission.mission_type,
+                    })
+                    events.append({
+                        "type": ev.event_type,
+                        "drone_id": ev.drone_id,
+                        **ev.data,
+                    })
+
             # Check bingo auto-recall.
             if drone.bingo_acknowledged:
                 timer = _bingo_timers.get(drone.id, 0.0) + dt
@@ -394,9 +438,18 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
                     "callsign": drone.callsign,
                 })
 
-        # Handle lost/destroyed cleanup.
+        # Handle lost/destroyed cleanup — mark mission as failed.
         if drone.status in ("lost", "destroyed"):
-            _missions.pop(drone.id, None)
+            lost_mission = _missions.pop(drone.id, None)
+            if lost_mission and not lost_mission.is_over:
+                lost_mission.fail()
+                events.append({
+                    "type": "mission_failed",
+                    "drone_id": drone.id,
+                    "callsign": drone.callsign,
+                    "mission_type": lost_mission.mission_type,
+                    "reason": drone.status,
+                })
             _bingo_timers.pop(drone.id, None)
 
     # 5. Tick decoys.
@@ -548,6 +601,16 @@ def _tick_recoveries(ship: Ship, dt: float) -> list[dict]:
         drone.speed = 0.0
         _missions.pop(drone_id, None)
         _bingo_timers.pop(drone_id, None)
+
+        # Transfer survivors from rescue drones.
+        if drone.cargo_current > 0 and drone.drone_type == "rescue":
+            events.append({
+                "type": "survivors_transferred",
+                "drone_id": drone_id,
+                "callsign": drone.callsign,
+                "count": drone.cargo_current,
+            })
+            drone.cargo_current = 0
 
         # Start turnaround.
         fd.start_turnaround(drone)

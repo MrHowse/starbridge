@@ -726,3 +726,194 @@ def test_sensor_contacts_include_all_enemies():
     bubble = [(70_000.0, 50_000.0, 8_000.0)]
     contacts2 = sen.build_sensor_contacts(world, ship, extra_bubbles=bubble)
     assert len(contacts2) == 1
+
+
+# ---------------------------------------------------------------------------
+# Mission lifecycle — timeout, completion, failure, survivor transfer
+# ---------------------------------------------------------------------------
+
+
+def _launch_and_activate(ship: Ship, drone_idx: int = 0, dt: float = 0.1) -> str:
+    """Launch the Nth hangar drone and tick until active. Returns drone_id."""
+    drones = glfo.get_drones()
+    drone = drones[drone_idx]
+    glfo.launch_drone(drone.id, ship)
+    # Tick through launch timer.
+    for _ in range(int(BASE_LAUNCH_TIME / dt) + 5):
+        glfo.tick(ship, dt)
+    assert drone.status == "active", f"Expected active, got {drone.status}"
+    return drone.id
+
+
+def test_mission_timeout_triggers_rtb():
+    """When tick_num exceeds timeout_tick, the mission aborts and drone RTBs."""
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+    drone = glfo.get_drone_by_id(drone_id)
+
+    from server.models.drone_missions import create_patrol_mission
+    mission = create_patrol_mission(drone_id, [(60_000, 60_000)], timeout_tick=10)
+    glfo.assign_mission(drone_id, mission)
+
+    # Tick with tick_num below timeout — no abort.
+    events = glfo.tick(ship, 0.1, tick_num=5)
+    assert drone.ai_behaviour != "rtb"
+
+    # Tick with tick_num exceeding timeout — should abort + RTB.
+    events = glfo.tick(ship, 0.1, tick_num=15)
+    rtb_events = [e for e in events if e["type"] == "drone_rtb"]
+    assert len(rtb_events) >= 1
+    assert mission.status == "aborted"
+
+
+def test_patrol_route_complete_triggers_rtb():
+    """When patrol route is fully complete, drone auto-RTBs."""
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+    drone = glfo.get_drone_by_id(drone_id)
+
+    from server.models.drone_missions import create_patrol_mission
+    # Single waypoint patrol — drone starts at ship pos.
+    mission = create_patrol_mission(drone_id, [(50_001, 50_001)], loiter_time=0.0)
+    glfo.assign_mission(drone_id, mission)
+
+    # Manually advance the waypoint to simulate route completion.
+    mission.advance_waypoint()
+    assert mission.route_complete
+    # Mark objective complete too.
+    for obj in mission.objectives:
+        obj.completed = True
+
+    events = glfo.tick(ship, 0.1)
+    complete_events = [e for e in events if e["type"] == "mission_complete"]
+    assert len(complete_events) >= 1
+    assert mission.status == "complete"
+
+
+def test_mission_failure_on_drone_destruction():
+    """When a drone is destroyed, its mission is marked as failed."""
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+    drone = glfo.get_drone_by_id(drone_id)
+
+    from server.models.drone_missions import create_patrol_mission
+    mission = create_patrol_mission(drone_id, [(60_000, 60_000)])
+    glfo.assign_mission(drone_id, mission)
+
+    # Destroy the drone.
+    from server.systems.drone_ai import apply_damage_to_drone
+    apply_damage_to_drone(drone, drone.max_hull + 10)
+    assert drone.status == "destroyed"
+
+    events = glfo.tick(ship, 0.1)
+    fail_events = [e for e in events if e["type"] == "mission_failed"]
+    assert len(fail_events) >= 1
+    assert fail_events[0]["mission_type"] == "patrol"
+    assert fail_events[0]["reason"] == "destroyed"
+    # Mission removed from active missions.
+    assert drone_id not in glfo.get_missions()
+
+
+def test_survivor_transfer_on_recovery():
+    """Rescue drone cargo (survivors) generates transfer event on recovery."""
+    ship = fresh_ship()
+    # Reset as medical ship which has rescue drones.
+    glfo.reset("medical_ship")
+    # Find rescue drone.
+    rescue = None
+    for d in glfo.get_drones():
+        if d.drone_type == "rescue":
+            rescue = d
+            break
+    assert rescue is not None, "Medical ship must have rescue drones"
+
+    drone_id = _launch_and_activate(ship, drone_idx=glfo.get_drones().index(rescue))
+    drone = glfo.get_drone_by_id(drone_id)
+    drone.cargo_current = 3  # Simulate 3 survivors aboard.
+
+    # Set drone to RTB.
+    drone.ai_behaviour = "rtb"
+    drone.status = "rtb"
+
+    # Tick until recovered.
+    all_events = []
+    for _ in range(200):
+        evts = glfo.tick(ship, 0.1)
+        all_events.extend(evts)
+        if drone.status in ("maintenance", "hangar"):
+            break
+
+    transfer_events = [e for e in all_events if e["type"] == "survivors_transferred"]
+    assert len(transfer_events) >= 1
+    assert transfer_events[0]["count"] == 3
+    assert drone.cargo_current == 0
+
+
+def test_ecm_fuel_multiplier():
+    """ECM drone consumes 2x fuel while actively jamming."""
+    from server.systems.drone_ai import (
+        DroneWorldContext,
+        ECM_FUEL_MULTIPLIER,
+        tick_drone,
+    )
+    from server.models.drones import create_drone
+
+    ecm = create_drone("ecm_test", "ecm_drone", "Ghost")
+    ecm.status = "active"
+    ecm.fuel = 100.0
+    ecm.position = (50_000, 50_000)
+
+    # Tick with no contacts — normal fuel burn.
+    ctx_empty = DroneWorldContext(ship_x=50_000, ship_y=50_000)
+    initial_fuel = ecm.fuel
+    tick_drone(ecm, 1.0, ctx_empty)
+    normal_burn = initial_fuel - ecm.fuel
+
+    # Reset fuel.
+    ecm.fuel = 100.0
+    initial_fuel = ecm.fuel
+
+    # Tick with a hostile contact in ECM range — should burn 2x.
+    ctx_hostile = DroneWorldContext(
+        ship_x=50_000, ship_y=50_000,
+        contacts=[{
+            "id": "e1", "x": 50_100, "y": 50_100,
+            "classification": "hostile", "kind": "enemy",
+        }],
+    )
+    tick_drone(ecm, 1.0, ctx_hostile)
+    ecm_burn = initial_fuel - ecm.fuel
+
+    # ECM burn should be ~2x normal burn.
+    assert ecm_burn == pytest.approx(normal_burn * ECM_FUEL_MULTIPLIER, rel=0.05)
+
+
+def test_build_state_includes_new_fields():
+    """build_state includes sensor_range, waypoints, and other new fields."""
+    ship = fresh_ship()
+    drone_id = _launch_and_activate(ship)
+    drone = glfo.get_drone_by_id(drone_id)
+
+    state = glfo.build_state(ship)
+    d_state = next(d for d in state["drones"] if d["id"] == drone_id)
+
+    assert "sensor_range" in d_state
+    assert "weapon_range" in d_state
+    assert "weapon_damage" in d_state
+    assert "ecm_strength" in d_state
+    assert "buoys_remaining" in d_state
+    assert "buoy_capacity" in d_state
+    assert "max_speed" in d_state
+    assert "waypoints" in d_state
+    assert "waypoint_index" in d_state
+    assert "loiter_point" in d_state
+
+
+def test_reset_uses_ship_class():
+    """reset() with different ship class creates correct complement."""
+    glfo.reset("carrier")
+    expected = sum(DRONE_COMPLEMENT["carrier"].values())
+    assert len(glfo.get_drones()) == expected
+    # Carrier should have ECM drones.
+    ecm_drones = [d for d in glfo.get_drones() if d.drone_type == "ecm_drone"]
+    assert len(ecm_drones) == 1

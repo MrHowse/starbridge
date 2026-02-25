@@ -63,6 +63,9 @@ SURVEY_RESOLUTION_MULT: float = 1.0
 # ECM jamming effective range.
 ECM_JAM_RANGE: float = 12_000.0
 
+# ECM fuel consumption multiplier while actively jamming.
+ECM_FUEL_MULTIPLIER: float = 2.0
+
 
 # ---------------------------------------------------------------------------
 # DroneEvent — events emitted by drone ticks
@@ -550,12 +553,14 @@ def _tick_ecm(
         return events
 
     # Check for enemies within ECM range.
+    jamming_active = False
     for contact in ctx.contacts:
         classification = contact.get("classification", "unknown")
         if classification not in ("hostile",):
             continue
         cx, cy = contact.get("x", 0.0), contact.get("y", 0.0)
         if _dist(drone.position, (cx, cy)) <= ECM_JAM_RANGE:
+            jamming_active = True
             events.append(DroneEvent(
                 event_type="ecm_jamming",
                 drone_id=drone.id,
@@ -565,6 +570,12 @@ def _tick_ecm(
                     "strength": drone.ecm_strength,
                 },
             ))
+
+    # Active jamming consumes 2x fuel — apply the extra consumption
+    # (base consumption already applied in tick_drone).
+    if jamming_active:
+        extra = drone.fuel_consumption * (ECM_FUEL_MULTIPLIER - 1.0) * dt
+        drone.fuel = max(0.0, drone.fuel - extra)
 
     return events
 
