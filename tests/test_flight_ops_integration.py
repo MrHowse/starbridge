@@ -33,6 +33,7 @@ from server.models.messages.flight_ops import (
     FlightOpsDesignateTargetPayload,
     FlightOpsEscortAssignPayload,
     FlightOpsLaunchDronePayload,
+    FlightOpsPrioritiseRecoveryPayload,
     FlightOpsRecallDronePayload,
     FlightOpsRushTurnaroundPayload,
     FlightOpsSetBehaviourPayload,
@@ -147,6 +148,14 @@ class TestPayloadValidation:
         msg = Message.build("flight_ops.abort_landing", {"drone_id": "drone_s1"})
         payload = validate_payload(msg)
         assert isinstance(payload, FlightOpsAbortLandingPayload)
+
+    def test_prioritise_recovery_payload(self):
+        msg = Message.build("flight_ops.prioritise_recovery", {
+            "order": ["drone_s1", "drone_c1"],
+        })
+        payload = validate_payload(msg)
+        assert isinstance(payload, FlightOpsPrioritiseRecoveryPayload)
+        assert payload.order == ["drone_s1", "drone_c1"]
 
 
 # ---------------------------------------------------------------------------

@@ -66,3 +66,7 @@ class FlightOpsAbortLandingPayload(BaseModel):
 
 class FlightOpsCancelLaunchPayload(BaseModel):
     drone_id: str
+
+
+class FlightOpsPrioritiseRecoveryPayload(BaseModel):
+    order: list[str]

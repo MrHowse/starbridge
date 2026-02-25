@@ -1115,3 +1115,134 @@ def test_serialise_launch_phases():
     assert glfo._launch_phases.get(drone.id) == "prep"
     assert glfo._retry_delays.get(drone.id) == pytest.approx(3.0)
     assert glfo._recovery_timers.get(drone.id) == pytest.approx(7.0)
+
+
+# ---------------------------------------------------------------------------
+# Active drone tick updates position (Gap 3)
+# ---------------------------------------------------------------------------
+
+
+def test_tick_active_drone_updates_position():
+    """An active drone should change position after tick."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    glfo.launch_drone(drone.id, ship)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
+    assert drone.status == "active"
+
+    # Give the drone a loiter point so it moves.
+    drone.loiter_point = (60000.0, 50000.0)
+    pos_before = drone.position
+
+    glfo.tick(ship, 1.0)
+
+    # Position should have changed.
+    assert drone.position != pos_before
+
+
+# ---------------------------------------------------------------------------
+# Combat drone events in tick output (Gap 4)
+# ---------------------------------------------------------------------------
+
+
+def test_tick_combat_drone_attack_events():
+    """Combat drone attack events should appear in tick output."""
+    ship = fresh_ship()
+    drones = glfo.get_drones()
+    combat = next(d for d in drones if d.drone_type == "combat")
+
+    # Launch and activate.
+    glfo.launch_drone(combat.id, ship)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
+    assert combat.status == "active"
+
+    # Set up engagement with a contact in range.
+    combat.ai_behaviour = "engage"
+    combat.contact_of_interest = "enemy_1"
+    contact = {"id": "enemy_1", "x": ship.x + 5000.0, "y": ship.y,
+               "classification": "hostile"}
+
+    events = glfo.tick(ship, 0.1, contacts=[contact])
+    attack_events = [e for e in events if e.get("type") == "drone_attack"]
+    assert len(attack_events) == 1
+    assert attack_events[0]["target_id"] == "enemy_1"
+    assert attack_events[0]["damage"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Bingo warning through game loop tick (Gap 5)
+# ---------------------------------------------------------------------------
+
+
+def test_tick_bingo_fuel_warning():
+    """Bingo fuel warning should appear in tick events."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+
+    # Launch and activate.
+    glfo.launch_drone(drone.id, ship)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
+    assert drone.status == "active"
+
+    # Move drone far from ship and set low fuel.
+    drone.position = (ship.x + 50000.0, ship.y)
+    drone.fuel = 5.0
+
+    events = glfo.tick(ship, 0.1)
+    bingo_events = [e for e in events if e.get("type") == "bingo_fuel"]
+    assert len(bingo_events) == 1
+    assert bingo_events[0]["drone_id"] == drone.id
+    assert drone.bingo_acknowledged is True
+
+
+# ---------------------------------------------------------------------------
+# Bingo auto-recall through game loop tick (Gap 6)
+# ---------------------------------------------------------------------------
+
+
+def test_tick_bingo_auto_recall():
+    """Bingo auto-recall should fire after 15s through game loop tick."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+
+    # Launch and activate.
+    glfo.launch_drone(drone.id, ship)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
+    assert drone.status == "active"
+
+    # Trigger bingo.
+    drone.bingo_acknowledged = True
+    drone.cargo_current = 0  # no critical cargo
+
+    # Tick for less than auto-recall delay — no recall.
+    for _ in range(100):
+        glfo.tick(ship, 0.1)
+    assert drone.ai_behaviour != "rtb"
+
+    # Tick past auto-recall delay (15s total).
+    for _ in range(60):
+        glfo.tick(ship, 0.1)
+    # Should have auto-recalled.
+    assert drone.ai_behaviour == "rtb"
+
+
+def test_tick_bingo_auto_recall_blocked_by_critical_cargo():
+    """Bingo auto-recall should NOT fire when drone has critical cargo."""
+    ship = fresh_ship()
+    drones = glfo.get_drones()
+    rescue = next(d for d in drones if d.drone_type == "rescue")
+
+    # Launch and activate.
+    glfo.launch_drone(rescue.id, ship)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
+    assert rescue.status == "active"
+
+    # Trigger bingo with cargo (survivors aboard).
+    rescue.bingo_acknowledged = True
+    rescue.cargo_current = 3
+
+    # Tick well past auto-recall delay.
+    for _ in range(200):
+        glfo.tick(ship, 0.1)
+    # Should NOT have auto-recalled — critical cargo.
+    assert rescue.ai_behaviour != "rtb"

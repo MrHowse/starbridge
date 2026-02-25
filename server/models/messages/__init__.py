@@ -133,6 +133,7 @@ from server.models.messages.flight_ops import (
     FlightOpsDesignateTargetPayload,
     FlightOpsEscortAssignPayload,
     FlightOpsLaunchDronePayload,
+    FlightOpsPrioritiseRecoveryPayload,
     FlightOpsRecallDronePayload,
     FlightOpsRushTurnaroundPayload,
     FlightOpsSetBehaviourPayload,
@@ -294,6 +295,7 @@ __all__ = [
     "FlightOpsRushTurnaroundPayload",
     "FlightOpsAbortLandingPayload",
     "FlightOpsCancelLaunchPayload",
+    "FlightOpsPrioritiseRecoveryPayload",
     # electronic warfare
     "EWSetJamTargetPayload",
     "EWToggleCountermeasuresPayload",
