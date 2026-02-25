@@ -263,6 +263,7 @@
 .fo-drone-state-badge--rtb        { color: var(--system-warning); animation: fo-return-pulse 0.8s ease-in-out infinite alternate; }
 .fo-drone-state-badge--recovering { color: var(--system-warning); }
 .fo-drone-state-badge--emergency  { color: #ff4040; animation: fo-return-pulse 0.5s ease-in-out infinite alternate; }
+.fo-drone-state-badge--recalled    { color: var(--system-warning); animation: fo-return-pulse 0.8s ease-in-out infinite alternate; }
 .fo-drone-state-badge--maintenance { color: var(--text-dim); }
 .fo-drone-state-badge--destroyed  { color: #ff4040; }
 .fo-drone-state-badge--lost       { color: #ff4040; }
@@ -344,6 +345,16 @@
   color: var(--system-warning);
   animation: fo-bingo-pulse 0.6s ease-in-out infinite alternate;
   margin-bottom: 0.2rem;
+}
+
+/* ─── Recalled label ─── */
+
+.fo-recalled-label {
+  font-size: 0.7rem;
+  color: var(--system-warning);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  animation: fo-return-pulse 0.8s ease-in-out infinite alternate;
 }
 
 /* ─── Button row ─── */

@@ -88,6 +88,10 @@ let _selectedDroneId = null;
 //   { type: 'decoy' }             — click map to set decoy direction
 let _interactionMode = null;
 
+// Hash guards — skip DOM rebuild when only bar values changed.
+let _prevDroneStructKey = '';
+let _prevHangarStructKey = '';
+
 // ---------------------------------------------------------------------------
 // Shared UI init
 // ---------------------------------------------------------------------------
@@ -134,6 +138,8 @@ initSharedUI({
     missionLabel.textContent = 'MISSION ENDED';
     foState = null;
     shipState = null;
+    _prevDroneStructKey = '';
+    _prevHangarStructKey = '';
     SoundBank.play((payload && payload.result === 'victory') ? 'victory' : 'defeat');
     SoundBank.stopAmbient('life_support');
     SoundBank.stopAmbient('alert_level');
@@ -648,9 +654,28 @@ function selectDrone(droneId) {
 
 function renderDroneCards() {
   if (!foState) return;
-  droneCardsEl.innerHTML = '';
 
   const activeDrones = foState.drones.filter(d => AIRBORNE_STATUSES.has(d.status));
+
+  // Structural key: properties that affect card layout/buttons.
+  // When only bar values change (fuel ticking down, etc.) we skip the full
+  // DOM rebuild and update bars in-place, preventing button hover flicker.
+  const structKey = activeDrones.length === 0 ? '__empty__' : activeDrones.map(d => [
+    d.id, d.status, d.ai_behaviour, d.drone_type,
+    d.engagement_rules, d.mission_type,
+    d.bingo_acknowledged, d.id === _selectedDroneId,
+    d.hull < d.max_hull, d.fuel <= FUEL_LOW,
+    d.max_hull > 0 && (d.hull / d.max_hull * 100) <= HULL_LOW,
+  ].join('|')).join(';');
+
+  if (structKey === _prevDroneStructKey) {
+    _updateDroneBarsInPlace(activeDrones);
+    return;
+  }
+  _prevDroneStructKey = structKey;
+
+  droneCardsEl.innerHTML = '';
+
   if (activeDrones.length === 0) {
     droneCardsEl.innerHTML = '<p class="text-dim" style="padding:0.4rem 0.75rem;font-size:0.8rem">No drones airborne.</p>';
     return;
@@ -659,6 +684,7 @@ function renderDroneCards() {
   for (const drone of activeDrones) {
     const card = document.createElement('div');
     const isSelected = drone.id === _selectedDroneId;
+    const isRecalled = drone.ai_behaviour === 'rtb';
     card.className = 'fo-drone-card';
     if (isSelected) card.classList.add('fo-drone-card--selected');
     card.addEventListener('click', e => {
@@ -666,7 +692,7 @@ function renderDroneCards() {
       selectDrone(drone.id);
     });
 
-    // Header: callsign + type + status badge.
+    // Header: callsign + type + status badge + recalled badge.
     const header = document.createElement('div');
     header.className = 'fo-drone-card__header';
 
@@ -683,6 +709,15 @@ function renderDroneCards() {
     badge.textContent = drone.status.toUpperCase();
 
     header.append(callsign, typeLabel, badge);
+
+    // Recalled badge (active drone ordered to RTB).
+    if (isRecalled && drone.status === 'active') {
+      const recalledBadge = document.createElement('span');
+      recalledBadge.className = 'fo-drone-state-badge fo-drone-state-badge--recalled';
+      recalledBadge.textContent = 'RECALLED';
+      header.appendChild(recalledBadge);
+    }
+
     card.appendChild(header);
 
     // Mission info row.
@@ -708,25 +743,28 @@ function renderDroneCards() {
 
     // Fuel bar.
     bars.appendChild(makeBar('FUEL', drone.fuel, 100,
-      drone.fuel <= FUEL_LOW ? 'fo-bar-fill--fuel-low' : 'fo-bar-fill--fuel'));
+      drone.fuel <= FUEL_LOW ? 'fo-bar-fill--fuel-low' : 'fo-bar-fill--fuel',
+      null, `${drone.id}-fuel`));
 
     // Hull bar (only if damaged).
     if (drone.hull < drone.max_hull) {
       const hullPct = (drone.hull / drone.max_hull) * 100;
       bars.appendChild(makeBar('HULL', hullPct, 100,
-        hullPct <= HULL_LOW ? 'fo-bar-fill--hull-low' : 'fo-bar-fill--hull'));
+        hullPct <= HULL_LOW ? 'fo-bar-fill--hull-low' : 'fo-bar-fill--hull',
+        null, `${drone.id}-hull`));
     }
 
     // Ammo bar (combat drones).
     if (drone.drone_type === 'combat' && drone.ammo !== undefined) {
-      bars.appendChild(makeBar('AMMO', drone.ammo, 100, 'fo-bar-fill--ammo'));
+      bars.appendChild(makeBar('AMMO', drone.ammo, 100, 'fo-bar-fill--ammo',
+        null, `${drone.id}-ammo`));
     }
 
     // Cargo bar (rescue drones).
     if (drone.drone_type === 'rescue' && drone.cargo_capacity > 0) {
       const cargoPct = (drone.cargo_current / drone.cargo_capacity) * 100;
       bars.appendChild(makeBar('CARGO', cargoPct, 100, 'fo-bar-fill--cargo',
-        `${drone.cargo_current}/${drone.cargo_capacity}`));
+        `${drone.cargo_current}/${drone.cargo_capacity}`, `${drone.id}-cargo`));
     }
 
     card.appendChild(bars);
@@ -744,20 +782,28 @@ function renderDroneCards() {
     btns.className = 'fo-drone-card__btns';
 
     if (drone.status === 'active') {
-      btns.appendChild(makeBtn('Recall', 'fo-btn fo-btn--warn', () => {
-        send('flight_ops.recall_drone', { drone_id: drone.id });
-      }));
-      if (drone.drone_type === 'combat') {
-        const rulesLabel = drone.engagement_rules === 'weapons_free' ? 'Hold' : 'W.Free';
-        const nextRules = drone.engagement_rules === 'weapons_free' ? 'weapons_hold' : 'weapons_free';
-        btns.appendChild(makeBtn(rulesLabel, 'fo-btn', () => {
-          send('flight_ops.set_engagement_rules', { drone_id: drone.id, rules: nextRules });
+      if (isRecalled) {
+        // Already recalled — show indicator instead of Recall button.
+        const retLabel = document.createElement('span');
+        retLabel.className = 'fo-recalled-label';
+        retLabel.textContent = 'RETURNING TO BASE';
+        btns.appendChild(retLabel);
+      } else {
+        btns.appendChild(makeBtn('Recall', 'fo-btn fo-btn--warn', () => {
+          send('flight_ops.recall_drone', { drone_id: drone.id });
         }));
-      }
-      if (drone.drone_type === 'survey') {
-        btns.appendChild(makeBtn('Buoy', 'fo-btn', () => {
-          send('flight_ops.deploy_buoy', { drone_id: drone.id });
-        }));
+        if (drone.drone_type === 'combat') {
+          const rulesLabel = drone.engagement_rules === 'weapons_free' ? 'Hold' : 'W.Free';
+          const nextRules = drone.engagement_rules === 'weapons_free' ? 'weapons_hold' : 'weapons_free';
+          btns.appendChild(makeBtn(rulesLabel, 'fo-btn', () => {
+            send('flight_ops.set_engagement_rules', { drone_id: drone.id, rules: nextRules });
+          }));
+        }
+        if (drone.drone_type === 'survey') {
+          btns.appendChild(makeBtn('Buoy', 'fo-btn', () => {
+            send('flight_ops.deploy_buoy', { drone_id: drone.id });
+          }));
+        }
       }
     } else if (drone.status === 'rtb' || drone.status === 'recovering') {
       const retSpan = document.createElement('span');
@@ -772,21 +818,68 @@ function renderDroneCards() {
   }
 }
 
+/** Fast-path: update bar widths and percentage text without rebuilding DOM. */
+function _updateDroneBarsInPlace(drones) {
+  for (const d of drones) {
+    const fuelFill = droneCardsEl.querySelector(`[data-bar="${d.id}-fuel"]`);
+    if (fuelFill) {
+      fuelFill.style.width = `${Math.max(0, Math.min(100, d.fuel))}%`;
+      const pct = fuelFill.closest('.fo-bar-row').querySelector('.fo-bar-pct');
+      if (pct) pct.textContent = `${Math.round(d.fuel)}%`;
+    }
+    const hullFill = droneCardsEl.querySelector(`[data-bar="${d.id}-hull"]`);
+    if (hullFill) {
+      const hullPct = d.max_hull > 0 ? (d.hull / d.max_hull) * 100 : 0;
+      hullFill.style.width = `${Math.max(0, Math.min(100, hullPct))}%`;
+      const pct = hullFill.closest('.fo-bar-row').querySelector('.fo-bar-pct');
+      if (pct) pct.textContent = `${Math.round(hullPct)}%`;
+    }
+    const ammoFill = droneCardsEl.querySelector(`[data-bar="${d.id}-ammo"]`);
+    if (ammoFill) {
+      ammoFill.style.width = `${Math.max(0, Math.min(100, d.ammo))}%`;
+      const pct = ammoFill.closest('.fo-bar-row').querySelector('.fo-bar-pct');
+      if (pct) pct.textContent = `${Math.round(d.ammo)}%`;
+    }
+    const cargoFill = droneCardsEl.querySelector(`[data-bar="${d.id}-cargo"]`);
+    if (cargoFill && d.cargo_capacity > 0) {
+      const cargoPct = (d.cargo_current / d.cargo_capacity) * 100;
+      cargoFill.style.width = `${Math.max(0, Math.min(100, cargoPct))}%`;
+      const pct = cargoFill.closest('.fo-bar-row').querySelector('.fo-bar-pct');
+      if (pct) pct.textContent = `${d.cargo_current}/${d.cargo_capacity}`;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Hangar cards
 // ---------------------------------------------------------------------------
 
 function renderHangarCards() {
   if (!foState) return;
-  hangarCardsEl.innerHTML = '';
 
   const hangarDrones = foState.drones.filter(d => HANGAR_STATUSES.has(d.status));
+  const turnarounds = foState.flight_deck.turnarounds || {};
+
+  // Structural key: properties that affect card buttons/layout.
+  const structKey = hangarDrones.length === 0 ? '__empty__' : hangarDrones.map(d => {
+    const taRemaining = turnarounds[d.id];
+    const isReady = d.status === 'hangar' && (taRemaining === undefined || taRemaining <= 0);
+    const hasTurnaround = taRemaining !== undefined && taRemaining > 0;
+    return [d.id, d.status, isReady, hasTurnaround].join('|');
+  }).join(';');
+
+  if (structKey === _prevHangarStructKey) {
+    _updateHangarBarsInPlace(hangarDrones, turnarounds);
+    return;
+  }
+  _prevHangarStructKey = structKey;
+
+  hangarCardsEl.innerHTML = '';
+
   if (hangarDrones.length === 0) {
     hangarCardsEl.innerHTML = '<p class="text-dim" style="padding:0.4rem 0.75rem;font-size:0.8rem">Hangar empty.</p>';
     return;
   }
-
-  const turnarounds = foState.flight_deck.turnarounds || {};
 
   for (const drone of hangarDrones) {
     const card = document.createElement('div');
@@ -823,6 +916,7 @@ function renderHangarCards() {
       // Turnaround in progress.
       const ta = document.createElement('span');
       ta.className = 'fo-hangar-turnaround';
+      ta.setAttribute('data-ta-label', drone.id);
       ta.textContent = taRemaining !== undefined ? `TURNAROUND ${Math.ceil(taRemaining)}s` : drone.status.toUpperCase();
       header.appendChild(ta);
       card.appendChild(header);
@@ -835,6 +929,7 @@ function renderHangarCards() {
         barWrap.className = 'fo-turnaround-bar';
         const barFill = document.createElement('div');
         barFill.className = 'fo-turnaround-bar-fill';
+        barFill.setAttribute('data-ta', drone.id);
         barFill.style.width = `${pct}%`;
         barWrap.appendChild(barFill);
         card.appendChild(barWrap);
@@ -850,6 +945,23 @@ function renderHangarCards() {
     }
 
     hangarCardsEl.appendChild(card);
+  }
+}
+
+/** Fast-path: update turnaround bar widths and labels without rebuilding DOM. */
+function _updateHangarBarsInPlace(drones, turnarounds) {
+  for (const d of drones) {
+    const taRemaining = turnarounds[d.id];
+    const taFill = hangarCardsEl.querySelector(`[data-ta="${d.id}"]`);
+    if (taFill && taRemaining !== undefined && taRemaining > 0) {
+      const maxTA = 30;
+      const pct = Math.max(0, Math.min(100, ((maxTA - taRemaining) / maxTA) * 100));
+      taFill.style.width = `${pct}%`;
+    }
+    const taLabel = hangarCardsEl.querySelector(`[data-ta-label="${d.id}"]`);
+    if (taLabel && taRemaining !== undefined) {
+      taLabel.textContent = `TURNAROUND ${Math.ceil(taRemaining)}s`;
+    }
   }
 }
 
@@ -1074,7 +1186,7 @@ document.addEventListener('keydown', e => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeBar(label, value, max, fillClass, customText) {
+function makeBar(label, value, max, fillClass, customText, dataKey) {
   const row = document.createElement('div');
   row.className = 'fo-bar-row';
 
@@ -1086,6 +1198,7 @@ function makeBar(label, value, max, fillClass, customText) {
   wrap.className = 'fo-bar-wrap';
   const fill = document.createElement('div');
   fill.className = `fo-bar-fill ${fillClass}`;
+  if (dataKey) fill.setAttribute('data-bar', dataKey);
   fill.style.width = `${Math.max(0, Math.min(100, (value / max) * 100))}%`;
   wrap.appendChild(fill);
 
