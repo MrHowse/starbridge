@@ -34,6 +34,29 @@ COUNTERMEASURE_REDUCTION: float = 0.30  # fraction of hull damage absorbed per c
 FREQ_MATCH_MULT: float = 1.5     # matched frequency → 50% bonus damage
 FREQ_MISMATCH_MULT: float = 0.5  # mismatched frequency → 50% penalty
 
+# Target profile (v0.07)
+SPEED_EVASION_FACTOR: float = 0.3  # max profile reduction at full speed
+
+
+# ---------------------------------------------------------------------------
+# Target profile (v0.07 — hit probability mechanics)
+# ---------------------------------------------------------------------------
+
+
+def calculate_effective_profile(ship: Ship) -> float:
+    """Compute effective target profile factoring in speed.
+
+    effective_profile = base_profile × (1.0 - speed_factor × SPEED_EVASION_FACTOR)
+    where speed_factor = current_speed / max_speed_base (0..1).
+
+    A scout at full speed: 0.5 × (1.0 - 1.0 × 0.3) = 0.35.
+    A stationary battleship: 1.0 × (1.0 - 0.0 × 0.3) = 1.0.
+    """
+    if ship.max_speed_base <= 0.0:
+        return ship.target_profile
+    speed_factor = min(1.0, ship.velocity / ship.max_speed_base)
+    return ship.target_profile * (1.0 - speed_factor * SPEED_EVASION_FACTOR)
+
 
 # ---------------------------------------------------------------------------
 # Arc check (shared by player and enemy callers)

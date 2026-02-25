@@ -69,6 +69,12 @@ def _serialise_ship(ship: Ship) -> dict:
         "throttle": ship.throttle,
         "hull": ship.hull,
         "hull_max": ship.hull_max,
+        "max_speed_base": ship.max_speed_base,
+        "acceleration_base": ship.acceleration_base,
+        "turn_rate_base": ship.turn_rate_base,
+        "target_profile": ship.target_profile,
+        "armour": ship.armour,
+        "armour_max": ship.armour_max,
         "docked_at": ship.docked_at,
         "shields": {
             "fore": ship.shields.fore, "aft": ship.shields.aft,
@@ -234,6 +240,12 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.throttle = float(data.get("throttle", ship.throttle))
     ship.hull = float(data.get("hull", ship.hull))
     ship.hull_max = float(data.get("hull_max", ship.hull))
+    ship.max_speed_base = float(data.get("max_speed_base", ship.max_speed_base))
+    ship.acceleration_base = float(data.get("acceleration_base", ship.acceleration_base))
+    ship.turn_rate_base = float(data.get("turn_rate_base", ship.turn_rate_base))
+    ship.target_profile = float(data.get("target_profile", ship.target_profile))
+    ship.armour = float(data.get("armour", ship.armour))
+    ship.armour_max = float(data.get("armour_max", ship.armour_max))
     ship.docked_at = data.get("docked_at")
 
     shields_d = data.get("shields", {})

@@ -24,7 +24,7 @@ def test_load_frigate_returns_ship_class():
 
 def test_load_frigate_has_correct_hull():
     sc = load_ship_class("frigate")
-    assert sc.max_hull == 100.0
+    assert sc.max_hull == 120.0
 
 
 def test_load_scout_has_lower_hull_than_frigate():
@@ -129,11 +129,11 @@ async def test_game_loop_applies_scout_hull():
 async def test_game_loop_applies_battleship_hull():
     _, world, _ = fresh()
     await game_loop.start("sandbox", ship_class="battleship")
-    assert world.ship.hull == 200.0
+    assert world.ship.hull == 300.0
 
 
 async def test_game_loop_unknown_ship_class_defaults_to_frigate():
     _, world, _ = fresh()
     await game_loop.start("sandbox", ship_class="xyzzy")
-    # Falls back to frigate hull (100).
-    assert world.ship.hull == 100.0
+    # Falls back to frigate hull (120).
+    assert world.ship.hull == 120.0

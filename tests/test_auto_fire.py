@@ -36,10 +36,15 @@ def _fresh_world(ship: Ship | None = None) -> World:
 
 
 def _scanned_enemy(entity_id: str, x: float, y: float, hull: float = 100.0):
-    """Create a scanned enemy at the given position."""
+    """Create a scanned enemy at the given position.
+
+    Sets target_profile=1.0 so auto-fire tests aren't affected by the
+    v0.07 target profile mechanic (those are tested in test_target_profile.py).
+    """
     enemy = spawn_enemy("fighter", x, y, entity_id)
     enemy.scan_state = "scanned"
     enemy.hull = hull
+    enemy.target_profile = 1.0
     return enemy
 
 

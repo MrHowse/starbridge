@@ -12,6 +12,7 @@ from server.systems.physics import (
     BASE_MAX_SPEED,
     BASE_TURN_RATE,
     DECELERATION,
+    acceleration_rate,
     max_speed,
     tick,
     turn_rate,
@@ -40,24 +41,45 @@ def make_ship(**kwargs: object) -> Ship:
 
 def test_max_speed_at_full_efficiency():
     ship = Ship()
-    assert max_speed(ship) == pytest.approx(BASE_MAX_SPEED)
+    assert max_speed(ship) == pytest.approx(ship.max_speed_base)
 
 
 def test_max_speed_halved_at_half_engine_power():
     ship = Ship()
     ship.systems["engines"].power = 50.0
-    assert max_speed(ship) == pytest.approx(BASE_MAX_SPEED * 0.5)
+    assert max_speed(ship) == pytest.approx(ship.max_speed_base * 0.5)
 
 
 def test_turn_rate_at_full_efficiency():
     ship = Ship()
-    assert turn_rate(ship) == pytest.approx(BASE_TURN_RATE)
+    assert turn_rate(ship) == pytest.approx(ship.turn_rate_base)
 
 
 def test_turn_rate_halved_at_half_manoeuvring_power():
     ship = Ship()
     ship.systems["manoeuvring"].power = 50.0
-    assert turn_rate(ship) == pytest.approx(BASE_TURN_RATE * 0.5)
+    assert turn_rate(ship) == pytest.approx(ship.turn_rate_base * 0.5)
+
+
+def test_acceleration_rate_reads_from_ship():
+    ship = Ship()
+    assert acceleration_rate(ship) == pytest.approx(ship.acceleration_base)
+
+
+def test_max_speed_uses_class_specific_value():
+    """Ships with different max_speed_base produce different max speeds."""
+    ship = Ship()
+    ship.max_speed_base = 250.0  # scout
+    assert max_speed(ship) == pytest.approx(250.0)
+
+    ship.max_speed_base = 80.0  # battleship
+    assert max_speed(ship) == pytest.approx(80.0)
+
+
+def test_turn_rate_uses_class_specific_value():
+    ship = Ship()
+    ship.turn_rate_base = 180.0  # scout
+    assert turn_rate(ship) == pytest.approx(180.0)
 
 
 # ---------------------------------------------------------------------------
@@ -68,22 +90,24 @@ def test_turn_rate_halved_at_half_manoeuvring_power():
 def test_ship_turns_toward_target_heading():
     ship = make_ship(heading=0.0, target_heading=90.0)
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
-    # Should have moved clockwise by (BASE_TURN_RATE * DT) = 45 * 0.1 = 4.5°
-    assert ship.heading == pytest.approx(BASE_TURN_RATE * DT)
+    # Should have moved clockwise by (turn_rate_base * DT)
+    assert ship.heading == pytest.approx(ship.turn_rate_base * DT)
 
 
 def test_ship_snaps_to_target_when_within_one_step():
-    step = BASE_TURN_RATE * DT  # 4.5°
-    ship = make_ship(heading=0.0, target_heading=step * 0.5)
+    ship = make_ship(heading=0.0)
+    step = ship.turn_rate_base * DT
+    ship.target_heading = step * 0.5
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
     assert ship.heading == pytest.approx(ship.target_heading)
 
 
 def test_ship_heading_wraps_past_360():
-    ship = make_ship(heading=358.0, target_heading=5.0)
+    ship = make_ship(heading=358.0, target_heading=20.0)
+    step = ship.turn_rate_base * DT
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
-    # Shortest path is clockwise (+7°). After one step (4.5°): 358 + 4.5 = 362.5 → 2.5
-    assert ship.heading == pytest.approx((358.0 + BASE_TURN_RATE * DT) % 360.0)
+    # Shortest path is clockwise (+22°). Step is 9°, so heading = (358+9) % 360 = 7.0
+    assert ship.heading == pytest.approx((358.0 + step) % 360.0)
 
 
 def test_ship_turns_counter_clockwise_for_shorter_path():
@@ -91,7 +115,7 @@ def test_ship_turns_counter_clockwise_for_shorter_path():
     ship = make_ship(heading=0.0, target_heading=270.0)
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
     # Heading should decrease (turn left)
-    expected = (0.0 - BASE_TURN_RATE * DT) % 360.0
+    expected = (0.0 - ship.turn_rate_base * DT) % 360.0
     assert ship.heading == pytest.approx(expected)
 
 
@@ -109,23 +133,26 @@ def test_ship_at_target_heading_does_not_move():
 def test_ship_accelerates_from_zero():
     ship = make_ship(throttle=100.0)
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
-    assert ship.velocity == pytest.approx(ACCELERATION * DT)
+    assert ship.velocity == pytest.approx(ship.acceleration_base * DT)
 
 
 def test_ship_decelerates_when_throttle_cut():
     ship = make_ship(throttle=0.0, velocity=100.0)
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
-    assert ship.velocity == pytest.approx(100.0 - DECELERATION * DT)
+    # Deceleration is proportional: accel * (DECELERATION / ACCELERATION)
+    decel = ship.acceleration_base * (DECELERATION / ACCELERATION)
+    assert ship.velocity == pytest.approx(100.0 - decel * DT)
 
 
 def test_ship_velocity_capped_at_max_speed():
-    ship = make_ship(throttle=100.0, velocity=BASE_MAX_SPEED - 1.0)
+    ship = make_ship(throttle=100.0)
+    ship.velocity = ship.max_speed_base - 1.0
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
-    assert ship.velocity == pytest.approx(BASE_MAX_SPEED)
+    assert ship.velocity == pytest.approx(ship.max_speed_base)
 
 
 def test_ship_velocity_does_not_go_below_zero():
-    ship = make_ship(throttle=0.0, velocity=0.5)  # less than DECELERATION*DT
+    ship = make_ship(throttle=0.0, velocity=0.5)  # less than decel*DT
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
     assert ship.velocity == pytest.approx(0.0)
 
@@ -169,11 +196,6 @@ def test_ship_displacement_matches_velocity():
     ship = make_ship(heading=90.0, target_heading=90.0, throttle=0.0, velocity=v)
     x_before = ship.x
     tick(ship, DT, SECTOR_WIDTH, SECTOR_HEIGHT)
-    # heading=90° → pure east → x increases by v*dt (velocity unchanged at target)
-    # Note: _thrust runs first and may adjust velocity slightly; at throttle=0 it decelerates.
-    # But we're checking that the formula is correct: dx = velocity_before * sin(90) * dt.
-    # The velocity is decremented before move, so use the post-thrust velocity.
-    # Instead just check the sign and rough magnitude.
     assert ship.x == pytest.approx(x_before + v * math.sin(math.radians(90.0)) * DT, rel=0.05)
 
 

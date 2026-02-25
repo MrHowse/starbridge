@@ -482,6 +482,12 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.ship.alert_level = "green"
     _world.ship.hull = sc.max_hull
     _world.ship.hull_max = sc.max_hull
+    _world.ship.max_speed_base = sc.max_speed
+    _world.ship.acceleration_base = sc.acceleration
+    _world.ship.turn_rate_base = sc.turn_rate
+    _world.ship.target_profile = sc.target_profile
+    _world.ship.armour = sc.armour
+    _world.ship.armour_max = sc.armour
     _world.ship.docked_at = None
     _world.ship.crew = CrewRoster()
     _world.ship.interior = make_default_interior()

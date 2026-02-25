@@ -43,6 +43,7 @@ ENEMY_TYPE_PARAMS: dict[str, dict] = {
         "beam_dmg":         4.0,
         "beam_cooldown":    1.0,
         "flee_threshold":   0.0,   # fighters never flee
+        "target_profile":   0.4,   # v0.07: small, fast, hard to hit
     },
     "scout": {
         "hull":           40.0,
@@ -53,6 +54,7 @@ ENEMY_TYPE_PARAMS: dict[str, dict] = {
         "beam_dmg":         5.0,
         "beam_cooldown":    1.5,
         "flee_threshold":   0.30,
+        "target_profile":   0.5,   # v0.07: small
     },
     "cruiser": {
         "hull":           70.0,
@@ -63,6 +65,7 @@ ENEMY_TYPE_PARAMS: dict[str, dict] = {
         "beam_dmg":        10.0,
         "beam_cooldown":    2.0,
         "flee_threshold":   0.20,
+        "target_profile":   0.85,  # v0.07: large, easy to hit
     },
     "destroyer": {
         "hull":          100.0,
@@ -73,6 +76,7 @@ ENEMY_TYPE_PARAMS: dict[str, dict] = {
         "beam_dmg":        15.0,
         "beam_cooldown":    3.0,
         "flee_threshold":   0.15,
+        "target_profile":   0.7,   # v0.07: medium-large
     },
 }
 
@@ -352,6 +356,8 @@ class Enemy:
     intrusion_stun_ticks: int = 0    # EW network intrusion: blocks beam fire when > 0
     # Gap closure — beam frequency vulnerability
     shield_frequency: str = ""       # alpha | beta | gamma | delta — matched by Weapons
+    # v0.07 — target profile (hit probability modifier for incoming fire)
+    target_profile: float = 1.0      # 0.0-1.0; lower = harder to hit
 
 
 # ---------------------------------------------------------------------------
@@ -582,6 +588,7 @@ def spawn_enemy(type_: Literal["fighter", "scout", "cruiser", "destroyer"], x: f
         shield_rear=init_shields,
         ai_state="idle",
         shield_frequency=_rng_module.choice(_SHIELD_FREQUENCIES),
+        target_profile=params.get("target_profile", 1.0),
     )
 
 

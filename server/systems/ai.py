@@ -74,7 +74,10 @@ def tick_enemies(
     threshold (higher = enemies stay in the fight longer).
     """
     import random as _rng_mod
+    from server.systems.combat import calculate_effective_profile
     accuracy_mult = getattr(difficulty, "enemy_accuracy", 1.0) if difficulty else 1.0
+    # v0.07: target profile reduces hit chance on the player ship.
+    effective_profile = calculate_effective_profile(ship)
     # Default aggression=0.25 (no scaling) when no difficulty is provided;
     # Officer preset uses 0.75 which halves the effective flee threshold.
     aggression = getattr(difficulty, "enemy_ai_aggression", 0.25) if difficulty else 0.25
@@ -121,8 +124,10 @@ def tick_enemies(
         if enemy.ai_state == "attack" and enemy.beam_cooldown <= 0.0 and not stunned:
             brg = bearing_to(enemy.x, enemy.y, target_x, target_y)
             if beam_in_arc(enemy.heading, brg, params["arc_deg"]):
-                # Accuracy check: miss probability scales with difficulty.
-                hit_chance = min(1.0, accuracy_mult)
+                # Accuracy check: miss probability scales with difficulty × target profile.
+                # Target profile only applies vs player ship, not stations.
+                profile = effective_profile if target_id == "player" else 1.0
+                hit_chance = min(1.0, accuracy_mult * profile)
                 if hit_chance < 1.0 and _rng_mod.random() > hit_chance:
                     enemy.beam_cooldown = params["beam_cooldown"]
                     continue  # miss

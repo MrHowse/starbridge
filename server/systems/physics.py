@@ -17,7 +17,7 @@ from server.models.ship import Ship
 from server.utils.math_helpers import angle_diff, wrap_angle
 
 # ---------------------------------------------------------------------------
-# Physics constants
+# Default physics constants (used when ship has no class-specific overrides)
 # ---------------------------------------------------------------------------
 
 BASE_MAX_SPEED: float = 200.0  # world units/sec at 100% engine power/efficiency
@@ -27,18 +27,23 @@ DECELERATION: float = 80.0     # world units/sec² — braking is faster than ac
 
 
 # ---------------------------------------------------------------------------
-# Derived quantities (depend on ship system state)
+# Derived quantities (depend on ship system state + class stats)
 # ---------------------------------------------------------------------------
 
 
 def max_speed(ship: Ship) -> float:
     """Maximum speed in world units/sec, scaled by engine efficiency."""
-    return BASE_MAX_SPEED * ship.systems["engines"].efficiency
+    return ship.max_speed_base * ship.systems["engines"].efficiency
 
 
 def turn_rate(ship: Ship) -> float:
     """Turn rate in degrees/sec, scaled by manoeuvring efficiency."""
-    return BASE_TURN_RATE * ship.systems["manoeuvring"].efficiency
+    return ship.turn_rate_base * ship.systems["manoeuvring"].efficiency
+
+
+def acceleration_rate(ship: Ship) -> float:
+    """Acceleration in world units/sec², from ship class data."""
+    return ship.acceleration_base
 
 
 # ---------------------------------------------------------------------------
@@ -83,25 +88,24 @@ def _turn(ship: Ship, dt: float) -> None:
 def _thrust(ship: Ship, dt: float) -> None:
     """Accelerate or decelerate velocity toward the throttle target speed."""
     target_speed = (ship.throttle / 100.0) * max_speed(ship)
+    accel = acceleration_rate(ship)
+    # Deceleration proportional to acceleration (braking is faster).
+    decel = accel * (DECELERATION / ACCELERATION)
 
     if ship.velocity < target_speed:
-        ship.velocity = min(ship.velocity + ACCELERATION * dt, target_speed)
+        ship.velocity = min(ship.velocity + accel * dt, target_speed)
     else:
-        ship.velocity = max(ship.velocity - DECELERATION * dt, target_speed)
+        ship.velocity = max(ship.velocity - decel * dt, target_speed)
 
 
 def _move(ship: Ship, dt: float, sector_width: float, sector_height: float) -> None:
     """Translate ship position in heading direction; clamp to sector bounds.
 
-    If the ship hits a boundary it stops (velocity → 0). The player must
+    If the ship hits a boundary it stops (velocity -> 0). The player must
     change heading and reapply throttle to continue.
-
-    TODO: Boundary behaviour could be made configurable per-mission in a future
-    phase — some missions may want wrap-around (continuous space) or open
-    boundaries rather than hard walls.
     """
     heading_rad = math.radians(ship.heading)
-    # Heading 0 = north = –y direction (y increases downward in world space).
+    # Heading 0 = north = -y direction (y increases downward in world space).
     new_x = ship.x + ship.velocity * math.sin(heading_rad) * dt
     new_y = ship.y - ship.velocity * math.cos(heading_rad) * dt
 

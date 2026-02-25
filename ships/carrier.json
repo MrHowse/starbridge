@@ -1,8 +1,15 @@
 {
   "id": "carrier",
   "name": "Atlas-class Carrier",
-  "description": "Drone carrier with an expanded flight deck. Relies on its drone complement for sensor coverage and combat support. Flight Ops is the decisive station. Best with 8-12 players.",
-  "max_hull": 120,
+  "description": "Drone platform. Minimal direct weapons, massive flight ops capability. Flight Ops is the star station \u2014 the carrier's combat power IS its drones.",
+  "max_hull": 200,
+  "max_speed": 100,
+  "acceleration": 15,
+  "turn_rate": 45,
+  "target_profile": 0.95,
+  "armour": 15,
+  "handling_trait": "heavy",
+  "decks": 7,
   "torpedo_ammo": 8,
   "torpedo_loadout": {
     "standard": 6, "homing": 4, "ion": 2, "piercing": 2,

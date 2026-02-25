@@ -132,6 +132,14 @@ class Ship:
     hull: float = 100.0      # current HP; 0 = destroyed
     hull_max: float = 100.0  # maximum HP (set from ship class at game start)
 
+    # --- Physical profile (v0.07 — set from ship class at game start) ---
+    max_speed_base: float = 200.0     # world units/sec at 100 % engine efficiency
+    acceleration_base: float = 50.0   # world units/sec²
+    turn_rate_base: float = 90.0      # degrees/sec at 100 % manoeuvring efficiency
+    target_profile: float = 1.0       # 0.0-1.0 — hit probability multiplier
+    armour: float = 0.0               # current armour points
+    armour_max: float = 0.0           # max armour (set from ship class)
+
     # --- Docking ---
     docked_at: str | None = None  # station ID while docked, None otherwise
 

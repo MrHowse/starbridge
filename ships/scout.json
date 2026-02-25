@@ -1,8 +1,15 @@
 {
   "id": "scout",
   "name": "Pathfinder-class Scout",
-  "description": "Fast and nimble courier vessel. Light hull — relies on speed and sensors to survive. Designed for 3-4 crew who each wear multiple hats.",
+  "description": "Fast and nimble courier vessel. Light hull \u2014 relies on speed and sensors to survive. Designed for 3-4 crew who each wear multiple hats.",
   "max_hull": 60,
+  "max_speed": 250,
+  "acceleration": 50,
+  "turn_rate": 180,
+  "target_profile": 0.5,
+  "armour": 0,
+  "handling_trait": "twitchy",
+  "decks": 3,
   "torpedo_ammo": 8,
   "torpedo_loadout": {
     "standard": 6, "homing": 2, "ion": 2, "piercing": 2,

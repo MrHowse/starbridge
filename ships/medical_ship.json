@@ -1,8 +1,15 @@
 {
   "id": "medical_ship",
   "name": "Hope-class Medical Frigate",
-  "description": "Lightly armed hospital vessel with an expanded medbay and surgical theatre. Medical station is the primary operational focus. Tough hull for a support ship — designed to survive long enough to do its job.",
-  "max_hull": 80,
+  "description": "Support vessel. No offensive weapons, exceptional medical and rescue capability. Medical is the star station. Comms and diplomacy are critical because you can't fight your way out.",
+  "max_hull": 100,
+  "max_speed": 140,
+  "acceleration": 25,
+  "turn_rate": 75,
+  "target_profile": 0.7,
+  "armour": 5,
+  "handling_trait": "gentle",
+  "decks": 5,
   "torpedo_ammo": 6,
   "torpedo_loadout": {
     "standard": 6, "homing": 2, "ion": 2, "piercing": 0,

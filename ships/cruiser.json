@@ -1,8 +1,15 @@
 {
   "id": "cruiser",
   "name": "Endeavour-class Cruiser",
-  "description": "Heavy warship with strong hull and generous armament. Specialist stations (EW, Tactical) come into their own at this scale. Best with 9-10 players.",
-  "max_hull": 140,
+  "description": "Command ship. Strong across the board with enhanced tactical capabilities. Captain and Tactical are the star stations.",
+  "max_hull": 180,
+  "max_speed": 120,
+  "acceleration": 20,
+  "turn_rate": 60,
+  "target_profile": 0.85,
+  "armour": 20,
+  "handling_trait": "steady",
+  "decks": 6,
   "torpedo_ammo": 16,
   "torpedo_loadout": {
     "standard": 10, "homing": 6, "ion": 6, "piercing": 6,

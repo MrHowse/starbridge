@@ -377,7 +377,9 @@ def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]
         return []
 
     # Accuracy roll — miss resets cooldown without damage.
-    if _rng.random() > AUTO_FIRE_ACCURACY:
+    # v0.07: target profile reduces hit chance (spec 1.2.5).
+    eff_accuracy = AUTO_FIRE_ACCURACY * getattr(target, "target_profile", 1.0)
+    if _rng.random() > eff_accuracy:
         _auto_fire_cooldown = AUTO_FIRE_INTERVAL
         return []
 
@@ -627,6 +629,11 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         brg = bearing_to(ship.x, ship.y, target.x, target.y)
         if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
             return None
+
+        # v0.07: target profile affects hit chance (spec 1.2.5).
+        hit_chance = min(1.0, getattr(target, "target_profile", 1.0))
+        if hit_chance < 1.0 and _rng.random() > hit_chance:
+            return ("weapons.beam_miss", {"target_id": target.id})
 
         apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency)
         if target.hull <= 0.0:

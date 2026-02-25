@@ -1,8 +1,15 @@
 {
   "id": "frigate",
   "name": "Resolution-class Frigate",
-  "description": "Standard multi-role warship. Balanced in all respects. The default choice for 7-8 players — supports all core roles without specialist stations.",
-  "max_hull": 100,
+  "description": "Balanced multi-role warship. Good classroom default \u2014 supports all core roles. The crew that coordinates best wins.",
+  "max_hull": 120,
+  "max_speed": 160,
+  "acceleration": 30,
+  "turn_rate": 90,
+  "target_profile": 0.75,
+  "armour": 10,
+  "handling_trait": "clean",
+  "decks": 5,
   "torpedo_ammo": 12,
   "torpedo_loadout": {
     "standard": 8, "homing": 4, "ion": 4, "piercing": 4,

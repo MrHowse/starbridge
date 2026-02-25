@@ -1,8 +1,15 @@
 {
   "id": "battleship",
   "name": "Sovereign-class Battleship",
-  "description": "Massive capital ship. Formidable hull and firepower; sluggish but near-unstoppable. Requires a full complement of 10-12 to operate effectively.",
-  "max_hull": 200,
+  "description": "Fortress. Enormous hull, devastating weapons, glacially slow. Engineering and Weapons are the star stations. Every system is powerful but draws massive power.",
+  "max_hull": 300,
+  "max_speed": 80,
+  "acceleration": 10,
+  "turn_rate": 30,
+  "target_profile": 1.0,
+  "armour": 40,
+  "handling_trait": "ponderous",
+  "decks": 8,
   "torpedo_ammo": 20,
   "torpedo_loadout": {
     "standard": 12, "homing": 8, "ion": 8, "piercing": 8,

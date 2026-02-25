@@ -38,6 +38,11 @@ DEFAULT_TORPEDO_LOADOUT: dict[str, int] = {
 }
 
 
+VALID_HANDLING_TRAITS: set[str] = {
+    "twitchy", "smooth", "clean", "steady", "ponderous", "heavy", "gentle",
+}
+
+
 class ShipClass(BaseModel):
     """Stat block for a ship class, loaded from ships/<id>.json."""
 
@@ -45,6 +50,17 @@ class ShipClass(BaseModel):
     name:             str
     description:      str
     max_hull:         float = 100.0
+
+    # --- Physical profile (v0.07) ---
+    max_speed:        float = 200.0   # world units/sec at 100 % engine efficiency
+    acceleration:     float = 50.0    # world units/sec²
+    turn_rate:        float = 90.0    # degrees/sec at 100 % manoeuvring efficiency
+    target_profile:   float = 1.0     # 0.0-1.0 — hit probability multiplier
+    armour:           float = 0.0     # damage absorbed per hit (between shields and hull)
+    handling_trait:    str   = "clean" # affects helm feel — see VALID_HANDLING_TRAITS
+    decks:            int   = 5       # number of physical decks
+
+    # --- Legacy / weapons ---
     torpedo_ammo:     int   = 12             # legacy field (kept for save-compat)
     torpedo_loadout:  dict[str, int] | None = None  # per-type magazine (v0.05g)
     min_crew:         int   = 1    # minimum players for a satisfying game
