@@ -115,7 +115,14 @@ function showWelcomeCrawl() {
 // State handler
 // ---------------------------------------------------------------------------
 
+/** Hash guard — skip full DOM rebuild when state payload is unchanged. */
+let _lastStateJson = '';
+
 function handleState(state) {
+  const json = JSON.stringify(state);
+  if (json === _lastStateJson) return;
+  _lastStateJson = json;
+
   renderTasks(state.tasks || [], state.urgent_tasks || []);
   renderBuffs(state.active_buffs || []);
   renderStickies(state.sticky_notes || []);

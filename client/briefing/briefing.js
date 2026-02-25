@@ -16,25 +16,35 @@ import { on, send, connect } from '../shared/connection.js';
 const COUNTDOWN_SECONDS = 30;
 
 const ROLE_URLS = {
-  captain:     '/client/captain/',
-  helm:        '/client/helm/',
-  weapons:     '/client/weapons/',
-  engineering: '/client/engineering/',
-  science:     '/client/science/',
-  medical:     '/client/medical/',
-  security:    '/client/security/',
-  comms:       '/client/comms/',
+  captain:            '/client/captain/',
+  helm:               '/client/helm/',
+  weapons:            '/client/weapons/',
+  engineering:        '/client/engineering/',
+  science:            '/client/science/',
+  medical:            '/client/medical/',
+  security:           '/client/security/',
+  comms:              '/client/comms/',
+  flight_ops:         '/client/flight_ops/',
+  electronic_warfare: '/client/ew/',
+  tactical:           '/client/tactical/',
+  damage_control:     '/client/damage_control/',
+  janitor:            '/client/janitor/',
 };
 
 const ROLE_LABELS = {
-  captain:     'CAPTAIN',
-  helm:        'HELM',
-  weapons:     'WEAPONS',
-  engineering: 'ENGINEERING',
-  science:     'SCIENCE',
-  medical:     'MEDICAL',
-  security:    'SECURITY',
-  comms:       'COMMS',
+  captain:            'CAPTAIN',
+  helm:               'HELM',
+  weapons:            'WEAPONS',
+  engineering:        'ENGINEERING',
+  science:            'SCIENCE',
+  medical:            'MEDICAL',
+  security:           'SECURITY',
+  comms:              'COMMS',
+  flight_ops:         'FLIGHT OPS',
+  electronic_warfare: 'ELECTRONIC WARFARE',
+  tactical:           'TACTICAL',
+  damage_control:     'DAMAGE CONTROL',
+  janitor:            'JANITOR',
 };
 
 const CORE_ROLES = ['captain', 'helm', 'weapons', 'engineering', 'science', 'medical'];
