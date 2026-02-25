@@ -25,6 +25,9 @@ const ROLES = [
   'captain', 'helm', 'weapons', 'engineering', 'science', 'medical',
   'security', 'comms', 'flight_ops', 'electronic_warfare', 'tactical', 'damage_control',
 ];
+
+/** Callsign names that unlock the secret janitor station. */
+const JANITOR_NAMES = ['the janitor', 'thejanitor'];
 const ROLE_LABELS = {
   captain:            'CAPTAIN',
   helm:               'HELM',
@@ -83,6 +86,14 @@ function init() {
   on('lobby.error',   handleLobbyError);
   on('game.started',  handleGameStarted);
   on('lobby.janitor_available', handleJanitorAvailable);
+
+  // Detect janitor name as the user types — show secret role card.
+  callsignInput.addEventListener('input', () => {
+    const name = callsignInput.value.trim().toLowerCase();
+    if (JANITOR_NAMES.includes(name)) {
+      handleJanitorAvailable();
+    }
+  });
 
   launchBtnEl.addEventListener('click', () => {
     const mission_id   = missionSelectEl ? missionSelectEl.value : 'sandbox';
