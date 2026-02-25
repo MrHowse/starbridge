@@ -406,7 +406,7 @@ def test_tick_launch_incremental():
     glfo.launch_drone(drone.id, ship)
     # Tick partway — should not complete yet.
     glfo.tick(ship, 1.0)
-    assert drone.status == "hangar"  # still in queue/tube
+    assert drone.status == "launching"  # still in queue/tube
     # Tick the rest.
     events = glfo.tick(ship, BASE_LAUNCH_TIME)
     launched = [e for e in events if e["type"] == "drone_launched"]

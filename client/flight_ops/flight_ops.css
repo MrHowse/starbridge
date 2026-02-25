@@ -347,6 +347,21 @@
   margin-bottom: 0.2rem;
 }
 
+/* ─── Launching label ─── */
+
+.fo-launching-label {
+  font-size: 0.7rem;
+  color: #4fc3f7;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  animation: fo-launch-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes fo-launch-pulse {
+  from { opacity: 0.5; }
+  to   { opacity: 1.0; }
+}
+
 /* ─── Recalled label ─── */
 
 .fo-recalled-label {

@@ -805,6 +805,11 @@ function renderDroneCards() {
           }));
         }
       }
+    } else if (drone.status === 'launching') {
+      const launchSpan = document.createElement('span');
+      launchSpan.className = 'fo-launching-label';
+      launchSpan.textContent = 'LAUNCH SEQUENCE\u2026';
+      btns.appendChild(launchSpan);
     } else if (drone.status === 'rtb' || drone.status === 'recovering') {
       const retSpan = document.createElement('span');
       retSpan.className = 'text-dim text-label';

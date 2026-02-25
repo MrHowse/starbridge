@@ -147,6 +147,8 @@ def launch_drone(drone_id: str, ship: Ship) -> bool:
         return False
     if not _flight_deck.queue_launch(drone_id):
         return False
+    # Mark status immediately so the UI reflects the pending launch.
+    drone.status = "launching"
     # Place drone at ship position when launch begins.
     drone.position = (ship.x, ship.y)
     return True
