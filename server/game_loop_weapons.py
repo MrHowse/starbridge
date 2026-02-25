@@ -27,8 +27,6 @@ from server.models.messages import Message
 from server.models.ship import Ship
 from server.models.world import Torpedo, World
 from server.systems.combat import (
-    BEAM_PLAYER_ARC_DEG,
-    BEAM_PLAYER_DAMAGE,
     BEAM_PLAYER_RANGE,
     CombatHitResult,
     apply_hit_to_enemy,
@@ -136,6 +134,7 @@ _tube_type_loading: list[str] = ["standard", "standard"]
 _pending_nuclear_auths: dict[str, dict] = {}
 
 _entity_counter: int = 0
+_beam_cooldown: float = 0.0   # seconds until beams can fire again (v0.07)
 
 # v0.05i — station IDs attacked by the player this tick (for sensor-array logic)
 _stations_attacked_this_tick: set[str] = set()
@@ -154,25 +153,30 @@ _weapons_crewed: bool = False
 _auto_fire_status_changed: bool | None = None
 
 
-def reset(initial_loadout: dict[str, int] | None = None) -> None:
-    """Reset all weapons state. Call at game start."""
+def reset(initial_loadout: dict[str, int] | None = None,
+          tube_count: int = 2) -> None:
+    """Reset all weapons state. Call at game start.
+
+    *tube_count* sets the number of torpedo tubes (0 = no torpedoes).
+    """
     global _weapons_target, _torpedo_ammo, _torpedo_ammo_max, _entity_counter
     global _tube_types, _tube_loading, _tube_type_loading, _pending_nuclear_auths
     global _tube_cooldowns, _tube_reload_times
     global _auto_fire_active, _auto_fire_cooldown, _auto_fire_delay
     global _weapons_crewed, _auto_fire_status_changed
+    global _beam_cooldown
     loadout = dict(initial_loadout) if initial_loadout else dict(DEFAULT_TORPEDO_LOADOUT)
     _torpedo_ammo = dict(loadout)
     _torpedo_ammo_max = dict(loadout)
     _weapons_target = None
-    _tube_cooldowns = [0.0, 0.0]
-    _tube_reload_times = [TORPEDO_RELOAD_BY_TYPE["standard"],
-                          TORPEDO_RELOAD_BY_TYPE["standard"]]
-    _tube_types = ["standard", "standard"]
-    _tube_loading = [0.0, 0.0]
-    _tube_type_loading = ["standard", "standard"]
+    _tube_cooldowns = [0.0] * tube_count
+    _tube_reload_times = [TORPEDO_RELOAD_BY_TYPE["standard"]] * tube_count
+    _tube_types = ["standard"] * tube_count
+    _tube_loading = [0.0] * tube_count
+    _tube_type_loading = ["standard"] * tube_count
     _pending_nuclear_auths = {}
     _entity_counter = 0
+    _beam_cooldown = 0.0
     _stations_attacked_this_tick.clear()
     _pending_component_destroyed.clear()
     _pending_diplomatic_events.clear()
@@ -197,6 +201,7 @@ def serialise() -> dict:
         "entity_counter": _entity_counter,
         "auto_fire_active": _auto_fire_active,
         "auto_fire_delay": _auto_fire_delay,
+        "beam_cooldown": _beam_cooldown,
         # pending nuclear auths not serialised — requests don't survive save/resume
     }
 
@@ -206,6 +211,7 @@ def deserialise(data: dict) -> None:
     global _tube_types, _tube_loading, _tube_type_loading, _entity_counter
     global _tube_reload_times
     global _auto_fire_active, _auto_fire_delay
+    global _beam_cooldown
     _weapons_target = data.get("weapons_target")
 
     # Backward compat: old saves stored torpedo_ammo as an int.
@@ -218,16 +224,18 @@ def deserialise(data: dict) -> None:
     raw_max = data.get("torpedo_ammo_max", dict(_torpedo_ammo))
     _torpedo_ammo_max = dict(raw_max) if isinstance(raw_max, dict) else dict(_torpedo_ammo)
 
-    _tube_cooldowns[:]    = data.get("tube_cooldowns", [0.0, 0.0])
-    _tube_reload_times[:] = data.get("tube_reload_times",
-                                     [TORPEDO_RELOAD_BY_TYPE["standard"],
-                                      TORPEDO_RELOAD_BY_TYPE["standard"]])
-    _tube_types[:]        = data.get("tube_types", ["standard", "standard"])
-    _tube_loading[:]      = data.get("tube_loading", [0.0, 0.0])
-    _tube_type_loading[:] = data.get("tube_type_loading", ["standard", "standard"])
+    # Variable tube count: restore from saved array length (backward compat: default 2).
+    saved_cooldowns = data.get("tube_cooldowns", [0.0, 0.0])
+    _tube_cooldowns = list(saved_cooldowns)
+    _tube_reload_times = list(data.get("tube_reload_times",
+                                       [TORPEDO_RELOAD_BY_TYPE["standard"]] * len(_tube_cooldowns)))
+    _tube_types        = list(data.get("tube_types", ["standard"] * len(_tube_cooldowns)))
+    _tube_loading      = list(data.get("tube_loading", [0.0] * len(_tube_cooldowns)))
+    _tube_type_loading = list(data.get("tube_type_loading", ["standard"] * len(_tube_cooldowns)))
     _entity_counter       = data.get("entity_counter", 0)
     _auto_fire_active     = data.get("auto_fire_active", False)
     _auto_fire_delay      = data.get("auto_fire_delay", 0.0)
+    _beam_cooldown        = float(data.get("beam_cooldown", 0.0))
     _pending_nuclear_auths.clear()
 
 
@@ -383,7 +391,7 @@ def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]
         _auto_fire_cooldown = AUTO_FIRE_INTERVAL
         return []
 
-    dmg = BEAM_PLAYER_DAMAGE * ship.systems["beams"].efficiency
+    dmg = ship.beam_damage_base * ship.systems["beams"].efficiency
     apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency="")
 
     event_payload = {
@@ -408,8 +416,11 @@ def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]
 
 def _find_auto_fire_target(ship: Ship, world: World):
     """Return the nearest scanned hostile enemy in beam range+arc, or None."""
+    if ship.beam_count <= 0:
+        return None
     best = None
     best_dist = float("inf")
+    arc = ship.beam_arc_deg
     for enemy in world.enemies:
         if getattr(enemy, "scan_state", None) != "scanned":
             continue
@@ -417,7 +428,7 @@ def _find_auto_fire_target(ship: Ship, world: World):
         if dist > BEAM_PLAYER_RANGE:
             continue
         brg = bearing_to(ship.x, ship.y, enemy.x, enemy.y)
-        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+        if not beam_in_arc(ship.heading, brg, arc):
             continue
         if dist < best_dist:
             best = enemy
@@ -478,13 +489,15 @@ def try_select_target(entity_id: str | None, world: World) -> dict | None:
 
 
 def tick_cooldowns(dt: float) -> None:
-    _tube_cooldowns[0] = max(0.0, _tube_cooldowns[0] - dt)
-    _tube_cooldowns[1] = max(0.0, _tube_cooldowns[1] - dt)
+    global _beam_cooldown
+    for i in range(len(_tube_cooldowns)):
+        _tube_cooldowns[i] = max(0.0, _tube_cooldowns[i] - dt)
+    _beam_cooldown = max(0.0, _beam_cooldown - dt)
 
 
 def tick_tube_loading(dt: float) -> None:
     """Advance per-tube loading timers; apply type when loading completes."""
-    for idx in range(2):
+    for idx in range(len(_tube_types)):
         if _tube_loading[idx] > 0.0:
             _tube_loading[idx] = max(0.0, _tube_loading[idx] - dt)
             if _tube_loading[idx] == 0.0:
@@ -503,14 +516,16 @@ def next_entity_id(prefix: str) -> str:
 
 
 def load_tube(tube: int, torpedo_type: str) -> tuple[str, dict] | None:
-    """Begin loading *torpedo_type* into *tube* (1 or 2).
+    """Begin loading *torpedo_type* into a tube (1-based index).
 
-    Returns a broadcast event tuple or None if tube is busy.
+    Returns a broadcast event tuple or None if tube is busy or invalid.
     """
     if torpedo_type not in TORPEDO_TYPES:
         return None
 
     tube_idx = tube - 1
+    if tube_idx < 0 or tube_idx >= len(_tube_types):
+        return None  # tube index out of range for this ship class
     if _tube_loading[tube_idx] > 0.0:
         return None   # already loading
     if _tube_cooldowns[tube_idx] > 0.0:
@@ -613,12 +628,21 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
 
     *beam_frequency* — alpha/beta/gamma/delta; frequency matching gives ±50% dmg vs enemies.
     """
-    global _weapons_target
+    global _weapons_target, _beam_cooldown
 
     if _weapons_target is None:
         return None
 
-    dmg = BEAM_PLAYER_DAMAGE * ship.systems["beams"].efficiency
+    # v0.07: beam cooldown — cannot fire faster than ship.beam_fire_rate.
+    if _beam_cooldown > 0.0:
+        return None
+
+    # v0.07: no beams if beam_count is 0 (medical ship).
+    if ship.beam_count <= 0:
+        return None
+
+    dmg = ship.beam_damage_base * ship.systems["beams"].efficiency
+    arc = ship.beam_arc_deg
 
     # ── Enemy target (existing behaviour) ─────────────────────────────────
     target = next((e for e in world.enemies if e.id == _weapons_target), None)
@@ -627,12 +651,13 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         if dist > BEAM_PLAYER_RANGE:
             return None
         brg = bearing_to(ship.x, ship.y, target.x, target.y)
-        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+        if not beam_in_arc(ship.heading, brg, arc):
             return None
 
         # v0.07: target profile affects hit chance (spec 1.2.5).
         hit_chance = min(1.0, getattr(target, "target_profile", 1.0))
         if hit_chance < 1.0 and _rng.random() > hit_chance:
+            _beam_cooldown = ship.beam_fire_rate
             return ("weapons.beam_miss", {"target_id": target.id})
 
         apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency)
@@ -642,6 +667,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
                 _weapons_target = None
             gl.log_event("combat", "enemy_destroyed", {"enemy_id": target.id, "cause": "beam"})
 
+        _beam_cooldown = ship.beam_fire_rate
         return (
             "weapons.beam_fired",
             {
@@ -660,7 +686,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         if dist > BEAM_PLAYER_RANGE:
             return None
         brg = bearing_to(ship.x, ship.y, creature.x, creature.y)
-        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+        if not beam_in_arc(ship.heading, brg, arc):
             return None
         creature.hull = max(0.0, creature.hull - dmg)
         if creature.hull <= 0.0:
@@ -670,6 +696,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
             gl.log_event("combat", "creature_destroyed", {
                 "creature_id": creature.id, "cause": "beam",
             })
+        _beam_cooldown = ship.beam_fire_rate
         return (
             "weapons.beam_fired",
             {
@@ -689,7 +716,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         if dist > BEAM_PLAYER_RANGE:
             return None
         brg = bearing_to(ship.x, ship.y, station.x, station.y)
-        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+        if not beam_in_arc(ship.heading, brg, arc):
             return None
 
         comp.hp = max(0.0, comp.hp - dmg)
@@ -705,6 +732,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
             if _weapons_target == comp.id:
                 _weapons_target = None
 
+        _beam_cooldown = ship.beam_fire_rate
         return (
             "weapons.beam_fired",
             {
@@ -723,7 +751,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         if dist > BEAM_PLAYER_RANGE:
             return None
         brg = bearing_to(ship.x, ship.y, station.x, station.y)
-        if not beam_in_arc(ship.heading, brg, BEAM_PLAYER_ARC_DEG):
+        if not beam_in_arc(ship.heading, brg, arc):
             return None
 
         # Shield arc absorption: if a generator covers this bearing, 80% absorbed.
@@ -740,6 +768,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
                 "station_name": station.name,
             })
 
+        _beam_cooldown = ship.beam_fire_rate
         return (
             "weapons.beam_fired",
             {
@@ -779,6 +808,8 @@ def fire_torpedo(ship: Ship, world: World, tube: int) -> list[tuple[str, dict]]:
     For nuclear torpedoes, returns an authorisation request instead of a fire event.
     """
     tube_idx = tube - 1
+    if tube_idx < 0 or tube_idx >= len(_tube_types):
+        return []  # tube index out of range for this ship class
 
     if _tube_cooldowns[tube_idx] > 0.0:
         return []
@@ -883,10 +914,13 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
             continue
 
         # Point defence: passive intercept of incoming (non-player) torpedoes.
+        # Intercept chance scales with turret count (v0.07 §1.5).
+        # Legacy: 0.3 at efficiency=1.0, 2 turrets → 0.15 per turret.
         if torp.owner != "player" and ship is not None:
             pd = ship.systems.get("point_defence")
-            if pd is not None and pd.efficiency > 0.0:
-                intercept_chance = pd.efficiency * 0.3  # 30% at full efficiency
+            turret_count = getattr(ship, "pd_turret_count", 2)
+            if pd is not None and pd.efficiency > 0.0 and turret_count > 0:
+                intercept_chance = min(pd.efficiency * 0.15 * turret_count, 0.95)
                 if _rng.random() < intercept_chance:
                     dead_torpedo_ids.append(torp.id)
                     events.append({

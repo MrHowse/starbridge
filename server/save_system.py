@@ -75,6 +75,12 @@ def _serialise_ship(ship: Ship) -> dict:
         "target_profile": ship.target_profile,
         "armour": ship.armour,
         "armour_max": ship.armour_max,
+        "beam_damage_base": ship.beam_damage_base,
+        "beam_fire_rate": ship.beam_fire_rate,
+        "beam_arc_deg": ship.beam_arc_deg,
+        "beam_count": ship.beam_count,
+        "torpedo_tube_count": ship.torpedo_tube_count,
+        "pd_turret_count": ship.pd_turret_count,
         "docked_at": ship.docked_at,
         "shields": {
             "fore": ship.shields.fore, "aft": ship.shields.aft,
@@ -246,6 +252,12 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.target_profile = float(data.get("target_profile", ship.target_profile))
     ship.armour = float(data.get("armour", ship.armour))
     ship.armour_max = float(data.get("armour_max", ship.armour_max))
+    ship.beam_damage_base = float(data.get("beam_damage_base", ship.beam_damage_base))
+    ship.beam_fire_rate = float(data.get("beam_fire_rate", ship.beam_fire_rate))
+    ship.beam_arc_deg = float(data.get("beam_arc_deg", ship.beam_arc_deg))
+    ship.beam_count = int(data.get("beam_count", ship.beam_count))
+    ship.torpedo_tube_count = int(data.get("torpedo_tube_count", ship.torpedo_tube_count))
+    ship.pd_turret_count = int(data.get("pd_turret_count", ship.pd_turret_count))
     ship.docked_at = data.get("docked_at")
 
     shields_d = data.get("shields", {})

@@ -440,7 +440,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
         k: max(0, int(v * _diff_preset.starting_torpedo_multiplier + 0.5))
         for k, v in _base_loadout.items()
     }
-    glw.reset(_scaled_loadout)
+    glw.reset(_scaled_loadout, tube_count=_world.ship.torpedo_tube_count)
     glmed.reset()
     if _diff_preset.medical_supply_multiplier != 1.0:
         _base_med = glmed.get_supplies()
@@ -488,6 +488,14 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.ship.target_profile = sc.target_profile
     _world.ship.armour = sc.armour
     _world.ship.armour_max = sc.armour
+    # v0.07 §1.5: Weapon loadout from ship class.
+    _wep = sc.weapons or {}
+    _world.ship.beam_damage_base = _wep.get("beam_damage", 20.0)
+    _world.ship.beam_fire_rate = _wep.get("beam_fire_rate", 0.0)
+    _world.ship.beam_arc_deg = _wep.get("beam_arc", 45.0)
+    _world.ship.beam_count = int(_wep.get("beam_count", 1))
+    _world.ship.torpedo_tube_count = int(_wep.get("torpedo_tubes", 2))
+    _world.ship.pd_turret_count = int(_wep.get("point_defence_turrets", 2))
     _world.ship.docked_at = None
     _world.ship.crew = CrewRoster()
     _world.ship.interior = make_default_interior()
@@ -2394,6 +2402,9 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "hull_max": ship.hull_max,
             "armour": ship.armour,
             "armour_max": ship.armour_max,
+            "beam_count": ship.beam_count,
+            "torpedo_tube_count": ship.torpedo_tube_count,
+            "pd_turret_count": ship.pd_turret_count,
             "docked_at": ship.docked_at,
             "docking_phase": gldo.get_state(),
             "active_services": {

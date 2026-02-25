@@ -17,6 +17,14 @@
   },
   "min_crew": 6,
   "max_crew": 9,
+  "weapons": {
+    "beam_damage": 6.0,
+    "beam_fire_rate": 1.0,
+    "beam_arc": 180,
+    "beam_count": 2,
+    "torpedo_tubes": 2,
+    "point_defence_turrets": 2
+  },
   "power_grid": {
     "reactor_max": 700,
     "battery_capacity": 500,

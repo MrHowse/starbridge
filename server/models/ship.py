@@ -140,6 +140,14 @@ class Ship:
     armour: float = 0.0               # current armour points
     armour_max: float = 0.0           # max armour (set from ship class)
 
+    # --- Weapon loadout (v0.07 §1.5 — set from ship class at game start) ---
+    beam_damage_base: float = 20.0    # damage per beam hit (default = legacy constant)
+    beam_fire_rate: float = 0.0       # seconds between beam shots (0 = no cooldown)
+    beam_arc_deg: float = 45.0        # ±degrees from heading (default = legacy constant)
+    beam_count: int = 1               # number of independent beam arrays
+    torpedo_tube_count: int = 2        # torpedo tubes (0 = no torpedoes)
+    pd_turret_count: int = 2           # point defence turrets
+
     # --- Docking ---
     docked_at: str | None = None  # station ID while docked, None otherwise
 
