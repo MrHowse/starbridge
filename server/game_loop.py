@@ -438,7 +438,7 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     glco.reset()
     glcap.reset()
     gldc.reset()
-    glfo.reset()
+    glfo.reset(ship_class)
     glew.reset()
     gltac.reset()
     gltr.reset()

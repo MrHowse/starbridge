@@ -77,6 +77,9 @@ const ctx = mapCanvas.getContext('2d');
 let shipState = null;
 let foState   = null;
 
+// Sensor contacts from ship.state for drawing on tactical map.
+let _sensorContacts = [];
+
 // Currently selected drone id.
 let _selectedDroneId = null;
 
@@ -152,6 +155,7 @@ initSharedUI({
 
 on('ship.state', payload => {
   shipState = payload;
+  _sensorContacts = payload.contacts || [];
   renderMap();
 });
 
@@ -254,6 +258,7 @@ function renderMap() {
 
   drawGrid();
   drawSensorCoverage();
+  drawContacts();
   drawDecoys();
   drawBuoys();
   drawDroneRoutes();
@@ -282,15 +287,73 @@ function drawGrid() {
   }
 }
 
+const CONTACT_COLOURS = {
+  hostile: '#ff4040',
+  unknown: '#ffffff',
+  friendly: '#00ff41',
+  neutral: '#ffaa00',
+};
+
+function drawContacts() {
+  if (!_sensorContacts || _sensorContacts.length === 0) return;
+
+  for (const c of _sensorContacts) {
+    const { cx, cy } = worldToCanvas(c.x, c.y);
+    const colour = CONTACT_COLOURS[c.classification] || CONTACT_COLOURS.unknown;
+    const kind = c.kind || 'enemy';
+
+    // Draw contact icon based on kind.
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.strokeStyle = colour;
+    ctx.fillStyle = colour;
+    ctx.lineWidth = 1;
+
+    if (kind === 'station') {
+      // Square with crosshair.
+      ctx.strokeRect(-5, -5, 10, 10);
+      ctx.beginPath();
+      ctx.moveTo(-3, 0); ctx.lineTo(3, 0);
+      ctx.moveTo(0, -3); ctx.lineTo(0, 3);
+      ctx.stroke();
+    } else if (kind === 'creature') {
+      // Circle with dot.
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Enemy — triangle.
+      ctx.beginPath();
+      ctx.moveTo(0, -5);
+      ctx.lineTo(5, 4);
+      ctx.lineTo(-5, 4);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Contact label.
+    ctx.fillStyle = colour;
+    ctx.font = '9px monospace';
+    const label = c.name || c.id || '';
+    if (label) ctx.fillText(label, cx + 7, cy + 3);
+  }
+}
+
 function drawSensorCoverage() {
   const scale = worldScale();
 
-  // Drone sensor bubbles (scouts and surveys when active).
+  // Drone sensor bubbles — all airborne drones with sensor capability.
   for (const d of foState.drones) {
     if (!AIRBORNE_STATUSES.has(d.status)) continue;
-    if (d.drone_type !== 'scout' && d.drone_type !== 'survey') continue;
+    const sensorRange = d.sensor_range || 0;
+    if (sensorRange <= 0) continue;
     const colour = TYPE_COLOURS[d.drone_type] || '#888';
-    const range = 5_000 * scale;
+    const range = sensorRange * scale;
+    if (range < 2) continue;
     const { cx, cy } = worldToCanvas(d.x, d.y);
     ctx.save();
     ctx.globalAlpha = 0.06;
@@ -305,10 +368,11 @@ function drawSensorCoverage() {
     ctx.restore();
   }
 
-  // Buoy coverage.
+  // Buoy coverage (15000 world units).
   for (const b of foState.buoys) {
     if (!b.active) continue;
-    const range = 8_000 * scale;
+    const range = 15_000 * scale;
+    if (range < 2) continue;
     const { cx, cy } = worldToCanvas(b.x, b.y);
     ctx.save();
     ctx.globalAlpha = 0.06;
@@ -363,10 +427,62 @@ function drawDroneRoutes() {
   if (!_selectedDroneId) return;
   const drone = foState.drones.find(d => d.id === _selectedDroneId);
   if (!drone || !AIRBORNE_STATUSES.has(drone.status)) return;
+  const colour = TYPE_COLOURS[drone.drone_type] || '#888';
 
-  // If drone has waypoints (from mission), draw them.
-  // For now we just draw a line from drone to its loiter/contact.
-  // Waypoint data isn't in build_state yet — that's Part 7.
+  // Draw waypoint route.
+  const wps = drone.waypoints || [];
+  if (wps.length > 0) {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+
+    // Line from drone to first remaining waypoint.
+    const startIdx = drone.waypoint_index || 0;
+    const { cx: dx, cy: dy } = worldToCanvas(drone.x, drone.y);
+    ctx.moveTo(dx, dy);
+
+    for (let i = startIdx; i < wps.length; i++) {
+      const { cx, cy } = worldToCanvas(wps[i][0], wps[i][1]);
+      ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1.0;
+
+    // Draw waypoint markers.
+    for (let i = 0; i < wps.length; i++) {
+      const { cx, cy } = worldToCanvas(wps[i][0], wps[i][1]);
+      const done = i < startIdx;
+      ctx.beginPath();
+      ctx.arc(cx, cy, done ? 2 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = done ? 'rgba(255,255,255,0.2)' : colour;
+      ctx.fill();
+      if (!done) {
+        ctx.fillStyle = colour;
+        ctx.font = '9px monospace';
+        ctx.fillText(`${i + 1}`, cx + 5, cy - 2);
+      }
+    }
+  }
+
+  // Draw line to loiter point if present.
+  if (drone.loiter_point && wps.length === 0) {
+    const { cx: dx, cy: dy } = worldToCanvas(drone.x, drone.y);
+    const { cx: lx, cy: ly } = worldToCanvas(drone.loiter_point[0], drone.loiter_point[1]);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.4;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(dx, dy);
+    ctx.lineTo(lx, ly);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1.0;
+    drawDiamond(lx, ly, 3, colour);
+  }
 }
 
 function drawDrones() {
@@ -562,6 +678,25 @@ canvasWrap.addEventListener('click', e => {
       exitInteractionMode();
       return;
     }
+    if (_interactionMode.type === 'target' && _selectedDroneId) {
+      // Find nearest contact to click.
+      let bestDist = 20;
+      let bestId = null;
+      for (const c of _sensorContacts) {
+        const { cx, cy } = worldToCanvas(c.x, c.y);
+        const dist = Math.hypot(px - cx, py - cy);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = c.id;
+        }
+      }
+      if (bestId) {
+        send('flight_ops.designate_target', { drone_id: _selectedDroneId, target_id: bestId });
+        SoundBank.play('scan_complete');
+      }
+      exitInteractionMode();
+      return;
+    }
     return;
   }
 
@@ -636,6 +771,15 @@ function enterDecoyMode() {
   mapPanelEl.classList.add('fo-map-panel--targeting');
 }
 
+function enterTargetMode() {
+  _interactionMode = { type: 'target' };
+  targetHint.textContent = 'Click a contact to designate target';
+  targetHint.style.display = '';
+  modeIndEl.textContent = 'TARGET SELECT';
+  modeIndEl.style.display = '';
+  mapPanelEl.classList.add('fo-map-panel--targeting');
+}
+
 function exitInteractionMode() {
   _interactionMode = null;
   targetHint.style.display = 'none';
@@ -688,6 +832,8 @@ function renderDroneCards() {
     d.bingo_acknowledged, d.id === _selectedDroneId,
     d.hull < d.max_hull, d.fuel <= FUEL_LOW,
     d.max_hull > 0 && (d.hull / d.max_hull * 100) <= HULL_LOW,
+    d.contact_of_interest || '', d.escort_target || '',
+    d.buoys_remaining, d.ecm_strength,
   ].join('|')).join(';');
 
   if (structKey === _prevDroneStructKey) {
@@ -743,7 +889,7 @@ function renderDroneCards() {
     card.appendChild(header);
 
     // Mission info row.
-    if (drone.mission_type || drone.ai_behaviour !== 'idle') {
+    if (drone.mission_type || drone.ai_behaviour !== 'loiter' || drone.contact_of_interest || drone.escort_target) {
       const info = document.createElement('div');
       info.className = 'fo-drone-card__info';
       if (drone.mission_type) {
@@ -755,6 +901,16 @@ function renderDroneCards() {
         const er = document.createElement('span');
         er.textContent = drone.engagement_rules.replace('_', ' ').toUpperCase();
         info.appendChild(er);
+      }
+      if (drone.contact_of_interest) {
+        const coi = document.createElement('span');
+        coi.textContent = `TGT: ${drone.contact_of_interest}`;
+        info.appendChild(coi);
+      }
+      if (drone.escort_target) {
+        const esc = document.createElement('span');
+        esc.textContent = `ESC: ${drone.escort_target}`;
+        info.appendChild(esc);
       }
       card.appendChild(info);
     }
@@ -791,6 +947,26 @@ function renderDroneCards() {
 
     card.appendChild(bars);
 
+    // ECM strength indicator (ecm drones).
+    if (drone.drone_type === 'ecm_drone' && drone.ecm_strength > 0) {
+      const ecmInfo = document.createElement('div');
+      ecmInfo.className = 'fo-drone-card__info';
+      const ecmSpan = document.createElement('span');
+      ecmSpan.textContent = `ECM: ${Math.round(drone.ecm_strength * 100)}%`;
+      ecmInfo.appendChild(ecmSpan);
+      card.appendChild(ecmInfo);
+    }
+
+    // Buoy count (survey drones).
+    if (drone.drone_type === 'survey' && drone.buoy_capacity > 0) {
+      const buoyInfo = document.createElement('div');
+      buoyInfo.className = 'fo-drone-card__info';
+      const buoySpan = document.createElement('span');
+      buoySpan.textContent = `Buoys: ${drone.buoys_remaining}/${drone.buoy_capacity}`;
+      buoyInfo.appendChild(buoySpan);
+      card.appendChild(buoyInfo);
+    }
+
     // Bingo warning.
     if (drone.bingo_acknowledged) {
       const bingo = document.createElement('div');
@@ -819,6 +995,16 @@ function renderDroneCards() {
           const nextRules = drone.engagement_rules === 'weapons_free' ? 'weapons_hold' : 'weapons_free';
           btns.appendChild(makeBtn(rulesLabel, 'fo-btn', () => {
             send('flight_ops.set_engagement_rules', { drone_id: drone.id, rules: nextRules });
+          }));
+          btns.appendChild(makeBtn('Target', 'fo-btn', () => {
+            selectDrone(drone.id);
+            enterTargetMode();
+          }));
+        }
+        if (drone.drone_type === 'scout') {
+          btns.appendChild(makeBtn('Track', 'fo-btn', () => {
+            selectDrone(drone.id);
+            enterTargetMode();
           }));
         }
         if (drone.drone_type === 'survey') {
@@ -1162,6 +1348,16 @@ document.addEventListener('keydown', e => {
     if (drone?.drone_type === 'combat') {
       const nextRules = drone.engagement_rules === 'weapons_free' ? 'weapons_hold' : 'weapons_free';
       send('flight_ops.set_engagement_rules', { drone_id: _selectedDroneId, rules: nextRules });
+    }
+    return;
+  }
+
+  // T — target designation mode.
+  if (key === 't' && _selectedDroneId) {
+    if (_interactionMode?.type === 'target') exitInteractionMode();
+    else {
+      if (_interactionMode) exitInteractionMode();
+      enterTargetMode();
     }
     return;
   }
