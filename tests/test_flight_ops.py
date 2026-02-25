@@ -12,9 +12,15 @@ from server.models.drones import (
 from server.models.drone_missions import create_patrol_mission
 from server.models.flight_deck import (
     BASE_LAUNCH_TIME,
+    BASE_RECOVERY_APPROACH_TIME,
     BASE_RECOVERY_CATCH_TIME,
+    LAUNCH_PREP_TIME,
     FlightDeck,
 )
+
+# Full 2-phase launch time (prep + catapult) and full recovery time (approach + catch).
+FULL_LAUNCH_TIME = LAUNCH_PREP_TIME + BASE_LAUNCH_TIME
+FULL_RECOVERY_TIME = BASE_RECOVERY_APPROACH_TIME + BASE_RECOVERY_CATCH_TIME
 from server.models.ship import Ship
 
 
@@ -399,8 +405,8 @@ def test_tick_launch_completes():
     ship = fresh_ship()
     drone = glfo.get_drones()[0]
     glfo.launch_drone(drone.id, ship)
-    # Tick past the launch time.
-    events = glfo.tick(ship, BASE_LAUNCH_TIME + 1.0)
+    # Tick past the full launch time (prep + catapult).
+    events = glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
     launched = [e for e in events if e["type"] == "drone_launched"]
     assert len(launched) == 1
     assert drone.status == "active"
@@ -413,8 +419,8 @@ def test_tick_launch_incremental():
     # Tick partway — should not complete yet.
     glfo.tick(ship, 1.0)
     assert drone.status == "launching"  # still in queue/tube
-    # Tick the rest.
-    events = glfo.tick(ship, BASE_LAUNCH_TIME)
+    # Tick the rest (need full launch time).
+    events = glfo.tick(ship, FULL_LAUNCH_TIME)
     launched = [e for e in events if e["type"] == "drone_launched"]
     assert len(launched) == 1
     assert drone.status == "active"
@@ -441,8 +447,8 @@ def test_tick_recovery_completes():
     # First tick: RTB → queue_recovery → recovering.
     glfo.tick(ship, 0.1)
     assert drone.status == "recovering"
-    # Next ticks: recovery timer counts down.
-    events2 = glfo.tick(ship, BASE_RECOVERY_CATCH_TIME + 1.0)
+    # Next ticks: recovery timer counts down (approach + catch = 10s).
+    events2 = glfo.tick(ship, FULL_RECOVERY_TIME + 1.0)
     recovered = [e for e in events2 if e["type"] == "drone_recovered"]
     assert len(recovered) == 1
     assert drone.status == "maintenance"
@@ -455,7 +461,7 @@ def test_tick_recovery_starts_turnaround():
     drone.fuel = 50.0
     # Queue and complete recovery.
     glfo.tick(ship, 0.1)  # rtb → recovering
-    glfo.tick(ship, BASE_RECOVERY_CATCH_TIME + 1.0)  # complete recovery
+    glfo.tick(ship, FULL_RECOVERY_TIME + 1.0)  # complete recovery
     fd = glfo.get_flight_deck()
     assert drone.id in fd.turnarounds
 
@@ -487,7 +493,7 @@ def test_tick_turnaround_restores_drone():
     drone.fuel = 50.0
     # RTB → recover → maintenance → turnaround → hangar.
     glfo.tick(ship, 0.1)  # queue recovery
-    glfo.tick(ship, BASE_RECOVERY_CATCH_TIME + 1.0)  # complete recovery, start turnaround
+    glfo.tick(ship, FULL_RECOVERY_TIME + 1.0)  # complete recovery, start turnaround
     # Turnaround duration depends on fuel/repair needs — tick generously.
     for _ in range(100):
         glfo.tick(ship, 1.0)
@@ -738,8 +744,8 @@ def _launch_and_activate(ship: Ship, drone_idx: int = 0, dt: float = 0.1) -> str
     drones = glfo.get_drones()
     drone = drones[drone_idx]
     glfo.launch_drone(drone.id, ship)
-    # Tick through launch timer.
-    for _ in range(int(BASE_LAUNCH_TIME / dt) + 5):
+    # Tick through full launch timer (prep + catapult).
+    for _ in range(int(FULL_LAUNCH_TIME / dt) + 5):
         glfo.tick(ship, dt)
     assert drone.status == "active", f"Expected active, got {drone.status}"
     return drone.id
@@ -917,3 +923,195 @@ def test_reset_uses_ship_class():
     # Carrier should have ECM drones.
     ecm_drones = [d for d in glfo.get_drones() if d.drone_type == "ecm_drone"]
     assert len(ecm_drones) == 1
+
+
+# ---------------------------------------------------------------------------
+# 2-phase launch
+# ---------------------------------------------------------------------------
+
+
+def test_two_phase_launch_prep_then_catapult():
+    """Launch has a 3s prep phase, then 8s catapult phase."""
+    from server.models.flight_deck import LAUNCH_PREP_TIME as LPT
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    glfo.launch_drone(drone.id, ship)
+
+    # After 1s (within prep), no launch yet.
+    glfo.tick(ship, 1.0)
+    assert drone.status == "launching"
+
+    # After prep completes (3s total), still launching (catapult phase).
+    glfo.tick(ship, LPT)  # 1+3 = 4s total
+    assert drone.status == "launching"
+
+    # After catapult completes (8s more from prep end).
+    events = glfo.tick(ship, 8.0)
+    launched = [e for e in events if e["type"] == "drone_launched"]
+    assert len(launched) == 1
+    assert drone.status == "active"
+
+
+def test_launch_prep_event_emitted():
+    """A launch_prep event is emitted when a drone enters the tube."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    glfo.launch_drone(drone.id, ship)
+    events = glfo.tick(ship, 0.1)
+    types = [e["type"] for e in events]
+    assert "launch_prep" in types
+
+
+# ---------------------------------------------------------------------------
+# Cancel launch
+# ---------------------------------------------------------------------------
+
+
+def test_cancel_launch_during_prep():
+    """Cancel launch during prep phase returns drone to hangar."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    glfo.launch_drone(drone.id, ship)
+    glfo.tick(ship, 0.1)  # Enter tube, start prep.
+    assert drone.status == "launching"
+
+    result = glfo.cancel_launch(drone.id)
+    assert result is True
+    assert drone.status == "hangar"
+
+
+def test_cancel_launch_nonexistent_returns_false():
+    assert glfo.cancel_launch("no_such") is False
+
+
+# ---------------------------------------------------------------------------
+# Combat launch damage conditional
+# ---------------------------------------------------------------------------
+
+
+def test_combat_launch_damage_only_in_combat():
+    """Combat launch damage only rolls when in_combat=True."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    glfo.launch_drone(drone.id, ship)
+    # Launch without combat — no damage events.
+    events = glfo.tick(ship, FULL_LAUNCH_TIME + 1.0, in_combat=False)
+    dmg_events = [e for e in events if e["type"] == "combat_launch_damage"]
+    assert len(dmg_events) == 0
+
+
+# ---------------------------------------------------------------------------
+# Ditch mechanism
+# ---------------------------------------------------------------------------
+
+
+def test_ditch_rtb_drone_fuel_empty_deck_fire():
+    """RTB drone with fuel=0 when deck has fire → ditched (lost)."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    drone.status = "rtb"
+    drone.fuel = 0.0
+    fd = glfo.get_flight_deck()
+    fd.set_fire(True)
+
+    events = glfo.tick(ship, 0.1)
+    assert drone.status == "lost"
+    ditch_events = [e for e in events if e["type"] == "drone_ditched"]
+    assert len(ditch_events) >= 1
+
+
+def test_ditch_not_triggered_when_deck_ok():
+    """RTB drone with fuel=0 but deck operational → NOT ditched (queues recovery)."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    drone.status = "rtb"
+    drone.fuel = 0.0
+
+    glfo.tick(ship, 0.1)
+    # Should queue recovery, not ditch.
+    assert drone.status == "recovering"
+
+
+def test_ditch_recovering_drone_fuel_empty_deck_depressurised():
+    """Recovering drone with fuel=0 when deck depressurised → ditched."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    drone.status = "recovering"
+    drone.fuel = 0.0
+    fd = glfo.get_flight_deck()
+    fd.set_depressurised(True)
+
+    events = glfo.tick(ship, 0.1)
+    assert drone.status == "lost"
+
+
+# ---------------------------------------------------------------------------
+# Auto-crash on recovery
+# ---------------------------------------------------------------------------
+
+
+def test_auto_crash_on_recovery_of_critical_drone():
+    """Drone with hull < 10% crashes on deck during recovery."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    drone.status = "rtb"
+    drone.hull = 1.0  # Below 10% of max
+
+    # RTB → queue → recovery.
+    glfo.tick(ship, 0.1)
+    assert drone.status == "recovering"
+
+    # Complete recovery → crash expected.
+    events = glfo.tick(ship, FULL_RECOVERY_TIME + 1.0)
+    crash_events = [e for e in events if e["type"] == "drone_crash_on_deck"]
+    assert len(crash_events) >= 1
+    assert drone.status == "destroyed"
+
+
+# ---------------------------------------------------------------------------
+# build_state turnaround sub-tasks
+# ---------------------------------------------------------------------------
+
+
+def test_build_state_turnaround_has_subtasks():
+    """build_state turnaround entries include per-sub-task fields."""
+    ship = fresh_ship()
+    drone = glfo.get_drones()[0]
+    drone.status = "rtb"
+    drone.fuel = 50.0
+
+    glfo.tick(ship, 0.1)  # queue recovery
+    glfo.tick(ship, FULL_RECOVERY_TIME + 1.0)  # complete recovery, start turnaround
+
+    state = glfo.build_state(ship)
+    fd = state["flight_deck"]
+    assert drone.id in fd["turnarounds"]
+    ta = fd["turnarounds"][drone.id]
+    assert "total_remaining" in ta
+    assert "needs_refuel" in ta
+    assert "refuel_remaining" in ta
+    assert "needs_rearm" in ta
+    assert "rearm_remaining" in ta
+    assert "needs_repair" in ta
+    assert "repair_remaining" in ta
+
+
+# ---------------------------------------------------------------------------
+# Serialise new state
+# ---------------------------------------------------------------------------
+
+
+def test_serialise_launch_phases():
+    """Launch phases and retry delays are serialised/deserialised."""
+    drone = glfo.get_drones()[0]
+    glfo._launch_phases[drone.id] = "prep"
+    glfo._retry_delays[drone.id] = 3.0
+    glfo._recovery_timers[drone.id] = 7.0
+
+    data = glfo.serialise()
+    glfo.reset()
+    glfo.deserialise(data)
+
+    assert glfo._launch_phases.get(drone.id) == "prep"
+    assert glfo._retry_delays.get(drone.id) == pytest.approx(3.0)
+    assert glfo._recovery_timers.get(drone.id) == pytest.approx(7.0)

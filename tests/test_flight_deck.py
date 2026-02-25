@@ -10,8 +10,12 @@ from server.models.flight_deck import (
     BASE_LAUNCH_TIME,
     COMBAT_LAUNCH_DAMAGE_AMOUNT,
     CRASH_RECOVERY_BLOCK_TIME,
+    CRASH_RECOVERY_DAMAGE,
+    LAUNCH_PREP_TIME,
     REARM_TIME,
     REFUEL_TIME,
+    REFUEL_RESERVE_COST,
+    REARM_RESERVE_COST,
     FlightDeck,
     create_flight_deck,
     deserialise_flight_deck,
@@ -121,7 +125,7 @@ class TestCanLaunchRecover:
 
     def test_cannot_recover_crash_block(self):
         fd = make_deck()
-        fd.start_crash_block()
+        fd.start_crash_block(random.Random(0))
         assert fd.can_recover is False
 
     def test_can_launch_during_depressurisation(self):
@@ -327,13 +331,19 @@ class TestDeckEmergencies:
 
     def test_crash_blocks_recovery(self):
         fd = make_deck()
-        fd.start_crash_block()
+        # Use rng that won't trigger fire (seed 0 → 0.844 > 0.30).
+        rng = random.Random(0)
+        fd.start_crash_block(rng)
         assert fd.can_recover is False
         assert fd.crash_block_remaining == pytest.approx(CRASH_RECOVERY_BLOCK_TIME)
+        # Crash should damage recovery health.
+        assert fd.recovery_health == pytest.approx(100.0 - CRASH_RECOVERY_DAMAGE)
 
     def test_crash_clears_after_time(self):
         fd = make_deck()
-        fd.start_crash_block()
+        # Use rng that won't trigger fire (seed 0 → 0.844 > 0.30).
+        rng = random.Random(0)
+        fd.start_crash_block(rng)
         events = fd.tick(CRASH_RECOVERY_BLOCK_TIME + 1.0)
         assert fd.crash_block_remaining == pytest.approx(0.0)
         assert fd.can_recover is True
@@ -401,19 +411,20 @@ class TestRolls:
     def test_effective_launch_time_healthy(self):
         fd = make_deck()
         fd.catapult_health = 100.0
-        assert fd.get_effective_launch_time() == pytest.approx(BASE_LAUNCH_TIME)
+        # 3s prep + 8s catapult = 11s
+        assert fd.get_effective_launch_time() == pytest.approx(LAUNCH_PREP_TIME + BASE_LAUNCH_TIME)
 
     def test_effective_launch_time_damaged(self):
         fd = make_deck()
         fd.catapult_health = 50.0
-        # factor = 0.5; time = 8 / 0.5 = 16
-        assert fd.get_effective_launch_time() == pytest.approx(BASE_LAUNCH_TIME / 0.5)
+        # factor = 0.5; catapult = 8 / 0.5 = 16; total = 3 + 16 = 19
+        assert fd.get_effective_launch_time() == pytest.approx(LAUNCH_PREP_TIME + BASE_LAUNCH_TIME / 0.5)
 
     def test_effective_launch_time_very_damaged(self):
         fd = make_deck()
         fd.catapult_health = 10.0
-        # factor = max(0.25, 0.1) = 0.25; time = 8 / 0.25 = 32
-        assert fd.get_effective_launch_time() == pytest.approx(BASE_LAUNCH_TIME / 0.25)
+        # factor = max(0.25, 0.1) = 0.25; catapult = 8 / 0.25 = 32; total = 3 + 32 = 35
+        assert fd.get_effective_launch_time() == pytest.approx(LAUNCH_PREP_TIME + BASE_LAUNCH_TIME / 0.25)
 
 
 # ---------------------------------------------------------------------------
@@ -458,11 +469,15 @@ class TestSerialisation:
         fd.launch_queue.append("drone_2")
         fd.recovery_queue.append("drone_3")
         fd.drone_fuel_reserve = 80.0
+        fd.drone_ammo_reserve = 80.0
         fd.catapult_health = 75.0
         fd.set_fire(True)
 
         d = make_combat_drone(fuel=50.0, ammo=30.0, hull=40.0)
         fd.start_turnaround(d)
+        # Turnaround consumes reserves: 80 - 10 = 70 (fuel), 80 - 15 = 65 (ammo).
+        expected_fuel = 80.0 - REFUEL_RESERVE_COST
+        expected_ammo = 80.0 - REARM_RESERVE_COST
 
         data = serialise_flight_deck(fd)
         restored = deserialise_flight_deck(data)
@@ -472,7 +487,8 @@ class TestSerialisation:
         assert "drone_1" in restored.tubes_in_use
         assert "drone_2" in restored.launch_queue
         assert "drone_3" in restored.recovery_queue
-        assert restored.drone_fuel_reserve == pytest.approx(80.0)
+        assert restored.drone_fuel_reserve == pytest.approx(expected_fuel)
+        assert restored.drone_ammo_reserve == pytest.approx(expected_ammo)
         assert restored.catapult_health == pytest.approx(75.0)
         assert restored.fire_active is True
         assert restored.deck_status == "fire"
@@ -488,3 +504,124 @@ class TestSerialisation:
         assert fd.launch_tubes == 1
         assert fd.deck_status == "operational"
         assert fd.power_available is True
+
+
+# ---------------------------------------------------------------------------
+# Reserve consumption
+# ---------------------------------------------------------------------------
+
+
+class TestReserveConsumption:
+    def test_refuel_consumes_fuel_reserve(self):
+        fd = make_deck()
+        fd.drone_fuel_reserve = 50.0
+        d = make_combat_drone(fuel=50.0, ammo=100.0, hull=60.0)
+        fd.start_turnaround(d)
+        assert fd.drone_fuel_reserve == pytest.approx(50.0 - REFUEL_RESERVE_COST)
+
+    def test_rearm_consumes_ammo_reserve(self):
+        fd = make_deck()
+        fd.drone_ammo_reserve = 50.0
+        d = make_combat_drone(fuel=100.0, ammo=50.0, hull=60.0)
+        fd.start_turnaround(d)
+        assert fd.drone_ammo_reserve == pytest.approx(50.0 - REARM_RESERVE_COST)
+
+    def test_no_refuel_when_fuel_reserve_empty(self):
+        fd = make_deck()
+        fd.drone_fuel_reserve = 0.0
+        d = make_combat_drone(fuel=50.0, ammo=100.0, hull=60.0)
+        fd.start_turnaround(d)
+        ta = fd.turnarounds["drone_c1"]
+        assert ta.needs_refuel is False
+        assert fd.drone_fuel_reserve == pytest.approx(0.0)
+
+    def test_no_rearm_when_ammo_reserve_empty(self):
+        fd = make_deck()
+        fd.drone_ammo_reserve = 0.0
+        d = make_combat_drone(fuel=100.0, ammo=50.0, hull=60.0)
+        fd.start_turnaround(d)
+        ta = fd.turnarounds["drone_c1"]
+        assert ta.needs_rearm is False
+        assert fd.drone_ammo_reserve == pytest.approx(0.0)
+
+    def test_reserve_floor_at_zero(self):
+        fd = make_deck()
+        fd.drone_fuel_reserve = 3.0  # less than REFUEL_RESERVE_COST (10)
+        d = make_combat_drone(fuel=50.0, ammo=100.0, hull=60.0)
+        fd.start_turnaround(d)
+        assert fd.drone_fuel_reserve == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# Crash risk and fire
+# ---------------------------------------------------------------------------
+
+
+class TestCrashRisk:
+    def test_check_crash_risk_healthy_drone(self):
+        fd = make_deck()
+        d = make_combat_drone(hull=60.0)
+        assert fd.check_crash_risk(d) is False
+
+    def test_check_crash_risk_critical_drone(self):
+        fd = make_deck()
+        d = make_combat_drone(hull=3.0)  # 3/60 = 5% < 10% threshold
+        assert fd.check_crash_risk(d, random.Random(0)) is True
+        assert fd.crash_block_remaining > 0
+
+    def test_crash_fire_with_low_rng(self):
+        """Seed 1 → random() = 0.134 < 0.30 → fire starts."""
+        fd = make_deck()
+        rng = random.Random(1)
+        fd.start_crash_block(rng)
+        assert fd.fire_active is True
+        assert any(e["type"] == "crash_fire" for e in fd.pending_events)
+
+    def test_crash_no_fire_with_high_rng(self):
+        """Seed 0 → random() = 0.844 > 0.30 → no fire."""
+        fd = make_deck()
+        rng = random.Random(0)
+        fd.start_crash_block(rng)
+        assert fd.fire_active is False
+
+    def test_crash_recovery_damage(self):
+        fd = make_deck()
+        fd.recovery_health = 80.0
+        fd.start_crash_block(random.Random(0))
+        assert fd.recovery_health == pytest.approx(80.0 - CRASH_RECOVERY_DAMAGE)
+
+    def test_effective_recovery_time(self):
+        fd = make_deck()
+        expected = 5.0 + 5.0  # approach + catch
+        assert fd.get_effective_recovery_time() == pytest.approx(expected)
+
+
+# ---------------------------------------------------------------------------
+# Rush with selective skip
+# ---------------------------------------------------------------------------
+
+
+class TestRushSkip:
+    def test_rush_skip_rearm(self):
+        fd = make_deck()
+        d = make_combat_drone(fuel=50.0, ammo=50.0, hull=30.0)
+        fd.start_turnaround(d)
+        fd.rush_turnaround("drone_c1", skip=["rearm"])
+        ta = fd.turnarounds["drone_c1"]
+        assert ta.needs_rearm is False
+        assert ta.rearm_remaining == pytest.approx(0.0)
+
+    def test_rush_skip_repair(self):
+        fd = make_deck()
+        d = make_combat_drone(fuel=100.0, ammo=100.0, hull=30.0)
+        fd.start_turnaround(d)
+        fd.rush_turnaround("drone_c1", skip=["repair"])
+        ta = fd.turnarounds["drone_c1"]
+        assert ta.needs_repair is False
+
+    def test_rush_skip_all(self):
+        fd = make_deck()
+        d = make_combat_drone(fuel=50.0, ammo=50.0, hull=30.0)
+        fd.start_turnaround(d)
+        fd.rush_turnaround("drone_c1", skip=["refuel", "rearm", "repair"])
+        assert fd.is_turnaround_complete("drone_c1") is True

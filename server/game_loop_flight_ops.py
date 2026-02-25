@@ -33,6 +33,9 @@ from server.models.drone_missions import (
     serialise_mission,
 )
 from server.models.flight_deck import (
+    LAUNCH_PREP_TIME,
+    LAUNCH_RETRY_DELAY,
+    BOLTER_RETRY_DELAY,
     FlightDeck,
     create_flight_deck,
     deserialise_flight_deck,
@@ -71,6 +74,12 @@ _pending_events: list[dict] = []
 # Launch timers: drone_id → seconds remaining in launch prep + launch.
 _launch_timers: dict[str, float] = {}
 
+# Launch phases: drone_id → "prep" | "launch" (used for 2-phase launch).
+_launch_phases: dict[str, str] = {}
+
+# Retry delay timers: drone_id → seconds remaining before re-queue.
+_retry_delays: dict[str, float] = {}
+
 # Recovery timers: drone_id → seconds remaining in recovery.
 _recovery_timers: dict[str, float] = {}
 
@@ -84,7 +93,7 @@ def reset(ship_class_id: str = "frigate") -> None:
     """Initialise flight ops state at game start."""
     global _drones, _flight_deck, _missions, _buoys, _decoys
     global _decoy_stock, _decoy_counter, _bingo_timers, _pending_events
-    global _launch_timers, _recovery_timers
+    global _launch_timers, _launch_phases, _retry_delays, _recovery_timers
 
     _drones = create_ship_drones(ship_class_id)
     _flight_deck = create_flight_deck(ship_class_id)
@@ -96,6 +105,8 @@ def reset(ship_class_id: str = "frigate") -> None:
     _bingo_timers = {}
     _pending_events = []
     _launch_timers = {}
+    _launch_phases = {}
+    _retry_delays = {}
     _recovery_timers = {}
     reset_mission_counter()
 
@@ -152,6 +163,19 @@ def launch_drone(drone_id: str, ship: Ship) -> bool:
     drone.status = "launching"
     # Place drone at ship position when launch begins.
     drone.position = (ship.x, ship.y)
+    return True
+
+
+def cancel_launch(drone_id: str) -> bool:
+    """Abort a launching drone (during prep phase). Returns to hangar."""
+    drone = get_drone_by_id(drone_id)
+    if drone is None:
+        return False
+    if not _flight_deck.cancel_launch(drone_id):
+        return False
+    _launch_timers.pop(drone_id, None)
+    _launch_phases.pop(drone_id, None)
+    drone.status = "hangar"
     return True
 
 
@@ -335,7 +359,7 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
     )
 
     # 1. Process launch queue → tubes → active.
-    events.extend(_tick_launches(ship, dt))
+    events.extend(_tick_launches(ship, dt, in_combat=in_combat))
 
     # 2. Process recovery queue → landing → hangar.
     events.extend(_tick_recoveries(ship, dt))
@@ -452,7 +476,20 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
                 })
             _bingo_timers.pop(drone.id, None)
 
-    # 5. Tick decoys.
+    # 5. Ditch check: drones with fuel=0 and deck unavailable are lost.
+    deck_unavailable = _flight_deck.fire_active or _flight_deck.depressurised
+    for drone in _drones:
+        if drone.status in ("active", "rtb", "recovering"):
+            if drone.fuel <= 0 and deck_unavailable:
+                drone.status = "lost"
+                events.append({
+                    "type": "drone_ditched",
+                    "drone_id": drone.id,
+                    "callsign": drone.callsign,
+                    "reason": "fuel_exhausted_deck_unavailable",
+                })
+
+    # 6. Tick decoys.
     decoy_events = tick_decoys(_decoys, dt)
     for dev in decoy_events:
         events.append({
@@ -476,10 +513,17 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
 # ---------------------------------------------------------------------------
 
 
-def _tick_launches(ship: Ship, dt: float) -> list[dict]:
-    """Process launch queue and tubes."""
+def _tick_launches(ship: Ship, dt: float, in_combat: bool = False) -> list[dict]:
+    """Process launch queue, tubes, and retry delays."""
     events: list[dict] = []
     fd = _flight_deck
+
+    # Tick retry delays first — re-queue when delay expires.
+    for drone_id in list(_retry_delays):
+        _retry_delays[drone_id] -= dt
+        if _retry_delays[drone_id] <= 0:
+            _retry_delays.pop(drone_id)
+            fd.queue_launch(drone_id)
 
     # Move drones from queue into available tubes.
     while fd.launch_queue and len(fd.tubes_in_use) < fd.launch_tubes:
@@ -487,21 +531,39 @@ def _tick_launches(ship: Ship, dt: float) -> list[dict]:
             break
         drone_id = fd.launch_queue.pop(0)
         fd.tubes_in_use.append(drone_id)
-        _launch_timers[drone_id] = fd.get_effective_launch_time()
+        _launch_timers[drone_id] = LAUNCH_PREP_TIME
+        _launch_phases[drone_id] = "prep"
         events.append({
             "type": "launch_prep",
             "drone_id": drone_id,
         })
 
     # Tick launch timers.
-    completed: list[str] = []
+    phase_completed: list[str] = []
     for drone_id in list(_launch_timers):
         _launch_timers[drone_id] -= dt
         if _launch_timers[drone_id] <= 0:
-            completed.append(drone_id)
+            phase_completed.append(drone_id)
 
-    for drone_id in completed:
+    for drone_id in phase_completed:
+        phase = _launch_phases.get(drone_id, "launch")
+
+        if phase == "prep":
+            # Prep complete — carry overflow into launch phase.
+            overflow = -_launch_timers[drone_id]  # positive leftover time
+            catapult_time = fd.launch_time
+            if fd.catapult_health < 100.0:
+                factor = max(0.25, fd.catapult_health / 100.0)
+                catapult_time = fd.launch_time / factor
+            _launch_timers[drone_id] = catapult_time - overflow
+            _launch_phases[drone_id] = "launch"
+            if _launch_timers[drone_id] > 0:
+                continue
+            # Overflow consumed the launch phase too — fall through.
+
+        # Launch phase complete.
         _launch_timers.pop(drone_id)
+        _launch_phases.pop(drone_id, None)
         if drone_id in fd.tubes_in_use:
             fd.tubes_in_use.remove(drone_id)
 
@@ -516,8 +578,8 @@ def _tick_launches(ship: Ship, dt: float) -> list[dict]:
                 "drone_id": drone_id,
                 "callsign": drone.callsign,
             })
-            # Re-queue after retry delay.
-            fd.queue_launch(drone_id)
+            # Re-queue after retry delay (5s).
+            _retry_delays[drone_id] = LAUNCH_RETRY_DELAY
             continue
 
         # Successful launch.
@@ -528,17 +590,18 @@ def _tick_launches(ship: Ship, dt: float) -> list[dict]:
         drone.bingo_acknowledged = False
         _bingo_timers.pop(drone_id, None)
 
-        # Combat launch damage roll.
-        hull_dmg = fd.roll_combat_launch_damage()
-        if hull_dmg > 0:
-            pct = (hull_dmg / 100.0) * drone.max_hull
-            apply_damage_to_drone(drone, pct)
-            events.append({
-                "type": "combat_launch_damage",
-                "drone_id": drone_id,
-                "callsign": drone.callsign,
-                "damage": pct,
-            })
+        # Combat launch damage roll — only during active combat.
+        if in_combat:
+            hull_dmg = fd.roll_combat_launch_damage()
+            if hull_dmg > 0:
+                pct = (hull_dmg / 100.0) * drone.max_hull
+                apply_damage_to_drone(drone, pct)
+                events.append({
+                    "type": "combat_launch_damage",
+                    "drone_id": drone_id,
+                    "callsign": drone.callsign,
+                    "damage": pct,
+                })
 
         events.append({
             "type": "drone_launched",
@@ -564,7 +627,7 @@ def _tick_recoveries(ship: Ship, dt: float) -> list[dict]:
     while fd.recovery_queue and fd.can_recover:
         drone_id = fd.recovery_queue[0]
         if fd.clear_to_land(drone_id):
-            _recovery_timers[drone_id] = fd.recovery_time
+            _recovery_timers[drone_id] = fd.get_effective_recovery_time()
             events.append({
                 "type": "recovery_approach",
                 "drone_id": drone_id,
@@ -586,9 +649,23 @@ def _tick_recoveries(ship: Ship, dt: float) -> list[dict]:
         if drone is None:
             continue
 
+        # Check crash risk for critically damaged drones.
+        if fd.check_crash_risk(drone):
+            drone.status = "destroyed"
+            _missions.pop(drone_id, None)
+            _bingo_timers.pop(drone_id, None)
+            events.append({
+                "type": "drone_crash_on_deck",
+                "drone_id": drone_id,
+                "callsign": drone.callsign,
+            })
+            continue
+
         # Roll for bolter.
         if fd.roll_bolter():
-            fd.queue_recovery(drone_id)
+            # Bolter — drone goes around, 15s penalty via delayed re-queue.
+            drone.status = "recovering"
+            _recovery_timers[drone_id] = BOLTER_RETRY_DELAY
             events.append({
                 "type": "bolter",
                 "drone_id": drone_id,
@@ -704,7 +781,15 @@ def build_state(ship: Ship) -> dict:
             "drone_fuel_reserve": round(_flight_deck.drone_fuel_reserve, 1),
             "drone_ammo_reserve": round(_flight_deck.drone_ammo_reserve, 1),
             "turnarounds": {
-                k: round(v.total_remaining, 1)
+                k: {
+                    "total_remaining": round(v.total_remaining, 1),
+                    "needs_refuel": v.needs_refuel,
+                    "needs_rearm": v.needs_rearm,
+                    "needs_repair": v.needs_repair,
+                    "refuel_remaining": round(v.refuel_remaining, 1),
+                    "rearm_remaining": round(v.rearm_remaining, 1),
+                    "repair_remaining": round(v.repair_remaining, 1),
+                }
                 for k, v in _flight_deck.turnarounds.items()
             },
         },
@@ -747,6 +832,8 @@ def serialise() -> dict:
         "decoy_counter": _decoy_counter,
         "bingo_timers": dict(_bingo_timers),
         "launch_timers": dict(_launch_timers),
+        "launch_phases": dict(_launch_phases),
+        "retry_delays": dict(_retry_delays),
         "recovery_timers": dict(_recovery_timers),
     }
 
@@ -754,7 +841,7 @@ def serialise() -> dict:
 def deserialise(data: dict) -> None:
     global _drones, _flight_deck, _missions, _buoys, _decoys
     global _decoy_stock, _decoy_counter, _bingo_timers, _pending_events
-    global _launch_timers, _recovery_timers
+    global _launch_timers, _launch_phases, _retry_delays, _recovery_timers
 
     _drones = [deserialise_drone(d) for d in data.get("drones", [])]
 
@@ -775,4 +862,6 @@ def deserialise(data: dict) -> None:
     _bingo_timers = dict(data.get("bingo_timers", {}))
     _pending_events = []
     _launch_timers = {k: float(v) for k, v in data.get("launch_timers", {}).items()}
+    _launch_phases = dict(data.get("launch_phases", {}))
+    _retry_delays = {k: float(v) for k, v in data.get("retry_delays", {}).items()}
     _recovery_timers = {k: float(v) for k, v in data.get("recovery_timers", {}).items()}

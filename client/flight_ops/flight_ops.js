@@ -1018,6 +1018,9 @@ function renderDroneCards() {
       launchSpan.className = 'fo-launching-label';
       launchSpan.textContent = 'LAUNCH SEQUENCE\u2026';
       btns.appendChild(launchSpan);
+      btns.appendChild(makeBtn('Abort', 'fo-btn fo-btn--warn', () => {
+        send('flight_ops.cancel_launch', { drone_id: drone.id });
+      }));
     } else if (drone.status === 'rtb' || drone.status === 'recovering') {
       const retSpan = document.createElement('span');
       retSpan.className = 'text-dim text-label';
@@ -1075,7 +1078,8 @@ function renderHangarCards() {
 
   // Structural key: properties that affect card buttons/layout.
   const structKey = hangarDrones.length === 0 ? '__empty__' : hangarDrones.map(d => {
-    const taRemaining = turnarounds[d.id];
+    const ta = turnarounds[d.id];
+    const taRemaining = ta ? ta.total_remaining : undefined;
     const isReady = d.status === 'hangar' && (taRemaining === undefined || taRemaining <= 0);
     const hasTurnaround = taRemaining !== undefined && taRemaining > 0;
     return [d.id, d.status, isReady, hasTurnaround].join('|');
@@ -1107,7 +1111,8 @@ function renderHangarCards() {
 
     header.appendChild(callsign);
 
-    const taRemaining = turnarounds[drone.id];
+    const ta = turnarounds[drone.id];
+    const taRemaining = ta ? ta.total_remaining : undefined;
     if (drone.status === 'hangar' && (taRemaining === undefined || taRemaining <= 0)) {
       // Ready to launch.
       const ready = document.createElement('span');
@@ -1127,15 +1132,29 @@ function renderHangarCards() {
       card.appendChild(btns);
     } else {
       // Turnaround in progress.
-      const ta = document.createElement('span');
-      ta.className = 'fo-hangar-turnaround';
-      ta.setAttribute('data-ta-label', drone.id);
-      ta.textContent = taRemaining !== undefined ? `TURNAROUND ${Math.ceil(taRemaining)}s` : drone.status.toUpperCase();
-      header.appendChild(ta);
+      const taLabel = document.createElement('span');
+      taLabel.className = 'fo-hangar-turnaround';
+      taLabel.setAttribute('data-ta-label', drone.id);
+      taLabel.textContent = taRemaining !== undefined ? `TURNAROUND ${Math.ceil(taRemaining)}s` : drone.status.toUpperCase();
+      header.appendChild(taLabel);
       card.appendChild(header);
 
-      if (taRemaining !== undefined && taRemaining > 0) {
-        // Progress bar — approximate max of 30s for turnaround.
+      if (ta && taRemaining > 0) {
+        // Per-sub-task progress bars.
+        const subBars = document.createElement('div');
+        subBars.className = 'fo-turnaround-sub-bars';
+        if (ta.needs_refuel) {
+          subBars.appendChild(makeTASubBar('FUEL', ta.refuel_remaining, 15, `${drone.id}-ta-fuel`));
+        }
+        if (ta.needs_rearm) {
+          subBars.appendChild(makeTASubBar('REARM', ta.rearm_remaining, 20, `${drone.id}-ta-rearm`));
+        }
+        if (ta.needs_repair) {
+          subBars.appendChild(makeTASubBar('REPAIR', ta.repair_remaining, ta.repair_remaining + 1, `${drone.id}-ta-repair`));
+        }
+        card.appendChild(subBars);
+
+        // Overall progress bar.
         const maxTA = 30;
         const pct = Math.max(0, Math.min(100, ((maxTA - taRemaining) / maxTA) * 100));
         const barWrap = document.createElement('div');
@@ -1150,8 +1169,12 @@ function renderHangarCards() {
         const btns = document.createElement('div');
         btns.className = 'fo-drone-card__btns';
         btns.style.marginTop = '0.2rem';
+        // Rush button — skip incomplete sub-tasks.
+        const skipList = [];
+        if (ta.needs_rearm && ta.rearm_remaining > 0) skipList.push('rearm');
+        if (ta.needs_repair && ta.repair_remaining > 0) skipList.push('repair');
         btns.appendChild(makeBtn('Rush', 'fo-btn fo-btn--warn', () => {
-          send('flight_ops.rush_turnaround', { drone_id: drone.id });
+          send('flight_ops.rush_turnaround', { drone_id: drone.id, skip: skipList });
         }));
         card.appendChild(btns);
       }
@@ -1164,7 +1187,8 @@ function renderHangarCards() {
 /** Fast-path: update turnaround bar widths and labels without rebuilding DOM. */
 function _updateHangarBarsInPlace(drones, turnarounds) {
   for (const d of drones) {
-    const taRemaining = turnarounds[d.id];
+    const ta = turnarounds[d.id];
+    const taRemaining = ta ? ta.total_remaining : undefined;
     const taFill = hangarCardsEl.querySelector(`[data-ta="${d.id}"]`);
     if (taFill && taRemaining !== undefined && taRemaining > 0) {
       const maxTA = 30;
@@ -1175,7 +1199,22 @@ function _updateHangarBarsInPlace(drones, turnarounds) {
     if (taLabel && taRemaining !== undefined) {
       taLabel.textContent = `TURNAROUND ${Math.ceil(taRemaining)}s`;
     }
+    // Update sub-task bars.
+    if (ta) {
+      _updateTASubBar(d.id, 'fuel', ta.refuel_remaining, 15);
+      _updateTASubBar(d.id, 'rearm', ta.rearm_remaining, 20);
+      _updateTASubBar(d.id, 'repair', ta.repair_remaining, ta.repair_remaining + 1);
+    }
   }
+}
+
+function _updateTASubBar(droneId, step, remaining, max) {
+  const fill = hangarCardsEl.querySelector(`[data-ta-sub="${droneId}-ta-${step}"]`);
+  if (!fill) return;
+  const pct = Math.max(0, Math.min(100, ((max - remaining) / max) * 100));
+  fill.style.width = `${pct}%`;
+  const lbl = fill.closest('.fo-ta-sub-row')?.querySelector('.fo-ta-sub-time');
+  if (lbl) lbl.textContent = remaining > 0 ? `${Math.ceil(remaining)}s` : 'DONE';
 }
 
 // ---------------------------------------------------------------------------
@@ -1431,6 +1470,27 @@ function makeBar(label, value, max, fillClass, customText, dataKey) {
   pct.textContent = customText || `${Math.round(value)}%`;
 
   row.append(lbl, wrap, pct);
+  return row;
+}
+
+function makeTASubBar(label, remaining, max, dataKey) {
+  const row = document.createElement('div');
+  row.className = 'fo-ta-sub-row';
+  const lbl = document.createElement('span');
+  lbl.className = 'fo-ta-sub-label';
+  lbl.textContent = label;
+  const wrap = document.createElement('div');
+  wrap.className = 'fo-ta-sub-wrap';
+  const fill = document.createElement('div');
+  fill.className = 'fo-ta-sub-fill';
+  fill.setAttribute('data-ta-sub', dataKey);
+  const pct = Math.max(0, Math.min(100, ((max - remaining) / max) * 100));
+  fill.style.width = `${pct}%`;
+  wrap.appendChild(fill);
+  const time = document.createElement('span');
+  time.className = 'fo-ta-sub-time';
+  time.textContent = remaining > 0 ? `${Math.ceil(remaining)}s` : 'DONE';
+  row.append(lbl, wrap, time);
   return row;
 }
 

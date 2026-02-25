@@ -45,11 +45,17 @@ EVASIVE_MANOEUVRE_RECOVERY_PENALTY: float = 0.30  # 30% worse recovery during ev
 # Crash risk.
 CRASH_HULL_THRESHOLD: float = 10.0     # hull % below which crash risk exists
 CRASH_RECOVERY_BLOCK_TIME: float = 30.0  # seconds to clear wreckage
+CRASH_RECOVERY_DAMAGE: float = 15.0    # recovery_health lost on crash
+CRASH_FIRE_CHANCE: float = 0.30        # 30% chance crash starts a fire
 
 # Turnaround timing.
 REFUEL_TIME: float = 15.0              # seconds to refuel fully
 REARM_TIME: float = 20.0               # seconds to rearm fully
 REPAIR_TIME_PER_PERCENT: float = 0.5   # seconds per 1% hull repair
+
+# Reserve consumption per turnaround.
+REFUEL_RESERVE_COST: float = 10.0      # % of fuel reserve per refuel
+REARM_RESERVE_COST: float = 15.0       # % of ammo reserve per rearm
 
 # Deck statuses.
 DECK_STATUSES = ("operational", "damaged", "fire", "depressurised", "power_loss")
@@ -201,9 +207,16 @@ class FlightDeck:
 
     def start_turnaround(self, drone: Drone) -> None:
         """Begin turnaround for a recovered drone."""
-        needs_refuel = drone.fuel < 100.0
-        needs_rearm = drone.ammo < 100.0 and drone.drone_type == "combat"
+        needs_refuel = drone.fuel < 100.0 and self.drone_fuel_reserve > 0
+        needs_rearm = (drone.ammo < 100.0 and drone.drone_type == "combat"
+                       and self.drone_ammo_reserve > 0)
         needs_repair = drone.hull < drone.max_hull
+
+        # Consume reserves.
+        if needs_refuel:
+            self.drone_fuel_reserve = max(0.0, self.drone_fuel_reserve - REFUEL_RESERVE_COST)
+        if needs_rearm:
+            self.drone_ammo_reserve = max(0.0, self.drone_ammo_reserve - REARM_RESERVE_COST)
 
         repair_time = 0.0
         if needs_repair:
@@ -291,10 +304,34 @@ class FlightDeck:
         elif not self.fire_active and not self.depressurised:
             self.deck_status = "operational"
 
-    def start_crash_block(self) -> None:
-        """Block recovery slot due to deck crash."""
+    def start_crash_block(self, rng: random.Random | None = None) -> None:
+        """Block recovery slot due to deck crash.
+
+        Also damages recovery system and may start a fire.
+        """
         self.crash_block_remaining = CRASH_RECOVERY_BLOCK_TIME
+        # Crash damages recovery system.
+        self.recovery_health = max(0.0, self.recovery_health - CRASH_RECOVERY_DAMAGE)
+        # Chance to start fire.
+        r = rng.random() if rng else random.random()
+        if r < CRASH_FIRE_CHANCE:
+            self.set_fire(True)
+            self.pending_events.append({"type": "crash_fire"})
         self.pending_events.append({"type": "deck_crash"})
+
+    def check_crash_risk(self, drone: Drone, rng: random.Random | None = None) -> bool:
+        """Check if a recovering drone crashes on deck (hull < threshold).
+
+        Returns True if crash occurs.
+        """
+        if drone.max_hull <= 0:
+            return False
+        hull_pct = (drone.hull / drone.max_hull) * 100.0
+        if hull_pct >= CRASH_HULL_THRESHOLD:
+            return False
+        # Drone is critically damaged — crash on deck.
+        self.start_crash_block(rng)
+        return True
 
     # -----------------------------------------------------------------------
     # Tick
@@ -347,11 +384,16 @@ class FlightDeck:
     # -----------------------------------------------------------------------
 
     def get_effective_launch_time(self) -> float:
-        """Launch time adjusted for catapult health."""
-        if self.catapult_health >= 100.0:
-            return self.launch_time
-        factor = max(0.25, self.catapult_health / 100.0)
-        return self.launch_time / factor  # damaged = slower
+        """Total launch time: prep (3s fixed) + catapult launch (affected by health)."""
+        catapult_time = self.launch_time
+        if self.catapult_health < 100.0:
+            factor = max(0.25, self.catapult_health / 100.0)
+            catapult_time = self.launch_time / factor  # damaged = slower
+        return LAUNCH_PREP_TIME + catapult_time
+
+    def get_effective_recovery_time(self) -> float:
+        """Total recovery time: approach (5s) + catch (5s)."""
+        return BASE_RECOVERY_APPROACH_TIME + BASE_RECOVERY_CATCH_TIME
 
     def roll_launch_failure(self, rng: random.Random | None = None) -> bool:
         """Roll for catapult failure.  Returns True if launch fails."""

@@ -54,6 +54,7 @@ from server.models.messages import (
     TacticalCreateStrikePlanPayload,
     TacticalExecuteStrikePlanPayload,
     FlightOpsAbortLandingPayload,
+    FlightOpsCancelLaunchPayload,
     FlightOpsClearToLandPayload,
     FlightOpsDeployBuoyPayload,
     FlightOpsDeployDecoyPayload,
@@ -2045,9 +2046,11 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "flight_ops.clear_to_land" and isinstance(payload, FlightOpsClearToLandPayload):
             glfo.clear_to_land(payload.drone_id)
         elif msg_type == "flight_ops.rush_turnaround" and isinstance(payload, FlightOpsRushTurnaroundPayload):
-            glfo.rush_turnaround(payload.drone_id)
+            glfo.rush_turnaround(payload.drone_id, skip=payload.skip if payload.skip else None)
         elif msg_type == "flight_ops.abort_landing" and isinstance(payload, FlightOpsAbortLandingPayload):
             glfo.abort_landing(payload.drone_id)
+        elif msg_type == "flight_ops.cancel_launch" and isinstance(payload, FlightOpsCancelLaunchPayload):
+            glfo.cancel_launch(payload.drone_id)
         elif msg_type == "ew.set_jam_target" and isinstance(payload, EWSetJamTargetPayload):
             glew.set_jam_target(payload.entity_id)
             gl.log_event("ew", "jam_target_set", {"entity_id": payload.entity_id})

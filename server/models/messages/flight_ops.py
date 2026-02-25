@@ -57,7 +57,12 @@ class FlightOpsClearToLandPayload(BaseModel):
 
 class FlightOpsRushTurnaroundPayload(BaseModel):
     drone_id: str
+    skip: list[str] = []
 
 
 class FlightOpsAbortLandingPayload(BaseModel):
+    drone_id: str
+
+
+class FlightOpsCancelLaunchPayload(BaseModel):
     drone_id: str

@@ -428,6 +428,45 @@
   transition: width 0.3s;
 }
 
+/* Sub-task bars (refuel / rearm / repair) */
+.fo-turnaround-sub-bars {
+  padding: 0.15rem 0.4rem;
+}
+
+.fo-ta-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 2px;
+}
+
+.fo-ta-sub-label {
+  font-size: 0.6rem;
+  font-weight: bold;
+  width: 3rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.fo-ta-sub-wrap {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fo-ta-sub-fill {
+  height: 100%;
+  background: var(--primary-dim);
+  transition: width 0.3s;
+}
+
+.fo-ta-sub-time {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  width: 2.5rem;
+  text-align: right;
+}
+
 /* =========================================================================
    Expendables section
    ========================================================================= */

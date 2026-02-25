@@ -52,6 +52,7 @@ from server.models.messages.flight_ops import (
     FlightOpsAbortLandingPayload,
     FlightOpsClearToLandPayload,
     FlightOpsDeployBuoyPayload,
+    FlightOpsCancelLaunchPayload,
     FlightOpsDeployDecoyPayload,
     FlightOpsDesignateTargetPayload,
     FlightOpsEscortAssignPayload,
@@ -251,6 +252,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "flight_ops.clear_to_land":         FlightOpsClearToLandPayload,
     "flight_ops.rush_turnaround":       FlightOpsRushTurnaroundPayload,
     "flight_ops.abort_landing":         FlightOpsAbortLandingPayload,
+    "flight_ops.cancel_launch":         FlightOpsCancelLaunchPayload,
     # Electronic Warfare
     "ew.set_jam_target":         EWSetJamTargetPayload,
     "ew.toggle_countermeasures": EWToggleCountermeasuresPayload,

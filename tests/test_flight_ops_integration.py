@@ -14,7 +14,16 @@ import pytest
 import server.game_loop_flight_ops as glfo
 from server.models.drones import DECOY_STOCK, DRONE_COMPLEMENT
 from server.models.drone_missions import create_patrol_mission
-from server.models.flight_deck import BASE_LAUNCH_TIME, BASE_RECOVERY_CATCH_TIME
+from server.models.flight_deck import (
+    BASE_LAUNCH_TIME,
+    BASE_RECOVERY_APPROACH_TIME,
+    BASE_RECOVERY_CATCH_TIME,
+    LAUNCH_PREP_TIME,
+)
+
+# Full 2-phase launch time (prep + catapult) and full recovery time (approach + catch).
+FULL_LAUNCH_TIME = LAUNCH_PREP_TIME + BASE_LAUNCH_TIME
+FULL_RECOVERY_TIME = BASE_RECOVERY_APPROACH_TIME + BASE_RECOVERY_CATCH_TIME
 from server.models.messages import Message, validate_payload
 from server.models.messages.flight_ops import (
     FlightOpsAbortLandingPayload,
@@ -152,8 +161,8 @@ def test_full_launch_patrol_rtb_cycle():
     # 1. Launch drone.
     assert glfo.launch_drone(drone.id, ship)
 
-    # 2. Complete launch.
-    glfo.tick(ship, BASE_LAUNCH_TIME + 1.0)
+    # 2. Complete launch (prep + catapult).
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
     assert drone.status == "active"
 
     # 3. Assign patrol mission.
@@ -171,8 +180,8 @@ def test_full_launch_patrol_rtb_cycle():
     glfo.tick(ship, 0.1)
     assert drone.status == "recovering"
 
-    # 6. Complete recovery.
-    glfo.tick(ship, BASE_RECOVERY_CATCH_TIME + 1.0)
+    # 6. Complete recovery (approach + catch).
+    glfo.tick(ship, FULL_RECOVERY_TIME + 1.0)
     assert drone.status == "maintenance"
 
     # 7. Wait for turnaround to complete.
@@ -195,9 +204,9 @@ def test_rescue_mission_cycle():
     drones = glfo.get_drones()
     rescue = next(d for d in drones if d.drone_type == "rescue")
 
-    # Launch.
+    # Launch (prep + catapult).
     glfo.launch_drone(rescue.id, ship)
-    glfo.tick(ship, BASE_LAUNCH_TIME + 1.0)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
     assert rescue.status == "active"
 
     # Set waypoint to rescue site.
@@ -249,7 +258,7 @@ def test_build_state_full_structure():
     # Launch a drone.
     drone = glfo.get_drones()[0]
     glfo.launch_drone(drone.id, ship)
-    glfo.tick(ship, BASE_LAUNCH_TIME + 1.0)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
 
     state = glfo.build_state(ship)
 
@@ -288,7 +297,7 @@ def test_save_resume_round_trip():
     # Create some state.
     drone = glfo.get_drones()[0]
     glfo.launch_drone(drone.id, ship)
-    glfo.tick(ship, BASE_LAUNCH_TIME + 1.0)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
     glfo.deploy_decoy_cmd(0.0, ship)
 
     # Serialise.
@@ -367,8 +376,8 @@ def test_multiple_drones_launch_sequentially():
     assert len(fd.tubes_in_use) == 1
     assert len(fd.launch_queue) == 1
 
-    # Complete first launch.
-    glfo.tick(ship, BASE_LAUNCH_TIME + 1.0)
+    # Complete first launch (prep + catapult).
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
     assert drones[0].status == "active"
 
     # Second moves into tube.
@@ -376,7 +385,7 @@ def test_multiple_drones_launch_sequentially():
     assert len(fd.tubes_in_use) == 1
 
     # Complete second launch.
-    glfo.tick(ship, BASE_LAUNCH_TIME + 1.0)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
     assert drones[1].status == "active"
 
 
@@ -391,11 +400,11 @@ def test_rush_turnaround_allows_relaunch():
 
     # Complete launch→RTB→recovery cycle.
     glfo.launch_drone(drone.id, ship)
-    glfo.tick(ship, BASE_LAUNCH_TIME + 1.0)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 1.0)
     drone.fuel = 50.0
     drone.status = "rtb"
     glfo.tick(ship, 0.1)  # queue recovery
-    glfo.tick(ship, BASE_RECOVERY_CATCH_TIME + 1.0)  # complete recovery
+    glfo.tick(ship, FULL_RECOVERY_TIME + 1.0)  # complete recovery
     assert drone.status == "maintenance"
 
     # Rush turnaround.
