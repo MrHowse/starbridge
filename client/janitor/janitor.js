@@ -115,17 +115,25 @@ function showWelcomeCrawl() {
 // State handler
 // ---------------------------------------------------------------------------
 
-/** Hash guard — skip full DOM rebuild when state payload is unchanged. */
-let _lastStateJson = '';
+/** Hash guards — skip sections whose data hasn't changed. */
+let _lastBuffsJson   = '';
+let _lastStickyJson  = '';
 
 function handleState(state) {
-  const json = JSON.stringify(state);
-  if (json === _lastStateJson) return;
-  _lastStateJson = json;
+  updateTasks(state.tasks || [], state.urgent_tasks || []);
 
-  renderTasks(state.tasks || [], state.urgent_tasks || []);
-  renderBuffs(state.active_buffs || []);
-  renderStickies(state.sticky_notes || []);
+  const buffsJson = JSON.stringify(state.active_buffs || []);
+  if (buffsJson !== _lastBuffsJson) {
+    _lastBuffsJson = buffsJson;
+    renderBuffs(state.active_buffs || []);
+  }
+
+  const stickyJson = JSON.stringify(state.sticky_notes || []);
+  if (stickyJson !== _lastStickyJson) {
+    _lastStickyJson = stickyJson;
+    renderStickies(state.sticky_notes || []);
+  }
+
   updateStats(state);
 }
 
@@ -140,17 +148,89 @@ function handleTaskResult(result) {
 }
 
 // ---------------------------------------------------------------------------
-// Task rendering
+// Task rendering — build DOM once, update in-place thereafter
 // ---------------------------------------------------------------------------
 
-function renderTasks(tasks, urgents) {
+const CATEGORY_LABELS = {
+  plumbing:     'PLUMBING',
+  mopping:      'MOPPING',
+  restocking:   'RESTOCKING',
+  maintenance:  'MAINTENANCE',
+  pest_control: 'PEST CONTROL',
+  special:      'SPECIAL',
+};
+
+/** Whether the task list DOM has been built at least once. */
+let _taskListBuilt = false;
+
+/**
+ * Build the task list DOM on first call; update in-place on subsequent calls.
+ * This avoids full DOM rebuilds that kill hover/click states.
+ */
+function updateTasks(tasks, urgents) {
   const listEl = document.getElementById('task-list');
   if (!listEl) return;
+
+  if (!_taskListBuilt) {
+    _buildTaskList(listEl, tasks, urgents);
+    _taskListBuilt = true;
+    return;
+  }
+
+  // --- In-place update of existing cards ---
+
+  // Update urgent section.
+  const urgentSection = listEl.querySelector('[data-category="urgent"]');
+  if (urgents.length > 0 && !urgentSection) {
+    // Urgents appeared — rebuild.
+    _taskListBuilt = false;
+    _buildTaskList(listEl, tasks, urgents);
+    _taskListBuilt = true;
+    return;
+  }
+  if (urgents.length === 0 && urgentSection) {
+    urgentSection.remove();
+  }
+
+  // Update each task card in-place.
+  for (const task of tasks) {
+    const card = listEl.querySelector(`[data-task-id="${task.id}"]`);
+    if (!card) continue;
+
+    const onCooldown = !task.ready;
+    const cdText = onCooldown ? `${Math.ceil(task.cooldown_remaining)}s` : 'READY';
+    const statusEl = card.querySelector('.janitor-task__status');
+    if (statusEl && statusEl.textContent !== cdText) {
+      statusEl.textContent = cdText;
+    }
+
+    // Update count badge.
+    const countEl = card.querySelector('.janitor-task__count');
+    if (task.times_performed > 0) {
+      const countText = `x${task.times_performed}`;
+      if (countEl) {
+        if (countEl.textContent !== countText) countEl.textContent = countText;
+      } else {
+        const badge = document.createElement('span');
+        badge.className = 'janitor-task__count';
+        badge.textContent = countText;
+        card.querySelector('.janitor-task__label').appendChild(badge);
+      }
+    }
+
+    // Toggle cooldown class.
+    card.classList.toggle('janitor-task--cooldown', onCooldown);
+  }
+}
+
+/** Full DOM build — called once on first state, or when structure changes. */
+function _buildTaskList(listEl, tasks, urgents) {
   listEl.innerHTML = '';
 
   // Urgent tasks first.
   if (urgents.length > 0) {
     const section = _createCategory('URGENT');
+    section.dataset.category = 'urgent';
     for (const u of urgents) {
       const card = document.createElement('div');
       card.className = 'janitor-task janitor-task--urgent';
@@ -168,17 +248,8 @@ function renderTasks(tasks, urgents) {
     groups[cat].push(task);
   }
 
-  const categoryLabels = {
-    plumbing:     'PLUMBING',
-    mopping:      'MOPPING',
-    restocking:   'RESTOCKING',
-    maintenance:  'MAINTENANCE',
-    pest_control: 'PEST CONTROL',
-    special:      'SPECIAL',
-  };
-
   for (const [cat, catTasks] of Object.entries(groups)) {
-    const section = _createCategory(categoryLabels[cat] || cat.toUpperCase());
+    const section = _createCategory(CATEGORY_LABELS[cat] || cat.toUpperCase());
     for (const task of catTasks) {
       const onCooldown = !task.ready;
       const card = document.createElement('div');
@@ -196,11 +267,11 @@ function renderTasks(tasks, urgents) {
         `<span class="janitor-task__label">${_esc(task.label)}${countText}</span>` +
         `<span class="janitor-task__status">${cdText}</span>`;
 
-      if (!onCooldown) {
-        card.addEventListener('click', () => {
-          send('janitor.perform_task', { task_id: task.id });
-        });
-      }
+      // Click handler — always attached; checks cooldown at click time.
+      card.addEventListener('click', () => {
+        if (card.classList.contains('janitor-task--cooldown')) return;
+        send('janitor.perform_task', { task_id: task.id });
+      });
 
       section.appendChild(card);
     }
