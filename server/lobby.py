@@ -409,7 +409,7 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
         mission_data = {}
     sig = mission_data.get("signal_location")
 
-    _default_interior = make_default_interior()
+    _default_interior = make_default_interior(payload.ship_class)
     interior_layout = {
         room_id: {
             "name": room.name,

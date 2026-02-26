@@ -1,0 +1,63 @@
+{
+  "id": "medical_ship",
+  "rooms": [
+    {"id": "bridge",      "name": "Bridge",      "crew_deck": "bridge",  "deck_number": 1, "position": [0, 0], "connections": ["conn"]},
+    {"id": "conn",        "name": "Conn",        "crew_deck": "bridge",  "deck_number": 1, "position": [1, 0], "connections": ["bridge", "ready_room", "science_lab"]},
+    {"id": "ready_room",  "name": "Ready Room",  "crew_deck": "bridge",  "deck_number": 1, "position": [2, 0], "connections": ["conn", "observation"]},
+    {"id": "observation", "name": "Observation",  "crew_deck": "bridge", "deck_number": 1, "position": [3, 0], "connections": ["ready_room"]},
+
+    {"id": "sensor_array", "name": "Sensor Array", "crew_deck": "sensors", "deck_number": 2, "position": [0, 1], "connections": ["science_lab"]},
+    {"id": "science_lab",  "name": "Science Lab",  "crew_deck": "sensors", "deck_number": 2, "position": [1, 1], "connections": ["sensor_array", "comms_center", "conn", "surgery"]},
+    {"id": "comms_center", "name": "Comms Center",  "crew_deck": "sensors", "deck_number": 2, "position": [2, 1], "connections": ["science_lab", "combat_info"]},
+    {"id": "combat_info",  "name": "Combat Info Ctr", "crew_deck": "sensors", "deck_number": 2, "position": [3, 1], "connections": ["comms_center"]},
+
+    {"id": "medbay",       "name": "Medbay",        "crew_deck": "medical", "deck_number": 3, "position": [0, 2], "connections": ["surgery", "pharmacy"]},
+    {"id": "surgery",      "name": "Surgery",       "crew_deck": "medical", "deck_number": 3, "position": [1, 2], "connections": ["medbay", "quarantine_a", "science_lab", "ward_a"]},
+    {"id": "quarantine_a", "name": "Quarantine A",  "crew_deck": "medical", "deck_number": 3, "position": [2, 2], "connections": ["surgery", "research_lab", "pharmacy"],
+     "quarantine_lockable": true, "tags": ["biohazard"]},
+    {"id": "pharmacy",     "name": "Pharmacy",      "crew_deck": "medical", "deck_number": 3, "position": [3, 2], "connections": ["quarantine_a", "medbay"]},
+    {"id": "research_lab", "name": "Research Lab",  "crew_deck": "medical", "deck_number": 3, "position": [4, 2], "connections": ["quarantine_a"]},
+
+    {"id": "ward_a",       "name": "Ward A",        "crew_deck": "medical", "deck_number": 4, "position": [0, 3], "connections": ["ward_b", "triage", "surgery", "engine_room"]},
+    {"id": "ward_b",       "name": "Ward B",        "crew_deck": "medical", "deck_number": 4, "position": [1, 3], "connections": ["ward_a", "quarantine_b"]},
+    {"id": "quarantine_b", "name": "Quarantine B",  "crew_deck": "medical", "deck_number": 4, "position": [2, 3], "connections": ["ward_b", "morgue"],
+     "quarantine_lockable": true, "tags": ["biohazard"]},
+    {"id": "triage",       "name": "Triage",        "crew_deck": "medical", "deck_number": 4, "position": [3, 3], "connections": ["ward_a", "morgue"]},
+    {"id": "morgue",       "name": "Morgue",        "crew_deck": "medical", "deck_number": 4, "position": [4, 3], "connections": ["quarantine_b", "triage"]},
+
+    {"id": "main_engineering", "name": "Main Engineering", "crew_deck": "engineering", "deck_number": 5, "position": [0, 4], "connections": ["engine_room"]},
+    {"id": "engine_room",      "name": "Engine Room",      "crew_deck": "engineering", "deck_number": 5, "position": [1, 4], "connections": ["main_engineering", "cargo_hold", "ward_a"]},
+    {"id": "cargo_hold",       "name": "Cargo Hold",       "crew_deck": "engineering", "deck_number": 5, "position": [2, 4], "connections": ["engine_room", "auxiliary_power"]},
+    {"id": "auxiliary_power",  "name": "Auxiliary Power",  "crew_deck": "engineering", "deck_number": 5, "position": [3, 4], "connections": ["cargo_hold"]}
+  ],
+  "system_rooms": {
+    "engines":       "engine_room",
+    "beams":         "combat_info",
+    "torpedoes":     "combat_info",
+    "shields":       "auxiliary_power",
+    "sensors":       "sensor_array",
+    "manoeuvring":   "bridge",
+    "flight_deck":   "cargo_hold",
+    "ecm_suite":     "comms_center",
+    "point_defence": "combat_info"
+  },
+  "deck_rooms": {
+    "1": ["bridge", "conn", "ready_room", "observation"],
+    "2": ["sensor_array", "science_lab", "comms_center", "combat_info"],
+    "3": ["medbay", "surgery", "quarantine_a", "pharmacy", "research_lab"],
+    "4": ["ward_a", "ward_b", "quarantine_b", "triage", "morgue"],
+    "5": ["main_engineering", "engine_room", "cargo_hold", "auxiliary_power"]
+  },
+  "boarding": {
+    "entry_points": ["cargo_hold"],
+    "objective_rooms": {
+      "bridge":   "bridge",
+      "reactor":  "engine_room",
+      "medical":  "medbay",
+      "cargo":    "cargo_hold",
+      "sabotage": "auxiliary_power"
+    },
+    "marine_default_positions": ["conn", "engine_room"],
+    "repair_base_room": "main_engineering"
+  }
+}

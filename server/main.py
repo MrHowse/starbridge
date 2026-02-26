@@ -657,7 +657,7 @@ async def resume_game(save_id: str) -> dict:
     except FileNotFoundError:
         mission_data = {}
     sig = mission_data.get("signal_location")
-    default_interior = _make_default_interior()
+    default_interior = _make_default_interior(ship_class)
     interior_layout = {
         room_id: {
             "name": room.name,

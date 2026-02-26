@@ -59,13 +59,17 @@ def reset() -> None:
 
 def init(ship: Ship,
          crew_member_ids: list[str] | None = None,
-         power_grid_config: dict | None = None) -> None:
+         power_grid_config: dict | None = None,
+         system_rooms: dict[str, str] | None = None,
+         repair_base_room: str | None = None) -> None:
     """Initialise engineering subsystems for a new game.
 
     Args:
         ship: The player ship (systems read for initial power levels).
         crew_member_ids: Crew IDs to form repair teams from.
         power_grid_config: Optional ship-class power_grid JSON section.
+        system_rooms: Per-ship-class system->room mapping for repair dispatch.
+        repair_base_room: Per-ship-class base room for repair teams.
     """
     global _power_grid, _repair_mgr, _damage_model
     global _requested_power, _rng, _tick_count
@@ -75,7 +79,11 @@ def init(ship: Ship,
     else:
         _power_grid = PowerGrid()
 
-    _repair_mgr = RepairTeamManager.create_teams(crew_member_ids or [])
+    _repair_mgr = RepairTeamManager.create_teams(
+        crew_member_ids or [],
+        system_rooms=system_rooms,
+        base_room=repair_base_room or "main_engineering",
+    )
     _damage_model = DamageModel.create_default()
 
     # Seed requested power from ship's current levels.

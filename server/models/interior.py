@@ -5,14 +5,22 @@ Defines the physical layout of the ship as a graph of rooms. Used by
 Engineering (repair routing), Medical (crew location), and Security
 (marine deployment) in v0.02+.
 
-The static 5-deck, 20-room layout is defined in make_default_interior().
+v0.07-4.2: Per-ship-class interior layouts loaded from interiors/*.json.
 """
 from __future__ import annotations
 
+import json
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from server.models.security import Intruder, MarineSquad
+
+# Directory containing interior JSON definitions.
+_INTERIORS_DIR = Path(__file__).resolve().parent.parent.parent / "interiors"
+
+# Cache of parsed interior data (ship_class -> dict).
+_interior_cache: dict[str, dict] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +39,11 @@ class Room:
     connections: list[str]     # IDs of adjacent connected rooms
     state: str = "normal"      # "normal" | "damaged" | "decompressed" | "fire" | "hostile"
     door_sealed: bool = False  # Whether the room's entry door is sealed
+    # v0.07-4.2: Per-ship-class fields
+    deck_number: int = 0                                       # Physical deck number (1-based)
+    marine_only_connections: list[str] = field(default_factory=list)  # Corvette secret tunnels
+    quarantine_lockable: bool = False                          # Medical ship biohazard rooms
+    tags: list[str] = field(default_factory=list)              # Flexible labels
 
 
 # ---------------------------------------------------------------------------
@@ -53,6 +66,7 @@ class ShipInterior:
         from_id: str,
         to_id: str,
         ignore_sealed: bool = False,
+        use_marine_tunnels: bool = False,
     ) -> list[str]:
         """BFS shortest path between two rooms.
 
@@ -60,6 +74,9 @@ class ShipInterior:
         Returns empty list if no path exists or rooms are unknown.
         Sealed rooms and decompressed rooms block traversal unless
         *ignore_sealed* is True (used by boarding parties that breach doors).
+
+        *use_marine_tunnels* includes marine_only_connections in the graph
+        (corvette secret tunnels that marines can use but intruders can't).
         """
         if from_id not in self.rooms or to_id not in self.rooms:
             return []
@@ -74,7 +91,11 @@ class ShipInterior:
             current_id = path[-1]
             room = self.rooms[current_id]
 
-            for next_id in room.connections:
+            neighbors = list(room.connections)
+            if use_marine_tunnels:
+                neighbors.extend(room.marine_only_connections)
+
+            for next_id in neighbors:
                 if next_id in visited:
                     continue
                 next_room = self.rooms.get(next_id)
@@ -94,93 +115,104 @@ class ShipInterior:
 
 
 # ---------------------------------------------------------------------------
-# Static ship layout (5 decks, 20 rooms)
+# JSON Loading & Caching
 # ---------------------------------------------------------------------------
 
 
-def make_default_interior() -> ShipInterior:
-    """Return the standard TSS Endeavour interior layout.
+def _load_interior_data(ship_class: str) -> dict:
+    """Load and cache interior JSON for a ship class."""
+    if ship_class in _interior_cache:
+        return _interior_cache[ship_class]
 
-    Layout — 5 physical decks, 4 rooms each, 20 rooms total:
+    path = _INTERIORS_DIR / f"{ship_class}.json"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"No interior layout for ship class '{ship_class}': {path}"
+        )
 
-      Deck 1 — Bridge      (crew: bridge)      bridge, conn, ready_room, observation
-      Deck 2 — Operations  (crew: sensors)     sensor_array, science_lab, comms_center, astrometrics
-      Deck 3 — Combat      (crew: weapons/shields) weapons_bay, torpedo_room, shields_control, combat_info
-      Deck 4 — Medical     (crew: medical)     medbay, surgery, quarantine, pharmacy
-      Deck 5 — Engineering (crew: engineering) main_engineering, engine_room, auxiliary_power, cargo_hold
+    with path.open(encoding="utf-8") as fh:
+        data = json.load(fh)
 
-    Horizontal connections: rooms on the same physical deck connect left→right.
-    Vertical corridor at column 1: conn → science_lab → torpedo_room → surgery → engine_room.
-    """
-    rooms: dict[str, Room] = {
-        # ---- Deck 1: Bridge ----
-        "bridge":      Room("bridge",      "Bridge",             "bridge",      (0, 0),
-                            ["conn"]),
-        "conn":        Room("conn",        "Conn",               "bridge",      (1, 0),
-                            ["bridge", "ready_room", "science_lab"]),
-        "ready_room":  Room("ready_room",  "Ready Room",         "bridge",      (2, 0),
-                            ["conn", "observation"]),
-        "observation": Room("observation", "Observation Lounge", "bridge",      (3, 0),
-                            ["ready_room"]),
+    _interior_cache[ship_class] = data
+    return data
 
-        # ---- Deck 2: Operations ----
-        "sensor_array":  Room("sensor_array",  "Sensor Array",  "sensors", (0, 1),
-                              ["science_lab"]),
-        "science_lab":   Room("science_lab",   "Science Lab",   "sensors", (1, 1),
-                              ["sensor_array", "comms_center", "conn", "torpedo_room"]),
-        "comms_center":  Room("comms_center",  "Comms Center",  "sensors", (2, 1),
-                              ["science_lab", "astrometrics"]),
-        "astrometrics":  Room("astrometrics",  "Astrometrics",  "sensors", (3, 1),
-                              ["comms_center"]),
 
-        # ---- Deck 3: Combat (weapons bay + torpedo room belong to weapons crew deck;
-        #              shields control + combat info belong to shields crew deck) ----
-        "weapons_bay":     Room("weapons_bay",     "Weapons Bay",     "weapons", (0, 2),
-                               ["torpedo_room"]),
-        "torpedo_room":    Room("torpedo_room",    "Torpedo Room",    "weapons", (1, 2),
-                               ["weapons_bay", "shields_control", "science_lab", "surgery"]),
-        "shields_control": Room("shields_control", "Shields Control", "shields", (2, 2),
-                               ["torpedo_room", "combat_info"]),
-        "combat_info":     Room("combat_info",     "Combat Info Ctr", "shields", (3, 2),
-                               ["shields_control"]),
+def clear_cache() -> None:
+    """Clear the interior data cache (for testing)."""
+    _interior_cache.clear()
 
-        # ---- Deck 4: Medical ----
-        "medbay":     Room("medbay",     "Medbay",     "medical", (0, 3),
-                           ["surgery"]),
-        "surgery":    Room("surgery",    "Surgery",    "medical", (1, 3),
-                           ["medbay", "quarantine", "torpedo_room", "engine_room"]),
-        "quarantine": Room("quarantine", "Quarantine", "medical", (2, 3),
-                           ["surgery", "pharmacy"]),
-        "pharmacy":   Room("pharmacy",   "Pharmacy",   "medical", (3, 3),
-                           ["quarantine"]),
 
-        # ---- Deck 5: Engineering ----
-        "main_engineering": Room("main_engineering", "Main Engineering", "engineering", (0, 4),
-                                 ["engine_room"]),
-        "engine_room":      Room("engine_room",      "Engine Room",      "engineering", (1, 4),
-                                 ["main_engineering", "auxiliary_power", "surgery"]),
-        "auxiliary_power":  Room("auxiliary_power",  "Auxiliary Power",  "engineering", (2, 4),
-                                 ["engine_room", "cargo_hold"]),
-        "cargo_hold":       Room("cargo_hold",       "Cargo Hold",       "engineering", (3, 4),
-                                 ["auxiliary_power"]),
-    }
+def load_interior(ship_class: str) -> dict:
+    """Public accessor for raw interior data dict."""
+    return _load_interior_data(ship_class)
+
+
+def get_system_rooms(ship_class: str) -> dict[str, str]:
+    """Return system->room mapping for a ship class."""
+    data = _load_interior_data(ship_class)
+    return dict(data["system_rooms"])
+
+
+def get_deck_rooms(ship_class: str) -> dict[int, list[str]]:
+    """Return deck_number->room_id list mapping for a ship class."""
+    data = _load_interior_data(ship_class)
+    return {int(k): list(v) for k, v in data["deck_rooms"].items()}
+
+
+def get_boarding_config(ship_class: str) -> dict:
+    """Return boarding configuration for a ship class."""
+    data = _load_interior_data(ship_class)
+    return dict(data["boarding"])
+
+
+# ---------------------------------------------------------------------------
+# Interior construction
+# ---------------------------------------------------------------------------
+
+
+def _build_interior_from_data(data: dict) -> ShipInterior:
+    """Build a ShipInterior from parsed JSON data."""
+    rooms: dict[str, Room] = {}
+    for rd in data["rooms"]:
+        rooms[rd["id"]] = Room(
+            id=rd["id"],
+            name=rd["name"],
+            deck=rd["crew_deck"],
+            position=tuple(rd["position"]),
+            connections=list(rd["connections"]),
+            door_sealed=rd.get("default_sealed", False),
+            deck_number=rd.get("deck_number", 0),
+            marine_only_connections=list(rd.get("marine_only_connections", [])),
+            quarantine_lockable=rd.get("quarantine_lockable", False),
+            tags=list(rd.get("tags", [])),
+        )
     return ShipInterior(rooms=rooms)
+
+
+def make_default_interior(ship_class: str = "frigate") -> ShipInterior:
+    """Return the interior layout for a ship class.
+
+    Loads from interiors/{ship_class}.json. Defaults to frigate for
+    backward compatibility (existing callers pass no args).
+    """
+    data = _load_interior_data(ship_class)
+    return _build_interior_from_data(data)
 
 
 def make_station_interior(station_id: str) -> ShipInterior:
     """Return an 8-room interior layout for a hostile enemy station.
 
     Layout (sid = station_id prefix):
-      {sid}_command   — Command Centre  (0,0) — capture objective
-      {sid}_bay       — Fighter Bay     (2,0)
-      {sid}_corridor  — Main Corridor   (1,1)
-      {sid}_reactor   — Reactor Room    (0,1)
-      {sid}_armoury   — Armoury         (2,1)
-      {sid}_gen_a     — Generator Room A (1,2)
-      {sid}_gen_b     — Generator Room B (2,2)
-      {sid}_quarters  — Crew Quarters   (0,2) — garrison start
+      {sid}_command   -- Command Centre  (0,0) -- capture objective
+      {sid}_bay       -- Fighter Bay     (2,0)
+      {sid}_corridor  -- Main Corridor   (1,1)
+      {sid}_reactor   -- Reactor Room    (0,1)
+      {sid}_armoury   -- Armoury         (2,1)
+      {sid}_gen_a     -- Generator Room A (1,2)
+      {sid}_gen_b     -- Generator Room B (2,2)
+      {sid}_quarters  -- Crew Quarters   (0,2) -- garrison start
 
-    Vertical spine: command ↔ corridor ↔ gen_a
+    Vertical spine: command <-> corridor <-> gen_a
     Horizontal connections within each row.
     """
     s = station_id

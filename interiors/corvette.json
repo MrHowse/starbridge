@@ -1,0 +1,55 @@
+{
+  "id": "corvette",
+  "rooms": [
+    {"id": "bridge",      "name": "Bridge",      "crew_deck": "bridge",  "deck_number": 1, "position": [0, 0], "connections": ["conn"]},
+    {"id": "conn",        "name": "Conn",        "crew_deck": "bridge",  "deck_number": 1, "position": [1, 0], "connections": ["bridge", "ready_room", "science_lab"],
+     "marine_only_connections": ["shields_control"]},
+    {"id": "ready_room",  "name": "Ready Room",  "crew_deck": "bridge",  "deck_number": 1, "position": [2, 0], "connections": ["conn", "observation"]},
+    {"id": "observation", "name": "Observation",  "crew_deck": "bridge", "deck_number": 1, "position": [3, 0], "connections": ["ready_room"]},
+
+    {"id": "sensor_array", "name": "Sensor Array", "crew_deck": "sensors", "deck_number": 2, "position": [0, 1], "connections": ["science_lab"]},
+    {"id": "science_lab",  "name": "Science Lab",  "crew_deck": "sensors", "deck_number": 2, "position": [1, 1], "connections": ["sensor_array", "comms_center", "conn", "torpedo_room"],
+     "marine_only_connections": ["engine_room"]},
+    {"id": "comms_center", "name": "Comms Center",  "crew_deck": "sensors", "deck_number": 2, "position": [2, 1], "connections": ["science_lab", "combat_info"]},
+    {"id": "combat_info",  "name": "Combat Info Ctr", "crew_deck": "sensors", "deck_number": 2, "position": [3, 1], "connections": ["comms_center"]},
+
+    {"id": "weapons_bay",     "name": "Weapons Bay",     "crew_deck": "weapons", "deck_number": 3, "position": [0, 2], "connections": ["torpedo_room"]},
+    {"id": "torpedo_room",    "name": "Torpedo Room",    "crew_deck": "weapons", "deck_number": 3, "position": [1, 2], "connections": ["weapons_bay", "shields_control", "science_lab", "engine_room"]},
+    {"id": "shields_control", "name": "Shields Control", "crew_deck": "weapons", "deck_number": 3, "position": [2, 2], "connections": ["torpedo_room", "armoury"]},
+    {"id": "armoury",         "name": "Armoury",          "crew_deck": "weapons", "deck_number": 3, "position": [3, 2], "connections": ["shields_control"]},
+
+    {"id": "main_engineering", "name": "Main Engineering", "crew_deck": "engineering", "deck_number": 4, "position": [0, 3], "connections": ["engine_room"]},
+    {"id": "engine_room",      "name": "Engine Room",      "crew_deck": "engineering", "deck_number": 4, "position": [1, 3], "connections": ["main_engineering", "cargo_hold", "torpedo_room"]},
+    {"id": "cargo_hold",       "name": "Cargo Hold",       "crew_deck": "engineering", "deck_number": 4, "position": [2, 3], "connections": ["engine_room", "medbay"]},
+    {"id": "medbay",           "name": "Medbay",           "crew_deck": "medical",     "deck_number": 4, "position": [3, 3], "connections": ["cargo_hold"]}
+  ],
+  "system_rooms": {
+    "engines":       "engine_room",
+    "beams":         "weapons_bay",
+    "torpedoes":     "torpedo_room",
+    "shields":       "shields_control",
+    "sensors":       "sensor_array",
+    "manoeuvring":   "bridge",
+    "flight_deck":   "cargo_hold",
+    "ecm_suite":     "comms_center",
+    "point_defence": "combat_info"
+  },
+  "deck_rooms": {
+    "1": ["bridge", "conn", "ready_room", "observation"],
+    "2": ["sensor_array", "science_lab", "comms_center", "combat_info"],
+    "3": ["weapons_bay", "torpedo_room", "shields_control", "armoury"],
+    "4": ["main_engineering", "engine_room", "cargo_hold", "medbay"]
+  },
+  "boarding": {
+    "entry_points": ["cargo_hold"],
+    "objective_rooms": {
+      "bridge":   "bridge",
+      "reactor":  "engine_room",
+      "medical":  "medbay",
+      "cargo":    "cargo_hold",
+      "sabotage": "shields_control"
+    },
+    "marine_default_positions": ["conn", "engine_room"],
+    "repair_base_room": "main_engineering"
+  }
+}

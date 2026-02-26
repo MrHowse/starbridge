@@ -576,7 +576,7 @@ def restore_game(save_id: str, world: World) -> dict:
     tick_count = int(data.get("tick_count", 0))
 
     # Restore ship state in-place (world.ship is a reference to the live ship).
-    world.ship.interior = make_default_interior()  # rebuild rooms before restoring state
+    world.ship.interior = make_default_interior(ship_class)  # rebuild rooms before restoring state
     _deserialise_ship(data.get("ship", {}), world.ship)
 
     # Restore world entities (enemies, torpedoes, stations, asteroids, hazards).

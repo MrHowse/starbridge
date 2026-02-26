@@ -134,8 +134,9 @@ _quarantined_rooms: set[str] = set()     # room_ids under quarantine
 def reset() -> None:
     """Clear all boarding state. Called at game start."""
     global _boarding_active, _station_boarding_active, _station_boarding_interior
-    global _next_party_id, _ship_lockdown
+    global _next_party_id, _ship_lockdown, _active_deck_rooms
     _boarding_active = False
+    _active_deck_rooms = None
     _eliminated_reported.clear()
     _station_boarding_active = False
     _station_boarding_interior = None
@@ -850,7 +851,7 @@ def disengage_team(team_id: str) -> bool:
 # Ship security systems (v0.06.3 Part 5)
 # ---------------------------------------------------------------------------
 
-# Deck → room_id mapping for the default interior.
+# Deck → room_id mapping for the default (frigate) interior.
 DECK_ROOMS: dict[int, list[str]] = {
     1: ["bridge", "conn", "ready_room", "observation"],
     2: ["sensor_array", "science_lab", "comms_center", "astrometrics"],
@@ -858,6 +859,9 @@ DECK_ROOMS: dict[int, list[str]] = {
     4: ["medbay", "surgery", "quarantine", "pharmacy"],
     5: ["main_engineering", "engine_room", "auxiliary_power", "cargo_hold"],
 }
+
+# Per-ship-class override (set by init_interior_config).
+_active_deck_rooms: dict[int, list[str]] | None = None
 
 # Inter-deck corridor connections (vertical corridor rooms).
 DECK_CORRIDOR_PAIRS: list[tuple[str, str]] = [
@@ -868,9 +872,21 @@ DECK_CORRIDOR_PAIRS: list[tuple[str, str]] = [
 ]
 
 
+def init_interior_config(ship_class: str) -> None:
+    """Load per-ship-class deck rooms. Call at game start after reset()."""
+    global _active_deck_rooms
+    from server.models.interior import get_deck_rooms
+    _active_deck_rooms = get_deck_rooms(ship_class)
+
+
+def _get_deck_rooms() -> dict[int, list[str]]:
+    """Return active deck rooms (class-specific if initialised, else frigate default)."""
+    return _active_deck_rooms if _active_deck_rooms is not None else DECK_ROOMS
+
+
 def _room_deck(room_id: str) -> int:
     """Return the deck number for a room_id, or 0 if unknown."""
-    for deck, rooms in DECK_ROOMS.items():
+    for deck, rooms in _get_deck_rooms().items():
         if room_id in rooms:
             return deck
     return 0
@@ -903,7 +919,7 @@ def unlock_door(interior: ShipInterior, room_id: str) -> bool:
 
 def lockdown_deck(interior: ShipInterior, deck: int) -> int:
     """Lock all doors on a deck. Returns count of doors locked."""
-    rooms = DECK_ROOMS.get(deck, [])
+    rooms = _get_deck_rooms().get(deck, [])
     count = 0
     for rid in rooms:
         if rid in interior.rooms and rid not in _breached_doors:
@@ -916,7 +932,7 @@ def lockdown_deck(interior: ShipInterior, deck: int) -> int:
 
 def lift_deck_lockdown(interior: ShipInterior, deck: int) -> int:
     """Unlock all doors on a deck. Returns count of doors unlocked."""
-    rooms = DECK_ROOMS.get(deck, [])
+    rooms = _get_deck_rooms().get(deck, [])
     count = 0
     for rid in rooms:
         if rid in interior.rooms and rid not in _breached_doors:
@@ -1068,7 +1084,7 @@ def set_deck_alert(deck: int, level: str) -> bool:
     """Set alert level for a deck. Returns False if invalid level."""
     if level not in ALERT_LEVELS:
         return False
-    if deck not in DECK_ROOMS:
+    if deck not in _get_deck_rooms():
         return False
     _deck_alerts[deck] = level
     return True

@@ -1,0 +1,45 @@
+{
+  "id": "scout",
+  "rooms": [
+    {"id": "bridge",          "name": "Bridge",          "crew_deck": "bridge",      "deck_number": 1, "position": [0, 0], "connections": ["conn"]},
+    {"id": "conn",            "name": "Conn",            "crew_deck": "bridge",      "deck_number": 1, "position": [1, 0], "connections": ["bridge", "sensor_array", "comms_center"]},
+    {"id": "sensor_array",    "name": "Sensor Array",    "crew_deck": "sensors",     "deck_number": 1, "position": [2, 0], "connections": ["conn", "shields_control"]},
+
+    {"id": "comms_center",    "name": "Comms Center",    "crew_deck": "sensors",     "deck_number": 2, "position": [0, 1], "connections": ["weapons_bay", "conn", "engine_room"]},
+    {"id": "weapons_bay",     "name": "Weapons Bay",     "crew_deck": "weapons",     "deck_number": 2, "position": [1, 1], "connections": ["comms_center", "shields_control", "main_engineering"]},
+    {"id": "shields_control", "name": "Shields Control",  "crew_deck": "weapons",    "deck_number": 2, "position": [2, 1], "connections": ["weapons_bay", "sensor_array", "cargo_hold"]},
+
+    {"id": "engine_room",      "name": "Engine Room",      "crew_deck": "engineering", "deck_number": 3, "position": [0, 2], "connections": ["main_engineering", "comms_center"]},
+    {"id": "main_engineering", "name": "Main Engineering", "crew_deck": "engineering", "deck_number": 3, "position": [1, 2], "connections": ["engine_room", "cargo_hold", "weapons_bay"]},
+    {"id": "cargo_hold",       "name": "Cargo Hold",       "crew_deck": "engineering", "deck_number": 3, "position": [2, 2], "connections": ["main_engineering", "medbay", "shields_control"]},
+    {"id": "medbay",           "name": "Medbay",           "crew_deck": "medical",     "deck_number": 3, "position": [3, 2], "connections": ["cargo_hold"]}
+  ],
+  "system_rooms": {
+    "engines":       "engine_room",
+    "beams":         "weapons_bay",
+    "torpedoes":     "weapons_bay",
+    "shields":       "shields_control",
+    "sensors":       "sensor_array",
+    "manoeuvring":   "bridge",
+    "flight_deck":   "cargo_hold",
+    "ecm_suite":     "comms_center",
+    "point_defence": "shields_control"
+  },
+  "deck_rooms": {
+    "1": ["bridge", "conn", "sensor_array"],
+    "2": ["comms_center", "weapons_bay", "shields_control"],
+    "3": ["engine_room", "main_engineering", "cargo_hold", "medbay"]
+  },
+  "boarding": {
+    "entry_points": ["cargo_hold"],
+    "objective_rooms": {
+      "bridge":   "bridge",
+      "reactor":  "engine_room",
+      "medical":  "medbay",
+      "cargo":    "cargo_hold",
+      "sabotage": "shields_control"
+    },
+    "marine_default_positions": ["conn", "main_engineering"],
+    "repair_base_room": "main_engineering"
+  }
+}

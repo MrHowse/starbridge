@@ -230,32 +230,45 @@ def generate_boarding_party(
     rng: _random.Random | None = None,
     objective_override: str | None = None,
     interior: object | None = None,
+    boarding_config: dict | None = None,
 ) -> BoardingParty:
     """Create a new boarding party.
 
     *difficulty_scale* multiplies the member count (1.0 = normal).
     *interior* if provided, calculates the path from entry to objective.
+    *boarding_config* overrides objective_rooms and deck mapping (per ship class).
     """
     if rng is None:
         rng = _random.Random()
 
+    # Use class-specific objective rooms if provided.
+    obj_rooms = OBJECTIVE_ROOMS
+    if boarding_config and "objective_rooms" in boarding_config:
+        obj_rooms = boarding_config["objective_rooms"]
+
     # Determine objective
     objective = objective_override or select_objective(entry_point, rng)
-    objective_room = OBJECTIVE_ROOMS.get(objective, "bridge")
+    objective_room = obj_rooms.get(objective, "bridge")
 
     # Determine size
     base_size = rng.randint(MIN_BOARDING_SIZE, MAX_BOARDING_SIZE)
     size = max(MIN_BOARDING_SIZE, round(base_size * difficulty_scale))
 
-    # Entry deck (infer from room if possible)
-    deck_map = {
+    # Entry deck: use interior room.deck_number if available, else fallback map.
+    _fallback_deck_map = {
         "bridge": 1, "conn": 1, "ready_room": 1, "observation": 1,
         "sensor_array": 2, "science_lab": 2, "comms_center": 2, "astrometrics": 2,
         "weapons_bay": 3, "torpedo_room": 3, "shields_control": 3, "combat_info": 3,
         "medbay": 4, "surgery": 4, "quarantine": 4, "pharmacy": 4,
         "main_engineering": 5, "engine_room": 5, "auxiliary_power": 5, "cargo_hold": 5,
     }
-    entry_deck = deck_map.get(entry_point, 5)
+    if interior is not None and hasattr(interior, "rooms"):
+        room_obj = interior.rooms.get(entry_point)  # type: ignore[union-attr]
+        entry_deck = getattr(room_obj, "deck_number", 0) if room_obj else 0
+        if entry_deck == 0:
+            entry_deck = _fallback_deck_map.get(entry_point, 5)
+    else:
+        entry_deck = _fallback_deck_map.get(entry_point, 5)
 
     # Calculate path if interior available
     path: list[str] = []

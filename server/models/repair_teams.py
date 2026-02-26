@@ -131,18 +131,25 @@ class RepairTeamManager:
     teams: dict[str, RepairTeam] = field(default_factory=dict)
     order_queue: list[dict] = field(default_factory=list)
     _next_order_id: int = 0
+    _system_rooms: dict[str, str] | None = field(default=None, repr=False)
 
     # ---- Factory ----
 
     @classmethod
     def create_teams(cls, crew_member_ids: list[str],
-                     team_size: int = DEFAULT_TEAM_SIZE) -> RepairTeamManager:
+                     team_size: int = DEFAULT_TEAM_SIZE,
+                     base_room: str = BASE_ROOM,
+                     system_rooms: dict[str, str] | None = None,
+                     ) -> RepairTeamManager:
         """Form repair teams from a list of crew member IDs.
 
         Creates as many teams of team_size as possible (up to 4).
         Extra crew are distributed round-robin to existing teams.
+
+        *base_room* overrides the default starting/return room for teams.
+        *system_rooms* overrides the system->room mapping for dispatch.
         """
-        mgr = cls()
+        mgr = cls(_system_rooms=system_rooms)
         if not crew_member_ids:
             return mgr
 
@@ -160,6 +167,8 @@ class RepairTeamManager:
                 name=f"{TEAM_NAMES[i]} Team",
                 member_ids=list(members),
                 size=len(members),
+                room_id=base_room,
+                base_room=base_room,
             )
             mgr.teams[team.id] = team
 
@@ -186,7 +195,7 @@ class RepairTeamManager:
         if team is None or team.is_eliminated:
             return False
 
-        target_room = SYSTEM_ROOMS.get(system)
+        target_room = (self._system_rooms or SYSTEM_ROOMS).get(system)
         if target_room is None or target_room not in interior.rooms:
             return False
 

@@ -502,6 +502,7 @@ async def start(
         _base_med = glmed.get_supplies()
         glmed.set_supplies(round(_base_med * _diff_preset.medical_supply_multiplier, 1))
     gls.reset()
+    gls.init_interior_config(sc.id)
     glco.reset()
     glcap.reset()
     gldc.reset()
@@ -604,7 +605,7 @@ async def start(
         setattr(_world.ship.shields, _facing, _world.ship.shield_capacity * _frac)
     _world.ship.docked_at = None
     _world.ship.crew = CrewRoster()
-    _world.ship.interior = make_default_interior()
+    _world.ship.interior = make_default_interior(sc.id)
     _world.ship.difficulty = _diff_preset
 
     # v0.07 §2.3: Apply equipment modules (stat changes to ship).
@@ -658,8 +659,15 @@ async def start(
     for _dk_name, _dk in _world.ship.crew.decks.items():
         for _ci in range(_dk.total):
             _crew_ids.append(f"{_dk_name}_{_ci}")
+    # v0.07 §4.2: Per-ship-class system rooms and repair base.
+    from server.models.interior import get_system_rooms, get_boarding_config
+    _int_sys_rooms = get_system_rooms(sc.id)
+    _int_boarding = get_boarding_config(sc.id)
+    _int_base_room = _int_boarding.get("repair_base_room", "main_engineering")
     gle.init(_world.ship, crew_member_ids=_crew_ids,
-             power_grid_config=sc.power_grid)
+             power_grid_config=sc.power_grid,
+             system_rooms=_int_sys_rooms,
+             repair_base_room=_int_base_room)
 
     # v0.07 §3.3: Apply power profile to ship systems and power grid.
     if _loadout_config:
