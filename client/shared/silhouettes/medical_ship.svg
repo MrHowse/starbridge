@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <g fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linejoin="round">
+    <!-- Rounded, non-threatening hull profile -->
+    <ellipse cx="100" cy="52" rx="48" ry="42"/>
+    <!-- Bridge dome (smooth) -->
+    <ellipse cx="100" cy="18" rx="18" ry="10"/>
+    <!-- Red cross marking -->
+    <line x1="100" y1="38" x2="100" y2="66" stroke="#ff4040" stroke-width="2"/>
+    <line x1="86" y1="52" x2="114" y2="52" stroke="#ff4040" stroke-width="2"/>
+    <!-- Sensor arrays (for life-sign detection) -->
+    <circle cx="60" cy="35" r="4"/>
+    <circle cx="140" cy="35" r="4"/>
+    <!-- Engine pods (lighter, quieter) -->
+    <ellipse cx="82" cy="88" rx="8" ry="4"/>
+    <ellipse cx="118" cy="88" rx="8" ry="4"/>
+    <!-- Docking collar (ambulance bay) -->
+    <rect x="92" y="90" width="16" height="6" rx="3"/>
+  </g>
+</svg>

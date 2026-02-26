@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <g fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linejoin="round">
+    <!-- Large hull with prominent bridge -->
+    <polygon points="100,3 75,20 62,40 55,60 58,80 75,92 100,97 125,92 142,80 145,60 138,40 125,20"/>
+    <!-- Prominent bridge section -->
+    <rect x="82" y="10" width="36" height="16" rx="4"/>
+    <line x1="88" y1="10" x2="88" y2="26"/>
+    <line x1="112" y1="10" x2="112" y2="26"/>
+    <!-- Multiple weapon turrets -->
+    <circle cx="60" cy="45" r="4"/>
+    <circle cx="140" cy="45" r="4"/>
+    <circle cx="62" cy="65" r="3"/>
+    <circle cx="138" cy="65" r="3"/>
+    <!-- Flag bridge antenna -->
+    <line x1="100" y1="3" x2="100" y2="-2"/>
+    <!-- Engine array -->
+    <rect x="72" y="88" width="14" height="7" rx="2"/>
+    <rect x="92" y="90" width="16" height="5" rx="2"/>
+    <rect x="114" y="88" width="14" height="7" rx="2"/>
+  </g>
+</svg>

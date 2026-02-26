@@ -112,6 +112,9 @@ export class MapRenderer {
 
     // Meaningful range rings (beam/torpedo/sensor).
     this._rangeRingDefs = [];   // [{range, label, style}] in world units
+
+    // Ship silhouette (loaded SVG image).
+    this._shipSilhouetteImg = null;
   }
 
   // ── Public data API ────────────────────────────────────────────────────────
@@ -167,6 +170,19 @@ export class MapRenderer {
    */
   setRangeRings(defs) {
     this._rangeRingDefs = defs;
+  }
+
+  /**
+   * Load a ship-class silhouette SVG for the player ship icon.
+   * Falls back to chevron if the image fails to load.
+   * @param {string} shipClass — e.g. 'frigate', 'battleship'
+   */
+  loadShipSilhouette(shipClass) {
+    this._shipSilhouetteImg = null;
+    if (!shipClass) return;
+    const img = new Image();
+    img.src = `/client/shared/silhouettes/${shipClass}.svg`;
+    img.onload = () => { this._shipSilhouetteImg = img; };
   }
 
   // ── Damage overlay ─────────────────────────────────────────────────────────
@@ -306,12 +322,12 @@ export class MapRenderer {
       // Camera-override mode (e.g. sector view): draw ship as small icon at world position.
       const sp = this.worldToCanvas(shipWX, shipWY);
       if (sp.x >= -10 && sp.x <= cw + 10 && sp.y >= -10 && sp.y <= ch + 10) {
-        _drawShipChevron(ctx, sp.x, sp.y, headRad, 5, C_PRIMARY);
+        _drawShipIcon(ctx, sp.x, sp.y, headRad, 5, C_PRIMARY, this._shipSilhouetteImg);
       }
     } else {
-      // Default: ship chevron at canvas centre.
+      // Default: ship icon at canvas centre.
       const chevRot = isHeadingUp ? 0 : headRad;
-      _drawShipChevron(ctx, cw / 2, ch / 2, chevRot, 8, C_PRIMARY);
+      _drawShipIcon(ctx, cw / 2, ch / 2, chevRot, 8, C_PRIMARY, this._shipSilhouetteImg);
     }
 
     // Ship screen position for beam flash origin.
@@ -912,6 +928,24 @@ function _drawCommsOffScreenArrow(ctx, cw, ch, sx, sy, cc, shipState) {
     ctx.fillText(label, lx, ly - 6);
     ctx.restore();
   }
+}
+
+/**
+ * Draw the player ship icon — uses silhouette SVG if loaded, falls back to chevron.
+ */
+function _drawShipIcon(ctx, cx, cy, headingRad, halfSize, colour, silhouetteImg) {
+  if (silhouetteImg) {
+    const imgH = halfSize * 2.5;
+    const imgW = imgH * 2;  // SVGs are 200×100 (2:1 aspect)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(headingRad);
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(silhouetteImg, -imgW / 2, -imgH / 2, imgW, imgH);
+    ctx.restore();
+    return;
+  }
+  _drawShipChevron(ctx, cx, cy, headingRad, halfSize, colour);
 }
 
 function _drawShipChevron(ctx, cx, cy, headingRad, halfSize, colour) {

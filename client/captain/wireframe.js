@@ -117,6 +117,8 @@ let _alertLevel = 'green';
 let _hitFlash = { active: false, timer: 0, viewport: null };
 let _beamFlash = { active: false, timer: 0 };
 let _animHandle = null;
+let _shipSilhouetteImg = null;
+let _shipClass = '';
 
 // View mode + overlay toggles
 let _viewMode = 'quad';         // 'quad' | 'fore' | 'aft' | 'port' | 'starboard'
@@ -210,6 +212,19 @@ export function setSingleCanvas(canvas) {
 
 export function setHighlights(on) { _highlightsEnabled = on; }
 export function setLabels(on)     { _labelsEnabled     = on; }
+
+/**
+ * Load the ship-class silhouette SVG for viewport overlay.
+ * @param {string} shipClass — e.g. 'frigate', 'battleship'
+ */
+export function setShipClass(shipClass) {
+  _shipClass = shipClass || '';
+  _shipSilhouetteImg = null;
+  if (!shipClass) return;
+  const img = new Image();
+  img.src = `/client/shared/silhouettes/${shipClass}.svg`;
+  img.onload = () => { _shipSilhouetteImg = img; };
+}
 
 export function resizeViewports() {
   for (const [key, canvas] of Object.entries(_canvases)) {
@@ -330,6 +345,16 @@ function _drawViewport(vp, canvasOverride = null, ctxOverride = null) {
     ctx.font      = `bold 10px 'Courier New'`;
     ctx.textAlign = 'right';
     ctx.fillText(`${String(hdg).padStart(3,'0')}°`, W - 5, 4);
+  }
+
+  // Ship silhouette overlay (forward viewport only, bottom-right corner).
+  if (vp === 'forward' && _shipSilhouetteImg) {
+    const imgH = canvasOverride ? 36 : 24;
+    const imgW = imgH * 2;  // SVGs are 200×100 (2:1)
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.drawImage(_shipSilhouetteImg, W - imgW - 6, H - imgH - 6, imgW, imgH);
+    ctx.restore();
   }
 }
 

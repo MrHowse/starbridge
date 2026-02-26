@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <g fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linejoin="round">
+    <!-- Sleek, narrow triangular hull with forward-swept wings -->
+    <polygon points="100,5 85,50 70,65 60,85 80,75 100,95 120,75 140,85 130,65 115,50"/>
+    <!-- Cockpit canopy -->
+    <ellipse cx="100" cy="25" rx="6" ry="10"/>
+    <!-- Engine nacelles -->
+    <line x1="75" y1="70" x2="70" y2="85"/>
+    <line x1="125" y1="70" x2="130" y2="85"/>
+    <!-- Wing struts -->
+    <line x1="85" y1="50" x2="65" y2="60"/>
+    <line x1="115" y1="50" x2="135" y2="60"/>
+  </g>
+</svg>

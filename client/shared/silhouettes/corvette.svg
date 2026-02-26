@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <g fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linejoin="round">
+    <!-- Compact hull with antenna arrays -->
+    <polygon points="100,8 80,35 70,55 65,80 85,85 100,90 115,85 135,80 130,55 120,35"/>
+    <!-- Sensor dome (top) -->
+    <circle cx="100" cy="20" r="8"/>
+    <!-- ECM antenna arrays -->
+    <line x1="70" y1="40" x2="50" y2="35"/>
+    <line x1="50" y1="35" x2="45" y2="30"/>
+    <line x1="130" y1="40" x2="150" y2="35"/>
+    <line x1="150" y1="35" x2="155" y2="30"/>
+    <!-- Side antenna spurs -->
+    <line x1="65" y1="60" x2="50" y2="55"/>
+    <line x1="135" y1="60" x2="150" y2="55"/>
+    <!-- Engine block -->
+    <rect x="88" y="82" width="24" height="8" rx="2"/>
+  </g>
+</svg>

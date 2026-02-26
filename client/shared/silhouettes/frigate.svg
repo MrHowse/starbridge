@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <g fill="none" stroke="#00ff41" stroke-width="1.5" stroke-linejoin="round">
+    <!-- Clean symmetrical medium hull -->
+    <polygon points="100,5 80,25 72,45 68,70 75,88 100,95 125,88 132,70 128,45 120,25"/>
+    <!-- Bridge section -->
+    <rect x="90" y="15" width="20" height="12" rx="3"/>
+    <!-- Weapon mounts (port/starboard) -->
+    <rect x="62" y="42" width="8" height="5" rx="1"/>
+    <rect x="130" y="42" width="8" height="5" rx="1"/>
+    <!-- Module bays (aft) -->
+    <rect x="78" y="62" width="18" height="8" rx="2"/>
+    <rect x="104" y="62" width="18" height="8" rx="2"/>
+    <!-- Engine nacelles -->
+    <rect x="78" y="85" width="10" height="8" rx="2"/>
+    <rect x="112" y="85" width="10" height="8" rx="2"/>
+  </g>
+</svg>
