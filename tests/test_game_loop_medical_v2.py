@@ -467,14 +467,17 @@ def test_treatment_consumes_supplies():
     roster = setup_medical()
     glmed.set_supplies(100.0)
     member = make_member()
-    inj = make_injury_obj(treatment_type="surgery")
+    inj = make_injury_obj(treatment_type="surgery")  # severity="moderate"
     member.injuries.append(inj)
     member.update_status()
     roster.members[member.id] = member
 
     glmed.admit_patient(member.id)
     glmed.start_crew_treatment(member.id, inj.id, "surgery")
-    assert glmed.get_supplies() == pytest.approx(100.0 - TREATMENT_SUPPLY_COSTS["surgery"])
+    # v0.07 §6.1.1.3: Cost is now severity-based (moderate=3.0), not treatment-type.
+    from server.models.injuries import SEVERITY_SUPPLY_COSTS
+    expected_cost = SEVERITY_SUPPLY_COSTS.get(inj.severity, TREATMENT_SUPPLY_COSTS["surgery"])
+    assert glmed.get_supplies() == pytest.approx(100.0 - expected_cost)
 
 
 def test_cannot_treat_at_zero_supplies():

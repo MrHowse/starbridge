@@ -317,6 +317,38 @@ def rush_turnaround(drone_id: str, skip: list[str] | None = None) -> bool:
     return _flight_deck.rush_turnaround(drone_id, skip)
 
 
+# v0.07 §6.1.1.6: Drone replacement cost.
+DRONE_REPLACEMENT_COST: float = 5.0  # DPU per replacement
+
+
+def replace_drone(drone_id: str, resources: object | None = None) -> dict:
+    """Replace a destroyed drone. Costs 5 DPU.
+
+    Returns {success: bool, message: str}.
+    """
+    drone = get_drone_by_id(drone_id)
+    if drone is None:
+        return {"success": False, "message": "Unknown drone"}
+    if drone.status != "destroyed":
+        return {"success": False, "message": "Drone not destroyed"}
+
+    # Check DPU availability.
+    if resources is not None and hasattr(resources, "consume"):
+        parts_avail = getattr(resources, "drone_parts", 0.0)
+        if parts_avail < DRONE_REPLACEMENT_COST:
+            return {"success": False, "message": "Insufficient drone parts"}
+        resources.consume("drone_parts", DRONE_REPLACEMENT_COST)
+    elif resources is not None:
+        return {"success": False, "message": "Insufficient drone parts"}
+
+    # Restore drone to hangar at full health/fuel.
+    drone.status = "hangar"
+    drone.hull = drone.max_hull
+    drone.fuel = 100.0
+    drone.ammo = 100.0 if drone.drone_type == "combat" else drone.ammo
+    return {"success": True, "message": f"Drone {drone.callsign} replaced"}
+
+
 def deploy_decoy_cmd(direction: float, ship: Ship) -> bool:
     """Launch a decoy in the given direction."""
     global _decoy_stock, _decoy_counter
@@ -429,7 +461,7 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
     )
 
     # 1. Process launch queue → tubes → active.
-    events.extend(_tick_launches(ship, dt, in_combat=in_combat))
+    events.extend(_tick_launches(ship, dt, in_combat=in_combat, resources=resources))
 
     # 2. Process recovery queue → landing → hangar.
     events.extend(_tick_recoveries(ship, dt))
@@ -601,7 +633,8 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
 # ---------------------------------------------------------------------------
 
 
-def _tick_launches(ship: Ship, dt: float, in_combat: bool = False) -> list[dict]:
+def _tick_launches(ship: Ship, dt: float, in_combat: bool = False,
+                   resources: object | None = None) -> list[dict]:
     """Process launch queue, tubes, and retry delays."""
     events: list[dict] = []
     fd = _flight_deck
@@ -675,6 +708,24 @@ def _tick_launches(ship: Ship, dt: float, in_combat: bool = False) -> list[dict]
             # Re-queue after retry delay (5s).
             _retry_delays[drone_id] = LAUNCH_RETRY_DELAY
             continue
+
+        # v0.07 §6.1.1.5: Consume drone fuel from ResourceStore on launch.
+        # At 0 DFU: launch blocked.
+        if resources is not None and hasattr(resources, "is_depleted"):
+            if resources.is_depleted("drone_fuel"):
+                drone.status = "hangar"
+                events.append({
+                    "type": "launch_blocked",
+                    "drone_id": drone_id,
+                    "callsign": drone.callsign,
+                    "reason": "no_drone_fuel",
+                })
+                continue
+            # Consume fuel for initial launch (drone's full fuel tank from ship reserves).
+            fuel_needed = 100.0 - drone.fuel
+            if fuel_needed > 0 and hasattr(resources, "consume"):
+                consumed = resources.consume("drone_fuel", fuel_needed)
+                drone.fuel += consumed
 
         # Successful launch.
         drone.status = "active"

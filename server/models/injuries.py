@@ -52,7 +52,7 @@ SEVERITY_PROGRESSION: dict[str, str] = {
     "serious":  "critical",
 }
 
-# Treatment supply costs (percentage of medical supply)
+# Treatment supply costs (by treatment type — fallback)
 TREATMENT_SUPPLY_COSTS: dict[str, float] = {
     "first_aid":         2.0,
     "stabilise":         3.0,
@@ -60,6 +60,14 @@ TREATMENT_SUPPLY_COSTS: dict[str, float] = {
     "intensive_care":    10.0,
     "quarantine":        5.0,
     "surgical_theatre":  15.0,
+}
+
+# v0.07 §6.1.1.3: Severity-based MSU costs (primary cost lookup).
+SEVERITY_SUPPLY_COSTS: dict[str, float] = {
+    "minor":    1.0,
+    "moderate": 3.0,
+    "serious":  5.0,
+    "critical": 8.0,
 }
 
 # Contagion spread interval and chance

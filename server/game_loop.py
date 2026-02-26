@@ -862,12 +862,22 @@ async def _loop() -> None:
             ) * _world.ship.fuel_multiplier * _world.ship.difficulty.fuel_consumption_multiplier * TICK_DT
             _res.consume("fuel", _fuel_burn)
             if _res.fuel <= 0:
-                # Reactor shutdown — all systems offline, ship adrift.
-                for _sys in _world.ship.systems.values():
-                    _sys._captain_offline = True
+                # Reactor shutdown — ship adrift.
+                # v0.07 §6.1.4.2: Emergency battery keeps sensors (life support)
+                # at minimal power. All other systems go offline.
+                _EMERGENCY_BATTERY_SYSTEMS = {"sensors"}
+                for _sname, _sys in _world.ship.systems.items():
+                    if _sname in _EMERGENCY_BATTERY_SYSTEMS:
+                        _sys.power = 25.0  # minimal emergency power
+                    else:
+                        _sys._captain_offline = True
                 _world.ship.throttle = 0.0
                 await _manager.broadcast(
-                    Message.build("ship.reactor_shutdown", {"reason": "fuel_depleted"})
+                    Message.build("ship.reactor_shutdown", {
+                        "reason": "fuel_depleted",
+                        "emergency_battery": True,
+                        "emergency_systems": list(_EMERGENCY_BATTERY_SYSTEMS),
+                    })
                 )
 
         if _res.provisions_max > 0:
@@ -963,6 +973,10 @@ async def _loop() -> None:
         _reassignment_roster = glmed.get_roster()
         _reassignment_events = _reassignment_roster.tick_reassignments(TICK_DT) if _reassignment_roster else []
         _world.ship.update_crew_factors(individual_roster=_reassignment_roster)
+        # v0.07 §6.1.1.8: Provisions depletion reduces crew factors across all systems.
+        if _res.provisions_crew_penalty > 0.0:
+            for _sys_obj in _world.ship.systems.values():
+                _sys_obj._crew_factor = max(0.05, _sys_obj._crew_factor * (1.0 - _res.provisions_crew_penalty))
         glj.apply_buffs(_world.ship)
         _crew_factor_events = _check_crew_factor_thresholds(_world.ship)
         glmed.tick_treatments(_world.ship, TICK_DT)

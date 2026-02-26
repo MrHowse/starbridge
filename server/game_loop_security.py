@@ -1476,6 +1476,10 @@ def _tick_room_combat(
         # Calculate combat power
         attacker_power = sum(p.combat_power for p in boarders)
         defender_power = sum(t.firepower * t.size for t in marines)
+        # v0.07 §6.1.1.7: At 0 AMU, marine firepower drops by 60%.
+        if resources is not None and hasattr(resources, "is_depleted") and resources.is_depleted("ammunition"):
+            from server.models.resources import AMMO_DEPLETED_FIREPOWER_PENALTY
+            defender_power *= (1.0 - AMMO_DEPLETED_FIREPOWER_PENALTY)
 
         if attacker_power <= 0 and defender_power <= 0:
             continue

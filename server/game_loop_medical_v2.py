@@ -47,6 +47,7 @@ from server.models.injuries import (
     CONTAGION_SPREAD_INTERVAL,
     CRITICAL_DEATH_TIMER,
     DEGRADE_TIMERS,
+    SEVERITY_SUPPLY_COSTS,
     TREATMENT_SUPPLY_COSTS,
     complete_treatment,
     generate_injuries,
@@ -322,8 +323,8 @@ def start_crew_treatment(
     if crew_id in _active_treatments:
         return {"success": False, "message": "Another treatment in progress"}
 
-    # Check supplies
-    cost = TREATMENT_SUPPLY_COSTS.get(treatment_type, 5.0)
+    # Check supplies — v0.07 §6.1.1.3: severity-based costs.
+    cost = SEVERITY_SUPPLY_COSTS.get(injury.severity, TREATMENT_SUPPLY_COSTS.get(treatment_type, 5.0))
     if _medical_supplies < cost:
         return {"success": False, "message": "Insufficient supplies"}
 
@@ -646,7 +647,7 @@ def _triage_ai_tick(roster: IndividualCrewRoster) -> list[dict]:
         untreated.sort(key=lambda i: severity_order.get(i.severity, 9))
         injury = untreated[0]
 
-        cost = TREATMENT_SUPPLY_COSTS.get(injury.treatment_type, 5.0)
+        cost = SEVERITY_SUPPLY_COSTS.get(injury.severity, TREATMENT_SUPPLY_COSTS.get(injury.treatment_type, 5.0))
         if _medical_supplies < cost:
             continue
 

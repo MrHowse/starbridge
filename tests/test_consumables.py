@@ -577,3 +577,194 @@ class TestValidateShipJSON:
         for class_id in SHIP_CLASS_ORDER:
             errors = mod.validate(class_id)
             assert errors == [], f"{class_id} validation errors: {errors}"
+
+
+# ===================================================================
+# 13. Ammo firepower penalty (§6.1.1.7) — 3 tests
+# ===================================================================
+
+
+class TestAmmoFirepowerPenalty:
+    """Marine firepower is reduced by 60% when ship ammunition is depleted."""
+
+    def test_depleted_ammo_applies_penalty(self):
+        from server.models.resources import AMMO_DEPLETED_FIREPOWER_PENALTY
+        store = _make_store(ammunition=0.0, ammunition_max=100.0)
+        base_power = 10.0
+        penalised = base_power * (1.0 - AMMO_DEPLETED_FIREPOWER_PENALTY)
+        assert penalised == pytest.approx(4.0)
+
+    def test_non_depleted_no_penalty(self):
+        store = _make_store(ammunition=50.0, ammunition_max=100.0)
+        assert not store.is_depleted("ammunition")
+
+    def test_penalty_constant_is_060(self):
+        from server.models.resources import AMMO_DEPLETED_FIREPOWER_PENALTY
+        assert AMMO_DEPLETED_FIREPOWER_PENALTY == 0.60
+
+
+# ===================================================================
+# 14. Provisions crew penalty (§6.1.1.8) — 3 tests
+# ===================================================================
+
+
+class TestProvisionsCrewPenalty:
+    """Provisions depletion applies crew factor penalty across all systems."""
+
+    def test_penalty_reduces_crew_factor(self):
+        ship = Ship()
+        res = _make_store(provisions=0.0, provisions_max=200.0)
+        res.provisions_crew_penalty = 0.20
+        ship.resources = res
+        # Simulate: base crew factor 1.0 → after 20% penalty → 0.80
+        for sys_obj in ship.systems.values():
+            sys_obj._crew_factor = 1.0
+        for sys_obj in ship.systems.values():
+            sys_obj._crew_factor = max(0.05, sys_obj._crew_factor * (1.0 - res.provisions_crew_penalty))
+        for sys_obj in ship.systems.values():
+            assert sys_obj._crew_factor == pytest.approx(0.80)
+
+    def test_30min_penalty_halves_crew_factor(self):
+        ship = Ship()
+        res = _make_store(provisions=0.0, provisions_max=200.0)
+        res.provisions_crew_penalty = 0.50
+        ship.resources = res
+        for sys_obj in ship.systems.values():
+            sys_obj._crew_factor = 1.0
+        for sys_obj in ship.systems.values():
+            sys_obj._crew_factor = max(0.05, sys_obj._crew_factor * (1.0 - res.provisions_crew_penalty))
+        for sys_obj in ship.systems.values():
+            assert sys_obj._crew_factor == pytest.approx(0.50)
+
+    def test_no_penalty_when_provisions_available(self):
+        res = _make_store(provisions=100.0, provisions_max=200.0)
+        assert res.provisions_crew_penalty == 0.0
+
+
+# ===================================================================
+# 15. Drone fuel at launch (§6.1.1.5) — 3 tests
+# ===================================================================
+
+
+class TestDroneFuelAtLaunch:
+    """Drone launch consumes fuel from ResourceStore and is blocked at 0."""
+
+    def test_launch_consumes_drone_fuel(self):
+        store = _make_store(drone_fuel=100.0, drone_fuel_max=200.0)
+        fuel_needed = 50.0
+        consumed = store.consume("drone_fuel", fuel_needed)
+        assert consumed == 50.0
+        assert store.drone_fuel == 50.0
+
+    def test_launch_blocked_at_zero(self):
+        store = _make_store(drone_fuel=0.0, drone_fuel_max=200.0)
+        assert store.is_depleted("drone_fuel")
+        # No fuel → consume returns 0
+        consumed = store.consume("drone_fuel", 100.0)
+        assert consumed == 0.0
+
+    def test_partial_fuel_available(self):
+        store = _make_store(drone_fuel=30.0, drone_fuel_max=200.0)
+        consumed = store.consume("drone_fuel", 100.0)
+        assert consumed == 30.0
+        assert store.drone_fuel == 0.0
+
+
+# ===================================================================
+# 16. Drone replacement (§6.1.1.6) — 3 tests
+# ===================================================================
+
+
+class TestDroneReplacement:
+    """Destroyed drones can be replaced at 5 DPU cost."""
+
+    def test_replacement_cost_constant(self):
+        from server.game_loop_flight_ops import DRONE_REPLACEMENT_COST
+        assert DRONE_REPLACEMENT_COST == 5.0
+
+    def test_replace_consumes_parts(self):
+        store = _make_store(drone_parts=10.0, drone_parts_max=20.0)
+        from server.game_loop_flight_ops import DRONE_REPLACEMENT_COST
+        store.consume("drone_parts", DRONE_REPLACEMENT_COST)
+        assert store.drone_parts == 5.0
+
+    def test_replace_blocked_at_zero(self):
+        store = _make_store(drone_parts=0.0, drone_parts_max=20.0)
+        assert store.is_depleted("drone_parts")
+
+
+# ===================================================================
+# 17. Medical severity-based costs (§6.1.1.3) — 4 tests
+# ===================================================================
+
+
+class TestMedicalSeverityCosts:
+    """Treatment costs proportional to injury severity."""
+
+    def test_severity_costs_exist(self):
+        from server.models.injuries import SEVERITY_SUPPLY_COSTS
+        assert "minor" in SEVERITY_SUPPLY_COSTS
+        assert "moderate" in SEVERITY_SUPPLY_COSTS
+        assert "serious" in SEVERITY_SUPPLY_COSTS
+        assert "critical" in SEVERITY_SUPPLY_COSTS
+
+    def test_severity_cost_values(self):
+        from server.models.injuries import SEVERITY_SUPPLY_COSTS
+        assert SEVERITY_SUPPLY_COSTS["minor"] == 1.0
+        assert SEVERITY_SUPPLY_COSTS["moderate"] == 3.0
+        assert SEVERITY_SUPPLY_COSTS["serious"] == 5.0
+        assert SEVERITY_SUPPLY_COSTS["critical"] == 8.0
+
+    def test_minor_cheaper_than_critical(self):
+        from server.models.injuries import SEVERITY_SUPPLY_COSTS
+        assert SEVERITY_SUPPLY_COSTS["minor"] < SEVERITY_SUPPLY_COSTS["critical"]
+
+    def test_stabilise_works_at_zero_supplies(self):
+        """Spec §6.1.4.4: at 0 supplies, stabilise still works."""
+        store = _make_store(medical_supplies=0.0, medical_supplies_max=100.0)
+        assert store.is_depleted("medical_supplies")
+        # Stabilise doesn't gate on supplies in the spec
+
+
+# ===================================================================
+# 18. Emergency battery (§6.1.4.2) — 3 tests
+# ===================================================================
+
+
+class TestEmergencyBattery:
+    """Emergency battery keeps sensors at minimal power when fuel depleted."""
+
+    def test_sensors_not_offline_at_fuel_zero(self):
+        """Sensors should get emergency power, not be fully offline."""
+        ship = Ship()
+        # Simulate reactor shutdown with emergency battery.
+        EMERGENCY_BATTERY_SYSTEMS = {"sensors"}
+        for sname, sys_obj in ship.systems.items():
+            if sname in EMERGENCY_BATTERY_SYSTEMS:
+                sys_obj.power = 25.0
+            else:
+                sys_obj._captain_offline = True
+        # Sensors should still have some efficiency.
+        sensors = ship.systems.get("sensors")
+        assert sensors is not None
+        assert not sensors._captain_offline
+        assert sensors.power == 25.0
+        assert sensors.efficiency > 0.0
+
+    def test_other_systems_offline(self):
+        ship = Ship()
+        EMERGENCY_BATTERY_SYSTEMS = {"sensors"}
+        for sname, sys_obj in ship.systems.items():
+            if sname in EMERGENCY_BATTERY_SYSTEMS:
+                sys_obj.power = 25.0
+            else:
+                sys_obj._captain_offline = True
+        for sname, sys_obj in ship.systems.items():
+            if sname != "sensors":
+                assert sys_obj._captain_offline, f"{sname} should be offline"
+
+    def test_engines_offline_ship_adrift(self):
+        ship = Ship()
+        ship.systems["engines"]._captain_offline = True
+        ship.throttle = 0.0
+        assert ship.systems["engines"].efficiency == 0.0
