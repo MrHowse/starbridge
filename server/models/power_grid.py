@@ -69,6 +69,9 @@ class PowerGrid:
     emergency_reserve: float = DEFAULT_EMERGENCY_RESERVE
     emergency_active: bool = False
 
+    # External drain (spinal mount etc.) — subtracted from reactor before distribution
+    external_drain: float = 0.0
+
     # Power buses
     primary_bus_online: bool = True
     secondary_bus_online: bool = True
@@ -122,8 +125,8 @@ class PowerGrid:
 
         total_demand = sum(active_demands.values())
 
-        # Determine available power
-        reactor = self.reactor_output
+        # Determine available power (subtract external drain before distribution)
+        reactor = max(0.0, self.reactor_output - self.external_drain)
 
         if reactor <= 0.0:
             # Emergency mode
@@ -270,7 +273,7 @@ class PowerGrid:
 
     def get_available_budget(self) -> float:
         """Read-only snapshot of current available power budget."""
-        reactor = self.reactor_output
+        reactor = max(0.0, self.reactor_output - self.external_drain)
         if reactor <= 0.0:
             base = self.emergency_reserve
         else:
@@ -302,6 +305,7 @@ class PowerGrid:
             "reroute_active": self.reroute_active,
             "reroute_timer": round(self.reroute_timer, 2),
             "reroute_target_bus": self.reroute_target_bus,
+            "external_drain": round(self.external_drain, 2),
         }
 
     @classmethod
@@ -325,6 +329,7 @@ class PowerGrid:
             reroute_active=data.get("reroute_active", False),
             reroute_timer=data.get("reroute_timer", 0.0),
             reroute_target_bus=data.get("reroute_target_bus"),
+            external_drain=data.get("external_drain", 0.0),
         )
 
     @classmethod

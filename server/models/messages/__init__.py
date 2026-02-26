@@ -207,6 +207,13 @@ from server.models.messages.flag_bridge import (
     FlagBridgeFleetOrderPayload,
 )
 
+# Spinal Mount (Battleship)
+from server.models.messages.spinal_mount import (
+    WeaponsSpinalChargePayload,
+    WeaponsSpinalFirePayload,
+    WeaponsSpinalCancelPayload,
+)
+
 __all__ = [
     # base
     "Message",
@@ -365,4 +372,8 @@ __all__ = [
     "FlagBridgeClearPriorityPayload",
     "FlagBridgeWeaponsOverridePayload",
     "FlagBridgeFleetOrderPayload",
+    # spinal mount (battleship)
+    "WeaponsSpinalChargePayload",
+    "WeaponsSpinalFirePayload",
+    "WeaponsSpinalCancelPayload",
 ]

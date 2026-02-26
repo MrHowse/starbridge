@@ -79,6 +79,24 @@ def repair_armour(ship: Ship, amount: float) -> float:
     return restored
 
 
+def repair_armour_zone(ship: Ship, facing: str, amount: float) -> float:
+    """Repair a specific armour zone (battleship only), capped at 75%.
+
+    Returns the amount actually restored.
+    """
+    if ship.armour_zones is None or ship.armour_zones_max is None:
+        return 0.0
+    if facing not in ship.armour_zones:
+        return 0.0
+    cap = ship.armour_zones_max[facing] * ARMOUR_FIELD_REPAIR_CAP
+    current = ship.armour_zones[facing]
+    if current >= cap:
+        return 0.0
+    restored = min(amount, cap - current)
+    ship.armour_zones[facing] = current + restored
+    return restored
+
+
 # ---------------------------------------------------------------------------
 # Arc check (shared by player and enemy callers)
 # ---------------------------------------------------------------------------
@@ -185,11 +203,19 @@ def apply_hit_to_player(
 
     # 2.5. Armour absorption — sits between shields and hull (v0.07 §1.3).
     # Armour absorbs up to its current value per hit.  Degrades by 1 per hit.
+    # Battleships have layered armour zones (v0.07 §2.5.2).
     armour_absorbed = 0.0
-    if hull_damage > 0.0 and ship.armour > 0.0:
-        armour_absorbed = min(ship.armour, hull_damage)
-        hull_damage -= armour_absorbed
-        ship.armour = max(0.0, ship.armour - 1.0)
+    if hull_damage > 0.0:
+        if ship.armour_zones is not None:
+            zone_hp = ship.armour_zones.get(facing, 0.0)
+            if zone_hp > 0.0:
+                armour_absorbed = min(zone_hp, hull_damage)
+                hull_damage -= armour_absorbed
+                ship.armour_zones[facing] = max(0.0, zone_hp - 1.0)
+        elif ship.armour > 0.0:
+            armour_absorbed = min(ship.armour, hull_damage)
+            hull_damage -= armour_absorbed
+            ship.armour = max(0.0, ship.armour - 1.0)
 
     result.armour_absorbed = armour_absorbed
 

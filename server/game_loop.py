@@ -136,6 +136,9 @@ from server.models.messages import (
     FlagBridgeClearPriorityPayload,
     FlagBridgeWeaponsOverridePayload,
     FlagBridgeFleetOrderPayload,
+    WeaponsSpinalChargePayload,
+    WeaponsSpinalFirePayload,
+    WeaponsSpinalCancelPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -175,6 +178,7 @@ import server.game_loop_dynamic_missions as gldm
 import server.game_loop_janitor as glj
 import server.game_loop_mining as glmn
 import server.game_loop_flag_bridge as glfb
+import server.game_loop_spinal_mount as glsm
 import server.equipment_modules as gleq
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
@@ -482,6 +486,10 @@ async def start(
         glew.enable_cloak_module()
     gltac.reset()
     glfb.reset(active=(ship_class == "cruiser"))
+    glsm.reset(
+        active=(ship_class == "battleship"),
+        reactor_max=sc.power_grid.get("reactor_max", 700.0) if sc.power_grid else 700.0,
+    )
     gltr.reset()
     gldo.reset()
     hazard_system.reset_state()
@@ -522,6 +530,17 @@ async def start(
     _world.ship.target_profile = sc.target_profile
     _world.ship.armour = sc.armour
     _world.ship.armour_max = sc.armour
+    # v0.07 §2.5.2: Battleship layered armour zones.
+    if ship_class == "battleship" and sc.armour > 0:
+        zone_val = sc.armour / 4.0
+        _world.ship.armour_zones = {
+            "fore": zone_val, "aft": zone_val,
+            "port": zone_val, "starboard": zone_val,
+        }
+        _world.ship.armour_zones_max = dict(_world.ship.armour_zones)
+    else:
+        _world.ship.armour_zones = None
+        _world.ship.armour_zones_max = None
     # v0.07 §1.5: Weapon loadout from ship class.
     _wep = sc.weapons or {}
     _world.ship.beam_damage_base = _wep.get("beam_damage", 20.0)
@@ -981,6 +1000,12 @@ async def _loop() -> None:
         scan_completed = sensors.tick(_world, _world.ship, TICK_DT)
         await gldo.tick(_world, _world.ship, _manager, TICK_DT)
         glw.tick_cooldowns(TICK_DT)
+        # v0.07 §2.5.1: Spinal mount tick (charge timer, cooldown).
+        spinal_events = glsm.tick(_world.ship, _world, TICK_DT)
+        for _sevt in spinal_events:
+            await _manager.broadcast(
+                Message.build(f"spinal.{_sevt['event']}", _sevt),
+            )
 
         # 8.5 Mission tick.
         over, result = await glm.tick_mission(_world, _world.ship, _manager, TICK_DT)
@@ -1748,6 +1773,13 @@ async def _loop() -> None:
                 }),
             )
 
+        # 11l3. Spinal mount state → weapons + captain (battleship only).
+        if glsm.is_active():
+            await _manager.broadcast_to_roles(
+                ["weapons", "captain"],
+                Message.build("spinal.state", glsm.build_state(_world.ship, _world)),
+            )
+
         # 11m. Janitor state → janitor station (secret).
         await _manager.broadcast_to_roles(
             ["janitor"],
@@ -2065,6 +2097,31 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             ship.shield_distribution = calculate_shield_distribution(payload.x, payload.y)
             gl.log_event("weapons", "shield_focus_changed", {"x": payload.x, "y": payload.y})
             _set_training_flag(glm, "weapons_shield_focus_set")
+        # v0.07 §2.5.1: Spinal mount messages.
+        elif msg_type == "weapons.spinal_charge" and isinstance(payload, WeaponsSpinalChargePayload):
+            if world is not None:
+                result = glsm.request_charge(payload.target_id, ship, world)
+                if result.get("ok"):
+                    events.append(("captain.authorization_request", {
+                        "request_id": result["request_id"],
+                        "action": "spinal_mount",
+                        "target_id": result["target_id"],
+                    }))
+                    gl.log_event("weapons", "spinal_charge_requested", {"target_id": payload.target_id})
+                else:
+                    events.append(("spinal.error", {"error": result.get("error", "")}))
+        elif msg_type == "weapons.spinal_fire" and isinstance(payload, WeaponsSpinalFirePayload):
+            if world is not None:
+                result = glsm.fire(ship, world, random)
+                events.append(("spinal.fire_result", result))
+                if result.get("hit"):
+                    gl.log_event("weapons", "spinal_fired", {"hit": True, "damage": result.get("damage", 0)})
+                else:
+                    gl.log_event("weapons", "spinal_fired", {"hit": False})
+        elif msg_type == "weapons.spinal_cancel" and isinstance(payload, WeaponsSpinalCancelPayload):
+            result = glsm.cancel()
+            events.append(("spinal.cancelled", result))
+            gl.log_event("weapons", "spinal_cancelled", result)
         elif msg_type == "science.start_scan" and isinstance(payload, ScienceStartScanPayload):
             if glew.is_stealth_engaged():
                 glew.break_stealth("active_scan")
@@ -2188,6 +2245,11 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             if world is not None:
                 for evt in glw.resolve_nuclear_auth(payload.request_id, payload.approved, ship, world):
                     events.append(evt)
+            # v0.07 §2.5.1: Also try spinal mount authorization.
+            spinal_result = glsm.resolve_auth(payload.request_id, payload.approved)
+            if spinal_result.get("ok"):
+                events.append(("spinal.auth_result", spinal_result))
+                gl.log_event("captain", "spinal_authorized", {"approved": payload.approved})
             _set_training_flag(glm, "captain_authorized")
         elif msg_type == "captain.add_log" and isinstance(payload, CaptainAddLogPayload):
             entry = glcap.add_log_entry(payload.text)
@@ -2602,6 +2664,13 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "cargo": dict(ship.cargo),
             "mining": glmn.build_state(),
             "flag_bridge_active": glfb.is_active(),
+            # v0.07 §2.5: Spinal mount + layered armour.
+            "spinal_active": glsm.is_active(),
+            "spinal_state": glsm.get_state(),
+            "spinal_charge_progress": round(glsm.get_charge_progress(), 1),
+            "spinal_cooldown": round(glsm.get_cooldown_remaining(), 1),
+            "armour_zones": dict(ship.armour_zones) if ship.armour_zones else None,
+            "armour_zones_max": dict(ship.armour_zones_max) if ship.armour_zones_max else None,
         },
         tick=tick,
     )

@@ -218,6 +218,10 @@ def tick(ship: Ship, interior: ShipInterior, dt: float) -> EngineeringTickResult
     if _power_grid is None or _damage_model is None:
         return result
 
+    # 0. Apply external drain (spinal mount power draw).
+    import server.game_loop_spinal_mount as glsm
+    _power_grid.external_drain = glsm.get_power_draw()
+
     # 1. Power distribution
     delivered = _power_grid.tick(dt, _requested_power)
     result.power_delivered = delivered
@@ -338,6 +342,7 @@ def build_state(ship: Ship) -> dict:
             "reroute_timer": round(pg.reroute_timer, 2),
             "reroute_target_bus": pg.reroute_target_bus,
             "available_budget": round(pg.get_available_budget(), 2),
+            "spinal_power_draw": round(pg.external_drain, 2),
         },
     }
 

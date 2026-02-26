@@ -287,6 +287,10 @@ def compute_debrief(events: list[dict]) -> dict:
     import server.game_loop_flag_bridge as _glfb
     flag_bridge_active = _glfb.is_active()
 
+    # v0.07 §2.5: Spinal mount active status.
+    import server.game_loop_spinal_mount as _glsm
+    spinal_mount_active = _glsm.is_active()
+
     return {
         "per_station_stats": per_station,
         "awards":            awards,
@@ -296,6 +300,7 @@ def compute_debrief(events: list[dict]) -> dict:
         "comms_performance": comms_performance,
         "equipment_modules": equipment_module_names,
         "flag_bridge_active": flag_bridge_active,
+        "spinal_mount_active": spinal_mount_active,
     }
 
 

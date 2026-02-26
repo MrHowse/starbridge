@@ -129,6 +129,11 @@ from server.models.messages.flag_bridge import (
     FlagBridgeWeaponsOverridePayload,
     FlagBridgeFleetOrderPayload,
 )
+from server.models.messages.spinal_mount import (
+    WeaponsSpinalChargePayload,
+    WeaponsSpinalFirePayload,
+    WeaponsSpinalCancelPayload,
+)
 from server.models.messages.navigation import MapClearRoutePayload, MapPlotRoutePayload
 from server.models.messages.weapons import (
     WeaponsFireBeamsPayload,
@@ -318,6 +323,10 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "captain.flag_clear_priority": FlagBridgeClearPriorityPayload,
     "weapons.override_priority":   FlagBridgeWeaponsOverridePayload,
     "captain.fleet_order":         FlagBridgeFleetOrderPayload,
+    # Spinal Mount (Battleship)
+    "weapons.spinal_charge":       WeaponsSpinalChargePayload,
+    "weapons.spinal_fire":         WeaponsSpinalFirePayload,
+    "weapons.spinal_cancel":       WeaponsSpinalCancelPayload,
 }
 
 

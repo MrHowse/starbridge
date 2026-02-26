@@ -139,6 +139,8 @@ class Ship:
     target_profile: float = 1.0       # 0.0-1.0 — hit probability multiplier
     armour: float = 0.0               # current armour points
     armour_max: float = 0.0           # max armour (set from ship class)
+    armour_zones: dict[str, float] | None = None      # battleship only: {fore, aft, port, starboard}
+    armour_zones_max: dict[str, float] | None = None   # original values for repair cap
 
     # --- Weapon loadout (v0.07 §1.5 — set from ship class at game start) ---
     beam_damage_base: float = 20.0    # damage per beam hit (default = legacy constant)

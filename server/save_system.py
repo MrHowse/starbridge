@@ -42,6 +42,7 @@ import server.game_loop_dynamic_missions as gldm
 import server.game_loop_janitor as glj
 import server.game_loop_mining as glmn
 import server.game_loop_flag_bridge as glfb
+import server.game_loop_spinal_mount as glsm
 import server.equipment_modules as gleq
 
 from server.difficulty import DifficultySettings
@@ -78,6 +79,8 @@ def _serialise_ship(ship: Ship) -> dict:
         "target_profile": ship.target_profile,
         "armour": ship.armour,
         "armour_max": ship.armour_max,
+        "armour_zones": dict(ship.armour_zones) if ship.armour_zones else None,
+        "armour_zones_max": dict(ship.armour_zones_max) if ship.armour_zones_max else None,
         "beam_damage_base": ship.beam_damage_base,
         "beam_fire_rate": ship.beam_fire_rate,
         "beam_arc_deg": ship.beam_arc_deg,
@@ -261,6 +264,8 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.target_profile = float(data.get("target_profile", ship.target_profile))
     ship.armour = float(data.get("armour", ship.armour))
     ship.armour_max = float(data.get("armour_max", ship.armour_max))
+    ship.armour_zones = data.get("armour_zones")
+    ship.armour_zones_max = data.get("armour_zones_max")
     ship.beam_damage_base = float(data.get("beam_damage_base", ship.beam_damage_base))
     ship.beam_fire_rate = float(data.get("beam_fire_rate", ship.beam_fire_rate))
     ship.beam_arc_deg = float(data.get("beam_arc_deg", ship.beam_arc_deg))
@@ -507,6 +512,7 @@ def save_game(
             "equipment_modules": gleq.serialise(),
             "mining": glmn.serialise(),
             "flag_bridge": glfb.serialise(),
+            "spinal_mount": glsm.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -608,6 +614,8 @@ def restore_game(save_id: str, world: World) -> dict:
         glmn.deserialise(mods["mining"])
     if mods.get("flag_bridge"):
         glfb.deserialise(mods["flag_bridge"])
+    if mods.get("spinal_mount"):
+        glsm.deserialise(mods["spinal_mount"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")
