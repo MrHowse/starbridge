@@ -75,6 +75,11 @@ class ShipClass(BaseModel):
     # --- Power grid (v0.07 §1.4) ---
     power_grid:       dict | None = None     # {reactor_max, battery_capacity, ...}
 
+    # --- Integration (v0.07 §5) ---
+    unique_systems:   list[str] = []    # e.g. ["stealth"], ["advanced_ecm"]
+    modular_bays:     int   = 0         # equipment module slots (frigate=2)
+    interior_layout:  str   = ""        # reference to interiors/{name}.json
+
     # --- Legacy / weapons ---
     torpedo_ammo:     int   = 12             # legacy field (kept for save-compat)
     torpedo_loadout:  dict[str, int] | None = None  # per-type magazine (v0.05g)

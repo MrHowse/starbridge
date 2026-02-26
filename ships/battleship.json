@@ -15,6 +15,9 @@
     "standard": 12, "homing": 8, "ion": 8, "piercing": 8,
     "heavy": 6, "proximity": 8, "nuclear": 2, "experimental": 2
   },
+  "unique_systems": ["spinal_mount", "armour_zones", "dual_targeting"],
+  "modular_bays": 0,
+  "interior_layout": "battleship",
   "min_crew": 10,
   "max_crew": 12,
   "weapons": {

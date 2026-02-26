@@ -15,6 +15,9 @@
     "standard": 6, "homing": 2, "ion": 2, "piercing": 0,
     "heavy": 0, "proximity": 2, "nuclear": 0, "experimental": 0
   },
+  "unique_systems": ["hospital"],
+  "modular_bays": 0,
+  "interior_layout": "medical_ship",
   "min_crew": 5,
   "max_crew": 8,
   "weapons": {

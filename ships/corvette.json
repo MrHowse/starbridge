@@ -15,6 +15,9 @@
     "standard": 6, "homing": 3, "ion": 3, "piercing": 3,
     "heavy": 1, "proximity": 2, "nuclear": 1, "experimental": 0
   },
+  "unique_systems": ["advanced_ecm"],
+  "modular_bays": 0,
+  "interior_layout": "corvette",
   "min_crew": 4,
   "max_crew": 6,
   "weapons": {

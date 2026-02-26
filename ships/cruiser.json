@@ -15,6 +15,9 @@
     "standard": 10, "homing": 6, "ion": 6, "piercing": 6,
     "heavy": 4, "proximity": 6, "nuclear": 2, "experimental": 1
   },
+  "unique_systems": ["flag_bridge", "dual_targeting"],
+  "modular_bays": 0,
+  "interior_layout": "cruiser",
   "min_crew": 8,
   "max_crew": 11,
   "weapons": {

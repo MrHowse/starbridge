@@ -15,6 +15,9 @@
     "standard": 8, "homing": 4, "ion": 4, "piercing": 4,
     "heavy": 2, "proximity": 4, "nuclear": 1, "experimental": 0
   },
+  "unique_systems": [],
+  "modular_bays": 2,
+  "interior_layout": "frigate",
   "min_crew": 6,
   "max_crew": 9,
   "weapons": {
