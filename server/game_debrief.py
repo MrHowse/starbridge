@@ -283,6 +283,10 @@ def compute_debrief(events: list[dict]) -> dict:
     import server.equipment_modules as _gleq
     equipment_module_names = _gleq.get_module_names()
 
+    # v0.07 §2.4: Flag bridge active status.
+    import server.game_loop_flag_bridge as _glfb
+    flag_bridge_active = _glfb.is_active()
+
     return {
         "per_station_stats": per_station,
         "awards":            awards,
@@ -291,6 +295,7 @@ def compute_debrief(events: list[dict]) -> dict:
         "dynamic_missions":  dynamic_missions,
         "comms_performance": comms_performance,
         "equipment_modules": equipment_module_names,
+        "flag_bridge_active": flag_bridge_active,
     }
 
 

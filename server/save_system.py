@@ -41,6 +41,7 @@ import server.game_loop_engineering as gle
 import server.game_loop_dynamic_missions as gldm
 import server.game_loop_janitor as glj
 import server.game_loop_mining as glmn
+import server.game_loop_flag_bridge as glfb
 import server.equipment_modules as gleq
 
 from server.difficulty import DifficultySettings
@@ -505,6 +506,7 @@ def save_game(
             "janitor": glj.serialise(),
             "equipment_modules": gleq.serialise(),
             "mining": glmn.serialise(),
+            "flag_bridge": glfb.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -604,6 +606,8 @@ def restore_game(save_id: str, world: World) -> dict:
         gleq.deserialise(mods["equipment_modules"])
     if mods.get("mining"):
         glmn.deserialise(mods["mining"])
+    if mods.get("flag_bridge"):
+        glfb.deserialise(mods["flag_bridge"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")

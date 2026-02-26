@@ -120,6 +120,15 @@ from server.models.messages.docking import (
 )
 from server.models.messages.game import GameBriefingLaunchPayload
 from server.models.messages.janitor import JanitorPerformTaskPayload, JanitorDismissStickyPayload
+from server.models.messages.flag_bridge import (
+    FlagBridgeAddDrawingPayload,
+    FlagBridgeRemoveDrawingPayload,
+    FlagBridgeClearDrawingsPayload,
+    FlagBridgeSetPriorityPayload,
+    FlagBridgeClearPriorityPayload,
+    FlagBridgeWeaponsOverridePayload,
+    FlagBridgeFleetOrderPayload,
+)
 from server.models.messages.navigation import MapClearRoutePayload, MapPlotRoutePayload
 from server.models.messages.weapons import (
     WeaponsFireBeamsPayload,
@@ -301,6 +310,14 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     # Janitor (secret station)
     "janitor.perform_task": JanitorPerformTaskPayload,
     "janitor.dismiss_sticky": JanitorDismissStickyPayload,
+    # Flag Bridge (Cruiser Captain)
+    "captain.flag_add_drawing":    FlagBridgeAddDrawingPayload,
+    "captain.flag_remove_drawing": FlagBridgeRemoveDrawingPayload,
+    "captain.flag_clear_drawings": FlagBridgeClearDrawingsPayload,
+    "captain.flag_set_priority":   FlagBridgeSetPriorityPayload,
+    "captain.flag_clear_priority": FlagBridgeClearPriorityPayload,
+    "weapons.override_priority":   FlagBridgeWeaponsOverridePayload,
+    "captain.fleet_order":         FlagBridgeFleetOrderPayload,
 }
 
 

@@ -196,6 +196,17 @@ from server.models.messages.janitor import (
     JanitorDismissStickyPayload,
 )
 
+# Flag Bridge (Cruiser Captain)
+from server.models.messages.flag_bridge import (
+    FlagBridgeAddDrawingPayload,
+    FlagBridgeRemoveDrawingPayload,
+    FlagBridgeClearDrawingsPayload,
+    FlagBridgeSetPriorityPayload,
+    FlagBridgeClearPriorityPayload,
+    FlagBridgeWeaponsOverridePayload,
+    FlagBridgeFleetOrderPayload,
+)
+
 __all__ = [
     # base
     "Message",
@@ -346,4 +357,12 @@ __all__ = [
     # janitor
     "JanitorPerformTaskPayload",
     "JanitorDismissStickyPayload",
+    # flag bridge (cruiser captain)
+    "FlagBridgeAddDrawingPayload",
+    "FlagBridgeRemoveDrawingPayload",
+    "FlagBridgeClearDrawingsPayload",
+    "FlagBridgeSetPriorityPayload",
+    "FlagBridgeClearPriorityPayload",
+    "FlagBridgeWeaponsOverridePayload",
+    "FlagBridgeFleetOrderPayload",
 ]

@@ -129,6 +129,13 @@ from server.models.messages import (
     MapClearRoutePayload,
     JanitorPerformTaskPayload,
     JanitorDismissStickyPayload,
+    FlagBridgeAddDrawingPayload,
+    FlagBridgeRemoveDrawingPayload,
+    FlagBridgeClearDrawingsPayload,
+    FlagBridgeSetPriorityPayload,
+    FlagBridgeClearPriorityPayload,
+    FlagBridgeWeaponsOverridePayload,
+    FlagBridgeFleetOrderPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -167,6 +174,7 @@ import server.game_loop_engineering as gle
 import server.game_loop_dynamic_missions as gldm
 import server.game_loop_janitor as glj
 import server.game_loop_mining as glmn
+import server.game_loop_flag_bridge as glfb
 import server.equipment_modules as gleq
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
@@ -473,6 +481,7 @@ async def start(
     if gleq.has_module("cloaking_device"):
         glew.enable_cloak_module()
     gltac.reset()
+    glfb.reset(active=(ship_class == "cruiser"))
     gltr.reset()
     gldo.reset()
     hazard_system.reset_state()
@@ -1721,6 +1730,24 @@ async def _loop() -> None:
                 Message.build("tactical.strike_countdown", _cdata),
             )
 
+        # 11l2. Flag Bridge state → Captain (cruiser only).
+        if glfb.is_active():
+            await _manager.broadcast_to_roles(
+                ["captain"],
+                Message.build("flag_bridge.state", glfb.build_state(_world, _world.ship)),
+            )
+            await _manager.broadcast_to_roles(
+                ["helm", "tactical"],
+                Message.build("flag_bridge.drawings", {"drawings": glfb.get_drawings()}),
+            )
+            await _manager.broadcast_to_roles(
+                ["weapons"],
+                Message.build("flag_bridge.priority", {
+                    "priority_queue": glfb.get_priority_queue(),
+                    "weapons_override": glfb.is_weapons_override(),
+                }),
+            )
+
         # 11m. Janitor state → janitor station (secret).
         await _manager.broadcast_to_roles(
             ["janitor"],
@@ -2336,6 +2363,35 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "tactical.execute_strike_plan" and isinstance(payload, TacticalExecuteStrikePlanPayload):
             ok = gltac.execute_strike_plan(payload.plan_id)
             gl.log_event("tactical", "strike_plan_executed", {"plan_id": payload.plan_id, "found": ok})
+        # --- Flag Bridge (v0.07 §2.4) ---
+        elif msg_type == "captain.flag_add_drawing" and isinstance(payload, FlagBridgeAddDrawingPayload):
+            result = glfb.add_drawing(
+                payload.drawing_type, payload.x, payload.y,
+                label=payload.label, x2=payload.x2, y2=payload.y2,
+                colour=payload.colour,
+            )
+            gl.log_event("captain", "flag_drawing_added", result)
+        elif msg_type == "captain.flag_remove_drawing" and isinstance(payload, FlagBridgeRemoveDrawingPayload):
+            result = glfb.remove_drawing(payload.drawing_id)
+            gl.log_event("captain", "flag_drawing_removed", {"drawing_id": payload.drawing_id, **result})
+        elif msg_type == "captain.flag_clear_drawings" and isinstance(payload, FlagBridgeClearDrawingsPayload):
+            result = glfb.clear_drawings()
+            gl.log_event("captain", "flag_drawings_cleared", result)
+        elif msg_type == "captain.flag_set_priority" and isinstance(payload, FlagBridgeSetPriorityPayload):
+            result = glfb.set_priority_queue(payload.entity_ids)
+            gl.log_event("captain", "flag_priority_set", {"entity_ids": payload.entity_ids})
+        elif msg_type == "captain.flag_clear_priority" and isinstance(payload, FlagBridgeClearPriorityPayload):
+            glfb.clear_priority_queue()
+            gl.log_event("captain", "flag_priority_cleared", {})
+        elif msg_type == "weapons.override_priority" and isinstance(payload, FlagBridgeWeaponsOverridePayload):
+            glfb.set_weapons_override(payload.override)
+            gl.log_event("weapons", "priority_override", {"override": payload.override})
+        elif msg_type == "captain.fleet_order" and isinstance(payload, FlagBridgeFleetOrderPayload):
+            result = glfb.issue_fleet_order(
+                payload.order_type, target_id=payload.target_id,
+                position=(payload.x, payload.y) if payload.x is not None and payload.y is not None else None,
+            )
+            gl.log_event("captain", "fleet_order", {"order_type": payload.order_type, **result})
         elif msg_type == "map.plot_route" and isinstance(payload, MapPlotRoutePayload):
             if world is not None:
                 route = gln.calculate_route(
@@ -2545,6 +2601,7 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "cargo_capacity": ship.cargo_capacity,
             "cargo": dict(ship.cargo),
             "mining": glmn.build_state(),
+            "flag_bridge_active": glfb.is_active(),
         },
         tick=tick,
     )

@@ -33,6 +33,13 @@ _QUEUE_FORWARDED_TYPES = frozenset({
     "captain.undock",
     "captain.accept_mission",
     "captain.decline_mission",
+    # Flag Bridge (v0.07 §2.4)
+    "captain.flag_add_drawing",
+    "captain.flag_remove_drawing",
+    "captain.flag_clear_drawings",
+    "captain.flag_set_priority",
+    "captain.flag_clear_priority",
+    "captain.fleet_order",
 })
 
 
