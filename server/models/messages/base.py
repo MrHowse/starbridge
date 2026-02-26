@@ -134,6 +134,15 @@ from server.models.messages.spinal_mount import (
     WeaponsSpinalFirePayload,
     WeaponsSpinalCancelPayload,
 )
+from server.models.messages.carrier_ops import (
+    CarrierCancelCAPPayload,
+    CarrierCancelScramblePayload,
+    CarrierCreateSquadronPayload,
+    CarrierDisbandSquadronPayload,
+    CarrierScramblePayload,
+    CarrierSetCAPPayload,
+    CarrierSquadronOrderPayload,
+)
 from server.models.messages.navigation import MapClearRoutePayload, MapPlotRoutePayload
 from server.models.messages.weapons import (
     WeaponsFireBeamsPayload,
@@ -327,6 +336,14 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "weapons.spinal_charge":       WeaponsSpinalChargePayload,
     "weapons.spinal_fire":         WeaponsSpinalFirePayload,
     "weapons.spinal_cancel":       WeaponsSpinalCancelPayload,
+    # Carrier Ops
+    "carrier.create_squadron":     CarrierCreateSquadronPayload,
+    "carrier.disband_squadron":    CarrierDisbandSquadronPayload,
+    "carrier.squadron_order":      CarrierSquadronOrderPayload,
+    "carrier.set_cap":             CarrierSetCAPPayload,
+    "carrier.cancel_cap":          CarrierCancelCAPPayload,
+    "carrier.scramble":            CarrierScramblePayload,
+    "carrier.cancel_scramble":     CarrierCancelScramblePayload,
 }
 
 

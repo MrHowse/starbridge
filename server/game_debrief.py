@@ -291,6 +291,10 @@ def compute_debrief(events: list[dict]) -> dict:
     import server.game_loop_spinal_mount as _glsm
     spinal_mount_active = _glsm.is_active()
 
+    # v0.07 §2.6: Carrier ops active status.
+    import server.game_loop_carrier_ops as _glcar
+    carrier_ops_active = _glcar.is_active()
+
     return {
         "per_station_stats": per_station,
         "awards":            awards,
@@ -301,6 +305,7 @@ def compute_debrief(events: list[dict]) -> dict:
         "equipment_modules": equipment_module_names,
         "flag_bridge_active": flag_bridge_active,
         "spinal_mount_active": spinal_mount_active,
+        "carrier_ops_active": carrier_ops_active,
     }
 
 

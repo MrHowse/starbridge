@@ -139,6 +139,13 @@ from server.models.messages import (
     WeaponsSpinalChargePayload,
     WeaponsSpinalFirePayload,
     WeaponsSpinalCancelPayload,
+    CarrierCreateSquadronPayload,
+    CarrierDisbandSquadronPayload,
+    CarrierSquadronOrderPayload,
+    CarrierSetCAPPayload,
+    CarrierCancelCAPPayload,
+    CarrierScramblePayload,
+    CarrierCancelScramblePayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -179,6 +186,7 @@ import server.game_loop_janitor as glj
 import server.game_loop_mining as glmn
 import server.game_loop_flag_bridge as glfb
 import server.game_loop_spinal_mount as glsm
+import server.game_loop_carrier_ops as glcar
 import server.equipment_modules as gleq
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
@@ -490,6 +498,7 @@ async def start(
         active=(ship_class == "battleship"),
         reactor_max=sc.power_grid.get("reactor_max", 700.0) if sc.power_grid else 700.0,
     )
+    glcar.reset(active=(ship_class == "carrier"))
     gltr.reset()
     gldo.reset()
     hazard_system.reset_state()
@@ -1006,6 +1015,11 @@ async def _loop() -> None:
             await _manager.broadcast(
                 Message.build(f"spinal.{_sevt['event']}", _sevt),
             )
+
+        # 8.4b Carrier ops tick.
+        if glcar.is_active():
+            _carrier_events = glcar.tick(_world.ship, TICK_DT)
+            _fo_events.extend(_carrier_events)
 
         # 8.5 Mission tick.
         over, result = await glm.tick_mission(_world, _world.ship, _manager, TICK_DT)
@@ -1700,6 +1714,13 @@ async def _loop() -> None:
             Message.build("flight_ops.state", glfo.build_state(_world.ship)),
         )
 
+        # 11j-a. Carrier ops state → Flight Ops station.
+        if glcar.is_active():
+            await _manager.broadcast_to_roles(
+                ["flight_ops"],
+                Message.build("carrier.state", glcar.build_state()),
+            )
+
         # 11j-b. Flight ops events (launch, recovery, bingo, etc.).
         if _fo_events:
             await _manager.broadcast_to_roles(
@@ -2122,6 +2143,41 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             result = glsm.cancel()
             events.append(("spinal.cancelled", result))
             gl.log_event("weapons", "spinal_cancelled", result)
+
+        # --- Carrier Ops (v0.07 §2.6) ---
+        elif msg_type == "carrier.create_squadron" and isinstance(payload, CarrierCreateSquadronPayload):
+            result = glcar.create_squadron(payload.name, payload.drone_ids)
+            events.append(("carrier.squadron_created", result))
+            gl.log_event("flight_ops", "squadron_created", result)
+        elif msg_type == "carrier.disband_squadron" and isinstance(payload, CarrierDisbandSquadronPayload):
+            result = glcar.disband_squadron(payload.squadron_id)
+            events.append(("carrier.squadron_disbanded", result))
+            gl.log_event("flight_ops", "squadron_disbanded", result)
+        elif msg_type == "carrier.squadron_order" and isinstance(payload, CarrierSquadronOrderPayload):
+            result = glcar.squadron_order(
+                payload.squadron_id, payload.order, ship=ship,
+                x=payload.x, y=payload.y,
+                behaviour=payload.behaviour, rules=payload.rules,
+            )
+            events.append(("carrier.squadron_order", result))
+            gl.log_event("flight_ops", "squadron_order", {"order": payload.order})
+        elif msg_type == "carrier.set_cap" and isinstance(payload, CarrierSetCAPPayload):
+            result = glcar.set_cap_zone(payload.centre_x, payload.centre_y, payload.radius, payload.drone_ids)
+            events.append(("carrier.cap_set", result))
+            gl.log_event("flight_ops", "cap_set", result)
+        elif msg_type == "carrier.cancel_cap" and isinstance(payload, CarrierCancelCAPPayload):
+            result = glcar.cancel_cap()
+            events.append(("carrier.cap_cancelled", result))
+            gl.log_event("flight_ops", "cap_cancelled", result)
+        elif msg_type == "carrier.scramble" and isinstance(payload, CarrierScramblePayload):
+            result = glcar.scramble(ship)
+            events.append(("carrier.scramble", result))
+            gl.log_event("flight_ops", "scramble", result)
+        elif msg_type == "carrier.cancel_scramble" and isinstance(payload, CarrierCancelScramblePayload):
+            result = glcar.cancel_scramble()
+            events.append(("carrier.scramble_cancelled", result))
+            gl.log_event("flight_ops", "scramble_cancelled", result)
+
         elif msg_type == "science.start_scan" and isinstance(payload, ScienceStartScanPayload):
             if glew.is_stealth_engaged():
                 glew.break_stealth("active_scan")

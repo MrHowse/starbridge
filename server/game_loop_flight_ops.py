@@ -87,6 +87,9 @@ _recovery_timers: dict[str, float] = {}
 # Evasive state — set by tick() from game_loop, used by recovery logic.
 _ship_evasive: bool = False
 
+# Scramble mode — set by carrier ops, reduces launch time.
+_scramble_mode: bool = False
+
 
 # ---------------------------------------------------------------------------
 # Public API — reset / init
@@ -98,7 +101,7 @@ def reset(ship_class_id: str = "frigate") -> None:
     global _drones, _flight_deck, _missions, _buoys, _decoys
     global _decoy_stock, _decoy_counter, _bingo_timers, _pending_events
     global _launch_timers, _launch_phases, _retry_delays, _recovery_timers
-    global _ship_evasive
+    global _ship_evasive, _scramble_mode
 
     _drones = create_ship_drones(ship_class_id)
     _flight_deck = create_flight_deck(ship_class_id)
@@ -111,6 +114,7 @@ def reset(ship_class_id: str = "frigate") -> None:
     _pending_events = []
     _launch_timers = {}
     _ship_evasive = False
+    _scramble_mode = False
     _launch_phases = {}
     _retry_delays = {}
     _recovery_timers = {}
@@ -365,6 +369,16 @@ def escort_assign(drone_id: str, escort_target: str) -> bool:
     return True
 
 
+def set_scramble_mode(active: bool) -> None:
+    """Enable/disable scramble launch mode (carrier only)."""
+    global _scramble_mode
+    _scramble_mode = active
+
+
+def get_scramble_mode() -> bool:
+    return _scramble_mode
+
+
 def abort_landing(drone_id: str) -> bool:
     """Wave off a landing drone."""
     return _flight_deck.abort_landing(drone_id)
@@ -572,8 +586,14 @@ def _tick_launches(ship: Ship, dt: float, in_combat: bool = False) -> list[dict]
             break
         drone_id = fd.launch_queue.pop(0)
         fd.tubes_in_use.append(drone_id)
-        _launch_timers[drone_id] = LAUNCH_PREP_TIME
-        _launch_phases[drone_id] = "prep"
+        if _scramble_mode:
+            # Scramble: skip prep, use 3s catapult time directly.
+            from server.game_loop_carrier_ops import SCRAMBLE_LAUNCH_INTERVAL
+            _launch_timers[drone_id] = SCRAMBLE_LAUNCH_INTERVAL
+            _launch_phases[drone_id] = "launch"
+        else:
+            _launch_timers[drone_id] = LAUNCH_PREP_TIME
+            _launch_phases[drone_id] = "prep"
         events.append({
             "type": "launch_prep",
             "drone_id": drone_id,

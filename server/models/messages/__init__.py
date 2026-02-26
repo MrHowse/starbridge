@@ -214,6 +214,17 @@ from server.models.messages.spinal_mount import (
     WeaponsSpinalCancelPayload,
 )
 
+# Carrier Ops
+from server.models.messages.carrier_ops import (
+    CarrierCancelCAPPayload,
+    CarrierCancelScramblePayload,
+    CarrierCreateSquadronPayload,
+    CarrierDisbandSquadronPayload,
+    CarrierScramblePayload,
+    CarrierSetCAPPayload,
+    CarrierSquadronOrderPayload,
+)
+
 __all__ = [
     # base
     "Message",
@@ -376,4 +387,12 @@ __all__ = [
     "WeaponsSpinalChargePayload",
     "WeaponsSpinalFirePayload",
     "WeaponsSpinalCancelPayload",
+    # carrier ops
+    "CarrierCreateSquadronPayload",
+    "CarrierDisbandSquadronPayload",
+    "CarrierSquadronOrderPayload",
+    "CarrierSetCAPPayload",
+    "CarrierCancelCAPPayload",
+    "CarrierScramblePayload",
+    "CarrierCancelScramblePayload",
 ]

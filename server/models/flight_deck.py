@@ -101,6 +101,9 @@ class FlightDeck:
     fuel_lines_health: float = 100.0
     control_tower_health: float = 100.0
 
+    # Turnaround speed multiplier (0.5 = 50% of normal time for carrier).
+    turnaround_multiplier: float = 1.0
+
     # Deck emergency state.
     fire_active: bool = False
     depressurised: bool = False
@@ -351,6 +354,8 @@ class FlightDeck:
                 events.append({"type": "crash_cleared"})
 
         # Turnaround ticks.
+        # turnaround_multiplier < 1.0 means faster (carrier = 0.5 → 2× speed).
+        ta_dt = dt / self.turnaround_multiplier if self.turnaround_multiplier > 0 else dt
         for ta in list(self.turnarounds.values()):
             if ta.total_remaining > 0:
                 fuel_rate = 1.0
@@ -358,11 +363,11 @@ class FlightDeck:
                     fuel_rate = max(0.1, self.fuel_lines_health / 100.0)
 
                 if ta.needs_refuel and ta.refuel_remaining > 0:
-                    ta.refuel_remaining = max(0.0, ta.refuel_remaining - dt * fuel_rate)
+                    ta.refuel_remaining = max(0.0, ta.refuel_remaining - ta_dt * fuel_rate)
                 if ta.needs_rearm and ta.rearm_remaining > 0:
-                    ta.rearm_remaining = max(0.0, ta.rearm_remaining - dt)
+                    ta.rearm_remaining = max(0.0, ta.rearm_remaining - ta_dt)
                 if ta.needs_repair and ta.repair_remaining > 0:
-                    ta.repair_remaining = max(0.0, ta.repair_remaining - dt)
+                    ta.repair_remaining = max(0.0, ta.repair_remaining - ta_dt)
 
                 ta.total_remaining = max(
                     ta.refuel_remaining,
@@ -462,10 +467,14 @@ def create_flight_deck(ship_class_id: str) -> FlightDeck:
         tubes = 3
         rec_slots = 2
 
+    # Carrier turnaround is 50% faster (v0.07 §2.6.5).
+    ta_mult = 0.5 if ship_class_id == "carrier" else 1.0
+
     return FlightDeck(
         launch_tubes=tubes,
         recovery_slots=rec_slots,
         hangar_slots=slots,
+        turnaround_multiplier=ta_mult,
     )
 
 
@@ -525,6 +534,7 @@ def serialise_flight_deck(fd: FlightDeck) -> dict:
         "depressurised": fd.depressurised,
         "power_available": fd.power_available,
         "crash_block_remaining": fd.crash_block_remaining,
+        "turnaround_multiplier": fd.turnaround_multiplier,
     }
 
 
@@ -551,6 +561,7 @@ def deserialise_flight_deck(data: dict) -> FlightDeck:
     fd.depressurised = data.get("depressurised", False)
     fd.power_available = data.get("power_available", True)
     fd.crash_block_remaining = data.get("crash_block_remaining", 0.0)
+    fd.turnaround_multiplier = data.get("turnaround_multiplier", 1.0)
     ta_data = data.get("turnarounds", {})
     fd.turnarounds = {k: deserialise_turnaround(v) for k, v in ta_data.items()}
     return fd
