@@ -59,6 +59,8 @@ from server.models.boarding import (
 )
 from server.models.interior import ShipInterior
 from server.models.marine_teams import (
+    DEFAULT_POSITIONS as MARINE_DEFAULT_POSITIONS,
+    TEAM_NAMES as MARINE_TEAM_NAMES,
     TRAVEL_TIME_PER_ROOM as MARINE_TRAVEL_TIME,
     MarineTeam,
     generate_marine_teams,
@@ -711,6 +713,45 @@ def init_marine_teams(
 def get_marine_teams() -> list[MarineTeam]:
     """Return current marine teams (read-only view)."""
     return list(_marine_teams)
+
+
+def add_extra_marine_squad(
+    crew_member_ids: list[str] | None = None,
+) -> MarineTeam | None:
+    """Add one extra marine squad (v0.07 §2.3 Marine Barracks module).
+
+    Returns the created team, or None if already at max (3 teams).
+    """
+    idx = len(_marine_teams)
+    if idx >= len(MARINE_TEAM_NAMES):
+        return None  # max 3 teams
+
+    meta = MARINE_TEAM_NAMES[idx]
+    position = MARINE_DEFAULT_POSITIONS[idx] if idx < len(MARINE_DEFAULT_POSITIONS) else "conn"
+    team_size = 4
+
+    available_crew = list(crew_member_ids) if crew_member_ids else []
+    members: list[str] = []
+    for _ in range(team_size):
+        if available_crew:
+            members.append(available_crew.pop(0))
+        else:
+            members.append(f"{meta['id']}_marine_{len(members)}")
+
+    leader = members[0] if members else ""
+
+    team = MarineTeam(
+        id=meta["id"],
+        name=meta["name"],
+        callsign=meta["callsign"],
+        members=members,
+        leader=leader,
+        size=len(members),
+        max_size=team_size,
+        location=position,
+    )
+    _marine_teams.append(team)
+    return team
 
 
 def get_boarding_parties() -> list[BoardingParty]:

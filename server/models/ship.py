@@ -154,6 +154,10 @@ class Ship:
     # --- Engines (v0.07 §1.8 — set from ship class at game start) ---
     fuel_multiplier: float = 1.0          # class-specific fuel consumption rate (1.0 = baseline)
 
+    # --- Cargo (v0.07 §2.3 — enabled by Cargo Hold equipment module) ---
+    cargo_capacity: float = 0.0                             # 0 = no cargo bay; set by equipment module
+    cargo: dict[str, float] = field(default_factory=dict)   # resource_type → amount
+
     # --- Sensors (v0.07 §1.7 — set from ship class at game start) ---
     sensor_range_base: float = 30_000.0   # world units at 100% sensor efficiency (default = legacy BASE_SENSOR_RANGE)
 

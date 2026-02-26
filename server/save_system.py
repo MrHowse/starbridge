@@ -40,6 +40,8 @@ import server.game_loop_docking as gldo
 import server.game_loop_engineering as gle
 import server.game_loop_dynamic_missions as gldm
 import server.game_loop_janitor as glj
+import server.game_loop_mining as glmn
+import server.equipment_modules as gleq
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -103,6 +105,8 @@ def _serialise_ship(ship: Ship) -> dict:
         "repair_focus": ship.repair_focus,
         "alert_level": ship.alert_level,
         "medical_supplies": ship.medical_supplies,
+        "cargo_capacity": ship.cargo_capacity,
+        "cargo": dict(ship.cargo),
         "countermeasure_charges": ship.countermeasure_charges,
         "ew_countermeasure_active": ship.ew_countermeasure_active,
         "crew": _serialise_crew(ship.crew),
@@ -289,6 +293,8 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.repair_focus = data.get("repair_focus")
     ship.alert_level = data.get("alert_level", "green")
     ship.medical_supplies = int(data.get("medical_supplies", ship.medical_supplies))
+    ship.cargo_capacity = float(data.get("cargo_capacity", ship.cargo_capacity))
+    ship.cargo = dict(data.get("cargo", ship.cargo))
     ship.countermeasure_charges = int(data.get("countermeasure_charges", ship.countermeasure_charges))
     ship.ew_countermeasure_active = bool(data.get("ew_countermeasure_active", False))
 
@@ -475,6 +481,7 @@ def save_game(
         "mission_id": mission_id,
         "difficulty_preset": difficulty_preset,
         "ship_class": ship_class,
+        "equipment_module_ids": gleq.get_active_modules(),
         "tick_count": tick_count,
         "sector_layout": world.sector_grid.layout_id if world.sector_grid else None,
         "sector_grid_visibility": world.sector_grid.serialise() if world.sector_grid else None,
@@ -496,6 +503,8 @@ def save_game(
             "engineering": gle.serialise(),
             "dynamic_missions": gldm.serialise(),
             "janitor": glj.serialise(),
+            "equipment_modules": gleq.serialise(),
+            "mining": glmn.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -591,6 +600,10 @@ def restore_game(save_id: str, world: World) -> dict:
         gldm.deserialise(mods["dynamic_missions"])
     if mods.get("janitor"):
         glj.deserialise(mods["janitor"])
+    if mods.get("equipment_modules"):
+        gleq.deserialise(mods["equipment_modules"])
+    if mods.get("mining"):
+        glmn.deserialise(mods["mining"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")

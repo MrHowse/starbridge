@@ -122,6 +122,25 @@ def reset(ship_class_id: str = "frigate") -> None:
 # ---------------------------------------------------------------------------
 
 
+def apply_hangar_expansion() -> None:
+    """Expand hangar by +2 slots and add 1 combat drone (v0.07 §2.3)."""
+    from server.models.drones import CALLSIGN_POOLS, create_drone
+    _flight_deck.hangar_slots += 2
+    # Find next available slot index.
+    used_slots = {d.hangar_slot for d in _drones if d.hangar_slot is not None}
+    slot = _flight_deck.hangar_slots - 2  # start from the first new slot
+    while slot in used_slots:
+        slot += 1
+    # Generate unique combat drone ID and callsign.
+    existing_combat = [d for d in _drones if d.drone_type == "combat"]
+    idx = len(existing_combat)
+    pool = CALLSIGN_POOLS.get("combat", [])
+    callsign = pool[idx % len(pool)] if pool else f"combat_{idx + 1}"
+    drone_id = f"drone_c{idx + 1}"
+    drone = create_drone(drone_id, "combat", callsign, hangar_slot=slot)
+    _drones.append(drone)
+
+
 def get_drones() -> list[Drone]:
     return _drones
 

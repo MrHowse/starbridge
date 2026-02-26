@@ -68,6 +68,12 @@ FREQ_LOCK_ENGAGE_TIME: float = 5.0
 #: Base range for frequency lock (scales with ECM efficiency).
 FREQ_LOCK_RANGE: float = 20_000.0
 
+# --- Cloaking Device (v0.07 §2.3 — Frigate equipment module) ---
+#: Maximum active cloak duration before overheat.
+CLOAK_MAX_DURATION: float = 60.0
+#: Cooldown after overheat before cloak can be re-engaged.
+CLOAK_OVERHEAT_COOLDOWN: float = 120.0
+
 
 # ---------------------------------------------------------------------------
 # Module-level state
@@ -94,6 +100,11 @@ _freq_lock_target_id: str | None = None
 _freq_lock_progress: float = 0.0
 _freq_lock_active: bool = False
 
+# --- Cloaking Device state ---
+_cloak_module: bool = False
+_cloak_active_timer: float = 0.0
+_cloak_cooldown: float = 0.0
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -107,6 +118,7 @@ def reset(ship_class: str = "") -> None:
     global _corvette_ecm, _ghosts, _ghost_counter, _intercept_timer
     global _intercepted_signals, _ghost_class
     global _freq_lock_target_id, _freq_lock_progress, _freq_lock_active
+    global _cloak_module, _cloak_active_timer, _cloak_cooldown
     _jam_target_id = None
     _intrusion_target_id = None
     _intrusion_target_system = None
@@ -124,6 +136,10 @@ def reset(ship_class: str = "") -> None:
     _freq_lock_target_id = None
     _freq_lock_progress = 0.0
     _freq_lock_active = False
+    # Cloaking Device
+    _cloak_module = False
+    _cloak_active_timer = 0.0
+    _cloak_cooldown = 0.0
 
 
 def set_jam_target(entity_id: str | None) -> None:
@@ -175,6 +191,9 @@ def toggle_stealth(active: bool) -> dict:
     if active:
         if _stealth_state in ("activating", "active"):
             return {"ok": False, "reason": "already_engaged"}
+        # Cloak module: reject if overheated.
+        if _cloak_module and _cloak_cooldown > 0.0:
+            return {"ok": False, "reason": "overheated", "cooldown": round(_cloak_cooldown, 1)}
         _stealth_state = "activating"
         _stealth_timer = 0.0
         return {"ok": True, "state": "activating"}
@@ -242,6 +261,35 @@ def pop_stealth_break_reason() -> str | None:
     reason = _stealth_break_reason
     _stealth_break_reason = None
     return reason
+
+
+# ---------------------------------------------------------------------------
+# Cloaking Device (v0.07 §2.3 — Frigate equipment module)
+# ---------------------------------------------------------------------------
+
+
+def enable_cloak_module() -> None:
+    """Enable cloaking device. Makes the frigate stealth-capable."""
+    global _stealth_capable, _cloak_module
+    _stealth_capable = True
+    _cloak_module = True
+
+
+def is_cloak_module() -> bool:
+    """True when the cloaking device module is installed."""
+    return _cloak_module
+
+
+def get_cloak_remaining() -> float | None:
+    """Return seconds remaining before overheat, or None if cloak not active."""
+    if not _cloak_module or _stealth_state != "active":
+        return None
+    return max(0.0, CLOAK_MAX_DURATION - _cloak_active_timer)
+
+
+def get_cloak_cooldown() -> float:
+    """Return seconds remaining on overheat cooldown (0 if ready)."""
+    return _cloak_cooldown
 
 
 # ---------------------------------------------------------------------------
@@ -466,7 +514,10 @@ def tick(world: World, ship: Ship, dt: float) -> None:
 
     Also advances the stealth state machine timer and enforces stealth constraints.
     """
-    global _stealth_state, _stealth_timer
+    global _stealth_state, _stealth_timer, _cloak_active_timer, _cloak_cooldown
+    # --- Cloak module: decay overheat cooldown ---
+    if _cloak_module and _cloak_cooldown > 0.0:
+        _cloak_cooldown = max(0.0, _cloak_cooldown - dt)
     # --- Silent Running timer ---
     if _stealth_state == "activating":
         _stealth_timer += dt
@@ -483,11 +534,20 @@ def tick(world: World, ship: Ship, dt: float) -> None:
         # Break stealth if throttle exceeds engine limit
         if ship.throttle > STEALTH_ENGINE_LIMIT:
             break_stealth("engine_power")
+        # Cloak module: enforce max duration
+        if _cloak_module:
+            _cloak_active_timer += dt
+            if _cloak_active_timer >= CLOAK_MAX_DURATION:
+                break_stealth("overheat")
+                _cloak_cooldown = CLOAK_OVERHEAT_COOLDOWN
     elif _stealth_state == "deactivating":
         _stealth_timer += dt
         if _stealth_timer >= STEALTH_DEACTIVATION_TIME:
             _stealth_state = "inactive"
             _stealth_timer = 0.0
+            # Reset cloak active timer on full deactivation.
+            if _cloak_module:
+                _cloak_active_timer = 0.0
 
     ecm_eff = ship.systems["ecm_suite"].efficiency  # 0.0–1.5
     # Effective range and buildup both scale with ECM efficiency.
@@ -579,6 +639,10 @@ def build_state(world: World, ship: Ship) -> dict:
         "stealth_state": _stealth_state,
         "stealth_timer": round(_stealth_timer, 2),
         "stealth_capable": _stealth_capable,
+        # Cloaking Device (v0.07 §2.3)
+        "cloak_module": _cloak_module,
+        "cloak_remaining": round(_cr, 1) if (_cr := get_cloak_remaining()) is not None else None,
+        "cloak_cooldown": round(_cloak_cooldown, 1),
         # Corvette ECM (v0.07 §2.2)
         "corvette_ecm": _corvette_ecm,
         "ghosts": [
@@ -603,6 +667,10 @@ def serialise() -> dict:
         "stealth_state": _stealth_state,
         "stealth_timer": _stealth_timer,
         "stealth_capable": _stealth_capable,
+        # Cloaking Device
+        "cloak_module": _cloak_module,
+        "cloak_active_timer": _cloak_active_timer,
+        "cloak_cooldown": _cloak_cooldown,
         # Corvette ECM
         "corvette_ecm": _corvette_ecm,
         "ghosts": list(_ghosts),
@@ -621,6 +689,7 @@ def deserialise(data: dict) -> None:
     global _corvette_ecm, _ghosts, _ghost_counter, _intercept_timer
     global _intercepted_signals, _ghost_class
     global _freq_lock_target_id, _freq_lock_progress, _freq_lock_active
+    global _cloak_module, _cloak_active_timer, _cloak_cooldown
     _jam_target_id           = data.get("jam_target_id")
     _intrusion_target_id     = data.get("intrusion_target_id")
     _intrusion_target_system = data.get("intrusion_target_system")
@@ -628,6 +697,10 @@ def deserialise(data: dict) -> None:
     _stealth_timer           = data.get("stealth_timer", 0.0)
     _stealth_capable         = data.get("stealth_capable", False)
     _stealth_break_reason    = None
+    # Cloaking Device
+    _cloak_module            = data.get("cloak_module", False)
+    _cloak_active_timer      = data.get("cloak_active_timer", 0.0)
+    _cloak_cooldown          = data.get("cloak_cooldown", 0.0)
     # Corvette ECM
     _corvette_ecm            = data.get("corvette_ecm", False)
     _ghosts                  = list(data.get("ghosts", []))

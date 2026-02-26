@@ -569,7 +569,7 @@ async def test_start_game_includes_difficulty_in_payload():
     """game.started payload contains the chosen difficulty string."""
     received_difficulty: list[str] = []
 
-    async def fake_start(mission_id: str, difficulty: str, ship_class: str = "frigate") -> None:
+    async def fake_start(mission_id: str, difficulty: str, ship_class: str = "frigate", equipment_modules: list | None = None) -> None:
         received_difficulty.append(difficulty)
 
     m = fresh("a")
@@ -589,7 +589,7 @@ async def test_start_game_default_difficulty_is_officer():
     """Omitting difficulty in lobby.start_game defaults to 'officer'."""
     received_difficulty: list[str] = []
 
-    async def fake_start(mission_id: str, difficulty: str, ship_class: str = "frigate") -> None:
+    async def fake_start(mission_id: str, difficulty: str, ship_class: str = "frigate", equipment_modules: list | None = None) -> None:
         received_difficulty.append(difficulty)
 
     m = fresh("a")

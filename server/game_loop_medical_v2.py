@@ -215,6 +215,17 @@ def get_bed_count() -> int:
     return _treatment_beds
 
 
+def set_quarantine_slots(n: int) -> None:
+    """Set the number of quarantine slots."""
+    global _quarantine_slots
+    _quarantine_slots = n
+
+
+def get_quarantine_slots() -> int:
+    """Return the number of quarantine slots."""
+    return _quarantine_slots
+
+
 # ---------------------------------------------------------------------------
 # Patient Management
 # ---------------------------------------------------------------------------

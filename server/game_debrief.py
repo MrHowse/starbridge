@@ -279,6 +279,10 @@ def compute_debrief(events: list[dict]) -> dict:
         "net_standings": {k: round(v, 1) for k, v in net_standings.items()},
     }
 
+    # v0.07 §2.3: Include active equipment module names.
+    import server.equipment_modules as _gleq
+    equipment_module_names = _gleq.get_module_names()
+
     return {
         "per_station_stats": per_station,
         "awards":            awards,
@@ -286,6 +290,7 @@ def compute_debrief(events: list[dict]) -> dict:
         "timeline":          timeline,
         "dynamic_missions":  dynamic_missions,
         "comms_performance": comms_performance,
+        "equipment_modules": equipment_module_names,
     }
 
 

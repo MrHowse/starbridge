@@ -41,6 +41,7 @@ class ActiveScan:
 
 
 _active_scan: ActiveScan | None = None
+_scan_speed_modifier: float = 1.0  # <1.0 = faster scans (v0.07 §2.3)
 
 
 # ---------------------------------------------------------------------------
@@ -50,8 +51,20 @@ _active_scan: ActiveScan | None = None
 
 def reset() -> None:
     """Clear scan state. Call at game start / stop."""
-    global _active_scan
+    global _active_scan, _scan_speed_modifier
     _active_scan = None
+    _scan_speed_modifier = 1.0
+
+
+def set_scan_speed_modifier(mult: float) -> None:
+    """Set scan speed modifier. <1.0 = faster scans."""
+    global _scan_speed_modifier
+    _scan_speed_modifier = mult
+
+
+def get_scan_speed_modifier() -> float:
+    """Return the current scan speed modifier."""
+    return _scan_speed_modifier
 
 
 def start_scan(entity_id: str) -> None:
@@ -99,7 +112,8 @@ def tick(world: World, ship: Ship, dt: float) -> list[str]:
     scan_time_mult = getattr(ship.difficulty, "scan_time_multiplier", 1.0)
     # Higher efficiency → smaller denominator → larger progress increment.
     # scan_time_multiplier >1 = slower scans (longer duration).
-    effective_scan_time = BASE_SCAN_TIME * max(0.1, scan_time_mult)
+    # _scan_speed_modifier <1.0 = faster scans (equipment module).
+    effective_scan_time = BASE_SCAN_TIME * max(0.1, scan_time_mult) * _scan_speed_modifier
     progress_per_sec = 100.0 / (effective_scan_time / efficiency)
     _active_scan.progress = min(100.0, _active_scan.progress + progress_per_sec * dt)
 

@@ -34,6 +34,7 @@ class LobbyStartGamePayload(BaseModel):
     mission_id: str
     difficulty: str = "officer"
     ship_class: str = "frigate"
+    equipment_modules: list[str] = []
 
 
 class LobbyStatePayload(BaseModel):

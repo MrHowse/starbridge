@@ -78,7 +78,7 @@ class LobbySession:
 
 _manager: _ManagerProtocol | None = None
 _session: LobbySession = LobbySession()
-_on_game_start: Callable[[str, str, str], Awaitable[None]] | None = None
+_on_game_start: Callable[[str, str, str, list[str]], Awaitable[None]] | None = None
 # Stored once game.started is broadcast; re-sent to any client that joins later.
 _game_payload: dict[str, str] | None = None
 # True from game.started until game.over; controls whether new joins get replay.
@@ -109,11 +109,11 @@ def init(manager: _ManagerProtocol) -> None:
     _reserved_roles = {}
 
 
-def register_game_start_callback(callback: Callable[[str, str, str], Awaitable[None]]) -> None:
+def register_game_start_callback(callback: Callable[[str, str, str, list[str]], Awaitable[None]]) -> None:
     """Register a coroutine to call when the host starts a game.
 
     Called from main.py to wire game_loop.start into the lobby flow.
-    The callback receives (mission_id, difficulty, ship_class) strings.
+    The callback receives (mission_id, difficulty, ship_class, equipment_modules).
     """
     global _on_game_start
     _on_game_start = callback
@@ -432,6 +432,16 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
 
     players = {role: occ[1] for role, occ in _session.roles.items() if occ is not None}
 
+    # Validate equipment modules (if any).
+    from server.equipment_modules import validate_modules
+    modules_ok, modules_err = validate_modules(payload.ship_class, payload.equipment_modules)
+    if not modules_ok:
+        await _manager.send(
+            connection_id,
+            Message.build("error.validation", {"message": modules_err, "original_type": "lobby.start_game"}),
+        )
+        return
+
     _game_payload = {
         "mission_id": payload.mission_id,
         "mission_name": mission_data.get("name", "Awaiting Orders"),
@@ -442,6 +452,7 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
         "ship_class": payload.ship_class,
         "ship_classes": ship_classes,
         "players": players,
+        "equipment_modules": payload.equipment_modules,
     }
     _game_active = True
     start_logging(payload.mission_id, players)
@@ -457,7 +468,7 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
     )
 
     if _on_game_start is not None:
-        await _on_game_start(payload.mission_id, payload.difficulty, payload.ship_class)
+        await _on_game_start(payload.mission_id, payload.difficulty, payload.ship_class, payload.equipment_modules)
 
 
 # ---------------------------------------------------------------------------

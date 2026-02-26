@@ -166,6 +166,8 @@ import server.game_loop_creatures as glc
 import server.game_loop_engineering as gle
 import server.game_loop_dynamic_missions as gldm
 import server.game_loop_janitor as glj
+import server.game_loop_mining as glmn
+import server.equipment_modules as gleq
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -410,7 +412,12 @@ def _load_sector_grid_for_mission(mission_dict: dict, mission_id: str):  # type:
         return None
 
 
-async def start(mission_id: str, difficulty: str = "officer", ship_class: str = "frigate") -> None:
+async def start(
+    mission_id: str,
+    difficulty: str = "officer",
+    ship_class: str = "frigate",
+    equipment_modules: list[str] | None = None,
+) -> None:
     """Begin the game loop. Called when the host launches a game."""
     global _task, _tick_count, _game_start_time, _training_last_hint_idx
     global _mission_id, _difficulty_preset, _ship_class_id
@@ -445,6 +452,9 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
         k: max(0, int(v * _diff_preset.starting_torpedo_multiplier + 0.5))
         for k, v in _base_loadout.items()
     }
+    # v0.07 §2.3: Extra Torpedo Magazine adds +1 per type.
+    if gleq.has_module("extra_torpedo_magazine"):
+        _scaled_loadout = {k: v + 1 for k, v in _scaled_loadout.items()}
     glw.reset(_scaled_loadout, tube_count=_world.ship.torpedo_tube_count)
     glmed.reset()
     if _diff_preset.medical_supply_multiplier != 1.0:
@@ -455,7 +465,13 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     glcap.reset()
     gldc.reset()
     glfo.reset(ship_class)
+    # v0.07 §2.3: Drone Hangar Expansion.
+    if gleq.has_module("drone_hangar_expansion"):
+        glfo.apply_hangar_expansion()
     glew.reset(ship_class)
+    # v0.07 §2.3: Cloaking Device — enable scout-style stealth on frigate.
+    if gleq.has_module("cloaking_device"):
+        glew.enable_cloak_module()
     gltac.reset()
     gltr.reset()
     gldo.reset()
@@ -469,9 +485,13 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _applied_science_weapons_assists.clear()
     _prev_crew_factors.clear()
     sensors.reset()
+    # v0.07 §2.3: Enhanced Sensor Array — 20% faster scans.
+    if gleq.has_module("enhanced_sensor_array"):
+        sensors.set_scan_speed_modifier(0.8)
     glc.reset()
     gle.reset()
     glj.reset()
+    glmn.reset(active=gleq.has_module("mining_equipment"))
 
     if _task is not None and not _task.done():
         logger.warning("Game loop already running — stopping before restart")
@@ -520,10 +540,21 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
     _world.ship.interior = make_default_interior()
     _world.ship.difficulty = _diff_preset
 
+    # v0.07 §2.3: Apply equipment modules (stat changes to ship).
+    gleq.reset()
+    _eq_modules = equipment_modules or []
+    gleq.apply_modules(_world.ship, _eq_modules)
+
     # v0.06.1: Generate individual crew roster and wire into medical v2.
     _crew_count = (sc.min_crew + sc.max_crew) // 2
     _individual_roster = IndividualCrewRoster.generate(_crew_count, ship_class=ship_class)
     glmed.init_roster(_individual_roster, ship_class=ship_class)
+    # v0.07 §2.3: Medical Ward Upgrade — +2 beds, +1 quarantine, +20% supplies.
+    if gleq.has_module("medical_ward_upgrade"):
+        glmed.set_bed_count(glmed.get_bed_count() + 2)
+        glmed.set_quarantine_slots(glmed.get_quarantine_slots() + 1)
+        _base_supplies = glmed.get_supplies()
+        glmed.set_supplies(round(_base_supplies * 1.2, 1))
 
     logger.info(
         "Ship class: %s (hull=%.0f, ammo=%d, crew=%d), difficulty: %s",
@@ -556,6 +587,9 @@ async def start(mission_id: str, difficulty: str = "officer", ship_class: str = 
 
     # v0.06.3: Initialise marine teams for security station.
     gls.init_marine_teams(ship_class, crew_member_ids=_crew_ids)
+    # v0.07 §2.3: Marine Barracks — add extra squad.
+    if gleq.has_module("marine_barracks"):
+        gls.add_extra_marine_squad(crew_member_ids=_crew_ids)
 
     # Apply battery_capacity_multiplier to the power grid.
     _pg = gle.get_power_grid()
@@ -809,6 +843,13 @@ async def _loop() -> None:
         _hazard_shield_mod = hazard_system.get_shield_regen_modifier()
         # 3.8b Janitor maintenance tick.
         _janitor_events = glj.tick(_world.ship, TICK_DT, _world)
+        # 3.8b2 Mining tick.
+        _mining_events = glmn.tick(_world.ship, _world, TICK_DT)
+        for _mev in _mining_events:
+            await _manager.broadcast_to_roles(
+                ["engineering"],
+                Message.build("ship.mining_event", _mev),
+            )
         # 3.8 Science sector scan.
         glss_events = glss.tick(TICK_DT, _world)
         # Advance creature study while BIO sector scan is active.
@@ -2499,6 +2540,11 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "corvette_ecm": glew.is_corvette_ecm(),
             "ghost_class": glew.get_ghost_class(),
             "freq_lock_active": glew.is_freq_lock_active(),
+            # v0.07 §2.3: Equipment modules.
+            "equipment_modules": gleq.get_active_modules(),
+            "cargo_capacity": ship.cargo_capacity,
+            "cargo": dict(ship.cargo),
+            "mining": glmn.build_state(),
         },
         tick=tick,
     )

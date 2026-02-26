@@ -85,14 +85,19 @@ game_loop.init(world, manager, input_queue)
 
 # When the host starts a game the lobby calls this wrapper, which captures the
 # player roster for profile updates before delegating to game_loop.start.
-async def _on_game_start(mission_id: str, difficulty: str = "officer", ship_class: str = "frigate") -> None:
+async def _on_game_start(
+    mission_id: str,
+    difficulty: str = "officer",
+    ship_class: str = "frigate",
+    equipment_modules: list[str] | None = None,
+) -> None:
     players = {
         role: occ[1]
         for role, occ in lobby._session.roles.items()
         if occ is not None
     }
     game_loop.set_session_players(players)
-    await game_loop.start(mission_id, difficulty, ship_class)
+    await game_loop.start(mission_id, difficulty, ship_class, equipment_modules or [])
 
 lobby.register_game_start_callback(_on_game_start)
 # When the game ends the loop calls this to reset lobby state.
