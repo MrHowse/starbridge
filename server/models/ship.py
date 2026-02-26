@@ -38,6 +38,7 @@ class ShipSystem:
     _crew_factor: float = 1.0    # Updated each tick by Ship.update_crew_factors()
     _captain_offline: bool = False   # True = Captain has taken this system offline
     _maintenance_buff: float = 0.0   # Additive bonus from janitor maintenance tasks
+    _power_profile_modifier: float = 1.0  # v0.07 §3.3: Power profile efficiency modifier
 
     @property
     def efficiency(self) -> float:
@@ -46,11 +47,12 @@ class ShipSystem:
         Multiplied by _crew_factor (0.0–1.0) so crew casualties reduce system output.
         _crew_factor defaults to 1.0 — existing behaviour is unchanged when crew is full.
         Returns 0.0 when _captain_offline is True (Captain has disabled the system).
+        _power_profile_modifier is multiplicative — reactor tuning affects base efficiency.
         _maintenance_buff is additive — janitor maintenance tasks can boost efficiency.
         """
         if self._captain_offline:
             return 0.0
-        base = (self.power / 100.0) * (self.health / 100.0) * self._crew_factor
+        base = (self.power / 100.0) * (self.health / 100.0) * self._crew_factor * self._power_profile_modifier
         return base + self._maintenance_buff
 
 

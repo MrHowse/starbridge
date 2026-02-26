@@ -381,13 +381,18 @@ def create_drone(
     )
 
 
-def create_ship_drones(ship_class_id: str) -> list[Drone]:
+def create_ship_drones(
+    ship_class_id: str,
+    complement_override: dict[str, int] | None = None,
+) -> list[Drone]:
     """Generate the full drone complement for a ship class.
 
     Each drone gets a sequential ID (``drone_s1``, ``drone_c2``, etc.)
     and a unique callsign from its type's pool.
+
+    If complement_override is provided, it replaces the default complement.
     """
-    complement = DRONE_COMPLEMENT.get(ship_class_id, {})
+    complement = complement_override if complement_override is not None else DRONE_COMPLEMENT.get(ship_class_id, {})
     drones: list[Drone] = []
 
     # Track callsign usage per type to assign unique names.

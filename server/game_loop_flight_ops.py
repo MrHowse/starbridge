@@ -96,14 +96,14 @@ _scramble_mode: bool = False
 # ---------------------------------------------------------------------------
 
 
-def reset(ship_class_id: str = "frigate") -> None:
+def reset(ship_class_id: str = "frigate", drone_complement: dict[str, int] | None = None) -> None:
     """Initialise flight ops state at game start."""
     global _drones, _flight_deck, _missions, _buoys, _decoys
     global _decoy_stock, _decoy_counter, _bingo_timers, _pending_events
     global _launch_timers, _launch_phases, _retry_delays, _recovery_timers
     global _ship_evasive, _scramble_mode
 
-    _drones = create_ship_drones(ship_class_id)
+    _drones = create_ship_drones(ship_class_id, complement_override=drone_complement)
     _flight_deck = create_flight_deck(ship_class_id)
     _missions = {}
     _buoys = []

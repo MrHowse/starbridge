@@ -90,6 +90,7 @@ async def _on_game_start(
     difficulty: str = "officer",
     ship_class: str = "frigate",
     equipment_modules: list[str] | None = None,
+    loadout: dict | None = None,
 ) -> None:
     players = {
         role: occ[1]
@@ -97,7 +98,7 @@ async def _on_game_start(
         if occ is not None
     }
     game_loop.set_session_players(players)
-    await game_loop.start(mission_id, difficulty, ship_class, equipment_modules or [])
+    await game_loop.start(mission_id, difficulty, ship_class, equipment_modules or [], loadout=loadout)
 
 lobby.register_game_start_callback(_on_game_start)
 # When the game ends the loop calls this to reset lobby state.
@@ -298,6 +299,27 @@ async def api_difficulty_presets() -> dict:
             for key, p in _PRESETS.items()
         }
     }
+
+
+@app.get("/api/loadout/defaults/{ship_class}")
+async def api_loadout_defaults(ship_class: str) -> dict:
+    """Return loadout constraints and presets for a ship class."""
+    from server.loadout import get_loadout_defaults
+    return get_loadout_defaults(ship_class)
+
+
+@app.post("/api/loadout/validate")
+async def api_loadout_validate(body: dict) -> dict:
+    """Validate a loadout configuration against a ship class."""
+    from server.loadout import LoadoutConfig, validate_loadout
+    ship_class = body.get("ship_class", "frigate")
+    loadout_data = body.get("loadout", {})
+    try:
+        config = LoadoutConfig(**loadout_data)
+        ok, err = validate_loadout(config, ship_class)
+        return {"valid": ok, "errors": [err] if not ok else []}
+    except Exception as exc:
+        return {"valid": False, "errors": [str(exc)]}
 
 
 @app.get("/manual")

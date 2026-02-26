@@ -299,6 +299,10 @@ def compute_debrief(events: list[dict]) -> dict:
     import server.game_loop_medical_ship as _glms
     medical_ship_active = _glms.is_active()
 
+    # v0.07 §3: Loadout configuration.
+    import server.loadout as _gllo
+    loadout_state = _gllo.build_state()
+
     return {
         "per_station_stats": per_station,
         "awards":            awards,
@@ -311,6 +315,7 @@ def compute_debrief(events: list[dict]) -> dict:
         "spinal_mount_active": spinal_mount_active,
         "carrier_ops_active": carrier_ops_active,
         "medical_ship_active": medical_ship_active,
+        "loadout": loadout_state,
     }
 
 

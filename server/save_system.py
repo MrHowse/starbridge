@@ -46,6 +46,7 @@ import server.game_loop_spinal_mount as glsm
 import server.game_loop_carrier_ops as glcar
 import server.game_loop_medical_ship as glms
 import server.equipment_modules as gleq
+import server.loadout as gllo
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -517,6 +518,7 @@ def save_game(
             "spinal_mount": glsm.serialise(),
             "carrier_ops": glcar.serialise(),
             "medical_ship": glms.serialise(),
+            "loadout": gllo.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -624,6 +626,8 @@ def restore_game(save_id: str, world: World) -> dict:
         glcar.deserialise(mods["carrier_ops"])
     if mods.get("medical_ship"):
         glms.deserialise(mods["medical_ship"])
+    if "loadout" in mods:
+        gllo.deserialise(mods["loadout"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")

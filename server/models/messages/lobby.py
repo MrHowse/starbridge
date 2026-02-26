@@ -35,6 +35,7 @@ class LobbyStartGamePayload(BaseModel):
     difficulty: str = "officer"
     ship_class: str = "frigate"
     equipment_modules: list[str] = []
+    loadout: dict | None = None  # v0.07 §3: Pre-mission loadout configuration
 
 
 class LobbyStatePayload(BaseModel):

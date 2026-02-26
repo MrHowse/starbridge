@@ -190,6 +190,7 @@ import server.game_loop_spinal_mount as glsm
 import server.game_loop_carrier_ops as glcar
 import server.game_loop_medical_ship as glms
 import server.equipment_modules as gleq
+import server.loadout as gllo
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -439,6 +440,7 @@ async def start(
     difficulty: str = "officer",
     ship_class: str = "frigate",
     equipment_modules: list[str] | None = None,
+    loadout: dict | None = None,
 ) -> None:
     """Begin the game loop. Called when the host launches a game."""
     global _task, _tick_count, _game_start_time, _training_last_hint_idx
@@ -467,13 +469,30 @@ async def start(
     _sector_grid_dirty = True  # broadcast on first tick
     gln.reset()
     glss.reset()
+    # v0.07 §3: Parse and store loadout configuration.
+    gllo.reset()
+    _loadout_config = None
+    if loadout:
+        try:
+            _loadout_config = gllo.LoadoutConfig(**loadout)
+            gllo.set_loadout(_loadout_config)
+        except Exception:
+            logger.warning("Invalid loadout config — using defaults")
+            _loadout_config = None
     # Apply starting_torpedo_multiplier from difficulty preset.
     _diff_preset = get_preset(difficulty)
-    _base_loadout = sc.get_torpedo_loadout()
-    _scaled_loadout = {
-        k: max(0, int(v * _diff_preset.starting_torpedo_multiplier + 0.5))
-        for k, v in _base_loadout.items()
-    }
+    if _loadout_config and _loadout_config.torpedo_loadout is not None:
+        # v0.07 §3.2: Custom torpedo loadout overrides ship class default.
+        _scaled_loadout = gllo.apply_torpedo_loadout(
+            _loadout_config.torpedo_loadout,
+            difficulty_multiplier=_diff_preset.starting_torpedo_multiplier,
+        )
+    else:
+        _base_loadout = sc.get_torpedo_loadout()
+        _scaled_loadout = {
+            k: max(0, int(v * _diff_preset.starting_torpedo_multiplier + 0.5))
+            for k, v in _base_loadout.items()
+        }
     # v0.07 §2.3: Extra Torpedo Magazine adds +1 per type.
     if gleq.has_module("extra_torpedo_magazine"):
         _scaled_loadout = {k: v + 1 for k, v in _scaled_loadout.items()}
@@ -486,7 +505,11 @@ async def start(
     glco.reset()
     glcap.reset()
     gldc.reset()
-    glfo.reset(ship_class)
+    # v0.07 §3.5: Drone loadout override.
+    _drone_override = None
+    if _loadout_config and _loadout_config.drone_loadout is not None:
+        _drone_override = gllo.apply_drone_loadout(_loadout_config.drone_loadout)
+    glfo.reset(ship_class, drone_complement=_drone_override)
     # v0.07 §2.3: Drone Hangar Expansion.
     if gleq.has_module("drone_hangar_expansion"):
         glfo.apply_hangar_expansion()
@@ -591,7 +614,16 @@ async def start(
 
     # v0.06.1: Generate individual crew roster and wire into medical v2.
     _crew_count = (sc.min_crew + sc.max_crew) // 2
-    _individual_roster = IndividualCrewRoster.generate(_crew_count, ship_class=ship_class)
+    # v0.07 §3.4: Apply crew complement bias.
+    _dept_bias = None
+    if _loadout_config and _loadout_config.crew_bias is not None:
+        _deck_adj = gllo.compute_crew_bias_deck_adjustments(
+            _loadout_config.crew_bias, _crew_count, num_decks=sc.decks,
+        )
+        _dept_bias = _deck_adj
+    _individual_roster = IndividualCrewRoster.generate(
+        _crew_count, ship_class=ship_class, deck_counts=_dept_bias,
+    )
     glmed.init_roster(_individual_roster, ship_class=ship_class)
     # v0.07 §2.3: Medical Ward Upgrade — +2 beds, +1 quarantine, +20% supplies.
     if gleq.has_module("medical_ward_upgrade"):
@@ -628,6 +660,11 @@ async def start(
             _crew_ids.append(f"{_dk_name}_{_ci}")
     gle.init(_world.ship, crew_member_ids=_crew_ids,
              power_grid_config=sc.power_grid)
+
+    # v0.07 §3.3: Apply power profile to ship systems and power grid.
+    if _loadout_config:
+        _pg = gle.get_power_grid()
+        gllo.apply_power_profile(_loadout_config.power_profile, _world.ship, _pg)
 
     # v0.06.3: Initialise marine teams for security station.
     gls.init_marine_teams(ship_class, crew_member_ids=_crew_ids)

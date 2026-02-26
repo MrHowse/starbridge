@@ -354,13 +354,17 @@ class IndividualCrewRoster:
 
     @classmethod
     def generate(cls, crew_count: int, ship_class: str = "frigate",
-                 rng: random.Random | None = None) -> IndividualCrewRoster:
+                 rng: random.Random | None = None,
+                 deck_counts: dict[int, int] | None = None) -> IndividualCrewRoster:
         """Generate a full crew roster for the given ship class.
 
         Args:
             crew_count: Total number of crew members to generate.
             ship_class: Ship class name (for future specialisation).
             rng: Optional random.Random instance for deterministic generation.
+            deck_counts: Optional per-deck crew counts (v0.07 §3.4 crew bias).
+                         Dict of {deck_number: count}. If provided, overrides
+                         the default even distribution.
         """
         if rng is None:
             rng = random.Random()
@@ -377,7 +381,12 @@ class IndividualCrewRoster:
         ranks = _distribute_ranks(crew_count)
 
         # Generate deck assignments
-        decks = _distribute_decks(crew_count)
+        if deck_counts is not None:
+            decks = []
+            for dk, cnt in sorted(deck_counts.items()):
+                decks.extend([dk] * cnt)
+        else:
+            decks = _distribute_decks(crew_count)
         rng.shuffle(decks)
 
         # Build crew members
