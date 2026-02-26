@@ -662,6 +662,7 @@ async def resume_game(save_id: str) -> dict:
         room_id: {
             "name": room.name,
             "deck": room.deck,
+            "deck_number": room.deck_number,
             "col": room.position[0],
             "row": room.position[1],
             "connections": list(room.connections),

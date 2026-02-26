@@ -1,5 +1,5 @@
 /**
- * Starbridge — Security Station (v0.06.3)
+ * Starbridge — Security Station (v0.07)
  *
  * Full interior combat UI with marine team commands, boarding party intel,
  * door control, lockdowns, bulkheads, alert levels, armoury, quarantine.
@@ -58,8 +58,6 @@ const ROOM_W    = 120;
 const ROOM_H    = 70;
 const MARGIN    = 40;
 const GAP       = 8;
-const CANVAS_W  = MARGIN * 2 + 4 * (ROOM_W + GAP) - GAP;
-const CANVAS_H  = MARGIN * 2 + 5 * (ROOM_H + GAP) - GAP;
 
 const HIT_FLASH_MS = 500;
 
@@ -72,13 +70,16 @@ const C_WARN     = '#ffb000';
 const C_FIRE     = '#ff6600';
 const C_CONN     = 'rgba(0,255,65,0.18)';
 
-// Hull geometry
-const HULL_CX = CANVAS_W / 2;
-const HULL_VERTICES = [
-  [292,5],[160,38],[24,96],[16,200],[24,332],[60,422],[148,448],
-  [292,454],[436,448],[524,422],[560,332],[568,200],[560,96],[424,38],
-];
-const DECK_BOUNDARIES_Y = [114, 192, 270, 348];
+// Dynamic hull geometry — recomputed per layout
+let _shipClass = '';
+let _hullImg = null;
+let _canvasW = MARGIN * 2 + 4 * (ROOM_W + GAP) - GAP;
+let _canvasH = MARGIN * 2 + 5 * (ROOM_H + GAP) - GAP;
+let _gridCols = 4;
+let _gridRows = 5;
+let _deckCount = 5;
+let _deckBoundariesY = [];
+let _deckLabels = {};
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -133,6 +134,104 @@ let _lastBoardingJson = '';
 let _lastStatusJson = '';
 
 // ---------------------------------------------------------------------------
+// Dynamic geometry computation
+// ---------------------------------------------------------------------------
+
+function _computeGeometry(layoutData) {
+  let maxCol = 0, maxRow = 0, maxDeck = 0;
+  const deckRows = {};  // deck_number -> Set of row indices
+
+  for (const r of Object.values(layoutData)) {
+    if (r.col > maxCol) maxCol = r.col;
+    if (r.row > maxRow) maxRow = r.row;
+    const dn = r.deck_number || r.deck_number || parseInt(r.deck) || 1;
+    if (dn > maxDeck) maxDeck = dn;
+    if (!deckRows[dn]) deckRows[dn] = new Set();
+    deckRows[dn].add(r.row);
+  }
+
+  _gridCols = maxCol + 1;
+  _gridRows = maxRow + 1;
+  _deckCount = maxDeck;
+
+  _canvasW = MARGIN * 2 + _gridCols * (ROOM_W + GAP) - GAP;
+  _canvasH = MARGIN * 2 + _gridRows * (ROOM_H + GAP) - GAP;
+
+  canvas.width = _canvasW;
+  canvas.height = _canvasH;
+
+  // Compute deck boundary Y positions
+  _deckBoundariesY = [];
+  for (let d = 1; d < _deckCount; d++) {
+    const rowsAbove = deckRows[d] || new Set();
+    const rowsBelow = deckRows[d + 1] || new Set();
+    const lastAbove = Math.max(...rowsAbove);
+    const firstBelow = Math.min(...rowsBelow);
+    const yAbove = MARGIN + lastAbove * (ROOM_H + GAP) + ROOM_H;
+    const yBelow = MARGIN + firstBelow * (ROOM_H + GAP);
+    _deckBoundariesY.push((yAbove + yBelow) / 2);
+  }
+
+  // Derive deck labels from room names
+  _deckLabels = {};
+  const deckNameCounts = {};
+  for (const r of Object.values(layoutData)) {
+    const dn = r.deck_number || r.deck_number || parseInt(r.deck) || 1;
+    if (!deckNameCounts[dn]) deckNameCounts[dn] = {};
+    const dname = r.crew_deck || r.deck || `Deck ${dn}`;
+    deckNameCounts[dn][dname] = (deckNameCounts[dn][dname] || 0) + 1;
+  }
+  for (const [dn, counts] of Object.entries(deckNameCounts)) {
+    let best = '', bestN = 0;
+    for (const [name, n] of Object.entries(counts)) {
+      if (n > bestN) { best = name; bestN = n; }
+    }
+    _deckLabels[dn] = best.charAt(0).toUpperCase() + best.slice(1);
+  }
+}
+
+function _populateDeckControls() {
+  // Deck tabs
+  const tabContainer = document.getElementById('deck-tabs');
+  if (tabContainer) {
+    const allBtn = tabContainer.querySelector('[data-deck="0"]');
+    tabContainer.innerHTML = '';
+    if (allBtn) tabContainer.appendChild(allBtn);
+    for (let d = 1; d <= _deckCount; d++) {
+      const btn = document.createElement('button');
+      btn.className = 'deck-tab';
+      btn.dataset.deck = String(d);
+      btn.textContent = `D${d}`;
+      tabContainer.appendChild(btn);
+    }
+  }
+
+  // Bulkhead select
+  const bSel = document.getElementById('sel-bulkhead');
+  if (bSel) {
+    bSel.innerHTML = '<option value="">BULKHEAD ▼</option>';
+    for (let d = 1; d < _deckCount; d++) {
+      bSel.innerHTML += `<option value="seal_${d}_${d + 1}">SEAL D${d}-D${d + 1}</option>`;
+    }
+    for (let d = 1; d < _deckCount; d++) {
+      bSel.innerHTML += `<option value="unseal_${d}_${d + 1}">UNSEAL D${d}-D${d + 1}</option>`;
+    }
+  }
+
+  // Arm crew select
+  const aSel = document.getElementById('sel-arm');
+  if (aSel) {
+    aSel.innerHTML = '<option value="">ARM CREW ▼</option>';
+    for (let d = 1; d <= _deckCount; d++) {
+      aSel.innerHTML += `<option value="arm_${d}">ARM DECK ${d}</option>`;
+    }
+    for (let d = 1; d <= _deckCount; d++) {
+      aSel.innerHTML += `<option value="disarm_${d}">DISARM DECK ${d}</option>`;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Geometry helpers
 // ---------------------------------------------------------------------------
 
@@ -157,35 +256,54 @@ function roomAtPoint(px, py) {
 // Hull rendering
 // ---------------------------------------------------------------------------
 
-function hullPath() {
-  ctx.beginPath();
-  ctx.moveTo(HULL_VERTICES[0][0], HULL_VERTICES[0][1]);
-  for (let i = 1; i < HULL_VERTICES.length; i++) ctx.lineTo(HULL_VERTICES[i][0], HULL_VERTICES[i][1]);
-  ctx.closePath();
-}
-
 function drawHull() {
   ctx.save();
-  hullPath(); ctx.fillStyle = '#030d05'; ctx.fill();
-  ctx.save(); hullPath(); ctx.clip(); hullPath();
-  ctx.strokeStyle = 'rgba(0,255,65,0.09)'; ctx.lineWidth = 10; ctx.stroke(); ctx.restore();
-  hullPath(); ctx.shadowBlur = 22; ctx.shadowColor = 'rgba(0,255,65,0.5)';
-  ctx.strokeStyle = 'rgba(0,255,65,0.6)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.shadowBlur = 0;
+  if (_hullImg && _hullImg.complete && _hullImg.naturalWidth > 0) {
+    // Draw SVG silhouette scaled to canvas as faint background
+    ctx.globalAlpha = 0.12;
+    ctx.drawImage(_hullImg, 0, 0, _canvasW, _canvasH);
+    ctx.globalAlpha = 1.0;
+    // Faint border glow
+    ctx.shadowBlur = 22; ctx.shadowColor = 'rgba(0,255,65,0.5)';
+    ctx.strokeStyle = 'rgba(0,255,65,0.6)'; ctx.lineWidth = 1.5;
+    const r = 12;
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(_canvasW - r, 0); ctx.quadraticCurveTo(_canvasW, 0, _canvasW, r);
+    ctx.lineTo(_canvasW, _canvasH - r); ctx.quadraticCurveTo(_canvasW, _canvasH, _canvasW - r, _canvasH);
+    ctx.lineTo(r, _canvasH); ctx.quadraticCurveTo(0, _canvasH, 0, _canvasH - r);
+    ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath(); ctx.stroke();
+    ctx.shadowBlur = 0;
+  } else {
+    // Fallback: rounded-rect outline
+    ctx.fillStyle = '#030d05';
+    const r = 12;
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(_canvasW - r, 0); ctx.quadraticCurveTo(_canvasW, 0, _canvasW, r);
+    ctx.lineTo(_canvasW, _canvasH - r); ctx.quadraticCurveTo(_canvasW, _canvasH, _canvasW - r, _canvasH);
+    ctx.lineTo(r, _canvasH); ctx.quadraticCurveTo(0, _canvasH, 0, _canvasH - r);
+    ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 22; ctx.shadowColor = 'rgba(0,255,65,0.5)';
+    ctx.strokeStyle = 'rgba(0,255,65,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
   ctx.restore();
 }
 
 function drawStructure() {
-  ctx.save(); hullPath(); ctx.clip();
+  const cx = _canvasW / 2;
+  ctx.save();
   ctx.setLineDash([5, 7]); ctx.strokeStyle = 'rgba(0,255,65,0.18)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(HULL_CX, 10); ctx.lineTo(HULL_CX, 450); ctx.stroke();
-  for (const y of DECK_BOUNDARIES_Y) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(cx, 10); ctx.lineTo(cx, _canvasH - 10); ctx.stroke();
+  for (const y of _deckBoundariesY) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(_canvasW, y); ctx.stroke(); }
   ctx.setLineDash([]);
   ctx.font = '10px "Share Tech Mono", monospace'; ctx.fillStyle = 'rgba(0,255,65,0.28)';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('BOW', HULL_CX, 10);
-  ctx.textBaseline = 'bottom'; ctx.fillText('STERN', HULL_CX, 448);
-  const eng = ctx.createRadialGradient(HULL_CX, 450, 0, HULL_CX, 450, 90);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('BOW', cx, 10);
+  ctx.textBaseline = 'bottom'; ctx.fillText('STERN', cx, _canvasH - 6);
+  const eng = ctx.createRadialGradient(cx, _canvasH - 4, 0, cx, _canvasH - 4, 90);
   eng.addColorStop(0, 'rgba(255,110,0,0.10)'); eng.addColorStop(1, 'rgba(255,110,0,0)');
-  ctx.fillStyle = eng; ctx.fillRect(HULL_CX - 90, 368, 180, 88);
+  ctx.fillStyle = eng; ctx.fillRect(cx - 90, _canvasH - 86, 180, 88);
   ctx.restore();
 }
 
@@ -211,8 +329,8 @@ function doorLineStyle(roomId) {
 }
 
 function draw() {
-  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-  ctx.fillStyle = C_BG; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.clearRect(0, 0, _canvasW, _canvasH);
+  ctx.fillStyle = C_BG; ctx.fillRect(0, 0, _canvasW, _canvasH);
   drawHull(); drawStructure();
   if (Object.keys(layout).length === 0) return;
 
@@ -363,13 +481,13 @@ function renderAlerts(force = false) {
   _lastAlertsJson = alertsKey;
 
   alertListEl.innerHTML = '';
-  const deckNames = { 1: 'Bridge', 2: 'Operations', 3: 'Combat', 4: 'Medical', 5: 'Engineering' };
-  for (let d = 1; d <= 5; d++) {
+  for (let d = 1; d <= _deckCount; d++) {
     const level = deckAlerts[String(d)] || 'normal';
     const row = document.createElement('div');
     row.className = 'alert-row';
+    const deckLabel = _deckLabels[d] || '';
     row.innerHTML = `
-      <span class="text-label text-dim">DECK ${d} ${deckNames[d]}</span>
+      <span class="text-label text-dim">DECK ${d}${deckLabel ? ' ' + deckLabel : ''}</span>
       <span class="alert-badge alert-badge--${level}">${level.toUpperCase()}</span>
     `;
     row.addEventListener('click', () => {
@@ -613,11 +731,11 @@ document.getElementById('sel-lockdown')?.addEventListener('change', function () 
   const val = this.value; this.value = '';
   if (val === 'deck' && selectedRoomId) {
     const r = layout[selectedRoomId];
-    if (r) send('security.lockdown_deck', { deck: parseInt(r.deck) || 1 });
+    if (r) send('security.lockdown_deck', { deck: r.deck_number || parseInt(r.deck) || 1 });
   } else if (val === 'ship') send('security.lockdown_all', {});
   else if (val === 'lift_deck' && selectedRoomId) {
     const r = layout[selectedRoomId];
-    if (r) send('security.lift_lockdown', { deck: parseInt(r.deck) || 1 });
+    if (r) send('security.lift_lockdown', { deck: r.deck_number || parseInt(r.deck) || 1 });
   } else if (val === 'lift_all') send('security.lift_lockdown', { all: true });
 });
 
@@ -647,7 +765,7 @@ document.getElementById('sel-alert')?.addEventListener('change', function () {
   const val = this.value; this.value = '';
   if (!selectedRoomId) return;
   const r = layout[selectedRoomId];
-  if (r && val) send('security.set_deck_alert', { deck: parseInt(r.deck) || 1, level: val });
+  if (r && val) send('security.set_deck_alert', { deck: r.deck_number || parseInt(r.deck) || 1, level: val });
 });
 
 // Populate quarantine and alert selects
@@ -696,7 +814,22 @@ function handleGameStarted(payload) {
   standbyEl.style.display = 'none';
   for (const el of document.querySelectorAll('[data-security-main]')) el.style.display = '';
   if (payload.mission_name) missionLabelEl.textContent = payload.mission_name;
-  if (payload.interior_layout) layout = payload.interior_layout;
+
+  _shipClass = payload.ship_class || '';
+
+  if (payload.interior_layout) {
+    layout = payload.interior_layout;
+    _computeGeometry(layout);
+  }
+
+  // Load SVG silhouette
+  if (_shipClass) {
+    _hullImg = new Image();
+    _hullImg.onload = () => draw();
+    _hullImg.src = `/client/shared/silhouettes/${_shipClass}.svg`;
+  }
+
+  _populateDeckControls();
   showBriefing(payload.mission_name, payload.briefing_text);
   populateSelects();
   renderAll(true);
@@ -730,8 +863,8 @@ function handleHullHit() {
 // ---------------------------------------------------------------------------
 
 function init() {
-  canvas.width = CANVAS_W;
-  canvas.height = CANVAS_H;
+  canvas.width = _canvasW;
+  canvas.height = _canvasH;
 
   onStatusChange((status) => {
     setStatusDot(statusDotEl, status);

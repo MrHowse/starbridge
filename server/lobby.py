@@ -414,6 +414,7 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
         room_id: {
             "name": room.name,
             "deck": room.deck,
+            "deck_number": room.deck_number,
             "col": room.position[0],
             "row": room.position[1],
             "connections": list(room.connections),
