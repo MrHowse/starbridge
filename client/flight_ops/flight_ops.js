@@ -137,6 +137,10 @@ initSharedUI({
 
     resizeCanvas();
     SoundBank.setAmbient('life_support', { active: true });
+
+    // Ship-class-specific panels
+    const squadronPanel = document.getElementById('squadron-panel');
+    if (squadronPanel) squadronPanel.style.display = (payload.ship_class === 'carrier') ? '' : 'none';
   },
   onGameOver(payload) {
     standbyEl.style.display = '';

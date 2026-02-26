@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function handleMessage(msg) {
   switch (msg.type) {
     case 'game.started':
-      showStation(msg.payload.mission_name || 'ACTIVE MISSION');
+      showStation(msg.payload.mission_name || 'ACTIVE MISSION', msg.payload.ship_class || '');
       SoundBank.setAmbient('life_support', { active: true });
       break;
     case 'game.over':
@@ -173,10 +173,16 @@ function handleMessage(msg) {
 // UI update helpers
 // ---------------------------------------------------------------------------
 
-function showStation(missionName) {
+function showStation(missionName, shipClass) {
   document.querySelector('[data-standby]').style.display = 'none';
   document.querySelector('[data-ew-main]').style.display = 'grid';
   document.getElementById('mission-label').textContent = missionName.toUpperCase();
+
+  // Ship-class-specific panels
+  const stealthPanel = document.getElementById('stealth-panel');
+  const advEcmPanel  = document.getElementById('advanced-ecm-panel');
+  if (stealthPanel) stealthPanel.style.display = shipClass === 'scout' ? '' : 'none';
+  if (advEcmPanel)  advEcmPanel.style.display  = shipClass === 'corvette' ? '' : 'none';
 }
 
 function updateControls() {

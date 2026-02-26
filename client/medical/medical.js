@@ -1062,6 +1062,13 @@ function handleGameStarted(payload) {
   if (payload.mission_name) missionLabelEl.textContent = payload.mission_name;
   showBriefing(payload.mission_name, payload.briefing_text);
   _startDiagramLoop();
+
+  // Ship-class-specific panels
+  const isMedShip = (payload.ship_class === 'medical_ship');
+  const surgicalPanel = document.getElementById('surgical-theatre-panel');
+  const triagePanel   = document.getElementById('triage-ai-panel');
+  if (surgicalPanel) surgicalPanel.style.display = isMedShip ? '' : 'none';
+  if (triagePanel)   triagePanel.style.display   = isMedShip ? '' : 'none';
 }
 
 function handleHullHit() {

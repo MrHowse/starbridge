@@ -160,6 +160,7 @@ let torpedoAmmoMax = {};   // type → max count
 let pendingAuth = [null, null];
 
 // Shield focus state.
+let _sfSilhouetteImg = null;        // ship silhouette for shield focus canvas
 let _sfX = 0.0, _sfY = 0.0;        // focus point (-1..+1)
 let _sfLockX = false, _sfLockY = false;
 let _sfDragging = false;
@@ -233,6 +234,20 @@ function handleGameStarted(payload) {
   hintsEnabled = payload.difficulty === 'cadet';
   gameActive = true;
 
+  // Ship-class-specific panels
+  const sc = payload.ship_class || '';
+  const spinalPanel = document.getElementById('spinal-mount-panel');
+  const dualPanel   = document.getElementById('dual-target-panel');
+  if (spinalPanel) spinalPanel.style.display = sc === 'battleship' ? '' : 'none';
+  if (dualPanel)   dualPanel.style.display   = (sc === 'cruiser' || sc === 'battleship') ? '' : 'none';
+
+  // Load ship silhouette for shield focus canvas.
+  if (sc) {
+    const img = new Image();
+    img.src = `/client/shared/silhouettes/${sc}.svg`;
+    img.onload = () => { _sfSilhouetteImg = img; };
+  }
+
   // Range control (replaces old fixed RADAR_WORLD_RADIUS).
   const wpnRanges = STATION_RANGES.weapons;
   rangeControl = new RangeControl({
@@ -301,6 +316,7 @@ function handleGameStarted(payload) {
         }
       },
     });
+    radarRenderer.loadShipSilhouette(sc);
     radarRenderer.onContactClick((id) => selectTarget(id));
     _updateWeaponRangeRings();
 
@@ -663,12 +679,19 @@ function _drawShieldFocus(dist) {
   ctx.fillStyle = '#000a14';
   ctx.fillRect(0, 0, W, H);
 
-  // Hull rect outline (60% of canvas, centred).
+  // Hull outline (silhouette SVG or fallback rect, 60% of canvas, centred).
   const hullW = W * 0.6, hullH = H * 0.6;
   const hullX = (W - hullW) / 2, hullY = (H - hullH) / 2;
-  ctx.strokeStyle = 'rgba(0,170,255,0.3)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(hullX, hullY, hullW, hullH);
+  if (_sfSilhouetteImg) {
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.drawImage(_sfSilhouetteImg, hullX, hullY, hullW, hullH);
+    ctx.restore();
+  } else {
+    ctx.strokeStyle = 'rgba(0,170,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(hullX, hullY, hullW, hullH);
+  }
 
   // 4 edge bands.
   const bands = [
