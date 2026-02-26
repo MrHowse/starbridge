@@ -149,6 +149,14 @@
         </div>
       </aside>
 
+      <!-- Ship-class-specific panels (hidden by default) -->
+      <div id="modular-bay-panel" class="panel eng-class-panel" style="display:none">
+        <div class="panel-header"><span>MODULAR BAYS</span></div>
+        <div class="panel-body" id="modular-bay-content">
+          <span class="text-dim">Equipment module status loading...</span>
+        </div>
+      </div>
+
     </main>
 
     <!-- ─── Bottom status bar ──────────────────────────────────────────── -->
@@ -160,6 +168,10 @@
       <span class="eng-statusbar__item" id="sb-battery">
         <span class="text-label">BAT</span>
         <span class="text-data" id="sb-battery-val">100%</span>
+      </span>
+      <span class="eng-statusbar__item" id="sb-armour" style="display:none">
+        <span class="text-label">ARM</span>
+        <span class="text-data" id="sb-armour-val">0/0</span>
       </span>
       <span class="eng-statusbar__item" id="sb-teams">
         <span class="text-label">TEAMS</span>

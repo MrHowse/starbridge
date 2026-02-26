@@ -101,14 +101,41 @@
           <div id="crew-mgmt-list"></div>
         </div>
 
-        <!-- Hull / shields quick-status -->
+        <!-- Hull / armour / shields quick-status -->
         <div class="captain-panel" id="quick-status-panel">
-          <div class="panel-header"><span>HULL / SHIELDS</span></div>
+          <div class="panel-header"><span>HULL / ARMOUR / SHIELDS</span></div>
           <div class="quick-status">
             <div class="quick-row">
               <span class="qs-label">HULL</span>
               <div class="qs-bar"><div id="hull-fill" class="qs-fill qs-fill--hull"></div></div>
               <span class="qs-val" id="hull-text">100</span>
+            </div>
+            <div class="quick-row" id="armour-row" style="display:none">
+              <span class="qs-label">ARM</span>
+              <div class="qs-bar"><div id="armour-fill" class="qs-fill qs-fill--armour"></div></div>
+              <span class="qs-val" id="armour-text">0</span>
+            </div>
+            <div id="armour-zones-container" style="display:none">
+              <div class="quick-row">
+                <span class="qs-label">A-F</span>
+                <div class="qs-bar"><div id="armour-fore-fill" class="qs-fill qs-fill--armour"></div></div>
+                <span class="qs-val" id="armour-fore-text">0</span>
+              </div>
+              <div class="quick-row">
+                <span class="qs-label">A-A</span>
+                <div class="qs-bar"><div id="armour-aft-fill" class="qs-fill qs-fill--armour"></div></div>
+                <span class="qs-val" id="armour-aft-text">0</span>
+              </div>
+              <div class="quick-row">
+                <span class="qs-label">A-P</span>
+                <div class="qs-bar"><div id="armour-port-fill" class="qs-fill qs-fill--armour"></div></div>
+                <span class="qs-val" id="armour-port-text">0</span>
+              </div>
+              <div class="quick-row">
+                <span class="qs-label">A-S</span>
+                <div class="qs-bar"><div id="armour-starboard-fill" class="qs-fill qs-fill--armour"></div></div>
+                <span class="qs-val" id="armour-starboard-text">0</span>
+              </div>
             </div>
             <div class="quick-row">
               <span class="qs-label">FORE</span>
@@ -226,6 +253,14 @@
             SAVE &amp; RETURN TO LOBBY
           </button>
           <div id="save-status" class="text-dim" style="font-size:.65rem;text-align:center;margin-top:4px"></div>
+        </div>
+
+        <!-- Ship-class-specific panels (hidden by default) -->
+        <div id="flag-bridge-panel" class="panel" style="display:none">
+          <div class="panel-header"><span>FLAG BRIDGE</span></div>
+          <div class="panel-body" id="flag-bridge-content">
+            <span class="text-dim">Fleet coordination available.</span>
+          </div>
         </div>
 
         <!-- Science summary -->

@@ -118,6 +118,8 @@ const damageLogListEl    = document.getElementById('damage-log-list');
 // Status bar
 const sbPowerVal     = document.getElementById('sb-power-val');
 const sbBatteryVal   = document.getElementById('sb-battery-val');
+const sbArmourEl     = document.getElementById('sb-armour');
+const sbArmourVal    = document.getElementById('sb-armour-val');
 const sbTeamsVal     = document.getElementById('sb-teams-val');
 const sbBusVal       = document.getElementById('sb-bus-val');
 const sbEmergencyVal = document.getElementById('sb-emergency-val');
@@ -129,6 +131,7 @@ const sbEmergencyEl  = document.getElementById('sb-emergency');
 
 let gameActive     = false;
 let hintsEnabled   = false;
+let _shipClass     = '';
 let currShipState  = null;    // most recent ship.state payload
 let currEngState   = null;    // most recent engineering.state payload
 let selectedSystem = null;    // key of the system selected in detail panel
@@ -199,6 +202,11 @@ function handleGameStarted(payload) {
   standbyEl.style.display    = 'none';
   engMainEl.style.display    = 'grid';
   statusBarEl.style.display  = 'flex';
+  _shipClass = payload.ship_class || '';
+
+  // Ship-class-specific panels
+  const modularBayPanel = document.getElementById('modular-bay-panel');
+  if (modularBayPanel) modularBayPanel.style.display = _shipClass === 'frigate' ? '' : 'none';
 
   // Store interior layout for the map
   interiorLayout = payload.interior_layout || {};
@@ -241,6 +249,13 @@ function handleShipState(payload) {
   applyShipState(payload);
   const totalPwr = Object.values(payload.systems || {}).reduce((s, sys) => s + (sys.power || 0), 0);
   SoundBank.setAmbient('reactor_drone', { powerLoad: totalPwr / POWER_BUDGET });
+
+  // Armour status bar
+  const armMax = payload.armour_max || 0;
+  if (sbArmourEl) sbArmourEl.style.display = armMax > 0 ? '' : 'none';
+  if (sbArmourVal && armMax > 0) {
+    sbArmourVal.textContent = `${Math.round(payload.armour || 0)}/${Math.round(armMax)}`;
+  }
 }
 
 function handleEngState(payload) {

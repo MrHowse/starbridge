@@ -444,6 +444,10 @@
   background: var(--hull-damage, #00ff41);
 }
 
+.qs-fill--armour {
+  background: #ff8800;
+}
+
 .qs-fill--shield {
   background: #00aaff;
 }

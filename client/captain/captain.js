@@ -37,6 +37,7 @@ import {
   setSingleCanvas,
   setHighlights,
   setLabels,
+  setShipClass,
 } from './wireframe.js';
 import {
   initShipStatus,
@@ -86,6 +87,20 @@ const shieldPortFill = document.getElementById('shield-port-fill');
 const shieldPortText = document.getElementById('shield-port-text');
 const shieldStarFill = document.getElementById('shield-star-fill');
 const shieldStarText = document.getElementById('shield-star-text');
+
+// Armour
+const armourRow          = document.getElementById('armour-row');
+const armourFill         = document.getElementById('armour-fill');
+const armourText         = document.getElementById('armour-text');
+const armourZonesEl      = document.getElementById('armour-zones-container');
+const armourForeFill     = document.getElementById('armour-fore-fill');
+const armourForeText     = document.getElementById('armour-fore-text');
+const armourAftFill      = document.getElementById('armour-aft-fill');
+const armourAftText      = document.getElementById('armour-aft-text');
+const armourPortFill     = document.getElementById('armour-port-fill');
+const armourPortText     = document.getElementById('armour-port-text');
+const armourStarFill     = document.getElementById('armour-starboard-fill');
+const armourStarText     = document.getElementById('armour-starboard-text');
 
 // Science
 const scanActiveRow      = document.getElementById('scan-active-row');
@@ -154,6 +169,7 @@ let shipState    = null;
 let mapRenderer  = null;
 let _sectorMap   = null;
 let _pendingAuthId = null;
+let _shipClass   = '';
 const _logEntries  = [];
 
 // Dynamic missions state
@@ -307,6 +323,11 @@ function handleGameStarted(payload) {
   standbyEl.style.display     = 'none';
   captainMainEl.style.display = '';
   gameActive = true;
+  _shipClass = payload.ship_class || '';
+
+  // Ship-class-specific panels
+  const flagBridgePanel = document.getElementById('flag-bridge-panel');
+  if (flagBridgePanel) flagBridgePanel.style.display = _shipClass === 'cruiser' ? '' : 'none';
 
   // Wireframe viewports
   initViewports({
@@ -316,6 +337,7 @@ function handleGameStarted(payload) {
     starboard: document.getElementById('vp-starboard'),
   });
   setSingleCanvas(document.getElementById('vp-single'));
+  setShipClass(_shipClass);
 
   // Ship silhouette + system controls
   const silhouetteCanvas = document.getElementById('ship-silhouette');
@@ -360,6 +382,7 @@ function handleGameStarted(payload) {
       onRoutePlot:   (wx, wy) => send('map.plot_route', { to_x: wx, to_y: wy }),
       onZoomChange:  () => {},
     });
+    mapRenderer.loadShipSilhouette(_shipClass);
     _sectorMap.setMapRenderer(mapRenderer);
     _sectorMap.setupStrategicClick(mapCanvas);
     _buildDamageToggle();
@@ -420,6 +443,36 @@ function _updateQuickStatus(state) {
 
   if (hullFill) hullFill.style.width = `${hull}%`;
   if (hullText) hullText.textContent = Math.round(hull);
+
+  // Armour bar (ships with armour_max > 0)
+  const armMax = state.armour_max || 0;
+  if (armourRow) armourRow.style.display = armMax > 0 ? '' : 'none';
+  if (armMax > 0) {
+    const arm = Math.max(0, state.armour || 0);
+    const armPct = Math.min(100, (arm / armMax) * 100);
+    if (armourFill) armourFill.style.width = `${armPct}%`;
+    if (armourText) armourText.textContent = Math.round(arm);
+  }
+
+  // Armour zones (battleship only)
+  const zones = state.armour_zones;
+  const zonesMax = state.armour_zones_max;
+  if (armourZonesEl) armourZonesEl.style.display = zones && zonesMax ? '' : 'none';
+  if (zones && zonesMax) {
+    const zoneMap = [
+      { fill: armourForeFill, text: armourForeText, key: 'fore' },
+      { fill: armourAftFill,  text: armourAftText,  key: 'aft' },
+      { fill: armourPortFill, text: armourPortText,  key: 'port' },
+      { fill: armourStarFill, text: armourStarText,  key: 'starboard' },
+    ];
+    for (const { fill, text, key } of zoneMap) {
+      const zhp = Math.max(0, zones[key] ?? 0);
+      const zmax = zonesMax[key] ?? 1;
+      const zpct = zmax > 0 ? Math.min(100, (zhp / zmax) * 100) : 0;
+      if (fill) fill.style.width = `${zpct}%`;
+      if (text) text.textContent = Math.round(zhp);
+    }
+  }
 
   const facingMap = [
     { fill: shieldForeFill, text: shieldForeText, key: 'fore' },
