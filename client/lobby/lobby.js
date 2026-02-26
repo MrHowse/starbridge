@@ -54,6 +54,17 @@ const MIN_CREW = {
   carrier:      7,
 };
 
+/** Brief stat summary per class for the silhouette preview. */
+const SHIP_STATS = {
+  scout:        'HP 60 | SPD 250 | ARM 0 | SHLD 40',
+  corvette:     'HP 90 | SPD 200 | ARM 5 | SHLD 60',
+  frigate:      'HP 120 | SPD 160 | ARM 10 | SHLD 80',
+  cruiser:      'HP 180 | SPD 120 | ARM 20 | SHLD 120',
+  battleship:   'HP 300 | SPD 80 | ARM 40 | SHLD 200',
+  carrier:      'HP 200 | SPD 100 | ARM 15 | SHLD 150',
+  medical_ship: 'HP 100 | SPD 140 | ARM 5 | SHLD 70',
+};
+
 // ---------------------------------------------------------------------------
 // DOM references
 // ---------------------------------------------------------------------------
@@ -94,6 +105,20 @@ function init() {
       handleJanitorAvailable();
     }
   });
+
+  // Ship class silhouette preview.
+  const shipClassEl  = document.querySelector('[data-ship-class-select]');
+  const previewImg   = document.getElementById('ship-preview-img');
+  const previewStats = document.getElementById('ship-preview-stats');
+  function _updateShipPreview() {
+    const cls = shipClassEl ? shipClassEl.value : 'frigate';
+    if (previewImg) previewImg.src = `/client/shared/silhouettes/${cls}.svg`;
+    if (previewStats) previewStats.textContent = SHIP_STATS[cls] || '';
+  }
+  if (shipClassEl) {
+    shipClassEl.addEventListener('change', _updateShipPreview);
+    _updateShipPreview();  // set initial preview
+  }
 
   launchBtnEl.addEventListener('click', () => {
     const mission_id   = missionSelectEl ? missionSelectEl.value : 'sandbox';

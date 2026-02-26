@@ -170,3 +170,84 @@ class TestShieldFocusIntegration:
         with open(path) as f:
             content = f.read()
         assert "loadShipSilhouette" in content
+
+
+# ---------------------------------------------------------------------------
+# §4.1.11: Enemy wireframe models
+# ---------------------------------------------------------------------------
+
+
+class TestEnemyWireframeModels:
+    """Verify wireframe.js has models for all 7 ship classes."""
+
+    SHIP_CLASS_MODELS = [
+        "scout", "corvette", "frigate", "cruiser",
+        "battleship", "carrier", "medical_ship",
+    ]
+
+    def _read_wireframe(self):
+        path = os.path.join(_BASE, "client", "captain", "wireframe.js")
+        with open(path) as f:
+            return f.read()
+
+    @pytest.mark.parametrize("ship_class", SHIP_CLASS_MODELS)
+    def test_wireframe_model_exists(self, ship_class):
+        content = self._read_wireframe()
+        # Each model is defined as a key in WIREFRAME_MODELS.
+        assert f"  {ship_class}:" in content or f"  {ship_class}: {{" in content, (
+            f"WIREFRAME_MODELS missing model for '{ship_class}'"
+        )
+
+    def test_contact_model_key_uses_dynamic_lookup(self):
+        """_contactModelKey should use WIREFRAME_MODELS[t] lookup, not hardcoded list."""
+        content = self._read_wireframe()
+        assert "WIREFRAME_MODELS[t]" in content
+
+    def test_non_ship_types_preserved(self):
+        """station, torpedo, friendly models must still exist."""
+        content = self._read_wireframe()
+        for key in ["station", "torpedo", "friendly"]:
+            assert f"  {key}:" in content or f"  {key}: {{" in content
+
+
+# ---------------------------------------------------------------------------
+# §4.3.10: Lobby silhouette preview
+# ---------------------------------------------------------------------------
+
+
+class TestLobbySilhouettePreview:
+    """Verify lobby shows ship silhouette and stat summary."""
+
+    def test_lobby_html_has_preview_element(self):
+        path = os.path.join(_BASE, "client", "lobby", "index.html")
+        with open(path) as f:
+            content = f.read()
+        assert 'id="ship-preview"' in content
+        assert 'id="ship-preview-img"' in content
+        assert "silhouettes/" in content
+
+    def test_lobby_js_has_ship_stats(self):
+        path = os.path.join(_BASE, "client", "lobby", "lobby.js")
+        with open(path) as f:
+            content = f.read()
+        assert "SHIP_STATS" in content
+
+    @pytest.mark.parametrize("ship_class", EXPECTED_CLASSES)
+    def test_lobby_js_has_stats_for_each_class(self, ship_class):
+        path = os.path.join(_BASE, "client", "lobby", "lobby.js")
+        with open(path) as f:
+            content = f.read()
+        assert f"  {ship_class}:" in content or f"'{ship_class}':" in content
+
+    def test_lobby_js_updates_preview_on_change(self):
+        path = os.path.join(_BASE, "client", "lobby", "lobby.js")
+        with open(path) as f:
+            content = f.read()
+        assert "_updateShipPreview" in content
+        assert "addEventListener" in content
+
+    def test_lobby_css_has_preview_styles(self):
+        path = os.path.join(_BASE, "client", "lobby", "lobby.css")
+        with open(path) as f:
+            content = f.read()
+        assert ".ship-preview" in content

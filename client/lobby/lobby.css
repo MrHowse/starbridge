@@ -185,6 +185,24 @@
   min-width: 120px;
 }
 
+/* Ship class silhouette preview */
+.ship-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ship-preview__img {
+  width: 56px;
+  height: 28px;
+  opacity: 0.7;
+}
+
+.ship-preview__stats {
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
 /* =========================================================================
    Footer
    ========================================================================= */

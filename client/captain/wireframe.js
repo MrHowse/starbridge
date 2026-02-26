@@ -33,6 +33,35 @@ const WIREFRAME_MODELS = {
     edges: [[0,1],[0,2],[1,4],[2,4],[0,3],[3,4]],
     scale: MODEL_SCALE,
   },
+  corvette: {
+    verts: [
+      [ 0,  1.2, 0],    // 0 nose
+      [-0.8, 0.3, 0],   // 1 left mid
+      [ 0.8, 0.3, 0],   // 2 right mid
+      [-0.6,-0.8, 0],   // 3 left rear
+      [ 0.6,-0.8, 0],   // 4 right rear
+      [ 0, -1.0, 0],    // 5 tail
+      [ 0,  0.6, 0.6],  // 6 sensor dome (top)
+      [-1.1, 0.1, 0.3], // 7 left antenna
+      [ 1.1, 0.1, 0.3], // 8 right antenna
+    ],
+    edges: [[0,1],[0,2],[1,3],[2,4],[3,5],[4,5],[0,6],[1,6],[2,6],
+            [1,7],[2,8],[6,7],[6,8]],
+    scale: MODEL_SCALE * 1.2,
+  },
+  frigate: {
+    verts: [
+      [ 0,  1.3, 0],   // 0 nose
+      [-0.9, 0,  0],   // 1 left flank
+      [ 0.9, 0,  0],   // 2 right flank
+      [-0.7,-1.0, 0],  // 3 left rear
+      [ 0.7,-1.0, 0],  // 4 right rear
+      [ 0, -1.3, 0],   // 5 tail
+      [ 0,  0.4, 0.5], // 6 bridge
+    ],
+    edges: [[0,1],[0,2],[1,3],[2,4],[3,5],[4,5],[0,6],[1,6],[2,6]],
+    scale: MODEL_SCALE * 1.4,
+  },
   cruiser: {
     verts: [
       [ 0,  1.5, 0],  // 0 nose
@@ -46,6 +75,64 @@ const WIREFRAME_MODELS = {
     ],
     edges: [[0,1],[0,2],[1,3],[2,4],[3,5],[4,5],[0,6],[1,6],[2,6],[3,7],[4,7],[5,7]],
     scale: MODEL_SCALE * 1.6,
+  },
+  battleship: {
+    verts: [
+      [ 0,  2.0, 0],    // 0 nose
+      [-1.4, 0.5, 0],   // 1 left bow
+      [ 1.4, 0.5, 0],   // 2 right bow
+      [-1.6,-0.5, 0],   // 3 left mid
+      [ 1.6,-0.5, 0],   // 4 right mid
+      [-1.2,-1.5, 0],   // 5 left stern
+      [ 1.2,-1.5, 0],   // 6 right stern
+      [ 0, -2.0, 0],    // 7 tail
+      [ 0,  1.0, 0.8],  // 8 bridge tower
+      [ 0,  1.8, 0.3],  // 9 spinal mount tip
+      [ 0, -0.5, 0.6],  // 10 aft superstructure
+    ],
+    edges: [[0,1],[0,2],[1,3],[2,4],[3,5],[4,6],[5,7],[6,7],
+            [0,8],[1,8],[2,8],[8,10],[5,10],[6,10],
+            [0,9],[9,8]],
+    scale: MODEL_SCALE * 2.5,
+  },
+  carrier: {
+    verts: [
+      [ 0,  1.8, 0],    // 0 nose
+      [-1.0, 0.5, 0],   // 1 left bow
+      [ 1.5, 0.5, 0],   // 2 right bow (wider — flight deck side)
+      [-0.8,-1.0, 0],   // 3 left mid
+      [ 1.8,-1.0, 0],   // 4 right mid (flight deck)
+      [-0.6,-1.8, 0],   // 5 left stern
+      [ 1.4,-1.8, 0],   // 6 right stern
+      [ 0, -2.0, 0],    // 7 tail
+      [-0.5, 0.8, 0.7], // 8 bridge (offset to port)
+      [ 1.6, 0.0, 0.2], // 9 flight deck edge fwd
+      [ 1.6,-1.4, 0.2], // 10 flight deck edge aft
+    ],
+    edges: [[0,1],[0,2],[1,3],[2,4],[3,5],[4,6],[5,7],[6,7],
+            [0,8],[1,8],[3,8],
+            [2,9],[9,10],[10,6],[4,9],[4,10]],
+    scale: MODEL_SCALE * 2.2,
+  },
+  medical_ship: {
+    verts: [
+      [ 0,  1.0, 0],    // 0 nose
+      [-1.0, 0,  0],    // 1 left beam
+      [ 1.0, 0,  0],    // 2 right beam
+      [-0.8,-0.8, 0],   // 3 left rear
+      [ 0.8,-0.8, 0],   // 4 right rear
+      [ 0, -1.0, 0],    // 5 tail
+      [ 0,  0.3, 0.5],  // 6 top dome
+      [ 0,  0.0, 0.3],  // 7 cross centre (top)
+      [ 0,  0.3, 0.3],  // 8 cross north
+      [ 0, -0.3, 0.3],  // 9 cross south
+      [-0.3, 0,  0.3],  // 10 cross west
+      [ 0.3, 0,  0.3],  // 11 cross east
+    ],
+    edges: [[0,1],[0,2],[1,3],[2,4],[3,5],[4,5],
+            [0,6],[1,6],[2,6],
+            [7,8],[7,9],[7,10],[7,11]],
+    scale: MODEL_SCALE * 1.3,
   },
   destroyer: {
     verts: [
@@ -595,8 +682,8 @@ function _contactModelKey(contact) {
   if (t === 'station') return 'station';
   if (t === 'torpedo') return 'torpedo';
   if (contact.is_friendly) return 'friendly';
-  if (t === 'destroyer') return 'destroyer';
-  if (t === 'cruiser')   return 'cruiser';
+  // Class-specific models (enemy ships).
+  if (WIREFRAME_MODELS[t]) return t;
   return 'scout';
 }
 
