@@ -404,10 +404,12 @@ def abort_landing(drone_id: str) -> bool:
 
 def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
          survivors: list[dict] | None = None, in_combat: bool = False,
-         tick_num: int = 0, ship_evasive: bool = False) -> list[dict]:
+         tick_num: int = 0, ship_evasive: bool = False,
+         resources: object | None = None) -> list[dict]:
     """Advance all flight ops state by dt seconds.
 
     *ship_evasive* — True when helm is making sharp turns; penalises recovery.
+    *resources* — when provided (ResourceStore), drone fuel/parts consumed on turnaround.
 
     Returns a list of events for broadcast.
     """
@@ -442,10 +444,28 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
             if drone:
                 drone.status = "hangar"
                 # Restore drone stats after turnaround.
+                # v0.07 §6.1: Consume from ResourceStore for refuel/repair.
                 if drone.fuel < 100.0:
-                    drone.fuel = 100.0
+                    fuel_needed = 100.0 - drone.fuel
+                    if resources is not None and hasattr(resources, "consume"):
+                        fuel_avail = getattr(resources, "drone_fuel", float("inf"))
+                        if fuel_avail > 0:
+                            consumed = resources.consume("drone_fuel", fuel_needed)
+                            drone.fuel += consumed
+                        # At 0 DFU: drone stays at current fuel level.
+                    else:
+                        drone.fuel = 100.0
                 if drone.hull < drone.max_hull:
-                    drone.hull = drone.max_hull
+                    damage_pct = ((drone.max_hull - drone.hull) / drone.max_hull) * 100.0
+                    parts_needed = max(1.0, damage_pct / 10.0)  # 1 DPU per 10% hull
+                    if resources is not None and hasattr(resources, "consume"):
+                        parts_avail = getattr(resources, "drone_parts", float("inf"))
+                        if parts_avail >= parts_needed:
+                            resources.consume("drone_parts", parts_needed)
+                            drone.hull = drone.max_hull
+                        # At 0 DPU: drone launches damaged.
+                    else:
+                        drone.hull = drone.max_hull
                 if drone.ammo < 100.0 and drone.drone_type == "combat":
                     drone.ammo = 100.0
     events.extend({"type": de["type"], **de} for de in deck_events)

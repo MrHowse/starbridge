@@ -154,6 +154,7 @@ from server.models.injuries import generate_injuries
 from server.models.interior import make_default_interior
 from server.models.ship_class import load_ship_class
 from server.difficulty import get_preset
+from server.models.resources import ResourceStore, PROVISIONS_CONSUMPTION_RATE
 from server.models.ship import Ship, calculate_shield_distribution
 from server.models.world import (
     World, spawn_enemy, spawn_creature, spawn_station_from_feature, STATION_FEATURE_TYPES,
@@ -613,6 +614,11 @@ async def start(
     _eq_modules = equipment_modules or []
     gleq.apply_modules(_world.ship, _eq_modules)
 
+    # v0.07 §6.1: Initialise consumable resources from ship class JSON.
+    _world.ship.resources = ResourceStore.from_ship_class_resources(sc.resources)
+    # Cargo capacity from ship class (equipment modules may have already added to it).
+    _world.ship.cargo_capacity = max(_world.ship.cargo_capacity, sc.cargo_capacity)
+
     # v0.06.1: Generate individual crew roster and wire into medical v2.
     _crew_count = (sc.min_crew + sc.max_crew) // 2
     # v0.07 §3.4: Apply crew complement bias.
@@ -846,12 +852,49 @@ async def _loop() -> None:
                 _current_sector_id = _new_sid
                 _sector_grid_dirty = True
 
+        # 2.8 Consumable resource tick: fuel + provisions.
+        _res = _world.ship.resources
+        if _res.fuel_max > 0 and _res.fuel > 0:
+            _throttle_frac = _world.ship.throttle / 100.0
+            _fuel_burn = (
+                _res.reactor_idle_rate
+                + (_res.engine_burn_rate - _res.reactor_idle_rate) * _throttle_frac
+            ) * _world.ship.fuel_multiplier * _world.ship.difficulty.fuel_consumption_multiplier * TICK_DT
+            _res.consume("fuel", _fuel_burn)
+            if _res.fuel <= 0:
+                # Reactor shutdown — all systems offline, ship adrift.
+                for _sys in _world.ship.systems.values():
+                    _sys._captain_offline = True
+                _world.ship.throttle = 0.0
+                await _manager.broadcast(
+                    Message.build("ship.reactor_shutdown", {"reason": "fuel_depleted"})
+                )
+
+        if _res.provisions_max > 0:
+            _crew_total = sum(d.total for d in _world.ship.crew.decks.values())
+            _prov_consume = PROVISIONS_CONSUMPTION_RATE * _crew_total / 60.0 * TICK_DT
+            _res.consume("provisions", _prov_consume)
+            if _res.provisions <= 0:
+                _res.provisions_depleted_time += TICK_DT
+                # Progressive crew factor penalty: -20% at 10min, -50% at 30min.
+                _depl_min = _res.provisions_depleted_time / 60.0
+                if _depl_min >= 30.0:
+                    _res.provisions_crew_penalty = 0.50
+                elif _depl_min >= 10.0:
+                    _res.provisions_crew_penalty = 0.20
+                else:
+                    _res.provisions_crew_penalty = 0.0
+            else:
+                _res.provisions_depleted_time = 0.0
+                _res.provisions_crew_penalty = 0.0
+
         # 3. Engineering. 3.5 Crew factors + medical + disease. 3.6 Security. 3.7 Comms.
         _eng_result = gle.tick(_world.ship, _world.ship.interior, TICK_DT)
         # 3.1 Training auto-simulation (only active during training missions).
         gltr.auto_helm_tick(_world.ship, TICK_DT)
         gltr.auto_engineering_tick(_world.ship, TICK_DT)
-        gldc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty)
+        gldc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty,
+                 resources=_world.ship.resources)
         # Build lightweight contact list for drone AI from world entities.
         _fo_contacts: list[dict] = []
         for _foe in _world.enemies:
@@ -872,6 +915,7 @@ async def _loop() -> None:
             in_combat=bool(_world.enemies),
             tick_num=_tick_count,
             ship_evasive=_is_ship_evasive(_world.ship),
+            resources=_world.ship.resources,
         )
 
         # v0.06.5 Part 7: Process flight ops events for cross-station effects.
@@ -928,7 +972,8 @@ async def _loop() -> None:
         medical_v2_events = glmed.tick(_med_roster, TICK_DT, difficulty=_world.ship.difficulty) if _med_roster else []
         security_events = gls.tick_security(_world.ship.interior, _world.ship, TICK_DT)
         # v0.06.3: Enhanced combat system (marine teams + boarding parties).
-        combat_events = gls.tick_combat(_world.ship.interior, _world.ship, TICK_DT)
+        combat_events = gls.tick_combat(_world.ship.interior, _world.ship, TICK_DT,
+                                        resources=_world.ship.resources)
         security_events.extend(combat_events)
         station_boarding_events = gls.tick_station_boarding(_world.ship, TICK_DT)
         glco.set_tick(_tick_count)
@@ -1732,6 +1777,23 @@ async def _loop() -> None:
                     "message": cfe["message"],
                 }),
             )
+
+        # 11g3b. Resource threshold alerts (every 10 ticks = 1s).
+        if _tick_count % 10 == 0 and _res.fuel_max > 0:
+            # Sync medical supplies from glmed into ResourceStore.
+            _med_supply_now = glmed.get_supplies()
+            _res.medical_supplies = float(_med_supply_now) if _med_supply_now is not None else _res.medical_supplies
+            _threshold_alerts = _res.check_thresholds()
+            for _ta in _threshold_alerts:
+                if _ta["level"] == "critical":
+                    await _manager.broadcast(
+                        Message.build("resources.critical", _ta)
+                    )
+                else:
+                    await _manager.broadcast_to_roles(
+                        ["captain"],
+                        Message.build("resources.warning", _ta),
+                    )
 
         # 11g4. Crew reassignment completion notifications.
         for _re in _reassignment_events:
@@ -2796,6 +2858,7 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "spinal_cooldown": round(glsm.get_cooldown_remaining(), 1),
             "armour_zones": dict(ship.armour_zones) if ship.armour_zones else None,
             "armour_zones_max": dict(ship.armour_zones_max) if ship.armour_zones_max else None,
+            "resources": ship.resources.to_dict(),
         },
         tick=tick,
     )

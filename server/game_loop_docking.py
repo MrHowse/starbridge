@@ -145,6 +145,22 @@ def _apply_service(service: str, world, ship) -> dict:
             armour_restored = ship.armour_max - ship.armour
             ship.armour = ship.armour_max
             effects["armour_restored"] = round(armour_restored, 1)
+        # v0.07 §6.1: Refuel and resupply repair materials at dock.
+        _res = getattr(ship, "resources", None)
+        if _res is not None:
+            if _res.fuel_max > 0:
+                fuel_added = _res.add("fuel", _res.fuel_max)
+                effects["fuel_added"] = round(fuel_added, 1)
+                # Undo reactor shutdown if fuel restored.
+                if _res.fuel > 0:
+                    for _sys in ship.systems.values():
+                        pass  # Captain must re-enable systems manually
+            if _res.repair_materials_max > 0:
+                rm_added = _res.add("repair_materials", _res.repair_materials_max)
+                effects["repair_materials_added"] = round(rm_added, 1)
+            if _res.ammunition_max > 0:
+                ammo_added = _res.add("ammunition", _res.ammunition_max)
+                effects["ammunition_added"] = round(ammo_added, 1)
 
     elif service == "torpedo_resupply":
         import server.game_loop_weapons as glw
@@ -154,8 +170,15 @@ def _apply_service(service: str, world, ship) -> dict:
         effects["torpedo_ammo"] = glw.get_ammo()
 
     elif service == "medical_transfer":
-        ship.medical_supplies = min(20, ship.medical_supplies + 10)
-        effects["medical_supplies"] = ship.medical_supplies
+        # v0.07 §6.1: Resupply medical from ResourceStore.
+        _res = getattr(ship, "resources", None)
+        if _res is not None and _res.medical_supplies_max > 0:
+            added = _res.add("medical_supplies", _res.medical_supplies_max)
+            effects["medical_supplies"] = round(_res.medical_supplies, 1)
+            effects["medical_added"] = round(added, 1)
+        else:
+            ship.medical_supplies = min(20, ship.medical_supplies + 10)
+            effects["medical_supplies"] = ship.medical_supplies
         # Stabilise up to 2 critical crew per deck (move to injured).
         for deck in ship.crew.decks.values():
             moved = min(deck.critical, 2)
@@ -178,8 +201,28 @@ def _apply_service(service: str, world, ship) -> dict:
         ship.countermeasure_charges = min(20, ship.countermeasure_charges + 5)
         effects["countermeasure_charges"] = ship.countermeasure_charges
 
-    # atmospheric_resupply, sensor_data_package, drone_service,
-    # crew_rest, intel_briefing — placeholder (no game effect yet).
+    elif service == "atmospheric_resupply":
+        # v0.07 §6.1: Fill provisions to max.
+        _res = getattr(ship, "resources", None)
+        if _res is not None and _res.provisions_max > 0:
+            added = _res.add("provisions", _res.provisions_max)
+            _res.provisions_depleted_time = 0.0
+            _res.provisions_crew_penalty = 0.0
+            effects["provisions"] = round(_res.provisions, 1)
+            effects["provisions_added"] = round(added, 1)
+
+    elif service == "drone_service":
+        # v0.07 §6.1: Fill drone fuel and drone parts to max.
+        _res = getattr(ship, "resources", None)
+        if _res is not None:
+            df_added = _res.add("drone_fuel", _res.drone_fuel_max)
+            dp_added = _res.add("drone_parts", _res.drone_parts_max)
+            effects["drone_fuel"] = round(_res.drone_fuel, 1)
+            effects["drone_parts"] = round(_res.drone_parts, 1)
+            effects["drone_fuel_added"] = round(df_added, 1)
+            effects["drone_parts_added"] = round(dp_added, 1)
+
+    # sensor_data_package, crew_rest, intel_briefing — no resource effect.
 
     return effects
 

@@ -44,5 +44,15 @@
     "battery_charge_rate": 70,
     "battery_discharge_rate": 140,
     "emergency_reserve": 150
-  }
+  },
+  "resources": {
+    "fuel":             {"starting": 1800, "capacity": 1800, "engine_burn": 0.8,  "reactor_idle": 0.7},
+    "medical_supplies": {"starting": 80,   "capacity": 100},
+    "repair_materials": {"starting": 70,   "capacity": 90},
+    "drone_fuel":       {"starting": 300,  "capacity": 300},
+    "drone_parts":      {"starting": 15,   "capacity": 25},
+    "ammunition":       {"starting": 70,   "capacity": 100},
+    "provisions":       {"starting": 800,  "capacity": 800}
+  },
+  "cargo_capacity": 80
 }

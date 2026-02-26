@@ -120,11 +120,15 @@ def cancel_dct(room_id: str) -> bool:
     return False
 
 
-def tick(interior: ShipInterior, dt: float, difficulty: object | None = None) -> None:
+def tick(interior: ShipInterior, dt: float, difficulty: object | None = None,
+         resources: object | None = None) -> None:
     """Advance DCT repairs and fire spreading for one simulation tick.
 
     *difficulty* — when provided, ``repair_speed_multiplier`` scales DCT
     repair duration (>1 = faster repairs, shorter duration).
+    *resources* — when provided (ResourceStore), repair material consumption
+    is gated: fire→damaged costs 2 RMU, damaged→normal costs 5 RMU.
+    At 0 RMU only fire→damaged (minor repair) works.
     """
     global _fire_spread_timer
 
@@ -143,6 +147,30 @@ def tick(interior: ShipInterior, dt: float, difficulty: object | None = None) ->
             continue
 
         if elapsed >= effective_repair_dur:
+            # Check repair material cost before completing.
+            old_sev = _SEVERITY.get(room.state, 0)
+            # fire→damaged = 2 RMU, damaged→normal = 5 RMU, decompressed→fire = 10 RMU
+            if old_sev == 2:     # fire → damaged
+                rmu_cost = 2
+            elif old_sev == 1:   # damaged → normal
+                rmu_cost = 5
+            elif old_sev == 3:   # decompressed → fire
+                rmu_cost = 10
+            else:
+                rmu_cost = 0
+
+            # Gate major repairs behind repair materials.
+            if resources is not None and rmu_cost > 0:
+                available = getattr(resources, "repair_materials", float("inf"))
+                if old_sev == 1 and available < rmu_cost:
+                    # At 0 RMU: damaged→normal blocked (major repair).
+                    # Keep timer at threshold so it retries when materials arrive.
+                    _active_dcts[room_id] = effective_repair_dur
+                    continue
+                # Consume materials.
+                if hasattr(resources, "consume"):
+                    resources.consume("repair_materials", rmu_cost)
+
             # Reduce severity by one level.
             new_state = _SEVERITY_DOWN.get(_SEVERITY.get(room.state, 0), "normal")
             room.state = new_state

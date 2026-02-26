@@ -52,6 +52,7 @@ from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
 from server.models.interior import ShipInterior, make_default_interior
 from server.models.security import Intruder, MarineSquad
+from server.models.resources import ResourceStore
 from server.models.ship import Ship, ShipSystem, Shields
 from server.models.world import Asteroid, Enemy, Hazard, Station, Torpedo, World
 
@@ -116,6 +117,7 @@ def _serialise_ship(ship: Ship) -> dict:
         "cargo": dict(ship.cargo),
         "countermeasure_charges": ship.countermeasure_charges,
         "ew_countermeasure_active": ship.ew_countermeasure_active,
+        "resources": _serialise_resources(ship.resources),
         "crew": _serialise_crew(ship.crew),
         "interior": _serialise_interior(ship.interior),
         "difficulty": {
@@ -189,6 +191,45 @@ def _serialise_interior(interior: ShipInterior) -> dict:
             for intr in interior.intruders
         ],
     }
+
+
+def _serialise_resources(res: ResourceStore) -> dict:
+    return {
+        "fuel": res.fuel, "fuel_max": res.fuel_max,
+        "engine_burn_rate": res.engine_burn_rate,
+        "reactor_idle_rate": res.reactor_idle_rate,
+        "medical_supplies": res.medical_supplies,
+        "medical_supplies_max": res.medical_supplies_max,
+        "repair_materials": res.repair_materials,
+        "repair_materials_max": res.repair_materials_max,
+        "drone_fuel": res.drone_fuel, "drone_fuel_max": res.drone_fuel_max,
+        "drone_parts": res.drone_parts, "drone_parts_max": res.drone_parts_max,
+        "ammunition": res.ammunition, "ammunition_max": res.ammunition_max,
+        "provisions": res.provisions, "provisions_max": res.provisions_max,
+        "provisions_depleted_time": res.provisions_depleted_time,
+        "provisions_crew_penalty": res.provisions_crew_penalty,
+    }
+
+
+def _deserialise_resources(data: dict, res: ResourceStore) -> None:
+    res.fuel = float(data.get("fuel", res.fuel))
+    res.fuel_max = float(data.get("fuel_max", res.fuel_max))
+    res.engine_burn_rate = float(data.get("engine_burn_rate", res.engine_burn_rate))
+    res.reactor_idle_rate = float(data.get("reactor_idle_rate", res.reactor_idle_rate))
+    res.medical_supplies = float(data.get("medical_supplies", res.medical_supplies))
+    res.medical_supplies_max = float(data.get("medical_supplies_max", res.medical_supplies_max))
+    res.repair_materials = float(data.get("repair_materials", res.repair_materials))
+    res.repair_materials_max = float(data.get("repair_materials_max", res.repair_materials_max))
+    res.drone_fuel = float(data.get("drone_fuel", res.drone_fuel))
+    res.drone_fuel_max = float(data.get("drone_fuel_max", res.drone_fuel_max))
+    res.drone_parts = float(data.get("drone_parts", res.drone_parts))
+    res.drone_parts_max = float(data.get("drone_parts_max", res.drone_parts_max))
+    res.ammunition = float(data.get("ammunition", res.ammunition))
+    res.ammunition_max = float(data.get("ammunition_max", res.ammunition_max))
+    res.provisions = float(data.get("provisions", res.provisions))
+    res.provisions_max = float(data.get("provisions_max", res.provisions_max))
+    res.provisions_depleted_time = float(data.get("provisions_depleted_time", 0.0))
+    res.provisions_crew_penalty = float(data.get("provisions_crew_penalty", 0.0))
 
 
 def _serialise_entities(world: World) -> dict:
@@ -306,6 +347,10 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.cargo = dict(data.get("cargo", ship.cargo))
     ship.countermeasure_charges = int(data.get("countermeasure_charges", ship.countermeasure_charges))
     ship.ew_countermeasure_active = bool(data.get("ew_countermeasure_active", False))
+
+    resources_d = data.get("resources", {})
+    if resources_d:
+        _deserialise_resources(resources_d, ship.resources)
 
     crew_d = data.get("crew", {})
     if crew_d:

@@ -80,6 +80,10 @@ class ShipClass(BaseModel):
     modular_bays:     int   = 0         # equipment module slots (frigate=2)
     interior_layout:  str   = ""        # reference to interiors/{name}.json
 
+    # --- Resources (v0.07 §6.1) ---
+    resources:        dict | None = None     # {fuel: {starting, capacity, engine_burn, reactor_idle}, ...}
+    cargo_capacity:   float = 0.0            # general-purpose cargo space
+
     # --- Legacy / weapons ---
     torpedo_ammo:     int   = 12             # legacy field (kept for save-compat)
     torpedo_loadout:  dict[str, int] | None = None  # per-type magazine (v0.05g)

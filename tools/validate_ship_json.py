@@ -38,6 +38,7 @@ KNOWN_UNIQUE_SYSTEMS: set[str] = {
 
 REQUIRED_WEAPON_FIELDS = {"beam_damage", "beam_fire_rate", "beam_arc", "beam_count"}
 REQUIRED_SUBFIELDS = {"weapons", "engines", "sensors", "shields", "power_grid"}
+REQUIRED_RESOURCE_TYPES = {"fuel", "medical_supplies", "repair_materials", "drone_fuel", "drone_parts", "ammunition", "provisions"}
 
 
 def validate(class_id: str) -> list[str]:
@@ -76,6 +77,25 @@ def validate(class_id: str) -> list[str]:
     for us in sc.unique_systems:
         if us not in KNOWN_UNIQUE_SYSTEMS:
             errors.append(f"Unknown unique_system: {us!r}")
+
+    # resources block (v0.07 §6.1).
+    if sc.resources is None:
+        errors.append("Missing resources block")
+    else:
+        for rt in REQUIRED_RESOURCE_TYPES:
+            if rt not in sc.resources:
+                errors.append(f"resources missing key: {rt}")
+            else:
+                block = sc.resources[rt]
+                if "starting" not in block:
+                    errors.append(f"resources.{rt} missing 'starting'")
+                if "capacity" not in block:
+                    errors.append(f"resources.{rt} missing 'capacity'")
+        fuel = sc.resources.get("fuel", {})
+        if "engine_burn" not in fuel:
+            errors.append("resources.fuel missing 'engine_burn'")
+        if "reactor_idle" not in fuel:
+            errors.append("resources.fuel missing 'reactor_idle'")
 
     return errors
 

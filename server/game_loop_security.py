@@ -1444,6 +1444,7 @@ def _get_boarder_at(room_id: str) -> BoardingParty | None:
 def _tick_room_combat(
     dt: float,
     events: list[tuple[str, dict]],
+    resources: object | None = None,
 ) -> None:
     """Resolve combat in rooms where marines and boarders coexist."""
     # Collect contested rooms
@@ -1516,6 +1517,9 @@ def _tick_room_combat(
                         {"squad_id": team.id, "count": team.size},
                     ))
             team.consume_ammo()
+            # v0.07 §6.1: Consume from ship ResourceStore (5 AMU per active squad per round).
+            if resources is not None and hasattr(resources, "consume"):
+                resources.consume("ammunition", 5.0 * dt * 10)  # normalise to 10Hz
 
         # Suppression
         if defender_power > attacker_power * 1.5:
@@ -1543,11 +1547,14 @@ def tick_combat(
     interior: ShipInterior,
     ship: Ship,
     dt: float,
+    resources: object | None = None,
 ) -> list[tuple[str, dict]]:
     """Run one tick of the enhanced combat system.
 
     Returns events to broadcast. Should be called each tick alongside
     tick_security (which handles the legacy system).
+    *resources* — when provided (ResourceStore), ammunition is consumed per
+    active squad per round. At 0 AMU, firepower penalised by 60%.
     """
     if not _marine_teams and not _boarding_parties:
         return []
@@ -1556,7 +1563,7 @@ def tick_combat(
 
     _tick_boarding_parties(interior, dt, events)
     _tick_marine_teams(interior, dt, events)
-    _tick_room_combat(dt, events)
+    _tick_room_combat(dt, events, resources=resources)
 
     # Tick security system timers (bulkhead unseal)
     events.extend(tick_security_systems(dt))

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from server.difficulty import DifficultySettings, get_preset
 from server.models.crew import CrewRoster, DECK_SYSTEM_MAP
 from server.models.interior import ShipInterior, make_default_interior
+from server.models.resources import ResourceStore
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +192,9 @@ class Ship:
 
     # --- Difficulty (set at game start by game_loop.start()) ---
     difficulty: DifficultySettings = field(default_factory=lambda: get_preset("officer"))
+
+    # --- Consumable resources (v0.07 §6.1) ---
+    resources: ResourceStore = field(default_factory=ResourceStore)
 
     # --- Electronic Warfare (v0.03k) ---
     countermeasure_charges: int = 10       # finite charges; each absorbed hit costs 1
