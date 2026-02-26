@@ -379,6 +379,19 @@ def get_scramble_mode() -> bool:
     return _scramble_mode
 
 
+def get_flight_deck_power_draw(reactor_max: float) -> float:
+    """Return flight deck mandatory power draw for carrier ships.
+
+    Passive (always): 15% of reactor_max.
+    Active (launch/recovery in progress): 25% of reactor_max.
+    Non-carrier callers should pass reactor_max=0.0.
+    """
+    if reactor_max <= 0.0:
+        return 0.0
+    active = bool(_flight_deck.tubes_in_use or _flight_deck.recovery_in_progress)
+    return reactor_max * (0.25 if active else 0.15)
+
+
 def abort_landing(drone_id: str) -> bool:
     """Wave off a landing drone."""
     return _flight_deck.abort_landing(drone_id)

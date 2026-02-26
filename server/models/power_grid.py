@@ -88,12 +88,14 @@ class PowerGrid:
 
     # ---- Tick ----
 
-    def tick(self, dt: float, system_demands: dict[str, float]) -> dict[str, float]:
+    def tick(self, dt: float, system_demands: dict[str, float],
+             protected_systems: set[str] | None = None) -> dict[str, float]:
         """Process one power tick. Returns actual power delivered per system.
 
         Args:
             dt: Time step in seconds (typically 0.1 for 10 Hz).
             system_demands: {system_name: requested_power_level} on 0-150 scale.
+            protected_systems: Systems that get priority allocation in brownout.
 
         Returns:
             {system_name: delivered_power} — may be reduced in brownout.
@@ -141,12 +143,35 @@ class PowerGrid:
 
         available = max(0.0, available)
 
-        # Brownout: proportional scaling
+        # Brownout: proportional scaling (with optional protected systems)
         delivered: dict[str, float] = {}
         if total_demand > 0.0 and available < total_demand:
-            scale = available / total_demand
-            for sys_name, demand in active_demands.items():
-                delivered[sys_name] = demand * scale
+            if protected_systems:
+                # Protected systems get priority allocation
+                protected_demand = sum(
+                    d for s, d in active_demands.items() if s in protected_systems
+                )
+                unprotected_demand = total_demand - protected_demand
+                # Give protected systems their full demand (capped at available)
+                protected_delivered = min(protected_demand, available)
+                remaining = max(0.0, available - protected_delivered)
+                for sys_name, demand in active_demands.items():
+                    if sys_name in protected_systems:
+                        # Proportional within protected group if even they exceed budget
+                        if protected_demand > 0.0 and protected_demand > available:
+                            delivered[sys_name] = demand * (available / protected_demand)
+                        else:
+                            delivered[sys_name] = demand
+                    else:
+                        # Scale remaining budget among unprotected
+                        if unprotected_demand > 0.0 and remaining > 0.0:
+                            delivered[sys_name] = demand * (remaining / unprotected_demand)
+                        else:
+                            delivered[sys_name] = 0.0
+            else:
+                scale = available / total_demand
+                for sys_name, demand in active_demands.items():
+                    delivered[sys_name] = demand * scale
         else:
             delivered = dict(active_demands)
 

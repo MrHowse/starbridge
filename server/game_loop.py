@@ -667,12 +667,19 @@ async def start(
     gle.init(_world.ship, crew_member_ids=_crew_ids,
              power_grid_config=sc.power_grid,
              system_rooms=_int_sys_rooms,
-             repair_base_room=_int_base_room)
+             repair_base_room=_int_base_room,
+             ship_class=ship_class)
 
     # v0.07 §3.3: Apply power profile to ship systems and power grid.
     if _loadout_config:
         _pg = gle.get_power_grid()
         gllo.apply_power_profile(_loadout_config.power_profile, _world.ship, _pg)
+
+    # v0.07 §1.4.2.7: Corvette ECM power efficiency — 0.6× modifier.
+    if ship_class == "corvette":
+        _ecm = _world.ship.systems.get("ecm_suite")
+        if _ecm:
+            _ecm._power_profile_modifier *= 0.6
 
     # v0.06.3: Initialise marine teams for security station.
     gls.init_marine_teams(ship_class, crew_member_ids=_crew_ids)

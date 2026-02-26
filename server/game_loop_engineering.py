@@ -38,6 +38,7 @@ _damage_model: DamageModel | None = None
 _requested_power: dict[str, float] = {}
 _rng: random.Random = random.Random()
 _tick_count: int = 0
+_ship_class: str = "frigate"
 
 
 # ---------------------------------------------------------------------------
@@ -48,20 +49,22 @@ _tick_count: int = 0
 def reset() -> None:
     """Clear all module state."""
     global _power_grid, _repair_mgr, _damage_model
-    global _requested_power, _rng, _tick_count
+    global _requested_power, _rng, _tick_count, _ship_class
     _power_grid = None
     _repair_mgr = None
     _damage_model = None
     _requested_power = {}
     _rng = random.Random()
     _tick_count = 0
+    _ship_class = "frigate"
 
 
 def init(ship: Ship,
          crew_member_ids: list[str] | None = None,
          power_grid_config: dict | None = None,
          system_rooms: dict[str, str] | None = None,
-         repair_base_room: str | None = None) -> None:
+         repair_base_room: str | None = None,
+         ship_class: str = "frigate") -> None:
     """Initialise engineering subsystems for a new game.
 
     Args:
@@ -70,9 +73,12 @@ def init(ship: Ship,
         power_grid_config: Optional ship-class power_grid JSON section.
         system_rooms: Per-ship-class system->room mapping for repair dispatch.
         repair_base_room: Per-ship-class base room for repair teams.
+        ship_class: Ship class ID (for carrier/medical power features).
     """
     global _power_grid, _repair_mgr, _damage_model
-    global _requested_power, _rng, _tick_count
+    global _requested_power, _rng, _tick_count, _ship_class
+
+    _ship_class = ship_class
 
     if power_grid_config:
         _power_grid = PowerGrid.from_ship_class(power_grid_config)
@@ -226,12 +232,19 @@ def tick(ship: Ship, interior: ShipInterior, dt: float) -> EngineeringTickResult
     if _power_grid is None or _damage_model is None:
         return result
 
-    # 0. Apply external drain (spinal mount power draw).
+    # 0. Apply external drain (spinal mount + carrier flight deck power draw).
     import server.game_loop_spinal_mount as glsm
-    _power_grid.external_drain = glsm.get_power_draw()
+    import server.game_loop_flight_ops as glfo
+    _power_grid.external_drain = (
+        glsm.get_power_draw()
+        + glfo.get_flight_deck_power_draw(
+            _power_grid.reactor_max if _ship_class == "carrier" else 0.0
+        )
+    )
 
-    # 1. Power distribution
-    delivered = _power_grid.tick(dt, _requested_power)
+    # 1. Power distribution (medical ships protect sensors + shields in brownout)
+    _protected = {"sensors", "shields"} if _ship_class == "medical_ship" else None
+    delivered = _power_grid.tick(dt, _requested_power, protected_systems=_protected)
     result.power_delivered = delivered
 
     # 2. Apply delivered power to ship systems
@@ -374,6 +387,7 @@ def serialise() -> dict:
     data: dict = {
         "requested_power": dict(_requested_power),
         "tick_count": _tick_count,
+        "ship_class": _ship_class,
     }
     if _power_grid is not None:
         data["power_grid"] = _power_grid.serialise()
@@ -387,10 +401,11 @@ def serialise() -> dict:
 def deserialise(data: dict, ship: Ship) -> None:
     """Restore engineering state from saved data."""
     global _power_grid, _repair_mgr, _damage_model
-    global _requested_power, _tick_count
+    global _requested_power, _tick_count, _ship_class
 
     _requested_power = data.get("requested_power", {})
     _tick_count = data.get("tick_count", 0)
+    _ship_class = data.get("ship_class", "frigate")
 
     if "power_grid" in data:
         _power_grid = PowerGrid.deserialise(data["power_grid"])
