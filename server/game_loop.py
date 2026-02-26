@@ -146,6 +146,7 @@ from server.models.messages import (
     CarrierCancelCAPPayload,
     CarrierScramblePayload,
     CarrierCancelScramblePayload,
+    MedicalSurgicalProcedurePayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -187,6 +188,7 @@ import server.game_loop_mining as glmn
 import server.game_loop_flag_bridge as glfb
 import server.game_loop_spinal_mount as glsm
 import server.game_loop_carrier_ops as glcar
+import server.game_loop_medical_ship as glms
 import server.equipment_modules as gleq
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
@@ -499,6 +501,11 @@ async def start(
         reactor_max=sc.power_grid.get("reactor_max", 700.0) if sc.power_grid else 700.0,
     )
     glcar.reset(active=(ship_class == "carrier"))
+    glms.reset(active=(ship_class == "medical_ship"))
+    if glms.is_active():
+        glmed.set_surgical_theatre(True)
+        glmed.set_triage_ai(True)
+        glmed.set_supply_max(glms.MEDICAL_SHIP_SUPPLY_MAX)
     gltr.reset()
     gldo.reset()
     hazard_system.reset_state()
@@ -933,6 +940,7 @@ async def _loop() -> None:
             ghosts=glew.get_ghosts() if glew.is_corvette_ecm() else None,
             ghost_class=glew.get_ghost_class() if glew.is_corvette_ecm() else None,
             freq_lock_target_ids=glew.get_freq_locked_ids() if glew.is_corvette_ecm() else None,
+            rescue_beacon_active=glms.is_rescue_beacon_active(),
         )
 
         # 5.5 Station AI — turrets, launchers, fighter bays, sensor arrays.
@@ -1636,6 +1644,12 @@ async def _loop() -> None:
             ["medical"],
             Message.build("medical.state", glmed.get_medical_state()),
         )
+        # 11g2-a. Medical ship state → Medical station.
+        if glms.is_active():
+            await _manager.broadcast_to_roles(
+                ["medical"],
+                Message.build("medical_ship.state", glms.build_state()),
+            )
         roster = glmed.get_roster()
         if roster is not None:
             _roster_payload = {"members": {
@@ -2235,6 +2249,9 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "medical.quarantine" and isinstance(payload, MedicalQuarantinePayload):
             result = glmed.quarantine_crew(payload.crew_id)
             gl.log_event("medical", "quarantine", {"crew_id": payload.crew_id, "success": result["success"]})
+        elif msg_type == "medical.surgical_procedure" and isinstance(payload, MedicalSurgicalProcedurePayload):
+            result = glmed.perform_surgical_procedure(payload.crew_id, payload.injury_id)
+            gl.log_event("medical", "surgical_procedure", {"crew_id": payload.crew_id, "injury_id": payload.injury_id, "success": result["success"]})
         elif msg_type == "security.move_squad" and isinstance(payload, SecurityMoveSquadPayload):
             gls.move_squad(ship.interior, payload.squad_id, payload.room_id)
             gl.log_event("security", "squad_moved", {"squad_id": payload.squad_id, "room_id": payload.room_id})

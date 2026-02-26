@@ -54,11 +54,12 @@ SEVERITY_PROGRESSION: dict[str, str] = {
 
 # Treatment supply costs (percentage of medical supply)
 TREATMENT_SUPPLY_COSTS: dict[str, float] = {
-    "first_aid":      2.0,
-    "stabilise":      3.0,
-    "surgery":        8.0,
-    "intensive_care": 10.0,
-    "quarantine":     5.0,
+    "first_aid":         2.0,
+    "stabilise":         3.0,
+    "surgery":           8.0,
+    "intensive_care":    10.0,
+    "quarantine":        5.0,
+    "surgical_theatre":  15.0,
 }
 
 # Contagion spread interval and chance

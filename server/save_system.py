@@ -44,6 +44,7 @@ import server.game_loop_mining as glmn
 import server.game_loop_flag_bridge as glfb
 import server.game_loop_spinal_mount as glsm
 import server.game_loop_carrier_ops as glcar
+import server.game_loop_medical_ship as glms
 import server.equipment_modules as gleq
 
 from server.difficulty import DifficultySettings
@@ -515,6 +516,7 @@ def save_game(
             "flag_bridge": glfb.serialise(),
             "spinal_mount": glsm.serialise(),
             "carrier_ops": glcar.serialise(),
+            "medical_ship": glms.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -620,6 +622,8 @@ def restore_game(save_id: str, world: World) -> dict:
         glsm.deserialise(mods["spinal_mount"])
     if mods.get("carrier_ops"):
         glcar.deserialise(mods["carrier_ops"])
+    if mods.get("medical_ship"):
+        glms.deserialise(mods["medical_ship"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")

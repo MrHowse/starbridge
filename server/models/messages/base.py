@@ -134,6 +134,7 @@ from server.models.messages.spinal_mount import (
     WeaponsSpinalFirePayload,
     WeaponsSpinalCancelPayload,
 )
+from server.models.messages.medical_ship import MedicalSurgicalProcedurePayload
 from server.models.messages.carrier_ops import (
     CarrierCancelCAPPayload,
     CarrierCancelScramblePayload,
@@ -344,6 +345,8 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "carrier.cancel_cap":          CarrierCancelCAPPayload,
     "carrier.scramble":            CarrierScramblePayload,
     "carrier.cancel_scramble":     CarrierCancelScramblePayload,
+    # Medical Ship (v0.07 §2.7)
+    "medical.surgical_procedure":  MedicalSurgicalProcedurePayload,
 }
 
 

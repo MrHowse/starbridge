@@ -63,6 +63,7 @@ def tick_enemies(
     ghosts: list[dict] | None = None,
     ghost_class: str | None = None,
     freq_lock_target_ids: set[str] | None = None,
+    rescue_beacon_active: bool = False,
 ) -> list[BeamHitEvent]:
     """Update all enemy AI states and movement; return any beam hit events.
 
@@ -120,7 +121,8 @@ def tick_enemies(
 
         # ── State transitions ─────────────────────────────────────────────
         _update_state(enemy, params, dist, eff_detect_range, aggression=aggression,
-                       ghost_class=ghost_class)
+                       ghost_class=ghost_class,
+                       rescue_beacon_active=rescue_beacon_active)
 
         # ── Despawn check (fleeing enemy too far away) ────────────────────
         if enemy.ai_state == "flee" and dist > 2.0 * eff_detect_range:
@@ -191,6 +193,7 @@ def _update_state(
     detect_range: float | None = None,
     aggression: float = 0.75,
     ghost_class: str | None = None,
+    rescue_beacon_active: bool = False,
 ) -> None:
     """Apply state-machine transitions.
 
@@ -203,13 +206,25 @@ def _update_state(
     *ghost_class* — corvette sensor disguise. "battleship"/"destroyer" cause
     enemies to flee on detection; "freighter"/"transport" increase the detect
     range threshold by 50% (enemies less alert to civilians).
+
+    *rescue_beacon_active* — medical ship rescue beacon. Enemies have a chance
+    per tick to break off and flee.
     """
+    import random as _rng_mod
     state = enemy.ai_state
     max_hull = params["hull"]
     eff_detect = detect_range if detect_range is not None else params["detect_range"]
     # Ghost class influence on detection threshold.
     if ghost_class in ("freighter", "transport"):
         eff_detect *= 1.5
+
+    # Rescue beacon hesitation: chance to flee instead of engaging.
+    if rescue_beacon_active and state in ("idle", "chase"):
+        import server.game_loop_medical_ship as glms
+        hesitation = glms.get_beacon_hesitation(getattr(enemy, "faction", "rebel"))
+        if hesitation > 0.0 and _rng_mod.random() < hesitation:
+            enemy.ai_state = "flee"
+            return
 
     if state == "idle":
         if dist < eff_detect:

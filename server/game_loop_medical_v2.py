@@ -93,7 +93,7 @@ QUARANTINE_SLOTS_BY_SHIP_CLASS: dict[str, int] = {
 }
 
 # Treatment types that require puzzles
-PUZZLE_TREATMENTS: set[str] = {"surgery", "intensive_care"}
+PUZZLE_TREATMENTS: set[str] = {"surgery", "intensive_care", "surgical_theatre"}
 
 # ---------------------------------------------------------------------------
 # Treatment dataclass
@@ -165,6 +165,10 @@ _morgue: list[str] = []
 _contagion_spread_timer: float = 0.0
 _rng: random.Random = random.Random()
 
+# v0.07 §2.7: Medical Ship features
+_surgical_theatre_available: bool = False
+_triage_ai_enabled: bool = False
+
 # Legacy compat state
 _legacy_treatments: dict[str, str] = {}
 _legacy_heal_timers: dict[str, float] = {}
@@ -173,18 +177,22 @@ _legacy_outbreak: dict[str, str] = {}
 
 def reset() -> None:
     """Clear all medical state. Called at game start."""
-    global _roster, _treatment_beds, _medical_supplies
+    global _roster, _treatment_beds, _medical_supplies, MAX_MEDICAL_SUPPLIES
     global _quarantine_slots, _contagion_spread_timer
+    global _surgical_theatre_available, _triage_ai_enabled
     _roster = None
     _treatment_beds = 4
     _occupied_beds.clear()
     _treatment_queue.clear()
     _active_treatments.clear()
+    MAX_MEDICAL_SUPPLIES = 100.0
     _medical_supplies = MAX_MEDICAL_SUPPLIES
     _quarantine_slots = 2
     _quarantine_occupied.clear()
     _morgue.clear()
     _contagion_spread_timer = 0.0
+    _surgical_theatre_available = False
+    _triage_ai_enabled = False
     # Legacy
     _legacy_treatments.clear()
     _legacy_heal_timers.clear()
@@ -481,6 +489,190 @@ def set_triage_priority(crew_ids: list[str]) -> None:
     _treatment_queue = valid + remaining
 
 
+# ---------------------------------------------------------------------------
+# v0.07 §2.7: Surgical Theatre + Triage AI
+# ---------------------------------------------------------------------------
+
+
+def set_surgical_theatre(active: bool) -> None:
+    """Enable/disable surgical theatre availability."""
+    global _surgical_theatre_available
+    _surgical_theatre_available = active
+
+
+def get_surgical_theatre() -> bool:
+    return _surgical_theatre_available
+
+
+def set_triage_ai(active: bool) -> None:
+    """Enable/disable triage AI autonomous treatment."""
+    global _triage_ai_enabled
+    _triage_ai_enabled = active
+
+
+def get_triage_ai_enabled() -> bool:
+    return _triage_ai_enabled
+
+
+def perform_surgical_procedure(crew_id: str, injury_id: str) -> dict:
+    """Perform a surgical theatre procedure on a crew member's injury.
+
+    Requires surgical_theatre_available flag, injury eligibility, bed, and supplies.
+    Returns {success, message, puzzle_required}.
+    """
+    import server.game_loop_medical_ship as glms
+
+    global _medical_supplies
+
+    if not _surgical_theatre_available:
+        return {"success": False, "message": "Surgical theatre not available"}
+
+    if _roster is None:
+        return {"success": False, "message": "No roster"}
+
+    member = _roster.members.get(crew_id)
+    if member is None:
+        return {"success": False, "message": "Unknown crew member"}
+
+    if member.treatment_bed is None:
+        return {"success": False, "message": "Not in a bed"}
+
+    # Find the injury
+    injury = None
+    for inj in member.injuries:
+        if inj.id == injury_id:
+            injury = inj
+            break
+
+    if injury is None:
+        return {"success": False, "message": "Unknown injury"}
+
+    if injury.treated:
+        return {"success": False, "message": "Already treated"}
+
+    if injury.treating:
+        return {"success": False, "message": "Already being treated"}
+
+    if crew_id in _active_treatments:
+        return {"success": False, "message": "Another treatment in progress"}
+
+    if not glms.can_perform_surgery(injury):
+        return {"success": False, "message": "Injury not eligible for surgical theatre"}
+
+    # Check supplies
+    cost = TREATMENT_SUPPLY_COSTS.get("surgical_theatre", 15.0)
+    if _medical_supplies < cost:
+        return {"success": False, "message": "Insufficient supplies"}
+
+    _medical_supplies -= cost
+
+    duration = glms.get_surgical_duration(injury)
+    treatment = Treatment(
+        crew_member_id=crew_id,
+        injury_id=injury_id,
+        treatment_type="surgical_theatre",
+        duration=duration,
+        puzzle_required=True,
+    )
+
+    injury.treating = True
+    _active_treatments[crew_id] = treatment
+
+    return {
+        "success": True,
+        "message": "Surgical procedure started",
+        "puzzle_required": True,
+    }
+
+
+def _triage_ai_tick(roster: IndividualCrewRoster) -> list[dict]:
+    """Triage AI: auto-admit and auto-treat when medical uncrewed.
+
+    Priority: critical > serious > moderate > minor.
+    """
+    global _medical_supplies
+    events: list[dict] = []
+    severity_order = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3}
+
+    # 1. Auto-admit injured crew not yet in medical bay.
+    injured_not_admitted = [
+        m for m in roster.members.values()
+        if m.status != "dead"
+        and m.location not in ("medical_bay", "quarantine", "morgue")
+        and any(not i.treated for i in m.injuries)
+    ]
+    # Sort by worst injury severity.
+    injured_not_admitted.sort(
+        key=lambda m: min(
+            (severity_order.get(i.severity, 9) for i in m.injuries if not i.treated),
+            default=9,
+        )
+    )
+
+    for member in injured_not_admitted:
+        bed = _find_free_bed()
+        if bed is None:
+            break
+        _occupied_beds[bed] = member.id
+        member.treatment_bed = bed
+        member.location = "medical_bay"
+        events.append({
+            "event": "triage_ai_admit",
+            "crew_id": member.id,
+            "bed": bed,
+        })
+
+    # 2. Auto-start treatment for admitted crew with untreated injuries.
+    admitted = [
+        m for m in roster.members.values()
+        if m.treatment_bed is not None
+        and m.status != "dead"
+        and m.id not in _active_treatments
+    ]
+    admitted.sort(
+        key=lambda m: min(
+            (severity_order.get(i.severity, 9) for i in m.injuries if not i.treated and not i.treating),
+            default=9,
+        )
+    )
+
+    for member in admitted:
+        if member.id in _active_treatments:
+            continue
+        # Find most severe untreated injury.
+        untreated = [i for i in member.injuries if not i.treated and not i.treating]
+        if not untreated:
+            continue
+        untreated.sort(key=lambda i: severity_order.get(i.severity, 9))
+        injury = untreated[0]
+
+        cost = TREATMENT_SUPPLY_COSTS.get(injury.treatment_type, 5.0)
+        if _medical_supplies < cost:
+            continue
+
+        _medical_supplies -= cost
+
+        treatment = Treatment(
+            crew_member_id=member.id,
+            injury_id=injury.id,
+            treatment_type=injury.treatment_type,
+            duration=injury.treatment_duration,
+            puzzle_required=False,  # Triage AI skips puzzles
+        )
+        treatment.puzzle_completed = True  # Auto-complete puzzle for AI
+        injury.treating = True
+        _active_treatments[member.id] = treatment
+
+        events.append({
+            "event": "triage_ai_treat",
+            "crew_id": member.id,
+            "injury_id": injury.id,
+            "treatment_type": injury.treatment_type,
+        })
+
+    return events
+
+
 def notify_puzzle_complete(crew_id: str, success: bool) -> None:
     """Notify that a treatment puzzle has been completed."""
     treatment = _active_treatments.get(crew_id)
@@ -630,6 +822,19 @@ def tick(roster: IndividualCrewRoster, dt: float, difficulty: object | None = No
                 "bed": bed,
             })
 
+    # 5. Triage AI: auto-admit and auto-treat when medical uncrewed.
+    if _triage_ai_enabled:
+        _med_assigned = roster.get_by_duty_station("medical_bay")
+        _med_active = sum(
+            1 for m in _med_assigned
+            if m.status not in ("dead",)
+            and m.location not in ("medical_bay", "quarantine", "morgue")
+            and m.reassignment_timer <= 0
+        ) if _med_assigned else 0
+        if _med_active == 0:
+            triage_events = _triage_ai_tick(roster)
+            events.extend(triage_events)
+
     return events
 
 
@@ -705,6 +910,13 @@ def set_supplies(amount: float) -> None:
     """Set medical supply level (e.g., from docking resupply)."""
     global _medical_supplies
     _medical_supplies = min(amount, MAX_MEDICAL_SUPPLIES)
+
+
+def set_supply_max(amount: float) -> None:
+    """Set the maximum medical supply level (e.g., medical ship 200%)."""
+    global MAX_MEDICAL_SUPPLIES, _medical_supplies
+    MAX_MEDICAL_SUPPLIES = amount
+    _medical_supplies = amount
 
 
 # ---------------------------------------------------------------------------
