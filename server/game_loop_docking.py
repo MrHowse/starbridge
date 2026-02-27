@@ -409,6 +409,9 @@ async def tick(world, ship, manager, dt: float) -> None:
                     "station_name": station.name,
                     "services": list(station.services),
                 })
+                # v0.07 §6.2: Auto-spawn vendor for docked station.
+                import server.game_loop_vendor as glvr
+                glvr.spawn_vendor_for_station(station)
 
     elif _state == "docked":
         # Tick active services.

@@ -84,6 +84,9 @@ class ShipClass(BaseModel):
     resources:        dict | None = None     # {fuel: {starting, capacity, engine_burn, reactor_idle}, ...}
     cargo_capacity:   float = 0.0            # general-purpose cargo space
 
+    # --- Economy (v0.07 §6.2) ---
+    starting_credits: float = 0.0            # credits at game start (before difficulty multiplier)
+
     # --- Legacy / weapons ---
     torpedo_ammo:     int   = 12             # legacy field (kept for save-compat)
     torpedo_loadout:  dict[str, int] | None = None  # per-type magazine (v0.05g)

@@ -47,6 +47,7 @@ import server.game_loop_carrier_ops as glcar
 import server.game_loop_medical_ship as glms
 import server.equipment_modules as gleq
 import server.loadout as gllo
+import server.game_loop_vendor as glvr
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -118,6 +119,8 @@ def _serialise_ship(ship: Ship) -> dict:
         "countermeasure_charges": ship.countermeasure_charges,
         "ew_countermeasure_active": ship.ew_countermeasure_active,
         "resources": _serialise_resources(ship.resources),
+        "credits": ship.credits,
+        "trade_reputation": ship.trade_reputation,
         "crew": _serialise_crew(ship.crew),
         "interior": _serialise_interior(ship.interior),
         "difficulty": {
@@ -139,6 +142,7 @@ def _serialise_ship(ship: Ship) -> dict:
             "medical_supply_multiplier": ship.difficulty.medical_supply_multiplier,
             "battery_capacity_multiplier": ship.difficulty.battery_capacity_multiplier,
             "fuel_consumption_multiplier": ship.difficulty.fuel_consumption_multiplier,
+            "starting_credits_multiplier": ship.difficulty.starting_credits_multiplier,
             "sensor_range_multiplier": ship.difficulty.sensor_range_multiplier,
             "scan_time_multiplier": ship.difficulty.scan_time_multiplier,
             "fog_of_war_reveal": ship.difficulty.fog_of_war_reveal,
@@ -348,6 +352,9 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.countermeasure_charges = int(data.get("countermeasure_charges", ship.countermeasure_charges))
     ship.ew_countermeasure_active = bool(data.get("ew_countermeasure_active", False))
 
+    ship.credits = float(data.get("credits", 0.0))
+    ship.trade_reputation = float(data.get("trade_reputation", 0.0))
+
     resources_d = data.get("resources", {})
     if resources_d:
         _deserialise_resources(resources_d, ship.resources)
@@ -383,6 +390,7 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
             medical_supply_multiplier=float(diff_d.get("medical_supply_multiplier", 1.0)),
             battery_capacity_multiplier=float(diff_d.get("battery_capacity_multiplier", 1.0)),
             fuel_consumption_multiplier=float(diff_d.get("fuel_consumption_multiplier", 1.0)),
+            starting_credits_multiplier=float(diff_d.get("starting_credits_multiplier", 1.0)),
             sensor_range_multiplier=float(diff_d.get("sensor_range_multiplier", 1.0)),
             scan_time_multiplier=float(diff_d.get("scan_time_multiplier", 1.0)),
             fog_of_war_reveal=float(diff_d.get("fog_of_war_reveal", 0.2)),
@@ -564,6 +572,7 @@ def save_game(
             "carrier_ops": glcar.serialise(),
             "medical_ship": glms.serialise(),
             "loadout": gllo.serialise(),
+            "vendors": glvr.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -673,6 +682,8 @@ def restore_game(save_id: str, world: World) -> dict:
         glms.deserialise(mods["medical_ship"])
     if "loadout" in mods:
         gllo.deserialise(mods["loadout"])
+    if mods.get("vendors"):
+        glvr.deserialise(mods["vendors"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")

@@ -196,6 +196,10 @@ class Ship:
     # --- Consumable resources (v0.07 §6.1) ---
     resources: ResourceStore = field(default_factory=ResourceStore)
 
+    # --- Economy (v0.07 §6.2) ---
+    credits: float = 0.0
+    trade_reputation: float = 0.0
+
     # --- Electronic Warfare (v0.03k) ---
     countermeasure_charges: int = 10       # finite charges; each absorbed hit costs 1
     ew_countermeasure_active: bool = False  # True when EW station has deployed countermeasures

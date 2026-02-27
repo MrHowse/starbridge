@@ -54,5 +54,6 @@
     "ammunition":       {"starting": 30,   "capacity": 40},
     "provisions":       {"starting": 600,  "capacity": 600}
   },
-  "cargo_capacity": 50
+  "cargo_capacity": 50,
+  "starting_credits": 600
 }

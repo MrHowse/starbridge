@@ -192,6 +192,7 @@ import server.game_loop_carrier_ops as glcar
 import server.game_loop_medical_ship as glms
 import server.equipment_modules as gleq
 import server.loadout as gllo
+import server.game_loop_vendor as glvr
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -618,6 +619,11 @@ async def start(
     _world.ship.resources = ResourceStore.from_ship_class_resources(sc.resources)
     # Cargo capacity from ship class (equipment modules may have already added to it).
     _world.ship.cargo_capacity = max(_world.ship.cargo_capacity, sc.cargo_capacity)
+
+    # v0.07 §6.2: Initialise credits from ship class × difficulty multiplier.
+    _world.ship.credits = round(sc.starting_credits * _diff_preset.starting_credits_multiplier, 2)
+    _world.ship.trade_reputation = 0.0
+    glvr.reset()
 
     # v0.06.1: Generate individual crew roster and wire into medical v2.
     _crew_count = (sc.min_crew + sc.max_crew) // 2
@@ -1127,6 +1133,8 @@ async def _loop() -> None:
             regenerate_shields(_world.ship, hazard_modifier=_hazard_shield_mod)
         scan_completed = sensors.tick(_world, _world.ship, TICK_DT)
         await gldo.tick(_world, _world.ship, _manager, TICK_DT)
+        # v0.07 §6.2: Vendor tick (trade windows, cooldowns).
+        glvr.tick(_world, _world.ship, TICK_DT)
         glw.tick_cooldowns(TICK_DT)
         # v0.07 §2.5.1: Spinal mount tick (charge timer, cooldown).
         spinal_events = glsm.tick(_world.ship, _world, TICK_DT)
@@ -1620,6 +1628,14 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(
                 ["captain"],
                 Message.build("mission.dynamic_list", {"missions": _dm_list}),
+            )
+
+        # 11b2. Vendor events (§6.2).
+        _vendor_events = glvr.pop_pending_events()
+        for _ve in _vendor_events:
+            await _manager.broadcast_to_roles(
+                ["captain", "comms"],
+                Message.build(f"vendor.{_ve['type']}", _ve),
             )
 
         # 11c. Scan progress.
@@ -2873,6 +2889,8 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "armour_zones": dict(ship.armour_zones) if ship.armour_zones else None,
             "armour_zones_max": dict(ship.armour_zones_max) if ship.armour_zones_max else None,
             "resources": ship.resources.to_dict(),
+            "credits": round(ship.credits, 2),
+            "trade_reputation": round(ship.trade_reputation, 2),
         },
         tick=tick,
     )

@@ -78,6 +78,10 @@ def validate(class_id: str) -> list[str]:
         if us not in KNOWN_UNIQUE_SYSTEMS:
             errors.append(f"Unknown unique_system: {us!r}")
 
+    # starting_credits (v0.07 §6.2).
+    if sc.starting_credits <= 0:
+        errors.append(f"starting_credits must be > 0, got {sc.starting_credits}")
+
     # resources block (v0.07 §6.1).
     if sc.resources is None:
         errors.append("Missing resources block")
