@@ -1174,7 +1174,8 @@ async def _loop() -> None:
         # v0.07 §6.6: Rationing tick (auto-approve, forecasts).
         _route = gln.get_route()
         _route_dist = _route.get("remaining_distance", -1.0) if _route else -1.0
-        glrat.tick(_world.ship, TICK_DT, _route_dist, True, _tick_count * TICK_DT)
+        _is_captain_crewed = len(_manager.get_by_role("captain")) > 0
+        glrat.tick(_world.ship, TICK_DT, _route_dist, _is_captain_crewed, _tick_count * TICK_DT)
         glw.tick_cooldowns(TICK_DT)
         # v0.07 §2.5.1: Spinal mount tick (charge timer, cooldown).
         spinal_events = glsm.tick(_world.ship, _world, TICK_DT)
@@ -2898,7 +2899,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                 events.append(("rationing.error", {"error": result.get("error", "")}))
         elif msg_type == "rationing.submit_request" and isinstance(payload, RationingSubmitRequestPayload):
             result = glrat.submit_request(
-                "captain", payload.resource_type, payload.quantity,
+                payload.source_station, payload.resource_type, payload.quantity,
                 payload.reason, _tick_count, ship,
             )
             if not result.get("ok"):

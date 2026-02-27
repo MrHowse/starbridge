@@ -17,6 +17,7 @@ class RationingCaptainOverridePayload(BaseModel):
 
 class RationingSubmitRequestPayload(BaseModel):
     """Submit an allocation request from a station."""
+    source_station: str
     resource_type: str
     quantity: float = Field(gt=0)
     reason: str = ""
