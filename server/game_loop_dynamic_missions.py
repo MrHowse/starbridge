@@ -484,6 +484,10 @@ def apply_rewards(rewards: MissionRewards, faction_standings: dict[str, Any]) ->
     if rewards.reputation > 0:
         summary["reputation"] = rewards.reputation
 
+    # Credits (§6.4.2.5)
+    if rewards.credits > 0:
+        summary["credits"] = rewards.credits
+
     return summary
 
 

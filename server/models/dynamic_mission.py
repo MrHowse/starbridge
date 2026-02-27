@@ -98,6 +98,7 @@ class MissionRewards:
     faction_standing: dict[str, float] = field(default_factory=dict)
     supplies: dict[str, int] = field(default_factory=dict)
     intel: list[str] = field(default_factory=list)
+    credits: float = 0.0              # Credits awarded (§6.4.2.5)
     crew: int = 0                     # Replacement crew gained
     reputation: int = 0               # General reputation score
     description: str = ""             # Human-readable summary
@@ -107,6 +108,7 @@ class MissionRewards:
             "faction_standing": dict(self.faction_standing),
             "supplies": dict(self.supplies),
             "intel": list(self.intel),
+            "credits": self.credits,
             "crew": self.crew,
             "reputation": self.reputation,
             "description": self.description,
@@ -118,6 +120,7 @@ class MissionRewards:
             faction_standing=d.get("faction_standing", {}),
             supplies=d.get("supplies", {}),
             intel=d.get("intel", []),
+            credits=d.get("credits", 0.0),
             crew=d.get("crew", 0),
             reputation=d.get("reputation", 0),
             description=d.get("description", ""),
@@ -304,11 +307,12 @@ def generate_rescue_mission(
         completion_deadline=DEFAULT_COMPLETION_DEADLINE,
         rewards=MissionRewards(
             faction_standing={faction: 15.0} if faction != "unknown" else {},
+            credits=50.0,
             crew=2,
             intel=["Sector chart data"],
             reputation=10,
             description=(
-                f"Faction standing +15, 2 replacement crew, sector chart data"
+                f"Faction standing +15, 50 credits, 2 replacement crew, sector chart data"
             ),
         ),
         decline_consequences={
@@ -438,9 +442,10 @@ def generate_investigation_mission(
         offered_tick=tick,
         accept_deadline=120.0,
         rewards=MissionRewards(
+            credits=60.0,
             intel=["Unknown — could be valuable tech or nothing"],
             reputation=5,
-            description="Unknown rewards — mystery mission",
+            description="60 credits, unknown rewards — mystery mission",
         ),
         decline_consequences={
             "description": "No penalty — exploration opportunity missed.",
@@ -504,10 +509,11 @@ def generate_intercept_mission(
         completion_deadline=240.0,
         rewards=MissionRewards(
             faction_standing={faction: -10.0},
+            credits=75.0,
             supplies={"torpedoes": 3, "fuel": 10},
             reputation=8,
             description=(
-                f"Torpedo supplies, fuel, {faction} standing -10, "
+                f"75 credits, torpedo supplies, fuel, {faction} standing -10, "
                 f"allied standing +5"
             ),
         ),
@@ -572,10 +578,11 @@ def generate_patrol_mission(
         accept_deadline=90.0,
         rewards=MissionRewards(
             faction_standing={faction: 10.0},
+            credits=40.0,
             crew=1,
             intel=["Sector chart data"],
             reputation=5,
-            description=f"{faction.title()} standing +10, 1 crew, intel",
+            description=f"40 credits, {faction.title()} standing +10, 1 crew, intel",
         ),
         decline_consequences={
             "description": "No penalty — request noted.",
