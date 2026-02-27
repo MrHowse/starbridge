@@ -27,6 +27,13 @@ from server.models.messages.salvage import (
     SalvageBeginPayload,
     SalvageCancelPayload,
 )
+from server.models.messages.rationing import (
+    RationingSetLevelPayload,
+    RationingCaptainOverridePayload,
+    RationingSubmitRequestPayload,
+    RationingApproveRequestPayload,
+    RationingDenyRequestPayload,
+)
 from server.models.messages.comms import (
     CommsAssessDistressPayload,
     CommsDecodeSignalPayload,
@@ -385,6 +392,12 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "salvage.select_items":        SalvageSelectItemsPayload,
     "salvage.begin_salvage":       SalvageBeginPayload,
     "salvage.cancel_salvage":      SalvageCancelPayload,
+    # Rationing (v0.07 §6.6)
+    "rationing.set_level":           RationingSetLevelPayload,
+    "rationing.captain_override":    RationingCaptainOverridePayload,
+    "rationing.submit_request":      RationingSubmitRequestPayload,
+    "rationing.approve_request":     RationingApproveRequestPayload,
+    "rationing.deny_request":        RationingDenyRequestPayload,
 }
 
 

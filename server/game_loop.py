@@ -163,6 +163,11 @@ from server.models.messages import (
     SalvageSelectItemsPayload,
     SalvageBeginPayload,
     SalvageCancelPayload,
+    RationingSetLevelPayload,
+    RationingCaptainOverridePayload,
+    RationingSubmitRequestPayload,
+    RationingApproveRequestPayload,
+    RationingDenyRequestPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -211,6 +216,7 @@ import server.loadout as gllo
 import server.game_loop_vendor as glvr
 import server.game_loop_negotiation as glng
 import server.game_loop_salvage as glsalv
+import server.game_loop_rationing as glrat
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -644,6 +650,7 @@ async def start(
     glvr.reset()
     glng.reset()
     glsalv.reset()
+    glrat.reset()
 
     # v0.06.1: Generate individual crew roster and wire into medical v2.
     _crew_count = (sc.min_crew + sc.max_crew) // 2
@@ -886,7 +893,9 @@ async def _loop() -> None:
                 _res.reactor_idle_rate
                 + (_res.engine_burn_rate - _res.reactor_idle_rate) * _throttle_frac
             ) * _world.ship.fuel_multiplier * _world.ship.difficulty.fuel_consumption_multiplier * TICK_DT
+            _fuel_burn *= glrat.get_consumption_multiplier("fuel")
             _res.consume("fuel", _fuel_burn)
+            glrat.record_consumption("fuel", _fuel_burn, _tick_count * TICK_DT)
             if _res.fuel <= 0:
                 # Reactor shutdown — ship adrift.
                 # v0.07 §6.1.4.2: Emergency battery keeps sensors (life support)
@@ -909,7 +918,9 @@ async def _loop() -> None:
         if _res.provisions_max > 0:
             _crew_total = sum(d.total for d in _world.ship.crew.decks.values())
             _prov_consume = PROVISIONS_CONSUMPTION_RATE * _crew_total / 60.0 * TICK_DT
+            _prov_consume *= glrat.get_consumption_multiplier("provisions")
             _res.consume("provisions", _prov_consume)
+            glrat.record_consumption("provisions", _prov_consume, _tick_count * TICK_DT)
             if _res.provisions <= 0:
                 _res.provisions_depleted_time += TICK_DT
                 # Progressive crew factor penalty: -20% at 10min, -50% at 30min.
@@ -1160,6 +1171,10 @@ async def _loop() -> None:
         glng.tick(_world, _world.ship, TICK_DT)
         # v0.07 §6.5: Salvage tick (despawn, scan, extract, reactor).
         glsalv.tick(_world.ship, TICK_DT)
+        # v0.07 §6.6: Rationing tick (auto-approve, forecasts).
+        _route = gln.get_route()
+        _route_dist = _route.get("remaining_distance", -1.0) if _route else -1.0
+        glrat.tick(_world.ship, TICK_DT, _route_dist, True, _tick_count * TICK_DT)
         glw.tick_cooldowns(TICK_DT)
         # v0.07 §2.5.1: Spinal mount tick (charge timer, cooldown).
         spinal_events = glsm.tick(_world.ship, _world, TICK_DT)
@@ -1682,6 +1697,14 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(
                 ["captain", "engineering"],
                 Message.build(f"salvage.{_se['type']}", _se),
+            )
+
+        # 11b2d. Rationing events (§6.6).
+        _rationing_events = glrat.pop_pending_events()
+        for _re in _rationing_events:
+            await _manager.broadcast_to_roles(
+                ["captain", "engineering"],
+                Message.build(f"rationing.{_re['type']}", _re),
             )
 
         # 11c. Scan progress.
@@ -2864,6 +2887,30 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             result = glsalv.cancel_salvage(payload.wreck_id)
             if not result.get("ok"):
                 events.append(("salvage.error", {"error": result.get("error", "")}))
+        # Rationing (v0.07 §6.6)
+        elif msg_type == "rationing.set_level" and isinstance(payload, RationingSetLevelPayload):
+            result = glrat.set_ration_level(payload.resource_type, payload.level)
+            if not result.get("ok"):
+                events.append(("rationing.error", {"error": result.get("error", "")}))
+        elif msg_type == "rationing.captain_override" and isinstance(payload, RationingCaptainOverridePayload):
+            result = glrat.captain_override(payload.resource_type)
+            if not result.get("ok"):
+                events.append(("rationing.error", {"error": result.get("error", "")}))
+        elif msg_type == "rationing.submit_request" and isinstance(payload, RationingSubmitRequestPayload):
+            result = glrat.submit_request(
+                "captain", payload.resource_type, payload.quantity,
+                payload.reason, _tick_count, ship,
+            )
+            if not result.get("ok"):
+                events.append(("rationing.error", {"error": result.get("error", "")}))
+        elif msg_type == "rationing.approve_request" and isinstance(payload, RationingApproveRequestPayload):
+            result = glrat.approve_request(payload.request_id, ship)
+            if not result.get("ok"):
+                events.append(("rationing.error", {"error": result.get("error", "")}))
+        elif msg_type == "rationing.deny_request" and isinstance(payload, RationingDenyRequestPayload):
+            result = glrat.deny_request(payload.request_id, payload.reason)
+            if not result.get("ok"):
+                events.append(("rationing.error", {"error": result.get("error", "")}))
         else:
             logger.warning("Unrecognised queued input type: %s", msg_type)
 
@@ -3006,6 +3053,8 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "resources": ship.resources.to_dict(),
             "credits": round(ship.credits, 2),
             "trade_reputation": round(ship.trade_reputation, 2),
+            "ration_levels": glrat.get_ration_levels(),
+            "forecasts": {k: v.to_dict() for k, v in glrat.get_forecasts().items()},
         },
         tick=tick,
     )

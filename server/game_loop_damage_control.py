@@ -18,6 +18,7 @@ import logging
 import random
 
 from server.models.interior import ShipInterior, Room
+import server.game_loop_rationing as glrat
 
 logger = logging.getLogger("starbridge.damage_control")
 
@@ -134,6 +135,9 @@ def tick(interior: ShipInterior, dt: float, difficulty: object | None = None,
 
     repair_mult = getattr(difficulty, "repair_speed_multiplier", 1.0) if difficulty else 1.0
     effective_repair_dur = DCT_REPAIR_DURATION / max(0.1, repair_mult)
+    # v0.07 §6.6: Rationing slows repairs.
+    _rm_eff = glrat.get_effectiveness_multiplier("repair_materials")
+    effective_repair_dur /= max(0.1, _rm_eff)
 
     # Advance DCT repairs.
     completed: list[str] = []
@@ -170,6 +174,7 @@ def tick(interior: ShipInterior, dt: float, difficulty: object | None = None,
                 # Consume materials.
                 if hasattr(resources, "consume"):
                     resources.consume("repair_materials", rmu_cost)
+                    glrat.record_consumption("repair_materials", rmu_cost, 0.0)
 
             # Reduce severity by one level.
             new_state = _SEVERITY_DOWN.get(_SEVERITY.get(room.state, 0), "normal")

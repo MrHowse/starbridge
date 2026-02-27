@@ -73,6 +73,7 @@ from server.models.security import (
     is_intruder_visible,
 )
 from server.models.ship import Ship
+import server.game_loop_rationing as glrat
 
 # ---------------------------------------------------------------------------
 # Module-level state
@@ -1523,7 +1524,9 @@ def _tick_room_combat(
             team.consume_ammo()
             # v0.07 §6.1: Consume from ship ResourceStore (5 AMU per active squad per round).
             if resources is not None and hasattr(resources, "consume"):
-                resources.consume("ammunition", 5.0 * dt * 10)  # normalise to 10Hz
+                _ammo_amt = 5.0 * dt * 10 * glrat.get_consumption_multiplier("ammunition")
+                resources.consume("ammunition", _ammo_amt)
+                glrat.record_consumption("ammunition", _ammo_amt, 0.0)
 
         # Suppression
         if defender_power > attacker_power * 1.5:

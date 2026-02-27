@@ -241,6 +241,15 @@ from server.models.messages.salvage import (
     SalvageCancelPayload,
 )
 
+# Rationing (v0.07 §6.6)
+from server.models.messages.rationing import (
+    RationingSetLevelPayload,
+    RationingCaptainOverridePayload,
+    RationingSubmitRequestPayload,
+    RationingApproveRequestPayload,
+    RationingDenyRequestPayload,
+)
+
 # Carrier Ops
 from server.models.messages.carrier_ops import (
     CarrierCancelCAPPayload,
@@ -442,4 +451,10 @@ __all__ = [
     "SalvageSelectItemsPayload",
     "SalvageBeginPayload",
     "SalvageCancelPayload",
+    # rationing
+    "RationingSetLevelPayload",
+    "RationingCaptainOverridePayload",
+    "RationingSubmitRequestPayload",
+    "RationingApproveRequestPayload",
+    "RationingDenyRequestPayload",
 ]

@@ -184,6 +184,7 @@ _HANDLERS: dict[str, _MessageHandler] = {
     "carrier":     _queue_forward_handler,
     "negotiation": _queue_forward_handler,
     "salvage":     _queue_forward_handler,
+    "rationing":   _queue_forward_handler,
 }
 
 

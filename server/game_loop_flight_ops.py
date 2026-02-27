@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 
+import server.game_loop_rationing as glrat
 from server.models.drones import (
     Decoy,
     Drone,
@@ -479,21 +480,25 @@ def tick(ship: Ship, dt: float, contacts: list[dict] | None = None,
                 # v0.07 §6.1: Consume from ResourceStore for refuel/repair.
                 if drone.fuel < 100.0:
                     fuel_needed = 100.0 - drone.fuel
+                    fuel_needed *= glrat.get_consumption_multiplier("drone_fuel")
                     if resources is not None and hasattr(resources, "consume"):
                         fuel_avail = getattr(resources, "drone_fuel", float("inf"))
                         if fuel_avail > 0:
                             consumed = resources.consume("drone_fuel", fuel_needed)
                             drone.fuel += consumed
+                            glrat.record_consumption("drone_fuel", consumed, 0.0)
                         # At 0 DFU: drone stays at current fuel level.
                     else:
                         drone.fuel = 100.0
                 if drone.hull < drone.max_hull:
                     damage_pct = ((drone.max_hull - drone.hull) / drone.max_hull) * 100.0
                     parts_needed = max(1.0, damage_pct / 10.0)  # 1 DPU per 10% hull
+                    parts_needed *= glrat.get_consumption_multiplier("drone_parts")
                     if resources is not None and hasattr(resources, "consume"):
                         parts_avail = getattr(resources, "drone_parts", float("inf"))
                         if parts_avail >= parts_needed:
                             resources.consume("drone_parts", parts_needed)
+                            glrat.record_consumption("drone_parts", parts_needed, 0.0)
                             drone.hull = drone.max_hull
                         # At 0 DPU: drone launches damaged.
                     else:

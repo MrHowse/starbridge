@@ -57,6 +57,7 @@ from server.models.injuries import (
     tick_injury_timers,
 )
 from server.models.ship import Ship
+import server.game_loop_rationing as glrat
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -325,11 +326,13 @@ def start_crew_treatment(
 
     # Check supplies — v0.07 §6.1.1.3: severity-based costs.
     cost = SEVERITY_SUPPLY_COSTS.get(injury.severity, TREATMENT_SUPPLY_COSTS.get(treatment_type, 5.0))
+    cost *= glrat.get_consumption_multiplier("medical_supplies")
     if _medical_supplies < cost:
         return {"success": False, "message": "Insufficient supplies"}
 
     # Deduct supplies
     _medical_supplies -= cost
+    glrat.record_consumption("medical_supplies", cost, 0.0)
 
     # Determine if puzzle needed
     puzzle_required = treatment_type in PUZZLE_TREATMENTS
@@ -562,10 +565,12 @@ def perform_surgical_procedure(crew_id: str, injury_id: str) -> dict:
 
     # Check supplies
     cost = TREATMENT_SUPPLY_COSTS.get("surgical_theatre", 15.0)
+    cost *= glrat.get_consumption_multiplier("medical_supplies")
     if _medical_supplies < cost:
         return {"success": False, "message": "Insufficient supplies"}
 
     _medical_supplies -= cost
+    glrat.record_consumption("medical_supplies", cost, 0.0)
 
     duration = glms.get_surgical_duration(injury)
     treatment = Treatment(
@@ -648,10 +653,12 @@ def _triage_ai_tick(roster: IndividualCrewRoster) -> list[dict]:
         injury = untreated[0]
 
         cost = SEVERITY_SUPPLY_COSTS.get(injury.severity, TREATMENT_SUPPLY_COSTS.get(injury.treatment_type, 5.0))
+        cost *= glrat.get_consumption_multiplier("medical_supplies")
         if _medical_supplies < cost:
             continue
 
         _medical_supplies -= cost
+        glrat.record_consumption("medical_supplies", cost, 0.0)
 
         treatment = Treatment(
             crew_member_id=member.id,

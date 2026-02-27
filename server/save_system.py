@@ -50,6 +50,7 @@ import server.loadout as gllo
 import server.game_loop_vendor as glvr
 import server.game_loop_negotiation as glng
 import server.game_loop_salvage as glsalv
+import server.game_loop_rationing as glrat
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -577,6 +578,7 @@ def save_game(
             "vendors": glvr.serialise(),
             "negotiation": glng.serialise(),
             "salvage": glsalv.serialise(),
+            "rationing": glrat.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -692,6 +694,8 @@ def restore_game(save_id: str, world: World) -> dict:
         glng.deserialise(mods["negotiation"])
     if mods.get("salvage"):
         glsalv.deserialise(mods["salvage"])
+    if mods.get("rationing"):
+        glrat.deserialise(mods["rationing"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")
