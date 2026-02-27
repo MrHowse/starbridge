@@ -217,6 +217,21 @@ from server.models.messages.spinal_mount import (
 # Medical Ship (v0.07 §2.7)
 from server.models.messages.medical_ship import MedicalSurgicalProcedurePayload
 
+# Negotiation (v0.07 §6.3)
+from server.models.messages.negotiation import (
+    NegotiationOpenChannelPayload,
+    NegotiationCloseChannelPayload,
+    NegotiationStartPayload,
+    NegotiationAcceptPayload,
+    NegotiationCounterPayload,
+    NegotiationWalkAwayPayload,
+    NegotiationAcceptCallbackPayload,
+    NegotiationInspectPayload,
+    NegotiationBluffPayload,
+    NegotiationBarterPayload,
+    NegotiationServiceContractPayload,
+)
+
 # Carrier Ops
 from server.models.messages.carrier_ops import (
     CarrierCancelCAPPayload,
@@ -400,4 +415,16 @@ __all__ = [
     "CarrierCancelScramblePayload",
     # medical ship
     "MedicalSurgicalProcedurePayload",
+    # negotiation
+    "NegotiationOpenChannelPayload",
+    "NegotiationCloseChannelPayload",
+    "NegotiationStartPayload",
+    "NegotiationAcceptPayload",
+    "NegotiationCounterPayload",
+    "NegotiationWalkAwayPayload",
+    "NegotiationAcceptCallbackPayload",
+    "NegotiationInspectPayload",
+    "NegotiationBluffPayload",
+    "NegotiationBarterPayload",
+    "NegotiationServiceContractPayload",
 ]

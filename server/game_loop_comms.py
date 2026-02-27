@@ -698,6 +698,17 @@ def get_all_standings() -> dict[str, FactionStanding]:
     return dict(_factions)
 
 
+def has_decoded_vendor_signals(faction: str) -> bool:
+    """Check if any signals from this faction have been fully decoded.
+
+    Used by negotiation bluff system for +20% bonus.
+    """
+    return any(
+        s.faction == faction and s.decode_progress >= 1.0
+        for s in _signals
+    )
+
+
 # ---------------------------------------------------------------------------
 # Channel / Bandwidth
 # ---------------------------------------------------------------------------

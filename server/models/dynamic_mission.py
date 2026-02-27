@@ -770,3 +770,82 @@ def generate_diplomatic_mission(
         estimated_difficulty="moderate",
         comms_assessment=comms_assessment,
     )
+
+
+# ---------------------------------------------------------------------------
+# Service contract generator (§6.3.3.4)
+# ---------------------------------------------------------------------------
+
+_CONTRACT_TYPE_TO_OBJECTIVE: dict[str, str] = {
+    "escort": "escort_to",
+    "delivery": "deliver",
+    "scan": "scan",
+    "patrol": "navigate_to",
+}
+
+_CONTRACT_TYPE_DESCRIPTIONS: dict[str, str] = {
+    "escort": "Escort the vendor's convoy through hostile space",
+    "delivery": "Deliver cargo to the specified location",
+    "scan": "Perform a sensor sweep of the designated area",
+    "patrol": "Patrol the designated sector and report contacts",
+}
+
+
+def generate_service_contract_mission(
+    mission_id: str,
+    contract_type: str,
+    vendor_id: str,
+    vendor_name: str,
+    target_position: tuple[float, float],
+    deadline: float,
+    credit_value: float,
+) -> DynamicMission:
+    """Generate a service contract mission from negotiation (§6.3.3.4).
+
+    Args:
+        contract_type: escort | delivery | scan | patrol
+        credit_value: the trade value being covered by this contract
+    """
+    obj_type = _CONTRACT_TYPE_TO_OBJECTIVE.get(contract_type, "navigate_to")
+    description = _CONTRACT_TYPE_DESCRIPTIONS.get(contract_type, "Complete the assigned task")
+
+    return DynamicMission(
+        id=mission_id,
+        source_signal_id="",
+        source_contact_id="",
+        title=f"Service Contract: {contract_type.title()} for {vendor_name}",
+        briefing=(
+            f"{vendor_name} requires a {contract_type} service in exchange "
+            f"for goods valued at {credit_value:.0f} credits. "
+            f"Failure to complete will result in reputation and standing penalties."
+        ),
+        mission_type="trade",
+        objectives=[
+            MissionObjective(
+                id=f"{mission_id}_task",
+                description=description,
+                objective_type=obj_type,
+                target_position=target_position,
+                order=1,
+            ),
+        ],
+        waypoint=target_position,
+        waypoint_name=vendor_name,
+        completion_deadline=deadline,
+        rewards=MissionRewards(
+            reputation=5,
+            description=f"Contract fulfilled — goods already received ({credit_value:.0f}cr value)",
+        ),
+        decline_consequences={
+            "description": "No penalty — contract not accepted.",
+        },
+        failure_consequences={
+            "reputation": -15,
+            "faction_standing": {"vendor": -10.0},
+            "description": (
+                f"Contract failed. Reputation -15, standing -10. "
+                f"Goods valued at {credit_value:.0f}cr must be returned or paid for."
+            ),
+        },
+        estimated_difficulty="moderate",
+    )

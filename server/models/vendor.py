@@ -57,6 +57,14 @@ HEAVY_MILITARY_ITEMS: frozenset[str] = frozenset({
     "heavy_torpedo", "nuclear_torpedo", "experimental_torpedo",
 })
 
+VENDOR_CIVILIAN_TYPES: frozenset[str] = frozenset({
+    "neutral_station", "outpost", "merchant",
+})
+
+VENDOR_MILITARY_TYPES: frozenset[str] = frozenset({
+    "allied_station", "allied_warship",
+})
+
 # Per-ship-class starting credits (before difficulty multiplier).
 STARTING_CREDITS: dict[str, float] = {
     "scout": 300,

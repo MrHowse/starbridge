@@ -7,6 +7,19 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from server.models.messages.captain import CaptainAcceptMissionPayload, CaptainAddLogPayload, CaptainAuthorizePayload, CaptainDeclineMissionPayload, CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
+from server.models.messages.negotiation import (
+    NegotiationOpenChannelPayload,
+    NegotiationCloseChannelPayload,
+    NegotiationStartPayload,
+    NegotiationAcceptPayload,
+    NegotiationCounterPayload,
+    NegotiationWalkAwayPayload,
+    NegotiationAcceptCallbackPayload,
+    NegotiationInspectPayload,
+    NegotiationBluffPayload,
+    NegotiationBarterPayload,
+    NegotiationServiceContractPayload,
+)
 from server.models.messages.comms import (
     CommsAssessDistressPayload,
     CommsDecodeSignalPayload,
@@ -347,6 +360,18 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "carrier.cancel_scramble":     CarrierCancelScramblePayload,
     # Medical Ship (v0.07 §2.7)
     "medical.surgical_procedure":  MedicalSurgicalProcedurePayload,
+    # Negotiation (v0.07 §6.3)
+    "negotiation.open_channel":      NegotiationOpenChannelPayload,
+    "negotiation.close_channel":     NegotiationCloseChannelPayload,
+    "negotiation.start":             NegotiationStartPayload,
+    "negotiation.accept":            NegotiationAcceptPayload,
+    "negotiation.counter":           NegotiationCounterPayload,
+    "negotiation.walk_away":         NegotiationWalkAwayPayload,
+    "negotiation.accept_callback":   NegotiationAcceptCallbackPayload,
+    "negotiation.inspect":           NegotiationInspectPayload,
+    "negotiation.bluff":             NegotiationBluffPayload,
+    "negotiation.barter":            NegotiationBarterPayload,
+    "negotiation.service_contract":  NegotiationServiceContractPayload,
 }
 
 

@@ -326,6 +326,84 @@ def execute_trade(
     return result
 
 
+def execute_trade_at_price(
+    vendor_id: str,
+    item_type: str,
+    quantity: int,
+    unit_price: float,
+    ship,
+) -> dict:
+    """Buy items at a specific negotiated price. Used by negotiation system."""
+    vendor = get_vendor_by_id(vendor_id)
+    if vendor is None:
+        return {"ok": False, "error": "Vendor not found"}
+    if not vendor.available:
+        return {"ok": False, "error": "Vendor not available"}
+
+    available = vendor.inventory.get(item_type, 0)
+    actual_qty = min(quantity, available)
+    if actual_qty <= 0:
+        return {"ok": False, "error": "Item out of stock"}
+
+    total_cost = round(unit_price * actual_qty, 2)
+    credits = getattr(ship, "credits", 0.0)
+    if total_cost > 0 and credits < total_cost:
+        return {"ok": False, "error": "Insufficient credits", "cost": total_cost, "credits": credits}
+
+    ship.credits = round(credits - total_cost, 2)
+    vendor.inventory[item_type] = available - actual_qty
+    _add_to_ship(ship, item_type, actual_qty)
+    adjust_reputation(ship, REPUTATION_TRADE_GAIN, "negotiated_trade")
+
+    result = {
+        "ok": True,
+        "item_type": item_type,
+        "quantity": actual_qty,
+        "unit_price": unit_price,
+        "total_cost": total_cost,
+        "credits_remaining": ship.credits,
+    }
+    _pending_events.append({"type": "trade_buy", "vendor_id": vendor_id, **result})
+    return result
+
+
+def sell_to_vendor_at_price(
+    vendor_id: str,
+    item_type: str,
+    quantity: int,
+    unit_price: float,
+    ship,
+) -> dict:
+    """Sell items at a specific negotiated price. Used by negotiation system."""
+    vendor = get_vendor_by_id(vendor_id)
+    if vendor is None:
+        return {"ok": False, "error": "Vendor not found"}
+    if not vendor.available:
+        return {"ok": False, "error": "Vendor not available"}
+
+    ship_qty = _get_ship_quantity(ship, item_type)
+    actual_qty = min(quantity, ship_qty)
+    if actual_qty <= 0:
+        return {"ok": False, "error": "Nothing to sell"}
+
+    total_earned = round(unit_price * actual_qty, 2)
+    _remove_from_ship(ship, item_type, actual_qty)
+    ship.credits = round(getattr(ship, "credits", 0.0) + total_earned, 2)
+    vendor.inventory[item_type] = vendor.inventory.get(item_type, 0) + actual_qty
+    adjust_reputation(ship, REPUTATION_TRADE_GAIN, "negotiated_trade")
+
+    result = {
+        "ok": True,
+        "item_type": item_type,
+        "quantity": actual_qty,
+        "unit_price": unit_price,
+        "total_earned": total_earned,
+        "credits_remaining": ship.credits,
+    }
+    _pending_events.append({"type": "trade_sell", "vendor_id": vendor_id, **result})
+    return result
+
+
 def sell_to_vendor(
     vendor_id: str,
     item_type: str,

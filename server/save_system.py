@@ -48,6 +48,7 @@ import server.game_loop_medical_ship as glms
 import server.equipment_modules as gleq
 import server.loadout as gllo
 import server.game_loop_vendor as glvr
+import server.game_loop_negotiation as glng
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -573,6 +574,7 @@ def save_game(
             "medical_ship": glms.serialise(),
             "loadout": gllo.serialise(),
             "vendors": glvr.serialise(),
+            "negotiation": glng.serialise(),
             "game_state": game_state or {},
         },
     }
@@ -684,6 +686,8 @@ def restore_game(save_id: str, world: World) -> dict:
         gllo.deserialise(mods["loadout"])
     if mods.get("vendors"):
         glvr.deserialise(mods["vendors"])
+    if mods.get("negotiation"):
+        glng.deserialise(mods["negotiation"])
 
     # Restore sector grid visibility (v0.05b).
     sector_layout = data.get("sector_layout")

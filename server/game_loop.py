@@ -147,6 +147,17 @@ from server.models.messages import (
     CarrierScramblePayload,
     CarrierCancelScramblePayload,
     MedicalSurgicalProcedurePayload,
+    NegotiationOpenChannelPayload,
+    NegotiationCloseChannelPayload,
+    NegotiationStartPayload,
+    NegotiationAcceptPayload,
+    NegotiationCounterPayload,
+    NegotiationWalkAwayPayload,
+    NegotiationAcceptCallbackPayload,
+    NegotiationInspectPayload,
+    NegotiationBluffPayload,
+    NegotiationBarterPayload,
+    NegotiationServiceContractPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -193,6 +204,7 @@ import server.game_loop_medical_ship as glms
 import server.equipment_modules as gleq
 import server.loadout as gllo
 import server.game_loop_vendor as glvr
+import server.game_loop_negotiation as glng
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -624,6 +636,7 @@ async def start(
     _world.ship.credits = round(sc.starting_credits * _diff_preset.starting_credits_multiplier, 2)
     _world.ship.trade_reputation = 0.0
     glvr.reset()
+    glng.reset()
 
     # v0.06.1: Generate individual crew roster and wire into medical v2.
     _crew_count = (sc.min_crew + sc.max_crew) // 2
@@ -1135,6 +1148,9 @@ async def _loop() -> None:
         await gldo.tick(_world, _world.ship, _manager, TICK_DT)
         # v0.07 §6.2: Vendor tick (trade windows, cooldowns).
         glvr.tick(_world, _world.ship, TICK_DT)
+        # v0.07 §6.3: Negotiation tick (channels, callbacks, combat state).
+        glng.set_combat_active(bool(_world.enemies))
+        glng.tick(_world, _world.ship, TICK_DT)
         glw.tick_cooldowns(TICK_DT)
         # v0.07 §2.5.1: Spinal mount tick (charge timer, cooldown).
         spinal_events = glsm.tick(_world.ship, _world, TICK_DT)
@@ -1636,6 +1652,14 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(
                 ["captain", "comms"],
                 Message.build(f"vendor.{_ve['type']}", _ve),
+            )
+
+        # 11b2b. Negotiation events (§6.3).
+        _neg_events = glng.pop_pending_events()
+        for _ne in _neg_events:
+            await _manager.broadcast_to_roles(
+                ["captain", "comms"],
+                Message.build(f"negotiation.{_ne['type']}", _ne),
             )
 
         # 11c. Scan progress.
@@ -2749,6 +2773,54 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                 events.append(("janitor.task_error", result))
         elif msg_type == "janitor.dismiss_sticky" and isinstance(payload, JanitorDismissStickyPayload):
             glj.dismiss_sticky(payload.sticky_id)
+        # Negotiation (v0.07 §6.3)
+        elif msg_type == "negotiation.open_channel" and isinstance(payload, NegotiationOpenChannelPayload):
+            import server.game_loop_docking as _gldo_neg
+            _is_docked = _gldo_neg.get_docked_station_id() is not None
+            _vendor = glvr.get_vendor_by_id(payload.vendor_id)
+            _dist = 0.0
+            if _vendor is not None and not _is_docked:
+                _dist = ((ship.x - _vendor.position[0])**2 + (ship.y - _vendor.position[1])**2)**0.5
+            result = glng.open_channel(payload.vendor_id, None, _dist, _is_docked)
+            if isinstance(result, str):
+                events.append(("negotiation.error", {"error": result}))
+        elif msg_type == "negotiation.close_channel" and isinstance(payload, NegotiationCloseChannelPayload):
+            glng.close_channel(payload.channel_id)
+        elif msg_type == "negotiation.start" and isinstance(payload, NegotiationStartPayload):
+            result = glng.start_negotiation(
+                payload.channel_id, payload.item_type, payload.quantity,
+                payload.is_selling, ship,
+            )
+            if not result.get("ok"):
+                events.append(("negotiation.error", {"error": result.get("error", "")}))
+        elif msg_type == "negotiation.accept" and isinstance(payload, NegotiationAcceptPayload):
+            result = glng.accept_offer(payload.session_id, ship)
+            if not result.get("ok"):
+                events.append(("negotiation.error", {"error": result.get("error", "")}))
+        elif msg_type == "negotiation.counter" and isinstance(payload, NegotiationCounterPayload):
+            result = glng.counter_offer(payload.session_id, payload.proposed_price, ship)
+            if not result.get("ok"):
+                events.append(("negotiation.error", {"error": result.get("error", "")}))
+        elif msg_type == "negotiation.walk_away" and isinstance(payload, NegotiationWalkAwayPayload):
+            glng.walk_away(payload.session_id)
+        elif msg_type == "negotiation.accept_callback" and isinstance(payload, NegotiationAcceptCallbackPayload):
+            result = glng.accept_callback(payload.session_id, ship)
+            if not result.get("ok"):
+                events.append(("negotiation.error", {"error": result.get("error", "")}))
+        elif msg_type == "negotiation.inspect" and isinstance(payload, NegotiationInspectPayload):
+            result = glng.inspect_item(payload.session_id, ship)
+            if not result.get("ok"):
+                events.append(("negotiation.error", {"error": result.get("error", "")}))
+        elif msg_type == "negotiation.bluff" and isinstance(payload, NegotiationBluffPayload):
+            glng.attempt_bluff(payload.session_id, payload.bluff_type, ship)
+        elif msg_type == "negotiation.barter" and isinstance(payload, NegotiationBarterPayload):
+            glng.propose_barter(
+                payload.session_id,
+                {"resource_items": payload.resource_items, "intel_items": payload.intel_items},
+                ship,
+            )
+        elif msg_type == "negotiation.service_contract" and isinstance(payload, NegotiationServiceContractPayload):
+            glng.propose_service_contract(payload.session_id, payload.contract_type, ship)
         else:
             logger.warning("Unrecognised queued input type: %s", msg_type)
 
