@@ -231,6 +231,21 @@ def build_sensor_contacts(
             "hull_max": round(station.hull_max, 1),
         })
 
+    # Wrecks (v0.07 §6.5) — always visible once spawned.
+    import server.game_loop_salvage as glsalv
+    for wreck in glsalv.get_wrecks():
+        contacts.append({
+            "id": wreck.id,
+            "x": round(wreck.x, 1),
+            "y": round(wreck.y, 1),
+            "heading": 0.0,
+            "kind": "wreck",
+            "scan_state": wreck.scan_state,
+            "classification": "neutral",
+            "enemy_type": wreck.enemy_type,
+            "salvage_state": wreck.salvage_state,
+        })
+
     # Corvette ECM ghost contacts — injected as fake enemy contacts.
     if ghost_contacts:
         contacts.extend(ghost_contacts)

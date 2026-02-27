@@ -20,6 +20,13 @@ from server.models.messages.negotiation import (
     NegotiationBarterPayload,
     NegotiationServiceContractPayload,
 )
+from server.models.messages.salvage import (
+    SalvageAssessPayload,
+    SalvageCancelAssessmentPayload,
+    SalvageSelectItemsPayload,
+    SalvageBeginPayload,
+    SalvageCancelPayload,
+)
 from server.models.messages.comms import (
     CommsAssessDistressPayload,
     CommsDecodeSignalPayload,
@@ -372,6 +379,12 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "negotiation.bluff":             NegotiationBluffPayload,
     "negotiation.barter":            NegotiationBarterPayload,
     "negotiation.service_contract":  NegotiationServiceContractPayload,
+    # Salvage (v0.07 §6.5)
+    "salvage.assess":              SalvageAssessPayload,
+    "salvage.cancel_assessment":   SalvageCancelAssessmentPayload,
+    "salvage.select_items":        SalvageSelectItemsPayload,
+    "salvage.begin_salvage":       SalvageBeginPayload,
+    "salvage.cancel_salvage":      SalvageCancelPayload,
 }
 
 

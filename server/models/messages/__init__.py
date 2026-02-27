@@ -232,6 +232,15 @@ from server.models.messages.negotiation import (
     NegotiationServiceContractPayload,
 )
 
+# Salvage (v0.07 §6.5)
+from server.models.messages.salvage import (
+    SalvageAssessPayload,
+    SalvageCancelAssessmentPayload,
+    SalvageSelectItemsPayload,
+    SalvageBeginPayload,
+    SalvageCancelPayload,
+)
+
 # Carrier Ops
 from server.models.messages.carrier_ops import (
     CarrierCancelCAPPayload,
@@ -427,4 +436,10 @@ __all__ = [
     "NegotiationBluffPayload",
     "NegotiationBarterPayload",
     "NegotiationServiceContractPayload",
+    # salvage
+    "SalvageAssessPayload",
+    "SalvageCancelAssessmentPayload",
+    "SalvageSelectItemsPayload",
+    "SalvageBeginPayload",
+    "SalvageCancelPayload",
 ]

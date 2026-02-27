@@ -34,6 +34,7 @@ from server.systems.combat import (
     beam_in_arc,
 )
 from server.utils.math_helpers import angle_diff, bearing_to, distance, wrap_angle
+import server.game_loop_salvage as glsalv
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -407,6 +408,7 @@ def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]
     })
 
     if target.hull <= 0.0:
+        glsalv.spawn_wreck("enemy", target.id, target.type, target.x, target.y)
         world.enemies = [e for e in world.enemies if e.id != target.id]
         gl.log_event("combat", "enemy_destroyed", {"enemy_id": target.id, "cause": "beam_auto"})
 
@@ -662,6 +664,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
 
         apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency)
         if target.hull <= 0.0:
+            glsalv.spawn_wreck("enemy", target.id, target.type, target.x, target.y)
             world.enemies = [e for e in world.enemies if e.id != target.id]
             if _weapons_target == target.id:
                 _weapons_target = None
@@ -947,6 +950,7 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                     for h_enemy in hit_enemies:
                         apply_hit_to_enemy(h_enemy, damage, torp.x, torp.y)
                         if h_enemy.hull <= 0.0:
+                            glsalv.spawn_wreck("enemy", h_enemy.id, h_enemy.type, h_enemy.x, h_enemy.y)
                             destroyed_ids.append(h_enemy.id)
                             gl.log_event("combat", "enemy_destroyed", {
                                 "enemy_id": h_enemy.id,
@@ -998,6 +1002,7 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                             event["stun_duration"] = ION_STUN_TICKS / 10.0
 
                     if hit_enemy.hull <= 0.0:
+                        glsalv.spawn_wreck("enemy", hit_enemy.id, hit_enemy.type, hit_enemy.x, hit_enemy.y)
                         world.enemies = [e for e in world.enemies
                                          if e.id != hit_enemy.id]
                         gl.log_event("combat", "enemy_destroyed", {

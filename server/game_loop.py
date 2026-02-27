@@ -158,6 +158,11 @@ from server.models.messages import (
     NegotiationBluffPayload,
     NegotiationBarterPayload,
     NegotiationServiceContractPayload,
+    SalvageAssessPayload,
+    SalvageCancelAssessmentPayload,
+    SalvageSelectItemsPayload,
+    SalvageBeginPayload,
+    SalvageCancelPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -205,6 +210,7 @@ import server.equipment_modules as gleq
 import server.loadout as gllo
 import server.game_loop_vendor as glvr
 import server.game_loop_negotiation as glng
+import server.game_loop_salvage as glsalv
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -637,6 +643,7 @@ async def start(
     _world.ship.trade_reputation = 0.0
     glvr.reset()
     glng.reset()
+    glsalv.reset()
 
     # v0.06.1: Generate individual crew roster and wire into medical v2.
     _crew_count = (sc.min_crew + sc.max_crew) // 2
@@ -1151,6 +1158,8 @@ async def _loop() -> None:
         # v0.07 §6.3: Negotiation tick (channels, callbacks, combat state).
         glng.set_combat_active(bool(_world.enemies))
         glng.tick(_world, _world.ship, TICK_DT)
+        # v0.07 §6.5: Salvage tick (despawn, scan, extract, reactor).
+        glsalv.tick(_world.ship, TICK_DT)
         glw.tick_cooldowns(TICK_DT)
         # v0.07 §2.5.1: Spinal mount tick (charge timer, cooldown).
         spinal_events = glsm.tick(_world.ship, _world, TICK_DT)
@@ -1633,6 +1642,11 @@ async def _loop() -> None:
         # Broadcast mission events to captain and log for debrief.
         _dm_events = gldm.pop_pending_mission_events()
         for _dme in _dm_events:
+            # Apply credit rewards on mission completion (§6.4.2.5).
+            if _dme["event"] == "mission_completed":
+                _reward_credits = _dme.get("rewards", {}).get("credits", 0.0)
+                if _reward_credits > 0:
+                    _world.ship.credits += _reward_credits
             await _manager.broadcast_to_roles(
                 ["captain", "comms"],
                 Message.build(f"mission.{_dme['event']}", _dme),
@@ -1660,6 +1674,14 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(
                 ["captain", "comms"],
                 Message.build(f"negotiation.{_ne['type']}", _ne),
+            )
+
+        # 11b2c. Salvage events (§6.5).
+        _salvage_events = glsalv.pop_pending_events()
+        for _se in _salvage_events:
+            await _manager.broadcast_to_roles(
+                ["captain", "engineering"],
+                Message.build(f"salvage.{_se['type']}", _se),
             )
 
         # 11c. Scan progress.
@@ -2821,6 +2843,27 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             )
         elif msg_type == "negotiation.service_contract" and isinstance(payload, NegotiationServiceContractPayload):
             glng.propose_service_contract(payload.session_id, payload.contract_type, ship)
+        # Salvage (v0.07 §6.5)
+        elif msg_type == "salvage.assess" and isinstance(payload, SalvageAssessPayload):
+            result = glsalv.assess_salvage(payload.wreck_id, ship)
+            if not result.get("ok"):
+                events.append(("salvage.error", {"error": result.get("error", "")}))
+        elif msg_type == "salvage.cancel_assessment" and isinstance(payload, SalvageCancelAssessmentPayload):
+            result = glsalv.cancel_assessment(payload.wreck_id)
+            if not result.get("ok"):
+                events.append(("salvage.error", {"error": result.get("error", "")}))
+        elif msg_type == "salvage.select_items" and isinstance(payload, SalvageSelectItemsPayload):
+            result = glsalv.select_items(payload.wreck_id, payload.item_ids)
+            if not result.get("ok"):
+                events.append(("salvage.error", {"error": result.get("error", "")}))
+        elif msg_type == "salvage.begin_salvage" and isinstance(payload, SalvageBeginPayload):
+            result = glsalv.begin_salvage(payload.wreck_id, ship)
+            if not result.get("ok"):
+                events.append(("salvage.error", {"error": result.get("error", "")}))
+        elif msg_type == "salvage.cancel_salvage" and isinstance(payload, SalvageCancelPayload):
+            result = glsalv.cancel_salvage(payload.wreck_id)
+            if not result.get("ok"):
+                events.append(("salvage.error", {"error": result.get("error", "")}))
         else:
             logger.warning("Unrecognised queued input type: %s", msg_type)
 
