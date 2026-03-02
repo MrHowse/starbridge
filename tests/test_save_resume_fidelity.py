@@ -573,10 +573,11 @@ class TestDCStatePreserved:
         restored = glhc.serialise()
         assert restored["active_dcts"] == expected["active_dcts"]
         assert len(restored["active_dcts"]) > 0  # we dispatched a DCT
-        assert restored["fire_spread_timer"] == pytest.approx(
-            expected["fire_spread_timer"])
         assert restored["pending_hull_damage"] == pytest.approx(
             expected["pending_hull_damage"])
+        assert restored["fires"] == expected["fires"]
+        assert restored["fire_teams"] == expected["fire_teams"]
+        assert restored["vent_rooms"] == expected["vent_rooms"]
 
 
 class TestInteriorStatePreserved:

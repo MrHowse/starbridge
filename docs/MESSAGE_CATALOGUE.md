@@ -153,6 +153,12 @@ All entries in `_PAYLOAD_SCHEMAS` — the server accepts and validates these.
 |---|---|---|
 | `hazard_control.dispatch_dct` | EngineeringDispatchDCTPayload | room_id |
 | `hazard_control.cancel_dct` | EngineeringCancelDCTPayload | room_id |
+| `hazard_control.suppress_local` | HazConSuppressLocalPayload | room_id |
+| `hazard_control.suppress_deck` | HazConSuppressDeckPayload | deck_name |
+| `hazard_control.vent_room` | HazConVentRoomPayload | room_id |
+| `hazard_control.cancel_vent` | HazConCancelVentPayload | room_id |
+| `hazard_control.dispatch_fire_team` | HazConDispatchFireTeamPayload | room_id |
+| `hazard_control.cancel_fire_team` | HazConCancelFireTeamPayload | room_id |
 
 ### Creatures
 
@@ -257,7 +263,7 @@ All entries in `_PAYLOAD_SCHEMAS` — the server accepts and validates these.
 | `engineering.state` | game_loop.py | hull, systems, repair_focus, overclocked_systems |
 | `engineering.dc_state` | game_loop.py | decks, fire_spread_timer |
 | `engineering.repair_team_event` | game_loop.py | type, team_id, location |
-| `hazard_control.state` | game_loop.py | decks, fire_spread_timer |
+| `hazard_control.state` | game_loop.py | rooms, active_dcts, fires, fire_teams, vent_rooms, deck_suppression |
 
 ### Weapons & Combat
 

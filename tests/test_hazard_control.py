@@ -50,12 +50,13 @@ def test_reset_clears_pending_hull_damage():
     assert glhc._pending_hull_damage == pytest.approx(0.0)
 
 
-def test_reset_resets_fire_spread_timer():
+def test_reset_clears_fires():
     interior = fresh_interior()
-    # Advance the timer.
-    glhc.tick(interior, 10.0)
+    room_id = next(iter(interior.rooms))
+    glhc.start_fire(room_id, 2, interior)
+    assert glhc._fires
     glhc.reset()
-    assert glhc._fire_spread_timer == pytest.approx(glhc.FIRE_SPREAD_INTERVAL)
+    assert not glhc._fires
 
 
 # ---------------------------------------------------------------------------
@@ -245,16 +246,15 @@ def test_tick_advances_dct_elapsed_time():
 def test_dct_reduces_fire_to_damaged_after_duration():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
-    interior.rooms[room_id].state = "fire"
+    # Use start_fire to create a proper Fire entry at intensity 1.
+    glhc.start_fire(room_id, 1, interior)
     glhc.dispatch_dct(room_id, interior)
 
-    # Tick just over the repair duration.
+    # Tick just over the repair duration — DCT reduces fire intensity by 1.
     glhc.tick(interior, glhc.DCT_REPAIR_DURATION + 0.01)
 
+    # Fire extinguished (intensity 0), room goes to "damaged".
     assert interior.rooms[room_id].state == "damaged"
-    # Timer should have reset for next level, not be removed.
-    assert room_id in glhc._active_dcts
-    assert glhc._active_dcts[room_id] == pytest.approx(0.0)
 
 
 def test_dct_reduces_damaged_to_normal_after_duration():
@@ -288,22 +288,28 @@ def test_dct_auto_cancels_when_room_already_normal():
 # ---------------------------------------------------------------------------
 
 
-def test_fire_spread_timer_decrements():
+def test_fire_spread_timer_decrements_per_fire():
     interior = fresh_interior()
-    initial = glhc._fire_spread_timer
+    room_id = next(rid for rid, r in interior.rooms.items() if r.connections)
+    glhc.start_fire(room_id, 3, interior)  # intensity 3 → 60s spread timer
+    initial_spread = glhc._fires[room_id].spread_timer
     glhc.tick(interior, 5.0)
-    assert glhc._fire_spread_timer == pytest.approx(initial - 5.0)
+    assert glhc._fires[room_id].spread_timer == pytest.approx(initial_spread - 5.0)
 
 
 def test_fire_spread_resets_timer_after_expiry():
     interior = fresh_interior()
-    glhc.tick(interior, glhc.FIRE_SPREAD_INTERVAL + 0.01)
-    assert glhc._fire_spread_timer == pytest.approx(glhc.FIRE_SPREAD_INTERVAL)
+    room_id = next(rid for rid, r in interior.rooms.items() if r.connections)
+    # Intensity 5 → 15s spread timer (fastest).
+    glhc.start_fire(room_id, 5, interior)
+    glhc._rng.seed(0)
+    glhc.tick(interior, 15.01)
+    # Timer should have reset.
+    assert glhc._fires[room_id].spread_timer > 0.0
 
 
 def test_fire_spread_ignites_adjacent_room():
     interior = fresh_interior()
-    # Find a room that has connections so spread can happen.
     fire_room = None
     for room in interior.rooms.values():
         if room.connections:
@@ -311,13 +317,14 @@ def test_fire_spread_ignites_adjacent_room():
             break
     assert fire_room is not None
 
-    fire_room.state = "fire"
+    # Use start_fire so the Fire entry exists for spread logic.
+    glhc.start_fire(fire_room.id, 5, interior)  # intensity 5 → 15s spread
     glhc._rng.seed(0)
 
     # Advance past the spread timer.
-    glhc.tick(interior, glhc.FIRE_SPREAD_INTERVAL + 0.01)
+    glhc.tick(interior, 15.01)
 
-    # At least one adjacent room should be non-normal.
+    # At least one adjacent room should be non-normal (fire or damaged from cascade).
     adj_states = {interior.rooms[rid].state for rid in fire_room.connections if rid in interior.rooms}
     assert adj_states & {"damaged", "fire"}, "Fire should have spread to an adjacent room"
 

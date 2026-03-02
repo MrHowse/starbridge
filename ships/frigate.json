@@ -53,7 +53,8 @@
     "drone_fuel":       {"starting": 200,  "capacity": 200},
     "drone_parts":      {"starting": 12,   "capacity": 20},
     "ammunition":       {"starting": 50,   "capacity": 80},
-    "provisions":       {"starting": 500,  "capacity": 500}
+    "provisions":       {"starting": 500,  "capacity": 500},
+    "suppressant":      {"starting": 15,   "capacity": 15}
   },
   "cargo_capacity": 60,
   "starting_credits": 800

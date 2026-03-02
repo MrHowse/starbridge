@@ -41,6 +41,7 @@ RESOURCE_TYPES: tuple[str, ...] = (
     "drone_parts",
     "ammunition",
     "provisions",
+    "suppressant",
 )
 
 
@@ -86,6 +87,10 @@ class ResourceStore:
     # Provisions
     provisions: float = 0.0
     provisions_max: float = 0.0
+
+    # Suppressant (fire suppression agent)
+    suppressant: float = 0.0
+    suppressant_max: float = 0.0
 
     # Provisions depletion tracking
     provisions_depleted_time: float = 0.0  # seconds at 0 provisions

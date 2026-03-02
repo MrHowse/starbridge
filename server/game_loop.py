@@ -176,6 +176,12 @@ from server.models.messages import (
     RationingSubmitRequestPayload,
     RationingApproveRequestPayload,
     RationingDenyRequestPayload,
+    HazConSuppressLocalPayload,
+    HazConSuppressDeckPayload,
+    HazConVentRoomPayload,
+    HazConCancelVentPayload,
+    HazConDispatchFireTeamPayload,
+    HazConCancelFireTeamPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -950,7 +956,7 @@ async def _loop() -> None:
         gltr.auto_helm_tick(_world.ship, TICK_DT)
         gltr.auto_engineering_tick(_world.ship, TICK_DT)
         glhc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty,
-                 resources=_world.ship.resources)
+                 resources=_world.ship.resources, ship=_world.ship)
         # Build lightweight contact list for drone AI from world entities.
         _fo_contacts: list[dict] = []
         for _foe in _world.enemies:
@@ -2119,6 +2125,14 @@ async def _loop() -> None:
                 "effect": _oc_comp_hit.get("effect", ""),
             })
             glops.add_feed_event("ENGINEERING", f"Overclock damage: {_oc_sys} {round(_oc_health)}%", "warning")
+            # B.2.1.4: Overclock fire chance (15%, intensity 1).
+            if random.random() < glhc.OVERCLOCK_FIRE_CHANCE:
+                from server.models.interior import get_system_rooms as _gsr
+                _oc_sys_rooms = _gsr(_ship_class_id)
+                _oc_room_id = _oc_sys_rooms.get(_oc_sys)
+                if _oc_room_id and _oc_room_id in _world.ship.interior.rooms:
+                    glhc.start_fire(_oc_room_id, glhc.OVERCLOCK_FIRE_INTENSITY, _world.ship.interior, _tick_count)
+                    gl.log_event("hazard_control", "overclock_fire", {"system": _oc_sys, "room_id": _oc_room_id})
         # 12a-b. Overheat warnings (from gle.tick).
         for _ow_evt in _eng_result.overclock_warnings:
             await _manager.broadcast_to_roles(
@@ -2355,6 +2369,24 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type in ("engineering.cancel_dct", "hazard_control.cancel_dct") and isinstance(payload, EngineeringCancelDCTPayload):
             glhc.cancel_dct(payload.room_id)
             gl.log_event("engineering", "dct_cancelled", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.suppress_local" and isinstance(payload, HazConSuppressLocalPayload):
+            glhc.suppress_local(payload.room_id, ship.resources)
+            gl.log_event("hazard_control", "suppress_local", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.suppress_deck" and isinstance(payload, HazConSuppressDeckPayload):
+            glhc.suppress_deck(payload.deck_name, ship.interior, ship.resources)
+            gl.log_event("hazard_control", "suppress_deck", {"deck_name": payload.deck_name})
+        elif msg_type == "hazard_control.vent_room" and isinstance(payload, HazConVentRoomPayload):
+            glhc.vent_room(payload.room_id, ship.interior)
+            gl.log_event("hazard_control", "vent_room", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.cancel_vent" and isinstance(payload, HazConCancelVentPayload):
+            glhc.cancel_vent(payload.room_id)
+            gl.log_event("hazard_control", "cancel_vent", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.dispatch_fire_team" and isinstance(payload, HazConDispatchFireTeamPayload):
+            glhc.dispatch_fire_team(payload.room_id, ship.interior)
+            gl.log_event("hazard_control", "dispatch_fire_team", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.cancel_fire_team" and isinstance(payload, HazConCancelFireTeamPayload):
+            glhc.cancel_fire_team(payload.room_id)
+            gl.log_event("hazard_control", "cancel_fire_team", {"room_id": payload.room_id})
         elif msg_type == "engineering.dispatch_team" and isinstance(payload, EngineeringDispatchTeamPayload):
             gle.dispatch_team(payload.team_id, payload.system, ship.interior)
             gl.log_event("engineering", "team_dispatched", {"team_id": payload.team_id, "system": payload.system})

@@ -120,6 +120,14 @@ from server.models.messages.operations import (
     OpsMarkObjectivePayload,
     OpsStationAdvisoryPayload,
 )
+from server.models.messages.hazard_control import (
+    HazConSuppressLocalPayload,
+    HazConSuppressDeckPayload,
+    HazConVentRoomPayload,
+    HazConCancelVentPayload,
+    HazConDispatchFireTeamPayload,
+    HazConCancelFireTeamPayload,
+)
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
     EngineeringCancelRepairOrderPayload,
@@ -348,9 +356,15 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "operations.issue_evasion_alert": OpsIssueEvasionAlertPayload,
     "operations.mark_objective": OpsMarkObjectivePayload,
     "operations.station_advisory": OpsStationAdvisoryPayload,
-    # Hazard Control (aliases engineering DCT payloads)
-    "hazard_control.dispatch_dct": EngineeringDispatchDCTPayload,
-    "hazard_control.cancel_dct":   EngineeringCancelDCTPayload,
+    # Hazard Control
+    "hazard_control.dispatch_dct":        EngineeringDispatchDCTPayload,
+    "hazard_control.cancel_dct":          EngineeringCancelDCTPayload,
+    "hazard_control.suppress_local":      HazConSuppressLocalPayload,
+    "hazard_control.suppress_deck":       HazConSuppressDeckPayload,
+    "hazard_control.vent_room":           HazConVentRoomPayload,
+    "hazard_control.cancel_vent":         HazConCancelVentPayload,
+    "hazard_control.dispatch_fire_team":  HazConDispatchFireTeamPayload,
+    "hazard_control.cancel_fire_team":    HazConCancelFireTeamPayload,
     # Creatures (v0.05k)
     "creature.sedate":            CreatureSedatePayload,
     "creature.ew_disrupt":        CreatureEWDisruptPayload,
