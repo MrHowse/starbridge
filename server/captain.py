@@ -40,6 +40,8 @@ _QUEUE_FORWARDED_TYPES = frozenset({
     "captain.flag_set_priority",
     "captain.flag_clear_priority",
     "captain.fleet_order",
+    # Emergency Systems (B.6.3)
+    "captain.abandon_ship",
 })
 
 

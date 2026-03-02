@@ -139,6 +139,13 @@ from server.models.messages.hazard_control import (
     HazConCancelDeconTeamPayload,
     HazConReinforceSectionPayload,
     HazConCancelReinforcementPayload,
+    HazConSealConnectionPayload,
+    HazConUnsealConnectionPayload,
+    HazConOverrideSecurityLockPayload,
+    HazConRedirectBatteryPayload,
+    HazConSetEvacuationOrderPayload,
+    HazConLaunchPodPayload,
+    AbandonShipPayload,
 )
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
@@ -392,6 +399,14 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     # Structural Integrity (v0.08 B.5)
     "hazard_control.reinforce_section":    HazConReinforceSectionPayload,
     "hazard_control.cancel_reinforcement": HazConCancelReinforcementPayload,
+    # Emergency Systems (v0.08 B.6)
+    "hazard_control.seal_connection":        HazConSealConnectionPayload,
+    "hazard_control.unseal_connection":      HazConUnsealConnectionPayload,
+    "hazard_control.override_security_lock": HazConOverrideSecurityLockPayload,
+    "hazard_control.redirect_battery":       HazConRedirectBatteryPayload,
+    "hazard_control.set_evacuation_order":   HazConSetEvacuationOrderPayload,
+    "hazard_control.launch_pod":             HazConLaunchPodPayload,
+    "captain.abandon_ship":                  AbandonShipPayload,
     # Creatures (v0.05k)
     "creature.sedate":            CreatureSedatePayload,
     "creature.ew_disrupt":        CreatureEWDisruptPayload,

@@ -67,6 +67,7 @@ class ShipInterior:
         to_id: str,
         ignore_sealed: bool = False,
         use_marine_tunnels: bool = False,
+        blocked_connections: set[tuple[str, str]] | None = None,
     ) -> list[str]:
         """BFS shortest path between two rooms.
 
@@ -77,6 +78,9 @@ class ShipInterior:
 
         *use_marine_tunnels* includes marine_only_connections in the graph
         (corvette secret tunnels that marines can use but intruders can't).
+
+        *blocked_connections* is an optional set of sorted (room_a, room_b) tuples
+        representing emergency bulkhead seals that block traversal.
         """
         if from_id not in self.rooms or to_id not in self.rooms:
             return []
@@ -105,6 +109,10 @@ class ShipInterior:
                     continue
                 if next_room.door_sealed and not ignore_sealed:
                     continue
+                if blocked_connections is not None:
+                    key = (min(current_id, next_id), max(current_id, next_id))
+                    if key in blocked_connections:
+                        continue
                 new_path = path + [next_id]
                 if next_id == to_id:
                     return new_path

@@ -174,7 +174,7 @@ from server.models.messages.operations import (
     OpsStationAdvisoryPayload,
 )
 
-# Hazard Control (v0.08 B.2 + B.3 + B.4)
+# Hazard Control (v0.08 B.2–B.6)
 from server.models.messages.hazard_control import (
     HazConSuppressLocalPayload,
     HazConSuppressDeckPayload,
@@ -194,6 +194,13 @@ from server.models.messages.hazard_control import (
     HazConCancelDeconTeamPayload,
     HazConReinforceSectionPayload,
     HazConCancelReinforcementPayload,
+    HazConSealConnectionPayload,
+    HazConUnsealConnectionPayload,
+    HazConOverrideSecurityLockPayload,
+    HazConRedirectBatteryPayload,
+    HazConSetEvacuationOrderPayload,
+    HazConLaunchPodPayload,
+    AbandonShipPayload,
 )
 
 # Game lifecycle
@@ -449,6 +456,13 @@ __all__ = [
     "HazConCancelDeconTeamPayload",
     "HazConReinforceSectionPayload",
     "HazConCancelReinforcementPayload",
+    "HazConSealConnectionPayload",
+    "HazConUnsealConnectionPayload",
+    "HazConOverrideSecurityLockPayload",
+    "HazConRedirectBatteryPayload",
+    "HazConSetEvacuationOrderPayload",
+    "HazConLaunchPodPayload",
+    "AbandonShipPayload",
     # game
     "ErrorValidationPayload",
     "ErrorPermissionPayload",

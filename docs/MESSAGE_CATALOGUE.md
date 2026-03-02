@@ -171,6 +171,13 @@ All entries in `_PAYLOAD_SCHEMAS` — the server accepts and validates these.
 | `hazard_control.cancel_decon_team` | HazConCancelDeconTeamPayload | room_id |
 | `hazard_control.reinforce_section` | HazConReinforceSectionPayload | section_id |
 | `hazard_control.cancel_reinforcement` | HazConCancelReinforcementPayload | section_id |
+| `hazard_control.seal_connection` | HazConSealConnectionPayload | room_a, room_b |
+| `hazard_control.unseal_connection` | HazConUnsealConnectionPayload | room_a, room_b |
+| `hazard_control.override_security_lock` | HazConOverrideSecurityLockPayload | room_id |
+| `hazard_control.redirect_battery` | HazConRedirectBatteryPayload | from_deck, to_deck |
+| `hazard_control.set_evacuation_order` | HazConSetEvacuationOrderPayload | deck_order |
+| `hazard_control.launch_pod` | HazConLaunchPodPayload | pod_id |
+| `captain.abandon_ship` | AbandonShipPayload | — |
 
 ### Creatures
 

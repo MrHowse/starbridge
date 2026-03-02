@@ -142,6 +142,23 @@ COLLAPSE_FIRE_CHANCE: float = 0.80
 COLLAPSE_FIRE_INTENSITY: int = 3
 COLLAPSE_CASCADE_DMG: float = 15.0
 
+# --- Emergency power (B.6.2) ---
+
+EMERGENCY_BATTERY_CAPACITY: float = 180.0    # seconds per deck
+BATTERY_TRANSFER_AMOUNT: float = 60.0        # seconds per redirect action
+NO_POWER_CREW_PENALTY: float = 0.80          # crew eff drops to 20%
+NO_POWER_CREW_DAMAGE: float = 0.017          # HP/s (~0.5 HP/30s)
+
+# --- Life pods (B.6.3) ---
+
+LIFE_POD_CAPACITY: int = 4
+LIFE_POD_LAUNCH_TIME: float = 10.0           # seconds to launch
+LIFE_POD_LOAD_RATE: float = 1.0              # crew/second per pod
+ABANDON_SHIP_HULL_THRESHOLD: float = 0.15    # fraction of max hull
+SMALL_SHIP_PODS_PER_DECK: int = 1
+LARGE_SHIP_PODS_PER_DECK: int = 2
+LARGE_SHIP_CLASSES: tuple[str, ...] = ("cruiser", "carrier", "battleship")
+
 # ---------------------------------------------------------------------------
 # Fire dataclass
 # ---------------------------------------------------------------------------
@@ -179,6 +196,24 @@ class Section:
 
 
 # ---------------------------------------------------------------------------
+# LifePod dataclass (B.6.3)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class LifePod:
+    """One life pod on a ship deck."""
+
+    id: str
+    deck_number: int
+    capacity: int = LIFE_POD_CAPACITY
+    loaded_crew: int = 0
+    launched: bool = False
+    launch_timer: float = 0.0        # >0 means launching in progress
+    _load_accum: float = 0.0         # fractional crew loading accumulator
+
+
+# ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
 
@@ -197,6 +232,19 @@ _room_to_section: dict[str, str] = {}        # room_id → section_id (lookup ca
 _section_adjacency: dict[str, list[str]] = {}  # section_id → adjacent section IDs
 _fire_structural_timers: dict[str, float] = {}  # section_id → accumulated fire-damage time
 
+# Emergency bulkheads (B.6.1).
+_sealed_connections: set[tuple[str, str]] = set()  # sorted (room_a, room_b) pairs
+
+# Emergency power (B.6.2).
+_deck_batteries: dict[int, float] = {}     # deck_number → remaining seconds
+_deck_power: dict[int, str] = {}           # deck_number → "main" / "emergency" / "none"
+_power_cut_overrides: set[int] = set()     # decks where HC manually cut power
+
+# Life pods (B.6.3).
+_life_pods: list[LifePod] = []
+_abandon_ship: bool = False
+_evacuation_order: list[int] = []          # deck_numbers in priority order
+
 _rng: random.Random = random.Random()
 
 
@@ -207,7 +255,7 @@ _rng: random.Random = random.Random()
 
 def reset() -> None:
     """Clear all hazard-control state.  Called at game start."""
-    global _pending_hull_damage
+    global _pending_hull_damage, _abandon_ship
     _active_dcts.clear()
     _pending_hull_damage = 0.0
     _fires.clear()
@@ -219,6 +267,14 @@ def reset() -> None:
     _room_to_section.clear()
     _section_adjacency.clear()
     _fire_structural_timers.clear()
+    # B.6 emergency systems.
+    _sealed_connections.clear()
+    _deck_batteries.clear()
+    _deck_power.clear()
+    _power_cut_overrides.clear()
+    _life_pods.clear()
+    _abandon_ship = False
+    _evacuation_order.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -568,6 +624,228 @@ def get_structural_crew_penalties() -> dict[str, float]:
 
 
 # ---------------------------------------------------------------------------
+# Public API — emergency bulkheads (B.6.1)
+# ---------------------------------------------------------------------------
+
+
+def _connection_key(room_a: str, room_b: str) -> tuple[str, str]:
+    """Return a sorted (min, max) tuple for a room connection."""
+    return (min(room_a, room_b), max(room_a, room_b))
+
+
+def seal_connection(room_a: str, room_b: str, interior: ShipInterior) -> bool:
+    """Seal an emergency bulkhead between two connected rooms.
+
+    Returns False if rooms are not connected or already sealed.
+    """
+    ra = interior.rooms.get(room_a)
+    rb = interior.rooms.get(room_b)
+    if ra is None or rb is None:
+        return False
+    if room_b not in ra.connections:
+        return False
+    key = _connection_key(room_a, room_b)
+    if key in _sealed_connections:
+        return False
+    _sealed_connections.add(key)
+    logger.info("Emergency bulkhead sealed: %s ↔ %s", room_a, room_b)
+    return True
+
+
+def unseal_connection(room_a: str, room_b: str) -> bool:
+    """Remove emergency bulkhead seal. Returns False if not sealed."""
+    key = _connection_key(room_a, room_b)
+    if key not in _sealed_connections:
+        return False
+    _sealed_connections.discard(key)
+    logger.info("Emergency bulkhead unsealed: %s ↔ %s", room_a, room_b)
+    return True
+
+
+def is_connection_sealed(room_a: str, room_b: str) -> bool:
+    """Check whether an emergency bulkhead is sealed between two rooms."""
+    return _connection_key(room_a, room_b) in _sealed_connections
+
+
+def get_sealed_connections() -> set[tuple[str, str]]:
+    """Return a copy of all sealed connections."""
+    return set(_sealed_connections)
+
+
+def override_security_lock(room_id: str, interior: ShipInterior) -> list[dict]:
+    """Override Security door lock (unlock room for evacuation).
+
+    Returns event list. If the door was sealed, unlocks it and emits an event
+    for Security notification.
+    """
+    room = interior.rooms.get(room_id)
+    if room is None:
+        return []
+    if not room.door_sealed:
+        return []
+    room.door_sealed = False
+    logger.info("HAZCON OVERRIDE: Door %s unlocked for evacuation", room_id)
+    return [{"type": "security_override", "room_id": room_id,
+             "message": f"HAZCON OVERRIDE: Door {room.name} unlocked for evacuation"}]
+
+
+# ---------------------------------------------------------------------------
+# Public API — emergency power (B.6.2)
+# ---------------------------------------------------------------------------
+
+
+def init_emergency_power(interior: ShipInterior) -> None:
+    """Initialise per-deck batteries and power state. Called at game start."""
+    _deck_batteries.clear()
+    _deck_power.clear()
+    _power_cut_overrides.clear()
+    deck_numbers: set[int] = set()
+    for room in interior.rooms.values():
+        deck_numbers.add(room.deck_number)
+    for dn in deck_numbers:
+        _deck_batteries[dn] = EMERGENCY_BATTERY_CAPACITY
+        _deck_power[dn] = "main"
+
+
+def redirect_battery(from_deck: int, to_deck: int,
+                     amount: float = BATTERY_TRANSFER_AMOUNT) -> bool:
+    """Transfer battery seconds from one deck to another.
+
+    Returns False if source has insufficient battery.
+    """
+    if from_deck not in _deck_batteries or to_deck not in _deck_batteries:
+        return False
+    available = _deck_batteries[from_deck]
+    if available < amount:
+        return False
+    _deck_batteries[from_deck] -= amount
+    _deck_batteries[to_deck] += amount
+    logger.info("Battery redirected: deck %d → deck %d (%.0fs)", from_deck, to_deck, amount)
+    return True
+
+
+def cut_deck_power(deck_number: int) -> bool:
+    """HC manually cuts main power on a deck. Returns True if now cut."""
+    if deck_number not in _deck_power:
+        return False
+    _power_cut_overrides.add(deck_number)
+    return True
+
+
+def restore_deck_power(deck_number: int) -> bool:
+    """HC removes manual power cut. Returns True if override was active."""
+    if deck_number not in _power_cut_overrides:
+        return False
+    _power_cut_overrides.discard(deck_number)
+    return True
+
+
+def get_power_crew_penalties() -> dict[str, float]:
+    """Return deck_name → 0.80 penalty for decks with no power."""
+    penalties: dict[str, float] = {}
+    for sec in _sections.values():
+        if _deck_power.get(sec.deck_number) == "none":
+            if NO_POWER_CREW_PENALTY > penalties.get(sec.deck_name, 0.0):
+                penalties[sec.deck_name] = NO_POWER_CREW_PENALTY
+    return penalties
+
+
+def get_powerless_decks() -> set[int]:
+    """Return deck numbers with power='none' (for cross-station queries)."""
+    return {dn for dn, state in _deck_power.items() if state == "none"}
+
+
+def get_deck_power() -> dict[int, str]:
+    """Return deck_number → power state dict."""
+    return dict(_deck_power)
+
+
+def restore_all_power() -> None:
+    """Restore all batteries and power to main (used on docking)."""
+    _power_cut_overrides.clear()
+    for dn in _deck_batteries:
+        _deck_batteries[dn] = EMERGENCY_BATTERY_CAPACITY
+        _deck_power[dn] = "main"
+
+
+# ---------------------------------------------------------------------------
+# Public API — life pods (B.6.3)
+# ---------------------------------------------------------------------------
+
+
+def init_life_pods(ship_class: str, interior: ShipInterior) -> None:
+    """Create life pods based on ship class and interior layout."""
+    _life_pods.clear()
+    global _abandon_ship
+    _abandon_ship = False
+    _evacuation_order.clear()
+
+    pods_per_deck = (LARGE_SHIP_PODS_PER_DECK
+                     if ship_class in LARGE_SHIP_CLASSES
+                     else SMALL_SHIP_PODS_PER_DECK)
+
+    deck_numbers: set[int] = set()
+    for room in interior.rooms.values():
+        deck_numbers.add(room.deck_number)
+
+    for dn in sorted(deck_numbers):
+        for i in range(pods_per_deck):
+            pod_id = f"pod_d{dn}_{chr(ord('a') + i)}"
+            _life_pods.append(LifePod(id=pod_id, deck_number=dn))
+
+
+def order_abandon_ship(ship: object | None = None) -> bool:
+    """Set abandon ship flag. Server-side hull check (< 15% of max).
+
+    Returns False if hull is above threshold or already abandoned.
+    """
+    global _abandon_ship
+    if _abandon_ship:
+        return False
+    if ship is not None:
+        hull = getattr(ship, "hull", 0.0)
+        hull_max = getattr(ship, "hull_max", 120.0)
+        if hull >= hull_max * ABANDON_SHIP_HULL_THRESHOLD:
+            return False
+    _abandon_ship = True
+    logger.info("ABANDON SHIP ordered")
+    return True
+
+
+def set_evacuation_order(deck_order: list[int]) -> bool:
+    """HC sets deck evacuation priority order."""
+    global _evacuation_order
+    if not _abandon_ship:
+        return False
+    _evacuation_order = list(deck_order)
+    return True
+
+
+def launch_pod(pod_id: str) -> bool:
+    """Start launch countdown on a pod. Returns False if already launched or empty."""
+    for pod in _life_pods:
+        if pod.id == pod_id:
+            if pod.launched or pod.loaded_crew <= 0:
+                return False
+            if pod.launch_timer > 0:
+                return False  # Already launching
+            pod.launch_timer = LIFE_POD_LAUNCH_TIME
+            logger.info("Life pod %s launching (crew: %d)", pod_id, pod.loaded_crew)
+            return True
+    return False
+
+
+def get_life_pods() -> list[LifePod]:
+    """Return current life pod list."""
+    return list(_life_pods)
+
+
+def is_abandon_ship() -> bool:
+    """Query abandon ship flag."""
+    return _abandon_ship
+
+
+# ---------------------------------------------------------------------------
 # Public API — serialise / deserialise
 # ---------------------------------------------------------------------------
 
@@ -593,6 +871,19 @@ def serialise() -> dict:
             "integrity": sec.integrity,
             "collapsed": sec.collapsed,
         }
+    # Life pods (B.6.3).
+    pods_data = []
+    for pod in _life_pods:
+        pods_data.append({
+            "id": pod.id,
+            "deck_number": pod.deck_number,
+            "capacity": pod.capacity,
+            "loaded_crew": pod.loaded_crew,
+            "launched": pod.launched,
+            "launch_timer": pod.launch_timer,
+            "load_accum": pod._load_accum,
+        })
+
     return {
         "active_dcts": dict(_active_dcts),
         "pending_hull_damage": _pending_hull_damage,
@@ -603,6 +894,14 @@ def serialise() -> dict:
         "sections": sections_data,
         "reinforcement_teams": dict(_reinforcement_teams),
         "fire_structural_timers": dict(_fire_structural_timers),
+        # B.6 emergency systems.
+        "sealed_connections": [list(c) for c in _sealed_connections],
+        "deck_batteries": {str(k): v for k, v in _deck_batteries.items()},
+        "deck_power": {str(k): v for k, v in _deck_power.items()},
+        "power_cut_overrides": list(_power_cut_overrides),
+        "life_pods": pods_data,
+        "abandon_ship": _abandon_ship,
+        "evacuation_order": list(_evacuation_order),
     }
 
 
@@ -655,6 +954,40 @@ def deserialise(data: dict) -> None:
 
     _fire_structural_timers.clear()
     _fire_structural_timers.update(data.get("fire_structural_timers", {}))
+
+    # B.6 emergency systems.
+    global _abandon_ship
+    _sealed_connections.clear()
+    for pair in data.get("sealed_connections", []):
+        if len(pair) == 2:
+            _sealed_connections.add((pair[0], pair[1]))
+
+    _deck_batteries.clear()
+    for k, v in data.get("deck_batteries", {}).items():
+        _deck_batteries[int(k)] = v
+
+    _deck_power.clear()
+    for k, v in data.get("deck_power", {}).items():
+        _deck_power[int(k)] = v
+
+    _power_cut_overrides.clear()
+    _power_cut_overrides.update(data.get("power_cut_overrides", []))
+
+    _life_pods.clear()
+    for pd in data.get("life_pods", []):
+        _life_pods.append(LifePod(
+            id=pd["id"],
+            deck_number=pd["deck_number"],
+            capacity=pd.get("capacity", LIFE_POD_CAPACITY),
+            loaded_crew=pd.get("loaded_crew", 0),
+            launched=pd.get("launched", False),
+            launch_timer=pd.get("launch_timer", 0.0),
+            _load_accum=pd.get("load_accum", 0.0),
+        ))
+
+    _abandon_ship = data.get("abandon_ship", False)
+    _evacuation_order.clear()
+    _evacuation_order.extend(data.get("evacuation_order", []))
 
 
 # ---------------------------------------------------------------------------
@@ -916,6 +1249,12 @@ def tick(interior: ShipInterior, dt: float, difficulty: object | None = None,
     # 12. Structural reinforcement.
     _tick_reinforcement_teams(dt, ship, events)
 
+    # 13. Emergency power (B.6.2).
+    _tick_emergency_power(dt, ship, interior, events)
+
+    # 14. Life pods (B.6.3).
+    _tick_life_pods(dt, ship, events)
+
     return events
 
 
@@ -971,6 +1310,18 @@ def build_dc_state(interior: ShipInterior, difficulty: object | None = None) -> 
         "vent_rooms": list(_vent_rooms),
         "deck_suppression": {dk: round(t, 1) for dk, t in _deck_suppression.items()},
         "sections": sections_state,
+        # B.6 emergency systems.
+        "sealed_connections": [list(c) for c in _sealed_connections],
+        "deck_power": {str(k): v for k, v in _deck_power.items()},
+        "deck_batteries": {str(k): round(v, 1) for k, v in _deck_batteries.items()},
+        "life_pods": [
+            {"id": p.id, "deck_number": p.deck_number, "capacity": p.capacity,
+             "loaded_crew": p.loaded_crew, "launched": p.launched,
+             "launching": p.launch_timer > 0}
+            for p in _life_pods
+        ],
+        "abandon_ship": _abandon_ship,
+        "evacuation_order": list(_evacuation_order),
     }
 
 
@@ -1020,6 +1371,7 @@ def _spread_fire_from_intensity(source: Fire, interior: ShipInterior) -> None:
         if rid in interior.rooms
         and rid not in _fires
         and interior.rooms[rid].state != "decompressed"
+        and not is_connection_sealed(source.room_id, rid)
     ]
     if not candidates:
         return
@@ -1400,3 +1752,160 @@ def _tick_reinforcement_teams(
 
     for section_id in completed:
         _reinforcement_teams.pop(section_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Internal — emergency power tick (B.6.2)
+# ---------------------------------------------------------------------------
+
+
+def _tick_emergency_power(
+    dt: float, ship: object | None, interior: ShipInterior,
+    events: list[dict],
+) -> None:
+    """Update deck power states and drain emergency batteries."""
+    if not _deck_power:
+        return
+
+    # Determine which decks should lose main power.
+    engines_down = False
+    if ship is not None:
+        systems = getattr(ship, "systems", {})
+        engines_sys = systems.get("engines")
+        if engines_sys is not None:
+            engines_down = getattr(engines_sys, "health", 100.0) <= 0.0
+
+    for dn in list(_deck_power):
+        # Check if any section on this deck is collapsed.
+        deck_collapsed = any(
+            s.collapsed for s in _sections.values() if s.deck_number == dn
+        )
+
+        needs_emergency = (
+            engines_down or deck_collapsed or dn in _power_cut_overrides
+        )
+
+        old_state = _deck_power[dn]
+
+        if not needs_emergency:
+            if old_state != "main":
+                _deck_power[dn] = "main"
+                if old_state != "main":
+                    events.append({"type": "power_restored", "deck_number": dn})
+            continue
+
+        # Deck needs emergency/no power.
+        battery = _deck_batteries.get(dn, 0.0)
+        if battery > 0:
+            _deck_batteries[dn] = max(0.0, battery - dt)
+            if old_state != "emergency":
+                _deck_power[dn] = "emergency"
+                events.append({"type": "power_emergency", "deck_number": dn,
+                               "battery": round(_deck_batteries[dn], 1)})
+            # Battery just ran out this tick?
+            if _deck_batteries[dn] <= 0:
+                _deck_power[dn] = "none"
+                events.append({"type": "power_none", "deck_number": dn})
+        else:
+            if old_state != "none":
+                _deck_power[dn] = "none"
+                events.append({"type": "power_none", "deck_number": dn})
+
+            # No power: crew take slow injury.
+            if ship is not None:
+                crew = getattr(ship, "crew", None)
+                if crew is not None:
+                    # Find deck_name for this deck_number.
+                    for sec in _sections.values():
+                        if sec.deck_number == dn:
+                            deck_crew = crew.decks.get(sec.deck_name)
+                            if deck_crew is not None and deck_crew.active > 0:
+                                # Slow injury: ~0.5 HP/30s = 0.017 HP/s.
+                                # Model as fractional casualty accumulation.
+                                injury_amount = NO_POWER_CREW_DAMAGE * dt
+                                if injury_amount >= 1.0:
+                                    crew.apply_casualties(sec.deck_name, int(injury_amount))
+                            break
+
+
+# ---------------------------------------------------------------------------
+# Internal — life pod tick (B.6.3)
+# ---------------------------------------------------------------------------
+
+
+def _tick_life_pods(
+    dt: float, ship: object | None, events: list[dict],
+) -> None:
+    """Load crew into pods and process launch countdowns."""
+    if not _abandon_ship:
+        return
+
+    # Determine deck priority order.
+    if _evacuation_order:
+        ordered_decks = list(_evacuation_order)
+    else:
+        # Default: all decks in ascending order.
+        ordered_decks = sorted({p.deck_number for p in _life_pods})
+
+    # Auto-load crew into pods (LIFE_POD_LOAD_RATE per second per pod).
+    load_per_tick = LIFE_POD_LOAD_RATE * dt
+    for dn in ordered_decks:
+        deck_pods = [p for p in _life_pods
+                     if p.deck_number == dn and not p.launched and p.launch_timer <= 0]
+        if not deck_pods:
+            continue
+
+        # Find available crew on this deck.
+        available_crew = 0
+        deck_name = None
+        if ship is not None:
+            crew = getattr(ship, "crew", None)
+            if crew is not None:
+                for sec in _sections.values():
+                    if sec.deck_number == dn:
+                        deck_name = sec.deck_name
+                        break
+                if deck_name is not None:
+                    deck_crew = crew.decks.get(deck_name)
+                    if deck_crew is not None:
+                        available_crew = deck_crew.active + deck_crew.injured
+
+        for pod in deck_pods:
+            if pod.loaded_crew >= pod.capacity:
+                continue
+            remaining_space = pod.capacity - pod.loaded_crew
+            can_add = min(load_per_tick, remaining_space, available_crew)
+            if can_add <= 0:
+                continue
+            pod._load_accum += can_add
+            if pod._load_accum >= 1.0:
+                loaded = int(pod._load_accum)
+                loaded = min(loaded, remaining_space, available_crew)
+                pod.loaded_crew += loaded
+                pod._load_accum -= loaded
+                available_crew -= loaded
+
+    # Process launch countdowns.
+    for pod in _life_pods:
+        if pod.launch_timer > 0:
+            pod.launch_timer -= dt
+            if pod.launch_timer <= 0:
+                pod.launch_timer = 0.0
+                pod.launched = True
+                # Remove crew from ship roster.
+                if ship is not None and pod.loaded_crew > 0:
+                    crew = getattr(ship, "crew", None)
+                    if crew is not None:
+                        deck_name = None
+                        for sec in _sections.values():
+                            if sec.deck_number == pod.deck_number:
+                                deck_name = sec.deck_name
+                                break
+                        if deck_name is not None:
+                            crew.apply_casualties(deck_name, pod.loaded_crew)
+                events.append({
+                    "type": "pod_launched",
+                    "pod_id": pod.id,
+                    "deck_number": pod.deck_number,
+                    "crew_saved": pod.loaded_crew,
+                })

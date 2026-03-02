@@ -194,6 +194,13 @@ from server.models.messages import (
     HazConCancelDeconTeamPayload,
     HazConReinforceSectionPayload,
     HazConCancelReinforcementPayload,
+    HazConSealConnectionPayload,
+    HazConUnsealConnectionPayload,
+    HazConOverrideSecurityLockPayload,
+    HazConRedirectBatteryPayload,
+    HazConSetEvacuationOrderPayload,
+    HazConLaunchPodPayload,
+    AbandonShipPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -560,6 +567,8 @@ async def start(
     glcap.reset()
     glhc.reset()
     glhc.init_sections(_world.ship.interior)
+    glhc.init_emergency_power(_world.ship.interior)
+    glhc.init_life_pods(_world.ship.ship_class if hasattr(_world.ship, "ship_class") else "frigate", _world.ship.interior)
     glatm.reset()
     glatm.init_atmosphere(_world.ship.interior)
     # v0.07 §3.5: Drone loadout override.
@@ -2457,6 +2466,28 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "hazard_control.cancel_reinforcement" and isinstance(payload, HazConCancelReinforcementPayload):
             glhc.cancel_reinforcement(payload.section_id)
             gl.log_event("hazard_control", "cancel_reinforcement", {"section_id": payload.section_id})
+        # --- Emergency Systems (B.6) ---
+        elif msg_type == "hazard_control.seal_connection" and isinstance(payload, HazConSealConnectionPayload):
+            glhc.seal_connection(payload.room_a, payload.room_b, ship.interior)
+            gl.log_event("hazard_control", "seal_connection", {"room_a": payload.room_a, "room_b": payload.room_b})
+        elif msg_type == "hazard_control.unseal_connection" and isinstance(payload, HazConUnsealConnectionPayload):
+            glhc.unseal_connection(payload.room_a, payload.room_b)
+            gl.log_event("hazard_control", "unseal_connection", {"room_a": payload.room_a, "room_b": payload.room_b})
+        elif msg_type == "hazard_control.override_security_lock" and isinstance(payload, HazConOverrideSecurityLockPayload):
+            glhc.override_security_lock(payload.room_id, ship.interior)
+            gl.log_event("hazard_control", "override_security_lock", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.redirect_battery" and isinstance(payload, HazConRedirectBatteryPayload):
+            glhc.redirect_battery(payload.from_deck, payload.to_deck)
+            gl.log_event("hazard_control", "redirect_battery", {"from_deck": payload.from_deck, "to_deck": payload.to_deck})
+        elif msg_type == "hazard_control.set_evacuation_order" and isinstance(payload, HazConSetEvacuationOrderPayload):
+            glhc.set_evacuation_order(payload.deck_order)
+            gl.log_event("hazard_control", "set_evacuation_order", {"deck_order": payload.deck_order})
+        elif msg_type == "hazard_control.launch_pod" and isinstance(payload, HazConLaunchPodPayload):
+            glhc.launch_pod(payload.pod_id)
+            gl.log_event("hazard_control", "launch_pod", {"pod_id": payload.pod_id})
+        elif msg_type == "captain.abandon_ship" and isinstance(payload, AbandonShipPayload):
+            glhc.order_abandon_ship(_world.ship if _world else None)
+            gl.log_event("captain", "abandon_ship", {})
         elif msg_type == "engineering.dispatch_team" and isinstance(payload, EngineeringDispatchTeamPayload):
             gle.dispatch_team(payload.team_id, payload.system, ship.interior)
             gl.log_event("engineering", "team_dispatched", {"team_id": payload.team_id, "system": payload.system})

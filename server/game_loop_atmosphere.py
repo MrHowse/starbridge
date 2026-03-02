@@ -724,7 +724,7 @@ def tick(interior: ShipInterior, dt: float, ship=None, fires: dict | None = None
 
     # 6. Life support restoration
     ls_eff = _get_life_support_efficiency(ship) if ship else 1.0
-    _tick_life_support(dt, ls_eff)
+    _tick_life_support(dt, ls_eff, interior)
 
     # 7. Force field / bulkhead / evacuation timers
     _tick_breach_timers(dt, events)
@@ -801,8 +801,13 @@ def _tick_coolant_leaks(dt: float) -> None:
 
 def _tick_vent_exchange(dt: float) -> None:
     """Exchange atmosphere between open-connected rooms."""
+    import server.game_loop_hazard_control as glhc
+
     for (room_a, room_b), state in _vent_states.items():
         if state != "open":
+            continue
+        # B.6.1: emergency bulkhead seals block atmosphere exchange.
+        if glhc.is_connection_sealed(room_a, room_b):
             continue
         atm_a = _atmosphere.get(room_a)
         atm_b = _atmosphere.get(room_b)
@@ -836,8 +841,12 @@ def _tick_filtered_scrub(dt: float) -> None:
             atm.chemical = max(0.0, atm.chemical - scrub)
 
 
-def _tick_life_support(dt: float, ls_eff: float) -> None:
+def _tick_life_support(dt: float, ls_eff: float,
+                       interior: ShipInterior | None = None) -> None:
     """Life support restores O2, pressure, and temperature toward normal."""
+    import server.game_loop_hazard_control as glhc
+    powerless = glhc.get_powerless_decks()
+
     for rid, atm in _atmosphere.items():
         # Skip rooms being vented to space or at vacuum with active breach
         if rid in _space_vent_rooms:
@@ -845,6 +854,11 @@ def _tick_life_support(dt: float, ls_eff: float) -> None:
         breach = _breaches.get(rid)
         if breach and not breach.force_field_active and not breach.bulkhead_sealed:
             continue  # Can't restore while actively breached
+        # B.6.2: no life support on powerless decks.
+        if powerless and interior is not None:
+            room = interior.rooms.get(rid)
+            if room is not None and room.deck_number in powerless:
+                continue
         # Restore O2
         if atm.oxygen_percent < NORMAL_O2:
             atm.oxygen_percent = min(NORMAL_O2, atm.oxygen_percent + LS_O2_RATE * ls_eff * dt)

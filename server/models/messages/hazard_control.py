@@ -1,4 +1,4 @@
-"""Hazard Control message payloads — v0.08 B.2 + B.3."""
+"""Hazard Control message payloads — v0.08 B.2–B.6."""
 from __future__ import annotations
 
 from pydantic import BaseModel
@@ -86,3 +86,37 @@ class HazConReinforceSectionPayload(BaseModel):
 
 class HazConCancelReinforcementPayload(BaseModel):
     section_id: str
+
+
+# --- B.6: Emergency Systems ---
+
+
+class HazConSealConnectionPayload(BaseModel):
+    room_a: str
+    room_b: str
+
+
+class HazConUnsealConnectionPayload(BaseModel):
+    room_a: str
+    room_b: str
+
+
+class HazConOverrideSecurityLockPayload(BaseModel):
+    room_id: str
+
+
+class HazConRedirectBatteryPayload(BaseModel):
+    from_deck: int
+    to_deck: int
+
+
+class HazConSetEvacuationOrderPayload(BaseModel):
+    deck_order: list[int]
+
+
+class HazConLaunchPodPayload(BaseModel):
+    pod_id: str
+
+
+class AbandonShipPayload(BaseModel):
+    pass
