@@ -152,6 +152,10 @@ DRONE_OPPORTUNITY_LABELS: list[str] = [
 SPAWN_DIST_MIN: float = 20_000.0
 SPAWN_DIST_MAX: float = 35_000.0
 
+# First enemy spawns closer so drones and weapons can engage early.
+FIRST_ENEMY_DIST_MIN: float = 8_000.0
+FIRST_ENEMY_DIST_MAX: float = 15_000.0
+
 # ---------------------------------------------------------------------------
 # Module state
 # ---------------------------------------------------------------------------
@@ -161,6 +165,7 @@ _timers: dict[str, float] = {}
 _entity_counter: int = 0   # offset counter for unique IDs
 _mission_type_counts: dict[str, int] = {}  # per-session mission variety tracking
 _first_mission_generated: bool = False  # first mission gets close distance
+_first_enemy_spawned: bool = False  # first enemy spawns closer
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -169,12 +174,13 @@ _first_mission_generated: bool = False  # first mission gets close distance
 
 def reset(active: bool = False) -> None:
     """Reset sandbox scheduler.  Pass active=True to start the scheduler."""
-    global _active, _entity_counter, _first_mission_generated
+    global _active, _entity_counter, _first_mission_generated, _first_enemy_spawned
     _active = active
     _entity_counter = 1000    # offset well above mission-spawned entity IDs
     _timers.clear()
     _mission_type_counts.clear()
     _first_mission_generated = False
+    _first_enemy_spawned = False
     if active:
         # Stagger initial timers so all events don't fire simultaneously.
         _timers["enemy_spawn"]          = random.uniform(30.0,  60.0)   # first wave sooner
@@ -458,9 +464,14 @@ def tick(
     # --- Enemy spawn (Weapons / Helm / Science / EW / Flight Ops) --------
     if _timers.get("enemy_spawn", 1.0) <= 0.0:
         if len(world.enemies) < MAX_ENEMIES:
+            global _first_enemy_spawned
             enemy_type = random.choice(ENEMY_TYPE_POOL)
             angle = random.uniform(0.0, 360.0)
-            dist  = random.uniform(SPAWN_DIST_MIN, SPAWN_DIST_MAX)
+            if not _first_enemy_spawned:
+                dist = random.uniform(FIRST_ENEMY_DIST_MIN, FIRST_ENEMY_DIST_MAX)
+                _first_enemy_spawned = True
+            else:
+                dist = random.uniform(SPAWN_DIST_MIN, SPAWN_DIST_MAX)
             sx    = world.ship.x + math.cos(math.radians(angle)) * dist
             sy    = world.ship.y + math.sin(math.radians(angle)) * dist
             # Clamp to world bounds with a safe margin.

@@ -163,6 +163,10 @@ initSharedUI({
 
 on('ship.state', payload => {
   shipState = payload;
+  renderMap();
+});
+
+on('sensor.contacts', payload => {
   _sensorContacts = payload.contacts || [];
   renderMap();
 });
@@ -1483,6 +1487,10 @@ function renderStatusBar() {
   parts.push(`AMMO: ${Math.round(fd.drone_ammo_reserve)}%`);
   parts.push(`BUOYS: ${foState.buoys.filter(b => b.active).length}`);
   parts.push(`DECOYS: ${foState.decoy_stock}`);
+  if (_sensorContacts.length > 0) {
+    const hostiles = _sensorContacts.filter(c => c.classification === 'hostile').length;
+    parts.push(`CONTACTS: ${_sensorContacts.length}${hostiles ? ` (${hostiles} hostile)` : ''}`);
+  }
 
   // Warnings.
   const warnings = [];

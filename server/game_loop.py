@@ -956,6 +956,12 @@ async def _loop() -> None:
                 "heading": 0.0, "kind": "station",
                 "classification": "hostile" if getattr(_sta, "faction", "hostile") == "hostile" else "neutral",
             })
+        for _cre in getattr(_world, "creatures", []):
+            _fo_contacts.append({
+                "id": _cre.id, "x": _cre.x, "y": _cre.y,
+                "heading": getattr(_cre, "heading", 0.0), "kind": "creature",
+                "classification": "unknown",
+            })
         _fo_events = glfo.tick(
             _world.ship, TICK_DT,
             contacts=_fo_contacts,
@@ -997,6 +1003,28 @@ async def _loop() -> None:
                 _surv_count = _foe.get("count", 0)
                 if _surv_count > 0:
                     glmed.admit_survivors(_surv_count, _world.ship)
+            # Log significant drone events to game log.
+            if _foe_type == "contact_detected":
+                gl.log_event("flight_ops", "drone_contact_detected", {
+                    "drone_id": _foe.get("drone_id", ""),
+                    "contact_id": _foe.get("contact_id", ""),
+                })
+            elif _foe_type == "drone_attack":
+                gl.log_event("flight_ops", "drone_attack", {
+                    "drone_id": _foe.get("drone_id", ""),
+                    "target_id": _foe.get("target_id", ""),
+                    "damage": _foe.get("damage", 0.0),
+                })
+            elif _foe_type == "drone_launched":
+                gl.log_event("flight_ops", "drone_launched_event", {
+                    "drone_id": _foe.get("drone_id", ""),
+                    "callsign": _foe.get("callsign", ""),
+                })
+            elif _foe_type == "drone_recovered":
+                gl.log_event("flight_ops", "drone_recovered_event", {
+                    "drone_id": _foe.get("drone_id", ""),
+                    "callsign": _foe.get("callsign", ""),
+                })
 
         glew.tick(_world, _world.ship, TICK_DT)
         _stealth_break = glew.pop_stealth_break_reason()
@@ -1618,7 +1646,7 @@ async def _loop() -> None:
             ghost_contacts=_ghost_contacts,
         )
         await _manager.broadcast_to_roles(
-            ["weapons", "science"],
+            ["weapons", "science", "flight_ops"],
             _sensor_contacts_payload,
         )
 

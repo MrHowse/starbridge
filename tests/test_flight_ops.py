@@ -1506,3 +1506,89 @@ def test_is_ship_evasive():
     # Small turn: 1 degree in one tick = 10 deg/s.
     ship.heading = 46.0
     assert _is_ship_evasive(ship) is False
+
+
+# ---------------------------------------------------------------------------
+# Playtest Fix 5: Drone contact detection + contact display
+# ---------------------------------------------------------------------------
+
+
+def test_scout_detects_contact_within_sensor_range():
+    """Scout drone emits contact_detected when enemy is in sensor range."""
+    glfo.reset()
+    ship = fresh_ship()
+    scout = None
+    for d in glfo.get_drones():
+        if d.drone_type == "scout":
+            scout = d
+            break
+    assert scout is not None
+    # Launch and activate the scout.
+    glfo.launch_drone(scout.id, ship)
+    events = glfo.tick(ship, FULL_LAUNCH_TIME + 0.1)
+    assert scout.status == "active"
+
+    # Place an enemy within scout's sensor range.
+    enemy_x = scout.position[0] + scout.effective_sensor_range * 0.5
+    enemy_y = scout.position[1]
+    contacts = [{"id": "e1", "x": enemy_x, "y": enemy_y, "heading": 0.0,
+                 "kind": "enemy", "classification": "hostile"}]
+    events = glfo.tick(ship, 0.1, contacts=contacts)
+
+    contact_events = [e for e in events if e.get("type") == "contact_detected"]
+    assert len(contact_events) == 1
+    assert contact_events[0]["contact_id"] == "e1"
+
+
+def test_scout_does_not_detect_contact_beyond_sensor_range():
+    """Scout drone does NOT detect enemy beyond sensor range."""
+    glfo.reset()
+    ship = fresh_ship()
+    scout = None
+    for d in glfo.get_drones():
+        if d.drone_type == "scout":
+            scout = d
+            break
+    assert scout is not None
+    glfo.launch_drone(scout.id, ship)
+    glfo.tick(ship, FULL_LAUNCH_TIME + 0.1)
+    assert scout.status == "active"
+
+    # Place an enemy far beyond scout's sensor range.
+    enemy_x = scout.position[0] + scout.effective_sensor_range * 3.0
+    enemy_y = scout.position[1]
+    contacts = [{"id": "far_e", "x": enemy_x, "y": enemy_y, "heading": 0.0,
+                 "kind": "enemy", "classification": "hostile"}]
+    events = glfo.tick(ship, 0.1, contacts=contacts)
+
+    contact_events = [e for e in events if e.get("type") == "contact_detected"]
+    assert len(contact_events) == 0
+
+
+def test_first_enemy_spawn_closer_in_sandbox():
+    """Sandbox first enemy spawns within FIRST_ENEMY_DIST range."""
+    import server.game_loop_sandbox as sb
+    from server.models.ship import Ship
+    from server.models.world import World
+    import math
+
+    ship = Ship()
+    ship.x, ship.y = 50_000.0, 50_000.0
+    world = World(ship=ship, width=100_000, height=100_000)
+    sb.reset(active=True)
+
+    # Tick until first enemy spawns.
+    events = []
+    for _ in range(1000):
+        evts = sb.tick(world, dt=1.0)
+        events.extend(evts)
+        enemy_evts = [e for e in evts if e["type"] == "spawn_enemy"]
+        if enemy_evts:
+            break
+
+    enemy_evts = [e for e in events if e["type"] == "spawn_enemy"]
+    assert len(enemy_evts) >= 1
+    e = enemy_evts[0]
+    dist = math.sqrt((e["x"] - ship.x) ** 2 + (e["y"] - ship.y) ** 2)
+    # First enemy must be within FIRST_ENEMY_DIST range.
+    assert dist <= sb.FIRST_ENEMY_DIST_MAX + 500  # small margin for clamping
