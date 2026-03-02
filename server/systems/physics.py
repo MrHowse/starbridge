@@ -24,6 +24,7 @@ BASE_MAX_SPEED: float = 200.0  # world units/sec at 100% engine power/efficiency
 BASE_TURN_RATE: float = 45.0   # degrees/sec at 100% manoeuvring power/efficiency
 ACCELERATION: float = 50.0     # world units/sec² — how fast velocity rises to target
 DECELERATION: float = 80.0     # world units/sec² — braking is faster than acceleration
+SPEED_FLOOR_FRACTION: float = 0.25  # min 25% of max speed when engines have power
 
 
 # ---------------------------------------------------------------------------
@@ -32,8 +33,18 @@ DECELERATION: float = 80.0     # world units/sec² — braking is faster than ac
 
 
 def max_speed(ship: Ship) -> float:
-    """Maximum speed in world units/sec, scaled by engine efficiency."""
-    return ship.max_speed_base * ship.systems["engines"].efficiency
+    """Maximum speed in world units/sec, scaled by engine efficiency.
+
+    Enforces a speed floor of 25% of max when engines have any power,
+    preventing crippled engines from making the ship feel broken.
+    """
+    eff = ship.systems["engines"].efficiency
+    calculated = ship.max_speed_base * eff
+    # Floor only when engines are powered (not deliberately shut off)
+    if eff > 0.0:
+        floor = ship.max_speed_base * SPEED_FLOOR_FRACTION
+        return max(calculated, floor)
+    return calculated
 
 
 def turn_rate(ship: Ship) -> float:

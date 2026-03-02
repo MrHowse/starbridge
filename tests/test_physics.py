@@ -76,6 +76,32 @@ def test_max_speed_uses_class_specific_value():
     assert max_speed(ship) == pytest.approx(80.0)
 
 
+def test_speed_floor_prevents_near_zero():
+    """Damaged engines should never drop below 25% of max speed."""
+    ship = Ship()
+    ship.max_speed_base = 120.0  # cruiser
+    ship.systems["engines"].health = 10.0  # 10% health
+    # Without floor: 120 * 0.1 = 12. With floor: max(12, 30) = 30
+    assert max_speed(ship) == pytest.approx(30.0)
+
+
+def test_speed_floor_does_not_apply_when_offline():
+    """Speed floor should not apply when engines are completely off."""
+    ship = Ship()
+    ship.max_speed_base = 120.0
+    ship.systems["engines"].power = 0.0
+    assert max_speed(ship) == pytest.approx(0.0)
+
+
+def test_speed_floor_cruiser_at_10pct_health():
+    """A cruiser at 10% engine health should still move at 25% max speed."""
+    ship = Ship()
+    ship.max_speed_base = 120.0
+    ship.systems["engines"].health = 10.0
+    # floor = 120 * 0.25 = 30, calculated = 120 * 0.10 = 12
+    assert max_speed(ship) >= 120.0 * 0.25
+
+
 def test_turn_rate_uses_class_specific_value():
     ship = Ship()
     ship.turn_rate_base = 180.0  # scout
