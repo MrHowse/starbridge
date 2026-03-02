@@ -146,7 +146,7 @@ class TestSandboxActive:
         events = glsb.tick(world, 0.1)
         board = [e for e in events if e["type"] == "start_boarding"]
         assert len(board) == 1
-        assert len(board[0]["intruders"]) == 2
+        assert 1 <= len(board[0]["intruders"]) <= 3
         for intruder in board[0]["intruders"]:
             assert "id" in intruder
             assert intruder["room_id"] == "cargo_hold"
@@ -330,4 +330,46 @@ class TestSandboxActive:
         assert "drone_opportunity"      in types
         assert "enemy_jamming"          in types
         assert "distress_signal"        in types
+        assert "security_incident"      in types
         # start_boarding may be suppressed if boarding already active; just check others
+
+
+class TestSecurityIncidents:
+    """Playtest Fix 6: Minor security events for Security station."""
+
+    def test_security_incident_fires_on_timer(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["security_event"] = 0.05
+        world = _make_world()
+        events = glsb.tick(world, 0.1)
+        incidents = [e for e in events if e["type"] == "security_incident"]
+        assert len(incidents) == 1
+        inc = incidents[0]
+        assert inc["incident"] in [t["incident"] for t in glsb.SECURITY_INCIDENT_TYPES]
+        assert "message" in inc
+        assert "deck" in inc
+
+    def test_security_incident_timer_resets(self) -> None:
+        glsb.reset(active=True)
+        glsb._timers["security_event"] = 0.05
+        world = _make_world()
+        glsb.tick(world, 0.1)
+        assert glsb._timers["security_event"] > 10.0
+
+    def test_boarding_party_size_varies(self) -> None:
+        """Boarding party size is 1-3 intruders (randomized)."""
+        sizes: set[int] = set()
+        for _ in range(50):
+            glsb.reset(active=True)
+            glsb._timers["boarding"] = 0.05
+            world = _make_world()
+            events = glsb.tick(world, 0.1)
+            board = [e for e in events if e["type"] == "start_boarding"]
+            if board:
+                sizes.add(len(board[0]["intruders"]))
+        # Over 50 trials, we should see at least 2 distinct sizes.
+        assert len(sizes) >= 2, f"Expected varied sizes, got {sizes}"
+
+    def test_boarding_interval_reduced(self) -> None:
+        """Boarding interval is now 75-120s (was 120-180)."""
+        assert glsb.BOARDING_INTERVAL == (75.0, 120.0)

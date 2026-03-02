@@ -1495,6 +1495,19 @@ async def _loop() -> None:
                     gl.log_event("security", "sandbox_boarding_started", {
                         "intruder_count": len(sb_evt["intruders"]),
                     })
+            elif _sb_type == "security_incident":
+                await _manager.broadcast_to_roles(
+                    ["security"],
+                    Message.build("security.incident", {
+                        "incident": sb_evt["incident"],
+                        "message": sb_evt["message"],
+                        "deck": sb_evt["deck"],
+                    }),
+                )
+                gl.log_event("security", "incident", {
+                    "incident": sb_evt["incident"],
+                    "deck": sb_evt["deck"],
+                })
             elif _sb_type == "incoming_transmission":
                 # Create a Signal object in the comms system
                 _sb_faction = sb_evt["faction"]

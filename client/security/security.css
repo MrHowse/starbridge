@@ -296,3 +296,41 @@
 
 .gauge__fill--warn   { background: var(--system-warning); }
 .gauge__fill--danger { background: var(--hostile); }
+
+/* ── Incident log ────────────────────────────────────────────────────────── */
+
+.incident-log {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.incident-row {
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border-secondary, rgba(255,255,255,0.08));
+}
+
+.incident-row:first-child {
+  animation: incident-flash 1s ease-out;
+}
+
+.incident-type {
+  color: var(--system-warning);
+  font-size: 0.7rem;
+  margin-right: 0.5rem;
+}
+
+.incident-age {
+  font-size: 0.65rem;
+  float: right;
+}
+
+.incident-msg {
+  font-size: 0.75rem;
+  margin: 0.15rem 0 0 0;
+  line-height: 1.2;
+}
+
+@keyframes incident-flash {
+  0%   { background: rgba(255, 200, 0, 0.3); }
+  100% { background: transparent; }
+}

@@ -10,6 +10,7 @@ Events returned from tick():
   {"type": "crew_casualty", "deck": str, "count": int}
   {"type": "start_boarding","intruders": list[dict]}
   {"type": "mission_signal","mission_type": str, "signal_params": dict}
+  {"type": "security_incident","incident": str, "message": str, "deck": str}
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
 ENEMY_SPAWN_INTERVAL:   tuple[float, float] = (60.0,  90.0)
 SYSTEM_DAMAGE_INTERVAL: tuple[float, float] = (45.0,  75.0)
 CREW_CASUALTY_INTERVAL: tuple[float, float] = (60.0, 100.0)
-BOARDING_INTERVAL:      tuple[float, float] = (120.0, 180.0)
+BOARDING_INTERVAL:      tuple[float, float] = (75.0, 120.0)
 
 INCOMING_TRANSMISSION_INTERVAL: tuple[float, float] = (90.0,  120.0)
 HULL_MICRO_DAMAGE_INTERVAL:     tuple[float, float] = (120.0, 180.0)
@@ -36,6 +37,19 @@ SENSOR_ANOMALY_INTERVAL:        tuple[float, float] = (90.0,  150.0)
 DRONE_OPPORTUNITY_INTERVAL:     tuple[float, float] = (120.0, 180.0)
 ENEMY_JAMMING_INTERVAL:         tuple[float, float] = (180.0, 240.0)
 DISTRESS_SIGNAL_INTERVAL:       tuple[float, float] = (180.0, 300.0)
+
+# Minor security events to keep the Security station busy between boardings.
+SECURITY_EVENT_INTERVAL:        tuple[float, float] = (30.0,  60.0)
+
+# Minor security incident types — give Security work between boardings.
+SECURITY_INCIDENT_TYPES: list[dict] = [
+    {"incident": "sensor_ghost",       "message": "Unidentified contact on internal sensors, Deck {deck}."},
+    {"incident": "crew_altercation",   "message": "Crew dispute reported on Deck {deck}. Possible fight."},
+    {"incident": "suspicious_cargo",   "message": "Suspect item flagged in cargo scan — Deck {deck}."},
+    {"incident": "system_access_alert","message": "Unauthorized system access attempt detected, Deck {deck}."},
+    {"incident": "door_malfunction",   "message": "Door {room} jammed — investigate possible tampering."},
+    {"incident": "missing_personnel",  "message": "Crew member unaccounted for on Deck {deck}. Last seen in {room}."},
+]
 
 # Hard cap on simultaneous sandbox enemies (initial 2 + up to 4 spawned).
 MAX_ENEMIES: int = 6
@@ -195,6 +209,7 @@ def reset(active: bool = False) -> None:
         _timers["distress_signal"]      = random.uniform(90.0, 120.0)
         _timers["creature_spawn"]       = random.uniform(120.0, 180.0)  # first one sooner
         _timers["mission_signal"]       = random.uniform(60.0,  90.0)   # first mission sooner
+        _timers["security_event"]       = random.uniform(20.0,  40.0)   # minor events early
 
 
 def is_active() -> bool:
@@ -504,15 +519,35 @@ def tick(
     # --- Boarding attempt (Security) --------------------------------------
     if _timers.get("boarding", 1.0) <= 0.0:
         _entity_counter += 1
+        _boarding_objectives = ["bridge", "engine_room", "shields_control", "weapons_bay"]
+        _intruder_count = random.choice([1, 1, 2, 2, 3])  # mostly 1-2
+        _intruder_list = []
+        for _bi in range(_intruder_count):
+            _intruder_list.append({
+                "id": f"sb_i{_entity_counter + _bi}",
+                "room_id": "cargo_hold",
+                "objective_id": random.choice(_boarding_objectives),
+            })
+        _entity_counter += _intruder_count
         events.append({
             "type": "start_boarding",
-            "intruders": [
-                {"id": f"sb_i{_entity_counter}",     "room_id": "cargo_hold", "objective_id": "bridge"},
-                {"id": f"sb_i{_entity_counter + 1}", "room_id": "cargo_hold", "objective_id": "engine_room"},
-            ],
+            "intruders": _intruder_list,
         })
-        _entity_counter += 1
         _timers["boarding"] = random.uniform(*BOARDING_INTERVAL) * _evt_mult / max(0.1, _brd_mult)
+
+    # --- Minor security incident (Security) --------------------------------
+    if _timers.get("security_event", 1.0) <= 0.0:
+        _incident_tpl = random.choice(SECURITY_INCIDENT_TYPES)
+        _deck = random.choice(CREW_DECKS)
+        _room = random.choice(["cargo_hold", "corridor_a", "mess_hall", "armoury", "airlock_1"])
+        _msg = _incident_tpl["message"].format(deck=_deck, room=_room)
+        events.append({
+            "type": "security_incident",
+            "incident": _incident_tpl["incident"],
+            "message": _msg,
+            "deck": _deck,
+        })
+        _timers["security_event"] = random.uniform(*SECURITY_EVENT_INTERVAL) * _evt_mult
 
     # --- Incoming transmission — NPC contact on a faction band (Comms) ----
     if _timers.get("incoming_transmission", 1.0) <= 0.0:

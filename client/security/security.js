@@ -859,6 +859,50 @@ function handleHullHit() {
 }
 
 // ---------------------------------------------------------------------------
+// Incident log (playtest fix 6)
+// ---------------------------------------------------------------------------
+
+const MAX_INCIDENTS = 8;
+const _incidents = [];
+
+function handleSecurityIncident(payload) {
+  _incidents.unshift({
+    incident: payload.incident || 'unknown',
+    message: payload.message || 'Unknown incident.',
+    deck: payload.deck || '',
+    time: Date.now(),
+  });
+  if (_incidents.length > MAX_INCIDENTS) _incidents.length = MAX_INCIDENTS;
+  renderIncidentLog();
+  SoundBank.play('alert');
+}
+
+function renderIncidentLog() {
+  const el = document.getElementById('incident-log');
+  if (!el) return;
+  if (_incidents.length === 0) {
+    el.innerHTML = '<p class="text-dim text-label">No incidents reported.</p>';
+    return;
+  }
+  el.innerHTML = '';
+  for (const inc of _incidents) {
+    const row = document.createElement('div');
+    row.className = 'incident-row';
+    const age = Math.round((Date.now() - inc.time) / 1000);
+    const ageStr = age < 60 ? `${age}s ago` : `${Math.floor(age / 60)}m ago`;
+    row.innerHTML = `
+      <span class="incident-type text-label">${inc.incident.replace(/_/g, ' ').toUpperCase()}</span>
+      <span class="incident-age text-dim">${ageStr}</span>
+      <p class="incident-msg text-body">${inc.message}</p>
+    `;
+    el.appendChild(row);
+  }
+}
+
+// Refresh incident ages every 10 seconds.
+setInterval(renderIncidentLog, 10_000);
+
+// ---------------------------------------------------------------------------
 // Initialisation
 // ---------------------------------------------------------------------------
 
@@ -877,6 +921,7 @@ function init() {
   on('ship.hull_hit',           handleHullHit);
   on('game.over',               (p) => { SoundBank.play(p.result === 'victory' ? 'victory' : 'defeat'); showGameOver(p.result, p.stats); });
   on('security.boarding_started', () => SoundBank.play('boarding_alert'));
+  on('security.incident', handleSecurityIncident);
 
   SoundBank.init();
   wireButtonSounds(SoundBank);
