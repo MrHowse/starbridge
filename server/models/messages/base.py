@@ -103,7 +103,15 @@ from server.models.messages.ew import (
     EWSetFreqLockPayload,
     EWBeginIntrusionPayload,
 )
-from server.models.messages.operations import OperationsPingPayload
+from server.models.messages.operations import (
+    OperationsPingPayload,
+    OpsStartAssessmentPayload,
+    OpsCancelAssessmentPayload,
+    OpsSetVulnerableFacingPayload,
+    OpsSetPrioritySubsystemPayload,
+    OpsTogglePredictionPayload,
+    OpsSetThreatLevelPayload,
+)
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
     EngineeringCancelRepairOrderPayload,
@@ -318,6 +326,12 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "ew.set_freq_lock":          EWSetFreqLockPayload,
     # Operations (replaces Tactical — v0.08)
     "operations.ping": OperationsPingPayload,
+    "operations.start_assessment": OpsStartAssessmentPayload,
+    "operations.cancel_assessment": OpsCancelAssessmentPayload,
+    "operations.set_vulnerable_facing": OpsSetVulnerableFacingPayload,
+    "operations.set_priority_subsystem": OpsSetPrioritySubsystemPayload,
+    "operations.toggle_prediction": OpsTogglePredictionPayload,
+    "operations.set_threat_level": OpsSetThreatLevelPayload,
     # Damage Control (aliases engineering DCT payloads)
     "damage_control.dispatch_dct": EngineeringDispatchDCTPayload,
     "damage_control.cancel_dct":   EngineeringCancelDCTPayload,

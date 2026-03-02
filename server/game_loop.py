@@ -123,6 +123,12 @@ from server.models.messages import (
     MapClearRoutePayload,
     JanitorPerformTaskPayload,
     JanitorDismissStickyPayload,
+    OpsStartAssessmentPayload,
+    OpsCancelAssessmentPayload,
+    OpsSetVulnerableFacingPayload,
+    OpsSetPrioritySubsystemPayload,
+    OpsTogglePredictionPayload,
+    OpsSetThreatLevelPayload,
     FlagBridgeAddDrawingPayload,
     FlagBridgeRemoveDrawingPayload,
     FlagBridgeClearDrawingsPayload,
@@ -2729,7 +2735,25 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             gl.log_event("ew", "freq_lock_set", result)
         # --- Operations (replaces Tactical — v0.08) ---
         elif msg_type == "operations.ping":
-            pass  # Heartbeat; real message handling added in A.2–A.5.
+            pass  # Heartbeat / keep-alive.
+        elif msg_type == "operations.start_assessment" and isinstance(payload, OpsStartAssessmentPayload):
+            result = glops.start_assessment(payload.contact_id, _world, _world.ship)
+            gl.log_event("operations", "start_assessment", {"contact_id": payload.contact_id, **result})
+        elif msg_type == "operations.cancel_assessment" and isinstance(payload, OpsCancelAssessmentPayload):
+            result = glops.cancel_assessment()
+            gl.log_event("operations", "cancel_assessment", result)
+        elif msg_type == "operations.set_vulnerable_facing" and isinstance(payload, OpsSetVulnerableFacingPayload):
+            result = glops.set_vulnerable_facing(payload.contact_id, payload.facing)
+            gl.log_event("operations", "set_vulnerable_facing", {"contact_id": payload.contact_id, "facing": payload.facing, **result})
+        elif msg_type == "operations.set_priority_subsystem" and isinstance(payload, OpsSetPrioritySubsystemPayload):
+            result = glops.set_priority_subsystem(payload.contact_id, payload.subsystem)
+            gl.log_event("operations", "set_priority_subsystem", {"contact_id": payload.contact_id, "subsystem": payload.subsystem, **result})
+        elif msg_type == "operations.toggle_prediction" and isinstance(payload, OpsTogglePredictionPayload):
+            result = glops.toggle_prediction(payload.contact_id, payload.active)
+            gl.log_event("operations", "toggle_prediction", {"contact_id": payload.contact_id, "active": payload.active, **result})
+        elif msg_type == "operations.set_threat_level" and isinstance(payload, OpsSetThreatLevelPayload):
+            result = glops.set_threat_level(payload.contact_id, payload.level)
+            gl.log_event("operations", "set_threat_level", {"contact_id": payload.contact_id, "level": payload.level, **result})
         # --- Flag Bridge (v0.07 §2.4) ---
         elif msg_type == "captain.flag_add_drawing" and isinstance(payload, FlagBridgeAddDrawingPayload):
             result = glfb.add_drawing(

@@ -156,7 +156,15 @@ from server.models.messages.ew import (
 )
 
 # Operations (replaces Tactical Officer — v0.08)
-from server.models.messages.operations import OperationsPingPayload
+from server.models.messages.operations import (
+    OperationsPingPayload,
+    OpsStartAssessmentPayload,
+    OpsCancelAssessmentPayload,
+    OpsSetVulnerableFacingPayload,
+    OpsSetPrioritySubsystemPayload,
+    OpsTogglePredictionPayload,
+    OpsSetThreatLevelPayload,
+)
 
 # Game lifecycle
 from server.models.messages.game import (
@@ -378,6 +386,12 @@ __all__ = [
     "EWBeginIntrusionPayload",
     # operations (replaces tactical officer — v0.08)
     "OperationsPingPayload",
+    "OpsStartAssessmentPayload",
+    "OpsCancelAssessmentPayload",
+    "OpsSetVulnerableFacingPayload",
+    "OpsSetPrioritySubsystemPayload",
+    "OpsTogglePredictionPayload",
+    "OpsSetThreatLevelPayload",
     # game
     "ErrorValidationPayload",
     "ErrorPermissionPayload",

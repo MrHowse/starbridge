@@ -34,6 +34,7 @@ from server.systems.combat import (
 )
 from server.utils.math_helpers import angle_diff, bearing_to, distance, wrap_angle
 import server.game_loop_salvage as glsalv
+import server.game_loop_operations as glops
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -392,7 +393,11 @@ def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]
         return []
 
     dmg = ship.beam_damage_base * ship.systems["beams"].efficiency
-    apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency="")
+    # v0.08: apply ops bonuses to auto-fire (flag bridge dual targeting).
+    _af_vf_bonus = glops.check_vulnerable_facing_bonus(target.id, target, ship.x, ship.y)
+    dmg *= (1.0 + _af_vf_bonus)
+    apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency="",
+                       priority_subsystem=glops.get_priority_subsystem(target.id))
 
     event_payload = {
         "target_id": target.id,
@@ -661,7 +666,14 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
             _beam_cooldown = ship.beam_fire_rate
             return ("weapons.beam_miss", {"target_id": target.id})
 
-        apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency)
+        # v0.08 A.2.2.2: Ops vulnerable facing bonus (+25% beam damage).
+        vf_bonus = glops.check_vulnerable_facing_bonus(target.id, target, ship.x, ship.y)
+        # v0.08 A.2.4.2: Ops prediction accuracy bonus (+10% damage).
+        pred_bonus = glops.get_prediction_accuracy_bonus(target.id, target.x, target.y)
+        dmg *= (1.0 + vf_bonus + pred_bonus)
+        # v0.08 A.2.3.2: Ops priority subsystem — passed to combat damage roll.
+        priority_sub = glops.get_priority_subsystem(target.id)
+        apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency, priority_subsystem=priority_sub)
         if target.hull <= 0.0:
             glsalv.spawn_wreck("enemy", target.id, target.type, target.x, target.y)
             world.enemies = [e for e in world.enemies if e.id != target.id]
@@ -947,7 +959,8 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                     ]
                     destroyed_ids: list[str] = []
                     for h_enemy in hit_enemies:
-                        apply_hit_to_enemy(h_enemy, damage, torp.x, torp.y)
+                        apply_hit_to_enemy(h_enemy, damage, torp.x, torp.y,
+                                           priority_subsystem=glops.get_priority_subsystem(h_enemy.id))
                         if h_enemy.hull <= 0.0:
                             glsalv.spawn_wreck("enemy", h_enemy.id, h_enemy.type, h_enemy.x, h_enemy.y)
                             destroyed_ids.append(h_enemy.id)
@@ -977,12 +990,15 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                         break
 
                 if hit_enemy is not None:
+                    _torp_priority = glops.get_priority_subsystem(hit_enemy.id)
                     if torp_type == "piercing":
                         # Ignores 75% of shield absorption (only 25% absorbed).
                         apply_hit_to_enemy(hit_enemy, damage, torp.x, torp.y,
-                                           shield_absorption_mult=0.25)
+                                           shield_absorption_mult=0.25,
+                                           priority_subsystem=_torp_priority)
                     else:
-                        apply_hit_to_enemy(hit_enemy, damage, torp.x, torp.y)
+                        apply_hit_to_enemy(hit_enemy, damage, torp.x, torp.y,
+                                           priority_subsystem=_torp_priority)
 
                     event: dict = {
                         "torpedo_id": torp.id,

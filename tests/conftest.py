@@ -20,3 +20,12 @@ def _reset_rationing_state():
     glrat.reset()
     yield
     glrat.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_operations_state():
+    """Reset operations module state before each test to prevent leakage."""
+    import server.game_loop_operations as glops
+    glops.reset()
+    yield
+    glops.reset()

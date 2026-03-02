@@ -362,6 +362,12 @@ class Enemy:
     shield_frequency: str = ""       # alpha | beta | gamma | delta — matched by Weapons
     # v0.07 — target profile (hit probability modifier for incoming fire)
     target_profile: float = 1.0      # 0.0-1.0; lower = harder to hit
+    # v0.08 — enemy subsystem health (used by Operations analysis & combat damage)
+    system_engines: float = 100.0
+    system_weapons: float = 100.0
+    system_shields: float = 100.0
+    system_sensors: float = 100.0
+    system_propulsion: float = 100.0
 
 
 # ---------------------------------------------------------------------------

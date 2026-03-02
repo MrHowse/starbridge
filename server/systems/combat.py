@@ -37,6 +37,12 @@ FREQ_MISMATCH_MULT: float = 0.5  # mismatched frequency → 50% penalty
 # Target profile (v0.07)
 SPEED_EVASION_FACTOR: float = 0.3  # max profile reduction at full speed
 
+# v0.08 — enemy subsystem damage
+ENEMY_SYSTEM_DAMAGE_CHANCE: float = 0.20         # base 20% chance per hit
+ENEMY_SYSTEM_DAMAGE_PRIORITY_BONUS: float = 0.20  # +20% when priority subsystem set
+ENEMY_SYSTEM_DAMAGE_FRACTION: float = 0.30        # 30% of hull damage as system damage
+_ENEMY_SUBSYSTEMS = ("engines", "weapons", "shields", "sensors", "propulsion")
+
 # Armour (v0.07 §1.3)
 ARMOUR_FIELD_REPAIR_CAP: float = 0.75  # max fraction of armour_max repairable in the field
 
@@ -253,8 +259,9 @@ def apply_hit_to_enemy(
     attacker_y: float,
     beam_frequency: str = "",
     shield_absorption_mult: float = 1.0,
+    priority_subsystem: str | None = None,
 ) -> None:
-    """Apply damage to an enemy ship (shields + hull; no system damage roll).
+    """Apply damage to an enemy ship (shields → hull → subsystem damage roll).
 
     If *beam_frequency* matches the enemy's shield_frequency the damage is
     multiplied by FREQ_MATCH_MULT (1.5×); a mismatch applies FREQ_MISMATCH_MULT
@@ -262,6 +269,9 @@ def apply_hit_to_enemy(
 
     *shield_absorption_mult* scales the shield absorption coefficient — 1.0 is
     full absorption, 0.25 means shields only absorb 25% (piercing torpedoes).
+
+    *priority_subsystem* — if set by Ops, increases the chance of damaging
+    that specific subsystem by ENEMY_SYSTEM_DAMAGE_PRIORITY_BONUS (v0.08 A.2.3).
     """
     # Apply beam frequency modifier before shield absorption.
     if beam_frequency and enemy.shield_frequency:
@@ -284,7 +294,46 @@ def apply_hit_to_enemy(
         if eff_coeff > 0.0:
             enemy.shield_rear = max(0.0, enemy.shield_rear - absorbed / eff_coeff)
 
-    enemy.hull = max(0.0, enemy.hull - (damage - absorbed))
+    hull_damage = damage - absorbed
+    enemy.hull = max(0.0, enemy.hull - hull_damage)
+
+    # v0.08 — enemy subsystem damage roll.
+    if hull_damage > 0.0:
+        _roll_enemy_system_damage(enemy, hull_damage, priority_subsystem)
+
+
+def _roll_enemy_system_damage(
+    enemy: Enemy,
+    hull_damage: float,
+    priority_subsystem: str | None = None,
+) -> None:
+    """Roll for subsystem damage when an enemy takes hull damage (v0.08 A.2.3).
+
+    Base chance: ENEMY_SYSTEM_DAMAGE_CHANCE (20%).
+    With priority subsystem: adds ENEMY_SYSTEM_DAMAGE_PRIORITY_BONUS (20%) and
+    the designated system is 50% likely to be the target.
+    """
+    chance = ENEMY_SYSTEM_DAMAGE_CHANCE
+    if priority_subsystem and priority_subsystem in _ENEMY_SUBSYSTEMS:
+        chance += ENEMY_SYSTEM_DAMAGE_PRIORITY_BONUS
+
+    if _random_module.random() >= chance:
+        return
+
+    # Pick which subsystem takes damage.
+    if (
+        priority_subsystem
+        and priority_subsystem in _ENEMY_SUBSYSTEMS
+        and _random_module.random() < 0.5
+    ):
+        target = priority_subsystem
+    else:
+        target = _random_module.choice(_ENEMY_SUBSYSTEMS)
+
+    sys_damage = hull_damage * ENEMY_SYSTEM_DAMAGE_FRACTION
+    field_name = f"system_{target}"
+    current = getattr(enemy, field_name, 100.0)
+    setattr(enemy, field_name, max(0.0, current - sys_damage))
 
 
 # ---------------------------------------------------------------------------
