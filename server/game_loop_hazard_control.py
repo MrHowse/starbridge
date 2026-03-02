@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 
 from server.models.interior import ShipInterior, Room
 import server.game_loop_rationing as glrat
+import server.game_loop_operations as glops
 
 logger = logging.getLogger("starbridge.hazard_control")
 
@@ -106,6 +107,41 @@ _SEVERITY: dict[str, int] = {
 }
 _SEVERITY_DOWN: dict[int, str] = {3: "fire", 2: "damaged", 1: "normal"}
 
+# --- Structural integrity model (B.5) ---
+
+STRUCT_NORMAL_MIN: float = 76.0
+STRUCT_STRESSED_MIN: float = 51.0
+STRUCT_WEAKENED_MIN: float = 26.0
+STRUCT_CRITICAL_MIN: float = 1.0
+STRUCT_WEAKENED_COLLAPSE_CHANCE: float = 0.15
+STRUCT_CRITICAL_COLLAPSE_CHANCE: float = 0.40
+STRUCT_WEAKENED_CREW_PENALTY: float = 0.10
+STRUCT_CRITICAL_CREW_PENALTY: float = 0.30
+
+# Combat structural damage ranges.
+STRUCT_BEAM_DMG_MIN: float = 5.0
+STRUCT_BEAM_DMG_MAX: float = 10.0
+STRUCT_TORPEDO_DMG_MIN: float = 15.0
+STRUCT_TORPEDO_DMG_MAX: float = 25.0
+STRUCT_BREACH_DMG: float = 10.0
+STRUCT_EXPLOSION_DMG_MIN: float = 20.0
+STRUCT_EXPLOSION_DMG_MAX: float = 30.0
+
+# Fire structural damage (intensity 4+).
+STRUCT_FIRE_DMG_INTERVAL: float = 30.0   # seconds between checks
+STRUCT_FIRE_DMG_AMOUNT: float = 2.0      # % per interval
+
+# Reinforcement.
+REINFORCE_INTERVAL: float = 30.0
+REINFORCE_AMOUNT: float = 10.0
+REINFORCE_MAX: float = 80.0
+REINFORCE_MIN_CREW: int = 2
+
+# Collapse effects.
+COLLAPSE_FIRE_CHANCE: float = 0.80
+COLLAPSE_FIRE_INTENSITY: int = 3
+COLLAPSE_CASCADE_DMG: float = 15.0
+
 # ---------------------------------------------------------------------------
 # Fire dataclass
 # ---------------------------------------------------------------------------
@@ -126,6 +162,23 @@ class Fire:
 
 
 # ---------------------------------------------------------------------------
+# Section dataclass (B.5)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Section:
+    """One structural section of the ship (a group of 2 adjacent rooms)."""
+
+    id: str                          # "deck1_a", "deck1_b", etc.
+    deck_number: int                 # Physical deck number (1-based)
+    deck_name: str                   # Crew deck name (from first room in section)
+    room_ids: list[str] = field(default_factory=list)
+    integrity: float = 100.0         # 0–100%
+    collapsed: bool = False
+
+
+# ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
 
@@ -136,6 +189,13 @@ _fires: dict[str, Fire] = {}                # room_id → Fire
 _fire_teams: dict[str, float] = {}          # room_id → elapsed seconds (manual teams)
 _vent_rooms: set[str] = set()               # rooms with ventilation cutoff active
 _deck_suppression: dict[str, float] = {}    # deck_name → remaining cooldown
+
+# Structural integrity (B.5).
+_sections: dict[str, Section] = {}           # section_id → Section
+_reinforcement_teams: dict[str, float] = {}  # section_id → elapsed seconds
+_room_to_section: dict[str, str] = {}        # room_id → section_id (lookup cache)
+_section_adjacency: dict[str, list[str]] = {}  # section_id → adjacent section IDs
+_fire_structural_timers: dict[str, float] = {}  # section_id → accumulated fire-damage time
 
 _rng: random.Random = random.Random()
 
@@ -154,6 +214,357 @@ def reset() -> None:
     _fire_teams.clear()
     _vent_rooms.clear()
     _deck_suppression.clear()
+    _sections.clear()
+    _reinforcement_teams.clear()
+    _room_to_section.clear()
+    _section_adjacency.clear()
+    _fire_structural_timers.clear()
+
+
+# ---------------------------------------------------------------------------
+# Public API — structural integrity (B.5)
+# ---------------------------------------------------------------------------
+
+
+def init_sections(interior: ShipInterior) -> None:
+    """Build structural sections from the interior layout.
+
+    Each deck's rooms are split into pairs of 2 in order of room ID.
+    Adjacent sections are pre-computed for cascade calculations.
+    """
+    _sections.clear()
+    _room_to_section.clear()
+    _section_adjacency.clear()
+    _fire_structural_timers.clear()
+    _reinforcement_teams.clear()
+
+    # Group rooms by deck_number.
+    deck_rooms: dict[int, list[Room]] = {}
+    for room in interior.rooms.values():
+        deck_rooms.setdefault(room.deck_number, []).append(room)
+
+    # Sort each deck's rooms by ID for deterministic ordering.
+    for dn in sorted(deck_rooms):
+        rooms = sorted(deck_rooms[dn], key=lambda r: r.id)
+        # Split into pairs of 2.
+        idx = 0
+        suffix = ord("a")
+        while idx < len(rooms):
+            chunk = rooms[idx:idx + 2]
+            section_id = f"deck{dn}_{chr(suffix)}"
+            sec = Section(
+                id=section_id,
+                deck_number=dn,
+                deck_name=chunk[0].deck,
+                room_ids=[r.id for r in chunk],
+            )
+            _sections[section_id] = sec
+            for r in chunk:
+                _room_to_section[r.id] = section_id
+            suffix += 1
+            idx += 2
+
+    # Compute adjacency (same deck_number OR cross-deck room connections).
+    section_ids = list(_sections)
+    for i, sid_a in enumerate(section_ids):
+        sa = _sections[sid_a]
+        adj: list[str] = []
+        for sid_b in section_ids:
+            if sid_b == sid_a:
+                continue
+            sb = _sections[sid_b]
+            # Same deck.
+            if sa.deck_number == sb.deck_number:
+                adj.append(sid_b)
+                continue
+            # Cross-deck: check room connections.
+            connected = False
+            for rid_a in sa.room_ids:
+                room_a = interior.rooms.get(rid_a)
+                if room_a is None:
+                    continue
+                for rid_b in sb.room_ids:
+                    if rid_b in room_a.connections:
+                        connected = True
+                        break
+                if connected:
+                    break
+            if connected:
+                adj.append(sid_b)
+        _section_adjacency[sid_a] = adj
+
+
+def rebuild_adjacency(interior: ShipInterior) -> None:
+    """Recompute section adjacency from current sections and interior connections.
+
+    Call after deserialise() when interior is available.
+    """
+    _section_adjacency.clear()
+    section_ids = list(_sections)
+    for sid_a in section_ids:
+        sa = _sections[sid_a]
+        adj: list[str] = []
+        for sid_b in section_ids:
+            if sid_b == sid_a:
+                continue
+            sb = _sections[sid_b]
+            if sa.deck_number == sb.deck_number:
+                adj.append(sid_b)
+                continue
+            connected = False
+            for rid_a in sa.room_ids:
+                room_a = interior.rooms.get(rid_a)
+                if room_a is None:
+                    continue
+                for rid_b in sb.room_ids:
+                    if rid_b in room_a.connections:
+                        connected = True
+                        break
+                if connected:
+                    break
+            if connected:
+                adj.append(sid_b)
+        _section_adjacency[sid_a] = adj
+
+
+def get_sections() -> dict[str, Section]:
+    """Return the current sections dict (read-only intent)."""
+    return _sections
+
+
+def get_section_for_room(room_id: str) -> Section | None:
+    """Look up the section containing a room."""
+    sid = _room_to_section.get(room_id)
+    if sid is None:
+        return None
+    return _sections.get(sid)
+
+
+def get_section_state(section: Section) -> str:
+    """Return the severity state for a section based on its integrity."""
+    if section.collapsed:
+        return "collapsed"
+    if section.integrity >= STRUCT_NORMAL_MIN:
+        return "normal"
+    if section.integrity >= STRUCT_STRESSED_MIN:
+        return "stressed"
+    if section.integrity >= STRUCT_WEAKENED_MIN:
+        return "weakened"
+    if section.integrity >= STRUCT_CRITICAL_MIN:
+        return "critical"
+    return "collapsed"
+
+
+def apply_combat_structural_damage(
+    interior: ShipInterior, damage_type: str = "beam",
+) -> list[dict]:
+    """Apply structural damage from combat to a random non-collapsed section.
+
+    damage_type: "beam" (-5 to -10%) or "torpedo" (-15 to -25%).
+    Returns list of event dicts (collapse, structural_warning, etc.).
+    """
+    if damage_type == "torpedo":
+        dmg = _rng.uniform(STRUCT_TORPEDO_DMG_MIN, STRUCT_TORPEDO_DMG_MAX)
+    else:
+        dmg = _rng.uniform(STRUCT_BEAM_DMG_MIN, STRUCT_BEAM_DMG_MAX)
+    eligible = [s for s in _sections.values() if not s.collapsed]
+    if not eligible:
+        return []
+    section = _rng.choice(eligible)
+    return _apply_section_damage(section, dmg, interior)
+
+
+def apply_breach_structural_damage(room_id: str) -> list[dict]:
+    """Apply -10% structural damage when a hull breach is created."""
+    sec = get_section_for_room(room_id)
+    if sec is None or sec.collapsed:
+        return []
+    return _apply_section_damage(sec, STRUCT_BREACH_DMG)
+
+
+def apply_explosion_structural_damage(
+    room_id: str, interior: ShipInterior | None = None,
+) -> list[dict]:
+    """Apply -20 to -30% structural damage from an explosion."""
+    sec = get_section_for_room(room_id)
+    if sec is None or sec.collapsed:
+        return []
+    dmg = _rng.uniform(STRUCT_EXPLOSION_DMG_MIN, STRUCT_EXPLOSION_DMG_MAX)
+    return _apply_section_damage(sec, dmg, interior)
+
+
+def _apply_section_damage(
+    section: Section, amount: float,
+    interior: ShipInterior | None = None,
+    ship: object | None = None,
+    _collapsed_set: set[str] | None = None,
+) -> list[dict]:
+    """Reduce section integrity and check for collapse.
+
+    Returns list of event dicts.
+    """
+    events: list[dict] = []
+    if section.collapsed:
+        return events
+
+    old_integrity = section.integrity
+    section.integrity = max(0.0, section.integrity - amount)
+
+    # Ops warning when crossing 50%.
+    if old_integrity >= 50.0 and section.integrity < 50.0:
+        glops.add_feed_event(
+            "HAZARD",
+            f"STRUCTURAL WARNING: {section.id} at {section.integrity:.0f}%",
+            "warning",
+        )
+        events.append({
+            "type": "structural_warning",
+            "section_id": section.id,
+            "integrity": round(section.integrity, 1),
+        })
+
+    # Check for collapse chance on Weakened/Critical sections.
+    state = get_section_state(section)
+    if state == "weakened" and _rng.random() < STRUCT_WEAKENED_COLLAPSE_CHANCE:
+        events.extend(_collapse_section(section, interior, ship, _collapsed_set))
+    elif state == "critical" and _rng.random() < STRUCT_CRITICAL_COLLAPSE_CHANCE:
+        events.extend(_collapse_section(section, interior, ship, _collapsed_set))
+    elif section.integrity <= 0.0:
+        events.extend(_collapse_section(section, interior, ship, _collapsed_set))
+
+    return events
+
+
+def _collapse_section(
+    section: Section,
+    interior: ShipInterior | None = None,
+    ship: object | None = None,
+    _collapsed_set: set[str] | None = None,
+) -> list[dict]:
+    """Collapse a section: destroy equipment, create breaches/fires/casualties, cascade."""
+    import server.game_loop_atmosphere as glatm
+
+    events: list[dict] = []
+    section.collapsed = True
+    section.integrity = 0.0
+    # Cancel any reinforcement in progress.
+    _reinforcement_teams.pop(section.id, None)
+
+    if _collapsed_set is None:
+        _collapsed_set = set()
+    _collapsed_set.add(section.id)
+
+    logger.info("Section COLLAPSED: %s", section.id)
+    events.append({
+        "type": "structural_collapse",
+        "section_id": section.id,
+        "deck_number": section.deck_number,
+        "room_ids": list(section.room_ids),
+    })
+
+    for room_id in section.room_ids:
+        # Destroy equipment (ship systems in this room).
+        if ship is not None:
+            systems = getattr(ship, "systems", {})
+            for sys_obj in systems.values():
+                if getattr(sys_obj, "room_id", None) == room_id:
+                    sys_obj.health = 0.0
+
+        # Create major breach.
+        if interior is not None:
+            glatm.create_breach(room_id, "major", interior)
+
+        # Fire (80% chance, intensity 3).
+        if interior is not None and _rng.random() < COLLAPSE_FIRE_CHANCE:
+            start_fire(room_id, COLLAPSE_FIRE_INTENSITY, interior)
+
+    # Crew casualties: injure 2 crew per room in section.
+    if ship is not None:
+        crew = getattr(ship, "crew", None)
+        if crew is not None:
+            casualty_count = len(section.room_ids) * 2
+            crew.apply_casualties(section.deck_name, casualty_count)
+            events.append({
+                "type": "structural_casualties",
+                "section_id": section.id,
+                "deck_name": section.deck_name,
+                "count": casualty_count,
+            })
+
+    # Cascade: adjacent sections take -15% damage.
+    for adj_sid in _section_adjacency.get(section.id, []):
+        if adj_sid in _collapsed_set:
+            continue
+        adj = _sections.get(adj_sid)
+        if adj is not None and not adj.collapsed:
+            events.extend(
+                _apply_section_damage(adj, COLLAPSE_CASCADE_DMG, interior, ship, _collapsed_set)
+            )
+
+    return events
+
+
+def restore_all_sections() -> None:
+    """Restore all sections to 100% integrity (used on docking)."""
+    for section in _sections.values():
+        if not section.collapsed:
+            section.integrity = 100.0
+
+
+def reinforce_section(section_id: str, ship: object | None = None) -> bool:
+    """Start structural reinforcement on a section.
+
+    Returns False if collapsed, at max, or insufficient crew.
+    """
+    sec = _sections.get(section_id)
+    if sec is None or sec.collapsed:
+        return False
+    if sec.integrity >= REINFORCE_MAX:
+        return False
+    if section_id in _reinforcement_teams:
+        return False
+
+    # Check crew: need at least 2 active on the section's deck.
+    if ship is not None:
+        crew = getattr(ship, "crew", None)
+        if crew is not None:
+            deck = crew.decks.get(sec.deck_name)
+            if deck is None or deck.active < REINFORCE_MIN_CREW:
+                return False
+
+    _reinforcement_teams[section_id] = 0.0
+    logger.debug("Reinforcement started: %s", section_id)
+    return True
+
+
+def cancel_reinforcement(section_id: str) -> bool:
+    """Cancel active structural reinforcement."""
+    if section_id in _reinforcement_teams:
+        del _reinforcement_teams[section_id]
+        return True
+    return False
+
+
+def get_structural_crew_penalties() -> dict[str, float]:
+    """Return deck_name → worst crew efficiency penalty from structural damage.
+
+    Weakened sections: 0.10 penalty.
+    Critical sections: 0.30 penalty.
+    """
+    penalties: dict[str, float] = {}
+    for sec in _sections.values():
+        if sec.collapsed:
+            continue
+        state = get_section_state(sec)
+        if state == "weakened":
+            penalty = STRUCT_WEAKENED_CREW_PENALTY
+        elif state == "critical":
+            penalty = STRUCT_CRITICAL_CREW_PENALTY
+        else:
+            continue
+        if penalty > penalties.get(sec.deck_name, 0.0):
+            penalties[sec.deck_name] = penalty
+    return penalties
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +584,15 @@ def serialise() -> dict:
             "suppression_type": f.suppression_type,
             "vent_elapsed": f.vent_elapsed,
         }
+    sections_data = {}
+    for sid, sec in _sections.items():
+        sections_data[sid] = {
+            "deck_number": sec.deck_number,
+            "deck_name": sec.deck_name,
+            "room_ids": list(sec.room_ids),
+            "integrity": sec.integrity,
+            "collapsed": sec.collapsed,
+        }
     return {
         "active_dcts": dict(_active_dcts),
         "pending_hull_damage": _pending_hull_damage,
@@ -180,6 +600,9 @@ def serialise() -> dict:
         "fire_teams": dict(_fire_teams),
         "vent_rooms": list(_vent_rooms),
         "deck_suppression": dict(_deck_suppression),
+        "sections": sections_data,
+        "reinforcement_teams": dict(_reinforcement_teams),
+        "fire_structural_timers": dict(_fire_structural_timers),
     }
 
 
@@ -210,6 +633,28 @@ def deserialise(data: dict) -> None:
 
     _deck_suppression.clear()
     _deck_suppression.update(data.get("deck_suppression", {}))
+
+    # Structural integrity (B.5).
+    _sections.clear()
+    _room_to_section.clear()
+    for sid, sd in data.get("sections", {}).items():
+        sec = Section(
+            id=sid,
+            deck_number=sd.get("deck_number", 0),
+            deck_name=sd.get("deck_name", ""),
+            room_ids=sd.get("room_ids", []),
+            integrity=sd.get("integrity", 100.0),
+            collapsed=sd.get("collapsed", False),
+        )
+        _sections[sid] = sec
+        for rid in sec.room_ids:
+            _room_to_section[rid] = sid
+
+    _reinforcement_teams.clear()
+    _reinforcement_teams.update(data.get("reinforcement_teams", {}))
+
+    _fire_structural_timers.clear()
+    _fire_structural_timers.update(data.get("fire_structural_timers", {}))
 
 
 # ---------------------------------------------------------------------------
@@ -465,6 +910,12 @@ def tick(interior: ShipInterior, dt: float, difficulty: object | None = None,
     # 10. Clean up extinguished fires.
     _cleanup_fires(interior)
 
+    # 11. Structural: fire damage to sections (intensity 4+).
+    _tick_structural_fire_damage(interior, dt)
+
+    # 12. Structural reinforcement.
+    _tick_reinforcement_teams(dt, ship, events)
+
     return events
 
 
@@ -500,6 +951,18 @@ def build_dc_state(interior: ShipInterior, difficulty: object | None = None) -> 
             "venting": rid in _vent_rooms,
         }
 
+    # Structural sections (B.5).
+    sections_state = {}
+    for sid, sec in _sections.items():
+        sections_state[sid] = {
+            "integrity": round(sec.integrity, 1),
+            "state": get_section_state(sec),
+            "room_ids": list(sec.room_ids),
+            "deck_number": sec.deck_number,
+            "collapsed": sec.collapsed,
+            "reinforcing": sid in _reinforcement_teams,
+        }
+
     return {
         "rooms": damaged_rooms,
         "active_dcts": active_dcts,
@@ -507,6 +970,7 @@ def build_dc_state(interior: ShipInterior, difficulty: object | None = None) -> 
         "fire_teams": {rid: round(elapsed, 1) for rid, elapsed in _fire_teams.items()},
         "vent_rooms": list(_vent_rooms),
         "deck_suppression": {dk: round(t, 1) for dk, t in _deck_suppression.items()},
+        "sections": sections_state,
     }
 
 
@@ -866,3 +1330,73 @@ def _trigger_room_event(interior: ShipInterior) -> None:
                 fire.escalation_timer = ESCALATION_INTERVAL
             else:
                 _spread_fire_from_intensity(fire, interior)
+
+
+# ---------------------------------------------------------------------------
+# Internal — structural integrity tick helpers (B.5)
+# ---------------------------------------------------------------------------
+
+
+def _tick_structural_fire_damage(interior: ShipInterior, dt: float) -> None:
+    """Fire at intensity 4+ damages the containing section: -2% per 30s."""
+    for fire in _fires.values():
+        if fire.intensity < 4:
+            continue
+        sec = get_section_for_room(fire.room_id)
+        if sec is None or sec.collapsed:
+            continue
+        timer = _fire_structural_timers.get(sec.id, 0.0) + dt
+        if timer >= STRUCT_FIRE_DMG_INTERVAL:
+            timer -= STRUCT_FIRE_DMG_INTERVAL
+            _apply_section_damage(sec, STRUCT_FIRE_DMG_AMOUNT, interior)
+        _fire_structural_timers[sec.id] = timer
+
+
+def _tick_reinforcement_teams(
+    dt: float, ship: object | None, events: list[dict],
+) -> None:
+    """Advance reinforcement timers.  Every 30s, +10% capped at 80%."""
+    completed: list[str] = []
+    for section_id in list(_reinforcement_teams):
+        sec = _sections.get(section_id)
+        if sec is None or sec.collapsed:
+            completed.append(section_id)
+            continue
+
+        _reinforcement_teams[section_id] += dt
+        prev_intervals = int((_reinforcement_teams[section_id] - dt) / REINFORCE_INTERVAL)
+        cur_intervals = int(_reinforcement_teams[section_id] / REINFORCE_INTERVAL)
+
+        if cur_intervals > prev_intervals:
+            # Check crew still available.
+            crew_ok = True
+            if ship is not None:
+                crew = getattr(ship, "crew", None)
+                if crew is not None:
+                    deck = crew.decks.get(sec.deck_name)
+                    if deck is None or deck.active < REINFORCE_MIN_CREW:
+                        crew_ok = False
+
+            if not crew_ok:
+                completed.append(section_id)
+                events.append({
+                    "type": "reinforcement_cancelled",
+                    "section_id": section_id,
+                    "reason": "insufficient_crew",
+                })
+                continue
+
+            sec.integrity = min(REINFORCE_MAX, sec.integrity + REINFORCE_AMOUNT)
+            events.append({
+                "type": "reinforcement_cycle",
+                "section_id": section_id,
+                "integrity": round(sec.integrity, 1),
+            })
+            logger.debug("Reinforcement cycle: %s → %.1f%%", section_id, sec.integrity)
+
+            # Stop if at max.
+            if sec.integrity >= REINFORCE_MAX:
+                completed.append(section_id)
+
+    for section_id in completed:
+        _reinforcement_teams.pop(section_id, None)

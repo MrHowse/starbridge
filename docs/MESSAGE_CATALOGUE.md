@@ -169,6 +169,8 @@ All entries in `_PAYLOAD_SCHEMAS` — the server accepts and validates these.
 | `hazard_control.cancel_space_vent` | HazConCancelSpaceVentPayload | room_id |
 | `hazard_control.dispatch_decon_team` | HazConDispatchDeconTeamPayload | room_id |
 | `hazard_control.cancel_decon_team` | HazConCancelDeconTeamPayload | room_id |
+| `hazard_control.reinforce_section` | HazConReinforceSectionPayload | section_id |
+| `hazard_control.cancel_reinforcement` | HazConCancelReinforcementPayload | section_id |
 
 ### Creatures
 

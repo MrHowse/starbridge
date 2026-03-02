@@ -192,6 +192,8 @@ from server.models.messages import (
     HazConCancelSpaceVentPayload,
     HazConDispatchDeconTeamPayload,
     HazConCancelDeconTeamPayload,
+    HazConReinforceSectionPayload,
+    HazConCancelReinforcementPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -557,6 +559,7 @@ async def start(
     glco.reset()
     glcap.reset()
     glhc.reset()
+    glhc.init_sections(_world.ship.interior)
     glatm.reset()
     glatm.init_atmosphere(_world.ship.interior)
     # v0.07 §3.5: Drone loadout override.
@@ -1216,6 +1219,9 @@ async def _loop() -> None:
             list(beam_hit_events) + list(station_beam_hits) + creature_beam_hits, _world, _manager
         )
         glhc.apply_hull_damage(_hull_before_combat - _world.ship.hull, _world.ship.interior)
+        # B.5: Structural damage from beam hits (only when hull actually took damage).
+        if _world.ship.hull < _hull_before_combat:
+            glhc.apply_combat_structural_damage(_world.ship.interior, "beam")
         # v0.07 §2.1: Break stealth on damage; suppress shield regen during active stealth.
         if _world.ship.hull < _hull_before_combat and glew.is_stealth_engaged():
             glew.break_stealth("damage")
@@ -2444,6 +2450,13 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "hazard_control.cancel_decon_team" and isinstance(payload, HazConCancelDeconTeamPayload):
             glatm.cancel_decon_team(payload.room_id)
             gl.log_event("hazard_control", "cancel_decon_team", {"room_id": payload.room_id})
+        # --- Structural Integrity (B.5) ---
+        elif msg_type == "hazard_control.reinforce_section" and isinstance(payload, HazConReinforceSectionPayload):
+            glhc.reinforce_section(payload.section_id, _world.ship if _world else None)
+            gl.log_event("hazard_control", "reinforce_section", {"section_id": payload.section_id})
+        elif msg_type == "hazard_control.cancel_reinforcement" and isinstance(payload, HazConCancelReinforcementPayload):
+            glhc.cancel_reinforcement(payload.section_id)
+            gl.log_event("hazard_control", "cancel_reinforcement", {"section_id": payload.section_id})
         elif msg_type == "engineering.dispatch_team" and isinstance(payload, EngineeringDispatchTeamPayload):
             gle.dispatch_team(payload.team_id, payload.system, ship.interior)
             gl.log_event("engineering", "team_dispatched", {"team_id": payload.team_id, "system": payload.system})

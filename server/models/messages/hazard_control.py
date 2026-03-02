@@ -75,3 +75,14 @@ class HazConDispatchDeconTeamPayload(BaseModel):
 
 class HazConCancelDeconTeamPayload(BaseModel):
     room_id: str
+
+
+# --- B.5: Structural Integrity System ---
+
+
+class HazConReinforceSectionPayload(BaseModel):
+    section_id: str
+
+
+class HazConCancelReinforcementPayload(BaseModel):
+    section_id: str

@@ -38,3 +38,12 @@ def _reset_atmosphere_state():
     glatm.reset()
     yield
     glatm.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_hazard_control_state():
+    """Reset hazard control module state before each test to prevent leakage."""
+    import server.game_loop_hazard_control as glhc
+    glhc.reset()
+    yield
+    glhc.reset()

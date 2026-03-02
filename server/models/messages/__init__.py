@@ -192,6 +192,8 @@ from server.models.messages.hazard_control import (
     HazConCancelSpaceVentPayload,
     HazConDispatchDeconTeamPayload,
     HazConCancelDeconTeamPayload,
+    HazConReinforceSectionPayload,
+    HazConCancelReinforcementPayload,
 )
 
 # Game lifecycle
@@ -445,6 +447,8 @@ __all__ = [
     "HazConCancelSpaceVentPayload",
     "HazConDispatchDeconTeamPayload",
     "HazConCancelDeconTeamPayload",
+    "HazConReinforceSectionPayload",
+    "HazConCancelReinforcementPayload",
     # game
     "ErrorValidationPayload",
     "ErrorPermissionPayload",

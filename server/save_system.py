@@ -658,6 +658,7 @@ def restore_game(save_id: str, world: World) -> dict:
         glfo.deserialise(mods["flight_ops"])
     if mods.get("hazard_control"):
         glhc.deserialise(mods["hazard_control"])
+        glhc.rebuild_adjacency(world.ship.interior)
     if mods.get("atmosphere"):
         glatm.deserialise(mods["atmosphere"])
     if mods.get("comms"):

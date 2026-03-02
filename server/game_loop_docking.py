@@ -145,6 +145,9 @@ def _apply_service(service: str, world, ship) -> dict:
             armour_restored = ship.armour_max - ship.armour
             ship.armour = ship.armour_max
             effects["armour_restored"] = round(armour_restored, 1)
+        # B.5: Restore structural integrity at dock (full restoration only via docking).
+        import server.game_loop_hazard_control as glhc
+        glhc.restore_all_sections()
         # v0.07 §6.1: Refuel and resupply repair materials at dock.
         _res = getattr(ship, "resources", None)
         if _res is not None:
