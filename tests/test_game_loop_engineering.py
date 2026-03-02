@@ -191,6 +191,19 @@ class TestPowerDistribution:
 
 
 class TestOverclockDamage:
+    def _tick_to_check(self, ship, interior, n=None):
+        """Tick enough times to reach the first overclock check.
+
+        The first overclocked tick sets next_check = tick + INTERVAL,
+        so we need INTERVAL + 1 ticks total to reach it.
+        Returns the result from the check tick.
+        """
+        ticks = n or (gle.OVERCLOCK_CHECK_INTERVAL + 1)
+        result = None
+        for _ in range(ticks):
+            result = gle.tick(ship, interior, 0.1)
+        return result
+
     def test_overclock_damages_component(self):
         ship = _ship()
         # High reactor so overclock power is actually delivered
@@ -207,8 +220,10 @@ class TestOverclockDamage:
         for sys_name in ALL_BUS_SYSTEMS:
             gle.set_power(sys_name, 50.0)
         gle.set_power("engines", 150.0)
-        result = gle.tick(ship, _interior(), 0.1)
-        # Find engine overclock events
+
+        # Tick through the check interval to reach a damage check
+        result = self._tick_to_check(ship, _interior())
+        assert result is not None
         engine_events = [e for e in result.overclock_events
                          if e["system"] == "engines"]
         assert len(engine_events) >= 1
@@ -224,7 +239,8 @@ class TestOverclockDamage:
         for name in ALL_BUS_SYSTEMS:
             gle.set_power(name, gle.OVERCLOCK_THRESHOLD)
 
-        result = gle.tick(ship, _interior(), 0.1)
+        result = self._tick_to_check(ship, _interior())
+        assert result is not None
         assert len(result.overclock_events) == 0
 
     def test_overclock_skips_destroyed_system(self):
@@ -245,10 +261,11 @@ class TestOverclockDamage:
         gle.tick(ship, _interior(), 0.1)
         assert ship.systems["engines"].health == pytest.approx(0.0)
 
-        # Now set rng and tick again — overclock should skip destroyed system
+        # Now set rng and tick through interval — overclock should skip
         gle._rng = random.Random(42)
         gle._rng.random = lambda: 0.0
-        result = gle.tick(ship, _interior(), 0.1)
+        result = self._tick_to_check(ship, _interior())
+        assert result is not None
         engine_events = [e for e in result.overclock_events
                          if e["system"] == "engines"]
         assert len(engine_events) == 0
@@ -257,15 +274,142 @@ class TestOverclockDamage:
         ship = _ship()
         gle.init(ship, power_grid_config={"reactor_max": 1500.0})
         gle._rng = random.Random(42)
-        gle._rng.random = lambda: 0.99  # above OVERCLOCK_DAMAGE_CHANCE
+        gle._rng.random = lambda: 0.99  # above all chance brackets
 
         for sys_name in ALL_BUS_SYSTEMS:
             gle.set_power(sys_name, 50.0)
         gle.set_power("engines", 150.0)
-        result = gle.tick(ship, _interior(), 0.1)
+        result = self._tick_to_check(ship, _interior())
+        assert result is not None
         engine_events = [e for e in result.overclock_events
                          if e["system"] == "engines"]
         assert len(engine_events) == 0
+
+    def test_overclock_rate_is_manageable(self):
+        """120% overclock for 120 seconds → ~12-15 damage events, not 60+."""
+        ship = _ship()
+        gle.init(ship, power_grid_config={"reactor_max": 1500.0})
+
+        for sys_name in ALL_BUS_SYSTEMS:
+            gle.set_power(sys_name, 50.0)
+        gle.set_power("engines", 120.0)
+
+        total_events = 0
+        interior = _interior()
+        for _ in range(1200):  # 120 seconds at 10 Hz
+            result = gle.tick(ship, interior, 0.1)
+            total_events += len([e for e in result.overclock_events
+                                 if e["system"] == "engines"])
+        # At 120% (10% chance bracket), checks every 8s → 15 checks in 120s
+        # 10% of 15 = ~1.5 expected, but with randomness allow up to 15
+        assert total_events <= 15, f"Got {total_events} events, expected <=15"
+
+    def test_overclock_grace_period(self):
+        """After repair, system is immune to overclock damage for 30 seconds."""
+        ship = _ship()
+        gle.init(ship, power_grid_config={"reactor_max": 1500.0})
+
+        for sys_name in ALL_BUS_SYSTEMS:
+            gle.set_power(sys_name, 50.0)
+        gle.set_power("engines", 150.0)
+
+        gle._rng = random.Random(42)
+        gle._rng.random = lambda: 0.0  # always triggers
+        gle._rng.uniform = lambda a, b: 10.0
+
+        # Simulate a repair event by setting grace period
+        gle._overclock_grace_until["engines"] = (
+            gle._tick_count + gle.OVERCLOCK_GRACE_TICKS
+        )
+
+        # Tick for 30 seconds (300 ticks) — no damage should occur
+        interior = _interior()
+        events_during_grace = 0
+        for _ in range(300):
+            result = gle.tick(ship, interior, 0.1)
+            events_during_grace += len([e for e in result.overclock_events
+                                        if e["system"] == "engines"])
+        assert events_during_grace == 0, (
+            f"Got {events_during_grace} events during grace period"
+        )
+
+        # After grace expires, force next check to happen soon
+        gle._overclock_next_check["engines"] = gle._tick_count + 1
+        result = gle.tick(ship, interior, 0.1)
+        engine_events = [e for e in result.overclock_events
+                         if e["system"] == "engines"]
+        assert len(engine_events) >= 1
+
+    def test_overclock_chance_scales_with_power(self):
+        """Higher overclock levels should have higher damage probability."""
+        ship = _ship()
+        # Test the bracket function directly
+        assert gle._get_overclock_chance(105.0) == 0.10
+        assert gle._get_overclock_chance(115.0) == 0.25
+        assert gle._get_overclock_chance(130.0) == 0.50
+        assert gle._get_overclock_chance(145.0) == 0.80
+        assert gle._get_overclock_chance(100.0) == 0.0  # at threshold, no risk
+
+    def test_overheat_warning_before_damage(self):
+        """Warning should be emitted ~5 seconds before damage check."""
+        ship = _ship()
+        gle.init(ship, power_grid_config={"reactor_max": 1500.0})
+
+        for sys_name in ALL_BUS_SYSTEMS:
+            gle.set_power(sys_name, 50.0)
+        gle.set_power("engines", 150.0)
+
+        interior = _interior()
+        warning_tick = None
+        # Tick until we see a warning
+        for i in range(gle.OVERCLOCK_CHECK_INTERVAL):
+            result = gle.tick(ship, interior, 0.1)
+            eng_warnings = [w for w in result.overclock_warnings
+                            if w["system"] == "engines"]
+            if eng_warnings and warning_tick is None:
+                warning_tick = i + 1  # 1-based tick count
+
+        assert warning_tick is not None, "No overheat warning emitted"
+        # next_check is set on tick 1 to (1 + INTERVAL) = 81
+        # warning fires at tick >= 81 - 50 = 31 → that's the 31st tick
+        expected = gle.OVERCLOCK_CHECK_INTERVAL - gle.OVERCLOCK_WARNING_TICKS + 1
+        assert warning_tick == expected
+
+    def test_max_simultaneous_damage(self):
+        """At most OVERCLOCK_MAX_SIMULTANEOUS systems take damage per tick."""
+        ship = _ship()
+        gle.init(ship, power_grid_config={"reactor_max": 5000.0})
+
+        gle._rng = random.Random(42)
+        gle._rng.random = lambda: 0.0  # always triggers
+        gle._rng.uniform = lambda a, b: 5.0
+
+        # Overclock ALL systems
+        for sys_name in ALL_BUS_SYSTEMS:
+            gle.set_power(sys_name, 150.0)
+
+        # Tick to first check
+        result = self._tick_to_check(ship, _interior())
+        assert result is not None
+        assert len(result.overclock_events) <= gle.OVERCLOCK_MAX_SIMULTANEOUS
+
+    def test_overheat_warning_in_build_state(self):
+        """build_state includes overheat_warning flag per system."""
+        ship = _ship()
+        gle.init(ship, power_grid_config={"reactor_max": 1500.0})
+
+        for sys_name in ALL_BUS_SYSTEMS:
+            gle.set_power(sys_name, 50.0)
+        gle.set_power("engines", 150.0)
+
+        interior = _interior()
+        # Tick past the warning threshold
+        for _ in range(gle.OVERCLOCK_CHECK_INTERVAL - gle.OVERCLOCK_WARNING_TICKS + 1):
+            gle.tick(ship, interior, 0.1)
+
+        state = gle.build_state(ship)
+        assert state["systems"]["engines"]["overheat_warning"] is True
+        assert state["systems"]["beams"]["overheat_warning"] is False
 
 
 # ---------------------------------------------------------------------------

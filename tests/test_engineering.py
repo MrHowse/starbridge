@@ -707,8 +707,11 @@ async def test_set_repair_queues_repair_order():
 async def test_gle_tick_overclock_damages_through_damage_model():
     """Overclock in gle.tick() should cause damage via the DamageModel."""
     _, world, _ = fresh_loop()
-    _init_gle_for_test(world)
     ship = world.ship
+    # Use a high reactor so overclock power is actually delivered
+    gle.reset()
+    gle.init(ship, crew_member_ids=_TEST_CREW_IDS,
+             power_grid_config={"reactor_max": 1500.0})
 
     dm = gle.get_damage_model()
     assert dm is not None
@@ -717,9 +720,14 @@ async def test_gle_tick_overclock_damages_through_damage_model():
     # Force overclock to trigger by seeding the rng.
     gle._rng = type(gle._rng)(42)  # seeded, but let's force it:
     gle._rng.random = lambda: 0.0  # always triggers
-    result = gle.tick(ship, ship.interior, 0.1)
 
-    assert len(result.overclock_events) > 0
+    # Tick through the check interval (overclock damage has a cooldown)
+    all_events = []
+    for _ in range(gle.OVERCLOCK_CHECK_INTERVAL + 1):
+        result = gle.tick(ship, ship.interior, 0.1)
+        all_events.extend(result.overclock_events)
+
+    assert len(all_events) > 0
     engines_health = dm.get_system_health("engines")
     assert engines_health < 100.0
 

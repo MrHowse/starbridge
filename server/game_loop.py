@@ -2061,6 +2061,13 @@ async def _loop() -> None:
                 "component_health": round(_oc_comp_hit.get("health", 0.0), 1),
                 "effect": _oc_comp_hit.get("effect", ""),
             })
+        # 12a-b. Overheat warnings (from gle.tick).
+        for _ow_evt in _eng_result.overclock_warnings:
+            await _manager.broadcast_to_roles(
+                ["engineering"],
+                Message.build("engineering.overheat_warning", _ow_evt),
+            )
+
         # 12b. Repair team notable events.
         _NOTABLE_TEAM_EVENTS = {"team_arrived", "team_returned", "casualty", "team_eliminated"}
         for _rt_evt in _eng_result.repair_team_events:

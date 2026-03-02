@@ -379,6 +379,7 @@ function applyShipState(state) {
     els.effText.textContent = sys.efficiency.toFixed(2);
 
     els.row.classList.toggle('sys-row--overclocked', sys.power > OVERCLOCK_THRESHOLD);
+    els.row.classList.toggle('sys-row--overheat-warning', !!sys.overheat_warning);
     els.row.classList.toggle('sys-row--offline',     sys.health <= 0);
 
     const needsHint = hintsEnabled && sys.health < 50 && sys.power < 75;

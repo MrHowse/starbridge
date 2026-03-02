@@ -24,9 +24,23 @@ from server.models.ship import Ship
 # ---------------------------------------------------------------------------
 
 OVERCLOCK_THRESHOLD: float = 100.0
-OVERCLOCK_DAMAGE_CHANCE: float = 0.10
+OVERCLOCK_DAMAGE_CHANCE: float = 0.10  # base; scaled by bracket below
 OVERCLOCK_DAMAGE_MIN: float = 5.0
 OVERCLOCK_DAMAGE_MAX: float = 15.0
+
+# --- Overclock tuning (playtest-fix-01) ---
+OVERCLOCK_CHECK_INTERVAL: int = 80    # ticks between checks (8s at 10 Hz)
+OVERCLOCK_GRACE_TICKS: int = 300      # 30s immunity after repair
+OVERCLOCK_WARNING_TICKS: int = 50     # warn 5s before check
+OVERCLOCK_MAX_SIMULTANEOUS: int = 2   # max systems damaged per check
+
+# Damage probability brackets by overclock power level
+OVERCLOCK_CHANCE_BRACKETS: list[tuple[float, float, float]] = [
+    (101.0, 110.0, 0.10),   # 10% — low risk
+    (111.0, 125.0, 0.25),   # 25% — moderate
+    (126.0, 140.0, 0.50),   # 50% — high
+    (141.0, 150.0, 0.80),   # 80% — very risky, short bursts only
+]
 
 # ---------------------------------------------------------------------------
 # Module-level state
@@ -40,6 +54,11 @@ _rng: random.Random = random.Random()
 _tick_count: int = 0
 _ship_class: str = "frigate"
 
+# Overclock tracking (per-system)
+_overclock_next_check: dict[str, int] = {}   # system → tick of next check
+_overclock_grace_until: dict[str, int] = {}  # system → tick when grace expires
+_overclock_warned: set[str] = set()          # systems with active overheat warning
+
 
 # ---------------------------------------------------------------------------
 # Init / Reset
@@ -50,6 +69,7 @@ def reset() -> None:
     """Clear all module state."""
     global _power_grid, _repair_mgr, _damage_model
     global _requested_power, _rng, _tick_count, _ship_class
+    global _overclock_next_check, _overclock_grace_until, _overclock_warned
     _power_grid = None
     _repair_mgr = None
     _damage_model = None
@@ -57,6 +77,9 @@ def reset() -> None:
     _rng = random.Random()
     _tick_count = 0
     _ship_class = "frigate"
+    _overclock_next_check = {}
+    _overclock_grace_until = {}
+    _overclock_warned = set()
 
 
 def init(ship: Ship,
@@ -77,8 +100,12 @@ def init(ship: Ship,
     """
     global _power_grid, _repair_mgr, _damage_model
     global _requested_power, _rng, _tick_count, _ship_class
+    global _overclock_next_check, _overclock_grace_until, _overclock_warned
 
     _ship_class = ship_class
+    _overclock_next_check = {}
+    _overclock_grace_until = {}
+    _overclock_warned = set()
 
     if power_grid_config:
         _power_grid = PowerGrid.from_ship_class(power_grid_config)
@@ -193,6 +220,8 @@ def repair_all_components(system: str) -> None:
         return
     for comp in sys_comps.values():
         comp.health = 100.0
+    # Grant overclock grace period after full repair
+    _overclock_grace_until[system] = _tick_count + OVERCLOCK_GRACE_TICKS
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +233,7 @@ def repair_all_components(system: str) -> None:
 class EngineeringTickResult:
     """Collected events from one engineering tick."""
     overclock_events: list[dict]
+    overclock_warnings: list[dict]
     repair_team_events: list[dict]
     power_delivered: dict[str, float]
 
@@ -225,6 +255,7 @@ def tick(ship: Ship, interior: ShipInterior, dt: float) -> EngineeringTickResult
 
     result = EngineeringTickResult(
         overclock_events=[],
+        overclock_warnings=[],
         repair_team_events=[],
         power_delivered={},
     )
@@ -252,18 +283,24 @@ def tick(ship: Ship, interior: ShipInterior, dt: float) -> EngineeringTickResult
         if sys_name in ship.systems:
             ship.systems[sys_name].power = power
 
-    # 3. Overclock damage
-    result.overclock_events = _apply_overclock_damage(ship, _tick_count)
+    # 3. Overclock damage + warnings
+    oc_events, oc_warnings = _apply_overclock_damage(ship, _tick_count)
+    result.overclock_events = oc_events
+    result.overclock_warnings = oc_warnings
 
     # 4. Repair team travel/repair
     if _repair_mgr is not None:
         team_events = _repair_mgr.tick(dt, interior, _rng)
         result.repair_team_events = team_events
 
-        # 5. Apply repair HP to damage model
+        # 5. Apply repair HP to damage model + set overclock grace period
         for evt in team_events:
             if evt["type"] == "repair_hp" and evt.get("system"):
                 _damage_model.repair_system(evt["system"], evt["hp"])
+                # Grant grace period — refreshed each repair tick
+                _overclock_grace_until[evt["system"]] = (
+                    _tick_count + OVERCLOCK_GRACE_TICKS
+                )
 
     # 6. Sync damage model health → ship system health
     _sync_health_to_ship(ship)
@@ -276,26 +313,87 @@ def tick(ship: Ship, interior: ShipInterior, dt: float) -> EngineeringTickResult
 # ---------------------------------------------------------------------------
 
 
-def _apply_overclock_damage(ship: Ship, tick: int) -> list[dict]:
-    """Check for overclock damage on systems above threshold."""
-    if _damage_model is None:
-        return []
+def _get_overclock_chance(power: float) -> float:
+    """Return damage probability for an overclock power level."""
+    for lo, hi, chance in OVERCLOCK_CHANCE_BRACKETS:
+        if lo <= power <= hi:
+            return chance
+    # Above 150 (shouldn't happen) — treat as max risk
+    if power > 150.0:
+        return 0.80
+    return 0.0
 
-    events: list[dict] = []
+
+def _apply_overclock_damage(
+    ship: Ship, tick: int,
+) -> tuple[list[dict], list[dict]]:
+    """Check for overclock damage on systems above threshold.
+
+    Returns (damage_events, warning_events).
+    Uses per-system cooldown timers, grace periods, scaled probability,
+    overheat warnings, and a cap on simultaneous damage.
+    """
+    if _damage_model is None:
+        return [], []
+
+    damage_events: list[dict] = []
+    warning_events: list[dict] = []
+
     for name, sys_obj in ship.systems.items():
-        if sys_obj.power > OVERCLOCK_THRESHOLD and sys_obj.health > 0.0:
-            if _rng.random() < OVERCLOCK_DAMAGE_CHANCE:
-                dmg = _rng.uniform(OVERCLOCK_DAMAGE_MIN, OVERCLOCK_DAMAGE_MAX)
-                comp_events = _damage_model.apply_damage(
-                    name, dmg, "overclock", tick=tick, rng=_rng)
-                if comp_events:
-                    events.append({
-                        "type": "overclock_damage",
-                        "system": name,
-                        "damage": dmg,
-                        "components": comp_events,
-                    })
-    return events
+        if sys_obj.power <= OVERCLOCK_THRESHOLD or sys_obj.health <= 0.0:
+            # Not overclocked or already destroyed — clear warning state
+            _overclock_warned.discard(name)
+            continue
+
+        # Skip systems in grace period (recently repaired)
+        if tick < _overclock_grace_until.get(name, 0):
+            _overclock_warned.discard(name)
+            continue
+
+        # Initialise next-check timer on first overclock
+        if name not in _overclock_next_check:
+            _overclock_next_check[name] = tick + OVERCLOCK_CHECK_INTERVAL
+
+        next_check = _overclock_next_check[name]
+
+        # Emit overheat warning 5s before check (once per cycle)
+        if (name not in _overclock_warned
+                and tick >= next_check - OVERCLOCK_WARNING_TICKS):
+            _overclock_warned.add(name)
+            warning_events.append({
+                "type": "overclock_warning",
+                "system": name,
+                "power": sys_obj.power,
+                "seconds_until_check": max(
+                    0.0, (next_check - tick) / 10.0),
+            })
+
+        # Not time for check yet
+        if tick < next_check:
+            continue
+
+        # Time for check — schedule next and roll for damage
+        _overclock_next_check[name] = tick + OVERCLOCK_CHECK_INTERVAL
+        _overclock_warned.discard(name)
+
+        # Cap simultaneous damage
+        if len(damage_events) >= OVERCLOCK_MAX_SIMULTANEOUS:
+            continue
+
+        chance = _get_overclock_chance(sys_obj.power)
+        if _rng.random() < chance:
+            dmg = _rng.uniform(OVERCLOCK_DAMAGE_MIN, OVERCLOCK_DAMAGE_MAX)
+            comp_events = _damage_model.apply_damage(
+                name, dmg, "overclock", tick=tick, rng=_rng)
+            if comp_events:
+                damage_events.append({
+                    "type": "overclock_damage",
+                    "system": name,
+                    "damage": dmg,
+                    "components": comp_events,
+                })
+
+    return damage_events, warning_events
 
 
 def _sync_health_to_ship(ship: Ship) -> None:
@@ -340,6 +438,7 @@ def build_state(ship: Ship) -> dict:
             "health": round(sys_obj.health, 2),
             "efficiency": round(sys_obj.efficiency, 3),
             "requested_power": _requested_power.get(name, sys_obj.power),
+            "overheat_warning": name in _overclock_warned,
         }
         if dm and name in dm.components:
             sys_info["components"] = [
@@ -388,6 +487,8 @@ def serialise() -> dict:
         "requested_power": dict(_requested_power),
         "tick_count": _tick_count,
         "ship_class": _ship_class,
+        "overclock_next_check": dict(_overclock_next_check),
+        "overclock_grace_until": dict(_overclock_grace_until),
     }
     if _power_grid is not None:
         data["power_grid"] = _power_grid.serialise()
@@ -402,10 +503,18 @@ def deserialise(data: dict, ship: Ship) -> None:
     """Restore engineering state from saved data."""
     global _power_grid, _repair_mgr, _damage_model
     global _requested_power, _tick_count, _ship_class
+    global _overclock_next_check, _overclock_grace_until, _overclock_warned
 
     _requested_power = data.get("requested_power", {})
     _tick_count = data.get("tick_count", 0)
     _ship_class = data.get("ship_class", "frigate")
+    _overclock_next_check = {
+        k: int(v) for k, v in data.get("overclock_next_check", {}).items()
+    }
+    _overclock_grace_until = {
+        k: int(v) for k, v in data.get("overclock_grace_until", {}).items()
+    }
+    _overclock_warned = set()
 
     if "power_grid" in data:
         _power_grid = PowerGrid.deserialise(data["power_grid"])
