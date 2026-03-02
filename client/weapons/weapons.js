@@ -60,6 +60,16 @@ const TYPE_COLORS         = { standard: '#00ff41', homing: '#00ffcc', ion:  '#00
 // Per-type reload times (must mirror TORPEDO_RELOAD_BY_TYPE on server).
 const TYPE_RELOAD_TIMES   = { standard: 3.0, homing: 4.0, ion: 5.0, piercing: 4.0,
                                heavy: 8.0, proximity: 4.0, nuclear: 10.0, experimental: 6.0 };
+const TYPE_DESCRIPTIONS   = {
+  standard:     '50 DMG | 500 m/s | 3s reload\nBalanced general-purpose torpedo',
+  homing:       '35 DMG | 500 m/s | 4s reload\nTracks target — effective vs fast ships',
+  ion:          '10 DMG | 500 m/s | 5s reload\nDrains shields + stuns systems 10s',
+  piercing:     '40 DMG | 400 m/s | 4s reload\nIgnores 75% of shield absorption',
+  heavy:        '100 DMG | 300 m/s | 8s reload\nMaximum impact — slow, easily intercepted',
+  proximity:    '30 DMG | 500 m/s | 4s reload\nAOE blast — hits all enemies in radius',
+  nuclear:      '200 DMG | 400 m/s | 10s reload\nDevastating — requires Captain authorisation',
+  experimental: '60 DMG | 500 m/s | 6s reload\nUnpredictable secondary effects',
+};
 const TRAIL_LENGTH        = 5;       // torpedo trail positions to store
 const EXPLOSION_DURATION  = 500;     // explosion ring animation duration ms
 
@@ -346,6 +356,7 @@ function handleShipState(payload) {
     torpedoAmmoMax = payload.torpedo_ammo_max;
   updateTubeUI(payload);
   updateMagazinePanel();
+  _updateLoadButtons();
 
   // Shield focus update (from server state).
   if (payload.shield_distribution) {
@@ -618,12 +629,16 @@ function _buildLoadControls() {
   loadSection.innerHTML = `
     <div class="text-dim text-label" style="margin-bottom:4px">LOAD TYPE</div>
     <div class="tube-load-row" id="tube-load-btns">
-      ${TORPEDO_TYPES.map(t => `
+      ${TORPEDO_TYPES.map(t => {
+        const abbr = TYPE_ABBREV[t] || t.toUpperCase();
+        const desc = TYPE_DESCRIPTIONS[t] || '';
+        return `
         <button class="load-btn" data-type="${t}" style="border-color:${TYPE_COLORS[t]}"
-                title="Load ${TYPE_ABBREV[t] || t.toUpperCase()} torpedo">
-          ${TYPE_ABBREV[t] || t.toUpperCase()}
-        </button>
-      `).join('')}
+                title="${abbr} — ${desc}">
+          <span class="load-btn-label">${abbr}</span>
+          <span class="load-btn-count" id="load-count-${t}">0</span>
+        </button>`;
+      }).join('')}
       <select class="load-tube-select text-data" id="load-tube-sel">
         <option value="1">T1</option>
         <option value="2">T2</option>
@@ -653,6 +668,7 @@ function selectTarget(id) {
   if (radarRenderer) radarRenderer.selectContact(id);
   send('weapons.select_target', { entity_id: id });
   updateTargetPanel();
+  _updateLoadButtons();
 }
 
 // ---------------------------------------------------------------------------
@@ -996,6 +1012,56 @@ function updateMagazinePanel() {
       <div class="mag-bar"><div class="mag-fill" style="width:${pct}%;background:${col}"></div></div>
     </div>`;
   }).join('');
+}
+
+function _suggestTorpedoType() {
+  const target = contacts.find(c => c.id === selectedId);
+  if (!target) return null;
+  const kind = target.kind || 'enemy';
+
+  // Station targets: heavy (they don't maneuver).
+  if (kind === 'station' && (torpedoAmmo.heavy ?? 0) > 0) return 'heavy';
+
+  // High shields: piercing bypasses 75%, ion drains.
+  if (target.scan_state === 'scanned') {
+    const totalShield = (target.shield_front ?? 0) + (target.shield_rear ?? 0);
+    if (totalShield > 60) {
+      if ((torpedoAmmo.piercing ?? 0) > 0) return 'piercing';
+      if ((torpedoAmmo.ion ?? 0) > 0) return 'ion';
+    }
+  }
+
+  // Fast ships (scouts): homing tracks them.
+  if (target.type === 'scout' && (torpedoAmmo.homing ?? 0) > 0) return 'homing';
+
+  // Default: standard if available.
+  if ((torpedoAmmo.standard ?? 0) > 0) return 'standard';
+  return null;
+}
+
+function _updateLoadButtons() {
+  const btns = document.getElementById('tube-load-btns');
+  if (!btns) return;
+  const suggested = _suggestTorpedoType();
+
+  btns.querySelectorAll('.load-btn').forEach(btn => {
+    const t     = btn.dataset.type;
+    const count = torpedoAmmo[t] ?? 0;
+    const max   = torpedoAmmoMax[t] ?? 0;
+
+    // Update count badge.
+    const countEl = btn.querySelector('.load-btn-count');
+    if (countEl) countEl.textContent = `${count}`;
+
+    // Disable if empty.
+    btn.disabled = count <= 0;
+
+    // Hide button entirely if ship carries none of this type.
+    btn.style.display = (max === 0) ? 'none' : '';
+
+    // Highlight suggested type.
+    btn.classList.toggle('load-btn--suggested', t === suggested);
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -96,6 +96,21 @@ class TestTorpedoConstants:
         for t in glw.TORPEDO_TYPES:
             assert t in glw.DEFAULT_TORPEDO_LOADOUT
 
+    def test_all_dicts_cover_all_types(self):
+        """Every per-type dict must have an entry for every torpedo type."""
+        dicts = [
+            glw.TORPEDO_DAMAGE_BY_TYPE,
+            glw.TORPEDO_VELOCITY_BY_TYPE,
+            glw.TORPEDO_RELOAD_BY_TYPE,
+        ]
+        for d in dicts:
+            for t in glw.TORPEDO_TYPES:
+                assert t in d, f"{t} missing from {d}"
+
+    def test_piercing_slower_than_standard(self):
+        """Piercing is slower — trade-off for shield bypass."""
+        assert glw.TORPEDO_VELOCITY_BY_TYPE["piercing"] < glw.TORPEDO_VELOCITY_BY_TYPE["standard"]
+
     def test_torpedo_dataclass_new_homing_target_field(self):
         t = Torpedo(id="t1", owner="player", x=0.0, y=0.0, heading=0.0)
         assert t.homing_target is None
