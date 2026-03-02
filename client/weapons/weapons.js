@@ -156,6 +156,7 @@ let contacts    = [];     // world.entities enemies array
 let torpedoes   = [];     // world.entities torpedoes array
 let selectedId  = null;   // selected enemy entity_id or null
 let suggestedId = null;   // cadet hint: nearest/lowest-hull contact
+let _lastTargetData = null;  // last known target snapshot (for lost contact)
 
 // Tube state (from ship.state).
 let tubeTypes       = ['standard', 'standard'];
@@ -807,7 +808,9 @@ function updateTargetPanel() {
   const shieldFreqRowEl = document.getElementById('target-shield-freq-row');
   const shieldFreqEl    = document.getElementById('target-shield-freq');
 
-  if (!target) {
+  if (!target && !selectedId) {
+    // No target selected at all.
+    _lastTargetData = null;
     targetIdLabel.textContent            = 'NONE';
     if (targetClassificationEl) { targetClassificationEl.textContent = ''; targetClassificationEl.style.display = 'none'; }
     if (targetAdvisoryEl)       { targetAdvisoryEl.textContent = ''; targetAdvisoryEl.style.display = 'none'; }
@@ -825,6 +828,25 @@ function updateTargetPanel() {
     if (shieldFreqRowEl) shieldFreqRowEl.style.display = 'none';
     return;
   }
+
+  if (!target && selectedId) {
+    // Target was selected but dropped off sensors — show last known data.
+    targetIdLabel.textContent = selectedId.toUpperCase();
+    if (targetAdvisoryEl) {
+      targetAdvisoryEl.textContent   = 'CONTACT LOST — last known data';
+      targetAdvisoryEl.style.display = '';
+      targetAdvisoryEl.style.color   = 'var(--danger, #ff4040)';
+    }
+    targetRange.textContent   = 'LOST';
+    targetBearing.textContent = '—';
+    beamStatus.textContent    = 'CONTACT LOST';
+    beamFireBtn.disabled      = true;
+    // Keep last known hull/shield/type data visible (already rendered).
+    return;
+  }
+
+  // Cache current data for lost-contact fallback.
+  _lastTargetData = { id: target.id, type: target.type, kind: target.kind };
 
   targetIdLabel.textContent = target.id.toUpperCase();
 
