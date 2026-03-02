@@ -19,7 +19,7 @@ class CommsHailPayload(BaseModel):
     frequency: float | None = None
     hail_type: Literal[
         "identify", "warning", "negotiate", "distress",
-        "deception", "broadcast", "surrender",
+        "deception", "broadcast", "surrender", "demand", "probe",
     ] = "identify"
 
 

@@ -668,6 +668,31 @@ NPC_REPLY_TEMPLATES: dict[tuple[str, str], list[str]] = {
         "Understood. We mean no hostility.",
         "Big words. Let's see if your guns match.",
     ],
+    ("hail", "identify"): [
+        "This is the transport vessel Meridian. Cargo run to sector 7.",
+        "Independent trader. Our registry is on file.",
+        "Patrol vessel Resolute, Federation Navy. Identify yourselves.",
+    ],
+    ("hail", "warning"): [
+        "Understood. Adjusting course now. No hostility intended.",
+        "We hear you. Powering down weapons. Standing by.",
+        "Warning received. We were just passing through.",
+    ],
+    ("hail", "negotiate"): [
+        "We're open to discussion. What are your terms?",
+        "Interesting proposal. Go on.",
+        "We might be willing to trade. What do you have?",
+    ],
+    ("hail", "demand"): [
+        "Don't shoot! We'll comply. Name your terms.",
+        "Easy now. We're not looking for trouble.",
+        "You're making a mistake, but fine. What do you want?",
+    ],
+    ("hail", "probe"): [
+        "Who wants to know? We're busy here.",
+        "Our mission is classified. Move along.",
+        "Standard cargo run. Nothing unusual to report.",
+    ],
     ("distress", "acknowledge"): [
         "Thank you! Coordinates transmitting now. Please hurry!",
         "Copy — help is on the way? We're venting atmosphere!",

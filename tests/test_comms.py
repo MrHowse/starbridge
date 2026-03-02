@@ -873,6 +873,26 @@ class TestMessageSchemas:
         assert p.hail_type == "warning"
         assert p.frequency == 0.42
 
+    def test_hail_type_demand_valid(self):
+        """demand is now a valid hail_type."""
+        from server.models.messages.comms import CommsHailPayload
+        p = CommsHailPayload(contact_id="e1", hail_type="demand")
+        assert p.hail_type == "demand"
+
+    def test_hail_type_probe_valid(self):
+        """probe is now a valid hail_type."""
+        from server.models.messages.comms import CommsHailPayload
+        p = CommsHailPayload(contact_id="e1", hail_type="probe")
+        assert p.hail_type == "probe"
+
+    def test_hail_templates_exist_for_all_ui_types(self):
+        """All UI hail types should have dedicated NPC reply templates."""
+        from server.models.comms import NPC_REPLY_TEMPLATES
+        for htype in ("identify", "warning", "negotiate", "demand", "probe"):
+            key = ("hail", htype)
+            assert key in NPC_REPLY_TEMPLATES, f"Missing template for {key}"
+            assert len(NPC_REPLY_TEMPLATES[key]) >= 2
+
     def test_probe_payload(self):
         from server.models.messages.comms import CommsProbePayload
         p = CommsProbePayload(target_id="enemy_1")
