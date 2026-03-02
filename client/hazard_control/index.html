@@ -32,46 +32,60 @@
       </div>
     </main>
 
-    <!-- ── Active layout ───────────────────────────────────────────────── -->
-    <div class="dc-main" data-dc-main style="display:none">
+    <!-- ── Active three-panel layout ───────────────────────────────────── -->
+    <div class="hc-main" data-hc-main style="display:none">
 
-      <!-- Left: ship interior room grid -->
-      <div class="dc-interior panel">
+      <!-- Left panel: deck status cards -->
+      <div class="hc-left panel">
         <div class="panel__header">
-          <span class="text-label">SHIP INTERIOR</span>
-          <span class="dc-legend">
-            <span class="dc-legend-chip dc-chip--normal">NORMAL</span>
-            <span class="dc-legend-chip dc-chip--damaged">DAMAGED</span>
-            <span class="dc-legend-chip dc-chip--fire">FIRE</span>
-            <span class="dc-legend-chip dc-chip--decompressed">DECOMP</span>
-          </span>
+          <span class="text-label">DECK STATUS</span>
         </div>
-        <div class="dc-room-grid" id="dc-room-grid">
-          <!-- Populated by JS -->
+        <div class="hc-deck-list" id="hc-deck-list"></div>
+      </div>
+
+      <!-- Centre panel: canvas interior map + overlay selector -->
+      <div class="hc-centre">
+        <div class="hc-overlay-bar" id="hc-overlay-bar"></div>
+        <div class="hc-canvas-wrap">
+          <canvas id="hc-canvas"></canvas>
         </div>
       </div>
 
-      <!-- Right: DCT teams panel -->
-      <div class="dc-teams panel">
+      <!-- Right panel: actions / hazards / event log -->
+      <div class="hc-right panel">
         <div class="panel__header">
-          <span class="text-label">REPAIR TEAMS</span>
-          <span class="text-data text-dim" id="dc-team-count">0 ACTIVE</span>
+          <span class="text-label" id="hc-actions-title">ACTIONS</span>
         </div>
-
-        <div class="dc-teams-scroll">
-          <!-- Selected room info -->
-          <div class="dc-selected-room" id="dc-selected-room">
-            <p class="text-dim">Select a room to dispatch a DCT.</p>
+        <div class="hc-right-scroll">
+          <div class="hc-actions" id="hc-actions">
+            <p class="text-dim">Select a room or connection.</p>
           </div>
 
-          <!-- Active DCTs list -->
-          <div class="panel__header" style="margin-top:var(--gap)">
-            <span class="text-label">ACTIVE TEAMS</span>
+          <div class="panel__header hc-sub-header">
+            <span class="text-label">ACTIVE HAZARDS</span>
           </div>
-          <div id="dc-active-dcts">
-            <p class="text-dim">No teams deployed.</p>
+          <div class="hc-hazards" id="hc-hazards">
+            <p class="text-dim">No active hazards.</p>
           </div>
+
+          <div class="panel__header hc-sub-header">
+            <span class="text-label">EVENT LOG</span>
+          </div>
+          <div class="hc-log" id="hc-log"></div>
         </div>
+      </div>
+
+      <!-- Bottom status bar -->
+      <div class="hc-bottom" id="hc-bottom">
+        <span class="hc-bottom-item" id="hc-suppressant">SUPPRESSANT —</span>
+        <span class="hc-bottom-sep">|</span>
+        <span class="hc-bottom-item" id="hc-teams">TEAMS 0</span>
+        <span class="hc-bottom-sep">|</span>
+        <span class="hc-bottom-item" id="hc-forcefields">FORCE FIELDS 0</span>
+        <span class="hc-bottom-sep">|</span>
+        <span class="hc-bottom-item" id="hc-lifesupport">LIFE SUPPORT —</span>
+        <span class="hc-bottom-sep">|</span>
+        <span class="hc-bottom-item" id="hc-worstdeck">WORST DECK —</span>
       </div>
 
     </div>
