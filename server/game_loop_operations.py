@@ -91,7 +91,7 @@ ADVISORY_MAX_LENGTH: int = 80     # characters (A.4.5)
 
 _VALID_ADVISORY_STATIONS = (
     "helm", "weapons", "science", "engineering", "medical", "security",
-    "comms", "flight_ops", "electronic_warfare", "damage_control",
+    "comms", "flight_ops", "electronic_warfare", "hazard_control",
     "captain", "operations",
 )
 
@@ -108,7 +108,7 @@ _STATION_KEYWORDS: list[tuple[str, list[str]]] = [
     ("security", ["board", "intrud", "secur", "breach"]),
     ("flight_ops", ["drone", "launch", "recover", "flight", "deploy"]),
     ("electronic_warfare", ["jam", "stealth", "electronic", "ecm", "ghost"]),
-    ("damage_control", ["hull", "fire", "breach", "damage"]),
+    ("hazard_control", ["hull", "fire", "breach", "damage"]),
 ]
 
 
@@ -1247,7 +1247,7 @@ def _tick_damage_coordination(world: World, ship: Ship, dt: float) -> None:
             dc.cooldown_timer = DAMAGE_ASSESSMENT_COOLDOWN
             _pending_broadcasts.append(
                 (
-                    ["engineering", "damage_control", "medical", "operations"],
+                    ["engineering", "hazard_control", "medical", "operations"],
                     {
                         "type": "damage_coordination_complete",
                         "priority_list": dc.priority_list,

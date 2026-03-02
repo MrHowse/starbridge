@@ -25,7 +25,7 @@ AWAY_SECS: float = 60.0   # after 60 s with no action → red
 ALL_STATION_ROLES: list[str] = [
     "captain", "helm", "weapons", "engineering", "science",
     "medical", "security", "comms", "flight_ops",
-    "electronic_warfare", "operations", "damage_control",
+    "electronic_warfare", "operations", "hazard_control",
     "quartermaster",
 ]
 

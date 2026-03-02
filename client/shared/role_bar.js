@@ -33,7 +33,7 @@ const ROLE_URLS = {
   flight_ops:         '/client/flight_ops/',
   electronic_warfare: '/client/ew/',
   operations:         '/client/operations/',
-  damage_control:     '/client/damage_control/',
+  hazard_control:     '/client/hazard_control/',
   quartermaster:      '/client/quartermaster/',
 };
 
@@ -49,7 +49,7 @@ const ROLE_LABELS = {
   flight_ops:         'FLT',
   electronic_warfare: 'EW',
   operations:         'OPS',
-  damage_control:     'DC',
+  hazard_control:     'HC',
   quartermaster:      'QM',
 };
 

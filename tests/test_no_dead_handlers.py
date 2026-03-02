@@ -58,7 +58,7 @@ _STATION_MODULES = {
     "flight_ops":     "server.flight_ops",
     "ew":             "server.ew",
     "operations":     "server.operations",
-    "damage_control": "server.damage_control",
+    "hazard_control": "server.hazard_control",
     "lobby":          "server.lobby",
 }
 

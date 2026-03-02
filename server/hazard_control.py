@@ -1,7 +1,7 @@
 """
-Damage Control Station Handler.
+Hazard Control Station Handler.
 
-Receives damage_control.* messages from the Damage Control client, validates
+Receives hazard_control.* messages from the Hazard Control client, validates
 them against their Pydantic schemas, and queues them for the game loop.
 
 Call init(sender, queue) from main.py before the game starts.
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ValidationError
 
 from server.models.messages import Message, validate_payload
 
-logger = logging.getLogger("starbridge.damage_control")
+logger = logging.getLogger("starbridge.hazard_control")
 
 
 class _SenderProtocol(Protocol):
@@ -37,8 +37,8 @@ def init(
     _queue = queue
 
 
-async def handle_damage_control_message(connection_id: str, message: Message) -> None:
-    """Validate and queue a Damage Control message for the game loop."""
+async def handle_hazard_control_message(connection_id: str, message: Message) -> None:
+    """Validate and queue a Hazard Control message for the game loop."""
     assert _sender is not None and _queue is not None
 
     try:
@@ -51,12 +51,12 @@ async def handle_damage_control_message(connection_id: str, message: Message) ->
                 {"message": str(exc), "original_type": message.type},
             ),
         )
-        logger.warning("Damage control validation error from %s: %s", connection_id, exc)
+        logger.warning("Hazard control validation error from %s: %s", connection_id, exc)
         return
 
     if payload is None:
         logger.warning(
-            "Unhandled damage_control message type '%s' from %s", message.type, connection_id
+            "Unhandled hazard_control message type '%s' from %s", message.type, connection_id
         )
         return
 

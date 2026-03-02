@@ -348,9 +348,9 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "operations.issue_evasion_alert": OpsIssueEvasionAlertPayload,
     "operations.mark_objective": OpsMarkObjectivePayload,
     "operations.station_advisory": OpsStationAdvisoryPayload,
-    # Damage Control (aliases engineering DCT payloads)
-    "damage_control.dispatch_dct": EngineeringDispatchDCTPayload,
-    "damage_control.cancel_dct":   EngineeringCancelDCTPayload,
+    # Hazard Control (aliases engineering DCT payloads)
+    "hazard_control.dispatch_dct": EngineeringDispatchDCTPayload,
+    "hazard_control.cancel_dct":   EngineeringCancelDCTPayload,
     # Creatures (v0.05k)
     "creature.sedate":            CreatureSedatePayload,
     "creature.ew_disrupt":        CreatureEWDisruptPayload,

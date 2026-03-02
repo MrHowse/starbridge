@@ -14,7 +14,7 @@ Save format:
     "tick_count": 1234,
     "ship": { ... },
     "entities": { enemies, torpedoes, stations, asteroids, hazards },
-    "modules": { weapons, medical, security, flight_ops, damage_control,
+    "modules": { weapons, medical, security, flight_ops, hazard_control,
                  comms, captain_log, training, ew, operations, mission, game_state },
   }
 """
@@ -29,7 +29,7 @@ import server.game_loop_weapons as glw
 import server.game_loop_medical_v2 as glmed
 import server.game_loop_security as gls
 import server.game_loop_flight_ops as glfo
-import server.game_loop_damage_control as gldc
+import server.game_loop_hazard_control as glhc
 import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
 import server.game_loop_training as gltr
@@ -559,7 +559,7 @@ def save_game(
             "medical": glmed.serialise(),
             "security": gls.serialise(),
             "flight_ops": glfo.serialise(),
-            "damage_control": gldc.serialise(),
+            "hazard_control": glhc.serialise(),
             "comms": glco.serialise(),
             "captain_log": glcap.serialise(),
             "training": gltr.serialise(),
@@ -654,8 +654,8 @@ def restore_game(save_id: str, world: World) -> dict:
         gls.deserialise(mods["security"])
     if mods.get("flight_ops"):
         glfo.deserialise(mods["flight_ops"])
-    if mods.get("damage_control"):
-        gldc.deserialise(mods["damage_control"])
+    if mods.get("hazard_control"):
+        glhc.deserialise(mods["hazard_control"])
     if mods.get("comms"):
         glco.deserialise(mods["comms"])
     if mods.get("captain_log"):

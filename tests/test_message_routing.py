@@ -97,7 +97,7 @@ def _drain_test_queue(queue: asyncio.Queue) -> list[tuple[str, object]]:
 _STATION_PREFIXES = [
     "lobby", "helm", "engineering", "weapons", "science", "captain",
     "medical", "security", "comms", "flight_ops", "ew", "operations",
-    "damage_control",
+    "hazard_control",
 ]
 
 _GENERIC_PREFIXES = ["puzzle", "creature", "docking", "map", "crew"]
@@ -294,15 +294,15 @@ class TestOperationsValidation:
         assert isinstance(result, OperationsPingPayload)
 
 
-class TestDamageControlValidation:
-    def test_damage_control_dispatch_dct(self):
-        msg = _msg("damage_control.dispatch_dct", {"room_id": "room_3"})
+class TestHazardControlValidation:
+    def test_hazard_control_dispatch_dct(self):
+        msg = _msg("hazard_control.dispatch_dct", {"room_id": "room_3"})
         result = validate_payload(msg)
         assert result is not None
         assert result.room_id == "room_3"
 
-    def test_damage_control_cancel_dct(self):
-        msg = _msg("damage_control.cancel_dct", {"room_id": "room_3"})
+    def test_hazard_control_cancel_dct(self):
+        msg = _msg("hazard_control.cancel_dct", {"room_id": "room_3"})
         result = validate_payload(msg)
         assert result is not None
 
@@ -767,16 +767,16 @@ class TestStationHandlerQueueIntegration:
         assert isinstance(payload, OperationsPingPayload)
 
     @pytest.mark.asyncio
-    async def test_damage_control_handler_queues_message(self):
-        from server import damage_control
+    async def test_hazard_control_handler_queues_message(self):
+        from server import hazard_control
         mock_sender = MockManager()
         queue: asyncio.Queue = asyncio.Queue()
-        damage_control.init(mock_sender, queue)
-        msg = _msg("damage_control.dispatch_dct", {"room_id": "room_7"})
-        await damage_control.handle_damage_control_message("conn1", msg)
+        hazard_control.init(mock_sender, queue)
+        msg = _msg("hazard_control.dispatch_dct", {"room_id": "room_7"})
+        await hazard_control.handle_hazard_control_message("conn1", msg)
         assert not queue.empty()
         msg_type, payload = queue.get_nowait()
-        assert msg_type == "damage_control.dispatch_dct"
+        assert msg_type == "hazard_control.dispatch_dct"
 
     @pytest.mark.asyncio
     async def test_handler_rejects_invalid_payload(self):

@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import ValidationError
 
-from server import captain, comms, damage_control, engineering, ew, flight_ops, game_loop, helm, janitor, lobby, medical, operations, science, security, weapons
+from server import captain, comms, engineering, ew, flight_ops, game_loop, hazard_control, helm, janitor, lobby, medical, operations, science, security, weapons
 from server.mission_validator import validate_mission as _validate_mission
 from server.connections import ConnectionManager
 from server.models.messages import Message, VALID_SYSTEMS, validate_payload
@@ -79,7 +79,7 @@ captain.init(manager, world.ship, input_queue)
 flight_ops.init(manager, input_queue)
 ew.init(manager, input_queue)
 operations.init(manager, input_queue)
-damage_control.init(manager, input_queue)
+hazard_control.init(manager, input_queue)
 janitor.init(manager, input_queue)
 game_loop.init(world, manager, input_queue)
 
@@ -173,7 +173,7 @@ _HANDLERS: dict[str, _MessageHandler] = {
     "flight_ops": flight_ops.handle_flight_ops_message,
     "ew": ew.handle_ew_message,
     "operations": operations.handle_operations_message,
-    "damage_control": damage_control.handle_damage_control_message,
+    "hazard_control": hazard_control.handle_hazard_control_message,
     "janitor": janitor.handle_janitor_message,
     # Generic queue-forwarded categories (handled in game_loop._drain_queue)
     "puzzle":   _queue_forward_handler,

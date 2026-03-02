@@ -25,7 +25,7 @@ import server.game_loop_weapons as glw
 import server.game_loop_science_scan as glss
 import server.game_loop_engineering as gle
 import server.game_loop_medical_v2 as glmed
-import server.game_loop_damage_control as gldc
+import server.game_loop_hazard_control as glhc
 import server.game_loop_navigation as gln
 
 
@@ -94,14 +94,14 @@ def _reset_all_modules():
     glss.reset()
     gle.reset()
     glmed.reset()
-    gldc.reset()
+    glhc.reset()
     gln.reset()
     yield
     glw.reset()
     glss.reset()
     gle.reset()
     glmed.reset()
-    gldc.reset()
+    glhc.reset()
     gln.reset()
 
 
@@ -391,7 +391,7 @@ class TestHelm:
 
 
 # ===================================================================
-# Damage Control
+# Hazard Control
 # ===================================================================
 
 
@@ -404,14 +404,14 @@ class TestDamageControl:
         room_id = list(interior.rooms.keys())[0]
         interior.rooms[room_id].state = "damaged"
 
-        ok = gldc.dispatch_dct(room_id, interior)
+        ok = glhc.dispatch_dct(room_id, interior)
         assert ok is True
 
         # Tick 4 seconds (half of DCT_REPAIR_DURATION = 8.0)
         for _ in range(40):
-            gldc.tick(interior, 0.1)
+            glhc.tick(interior, 0.1)
 
-        dc_state = gldc.build_dc_state(interior)
+        dc_state = glhc.build_dc_state(interior)
         # Room should still be listed as damaged (repair takes 8s)
         if room_id in dc_state["active_dcts"]:
             assert dc_state["active_dcts"][room_id] > 0.0
@@ -423,11 +423,11 @@ class TestDamageControl:
         room_id = list(interior.rooms.keys())[0]
         interior.rooms[room_id].state = "damaged"
 
-        gldc.dispatch_dct(room_id, interior)
+        glhc.dispatch_dct(room_id, interior)
 
         # Tick 9 seconds (more than DCT_REPAIR_DURATION = 8.0)
         for _ in range(90):
-            gldc.tick(interior, 0.1)
+            glhc.tick(interior, 0.1)
 
         assert interior.rooms[room_id].state == "normal"
 
@@ -523,7 +523,7 @@ class TestRapidSwitching:
         # Damage a room for DC
         room_id = list(interior.rooms.keys())[0]
         interior.rooms[room_id].state = "fire"
-        gldc.dispatch_dct(room_id, interior)
+        glhc.dispatch_dct(room_id, interior)
 
         # Plot a route
         route = gln.calculate_route(ship.x, ship.y, 80_000, 20_000)
@@ -551,7 +551,7 @@ class TestRapidSwitching:
                 glss.tick(dt, world)
             elif phase == 4:
                 # DC: tick
-                gldc.tick(interior, dt)
+                glhc.tick(interior, dt)
 
             # Physics always ticks
             physics_tick(ship, dt, 100_000.0, 100_000.0)
@@ -571,7 +571,7 @@ class TestRapidSwitching:
 
         room_id = list(interior.rooms.keys())[2]
         interior.rooms[room_id].state = "damaged"
-        gldc.dispatch_dct(room_id, interior)
+        glhc.dispatch_dct(room_id, interior)
 
         route = gln.calculate_route(ship.x, ship.y, 70_000, 30_000)
         gln.set_route(route)
@@ -582,7 +582,7 @@ class TestRapidSwitching:
             glw.tick_cooldowns(dt)
             glss.tick(dt, world)
             gle.tick(ship, interior, dt)
-            gldc.tick(interior, dt)
+            glhc.tick(interior, dt)
             physics_tick(ship, dt, 100_000.0, 100_000.0)
 
             # Every 5 ticks, do a "station switch" operation burst
@@ -655,7 +655,7 @@ class TestRapidSwitching:
 
         room_id = list(interior.rooms.keys())[0]
         interior.rooms[room_id].state = "damaged"
-        gldc.dispatch_dct(room_id, interior)
+        glhc.dispatch_dct(room_id, interior)
 
         crew_id = list(roster.members.keys())[0]
         _add_injury(roster, crew_id)
@@ -663,11 +663,11 @@ class TestRapidSwitching:
 
         # Interleave DC and medical ticks
         for _ in range(40):
-            gldc.tick(interior, 0.1)
+            glhc.tick(interior, 0.1)
             glmed.tick(roster, 0.1)
 
         # After 4 seconds, DCT should be ~50% done (4/8)
-        dc_state = gldc.build_dc_state(interior)
+        dc_state = glhc.build_dc_state(interior)
         if room_id in dc_state["active_dcts"]:
             progress = dc_state["active_dcts"][room_id]
             assert progress == pytest.approx(0.5, abs=0.1)

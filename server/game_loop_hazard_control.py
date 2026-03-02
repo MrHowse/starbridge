@@ -1,9 +1,9 @@
 """
-Damage Control — room fire/damage events and DCT dispatch.
+Hazard Control — room fire/damage events and DCT dispatch.
 
 When the hull takes significant damage, a random interior room is escalated
 in severity (normal → damaged → fire). Fires spread periodically to adjacent
-rooms. Engineering can dispatch Damage Control Teams (DCTs) to repair rooms
+rooms. Hazard Control can dispatch Damage Control Teams (DCTs) to repair rooms
 one severity level at a time.
 
 Severity order: normal < damaged < fire < decompressed
@@ -20,7 +20,7 @@ import random
 from server.models.interior import ShipInterior, Room
 import server.game_loop_rationing as glrat
 
-logger = logging.getLogger("starbridge.damage_control")
+logger = logging.getLogger("starbridge.hazard_control")
 
 # ---------------------------------------------------------------------------
 # Constants

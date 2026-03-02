@@ -21,7 +21,7 @@ from server.difficulty import DifficultySettings, get_preset
 
 import server.save_system as ss
 import server.game_loop_weapons as glw
-import server.game_loop_damage_control as gldc
+import server.game_loop_hazard_control as glhc
 import server.game_loop_engineering as gle
 import server.game_loop_docking as gldo
 import server.game_loop_medical_v2 as glmed
@@ -154,10 +154,10 @@ def complex_world():
     glw.set_ammo_for_type("nuclear", 0)
 
     # -- DC module state --
-    gldc.reset()
+    glhc.reset()
     # Damage a room so we can dispatch a DCT
     rooms[0].state = "fire"
-    gldc.dispatch_dct(rooms[0].id, ship.interior)
+    glhc.dispatch_dct(rooms[0].id, ship.interior)
 
     # -- Engineering module state --
     gle.reset()
@@ -217,13 +217,13 @@ def test_full_save_resume_round_trip(complex_world):
     # that were set up by the fixture).
     expected_ammo = glw.get_ammo()
     expected_target = glw.get_target()
-    expected_dc = gldc.serialise()
+    expected_dc = glhc.serialise()
     expected_eng = gle.serialise()
 
     # --- Reset all state to defaults ---
     fresh_world = World()
     glw.reset()
-    gldc.reset()
+    glhc.reset()
     gle.reset()
     gldo.reset()
     glmed.reset()
@@ -339,7 +339,7 @@ def test_full_save_resume_round_trip(complex_world):
     assert restored_ammo["nuclear"] == expected_ammo["nuclear"]
 
     # -- DC --
-    dc_state = gldc.serialise()
+    dc_state = glhc.serialise()
     assert dc_state["active_dcts"] == expected_dc["active_dcts"]
 
     # -- Engineering --
@@ -359,7 +359,7 @@ class TestShipPositionPreserved:
     def test_ship_position_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert world.ship.x == pytest.approx(23_456.7)
@@ -374,7 +374,7 @@ class TestShipHullPreserved:
     def test_ship_hull_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert world.ship.hull == pytest.approx(63.0)
@@ -385,7 +385,7 @@ class TestShieldsPreserved:
     def test_shields_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert world.ship.shields.fore == pytest.approx(35.0)
@@ -398,7 +398,7 @@ class TestShieldFocusPreserved:
     def test_shield_focus_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert world.ship.shield_focus["x"] == pytest.approx(0.6)
@@ -414,7 +414,7 @@ class TestSystemsPowerPreserved:
     def test_systems_power_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert world.ship.systems["engines"].power == pytest.approx(120.0)
@@ -426,7 +426,7 @@ class TestSystemsHealthPreserved:
     def test_systems_health_preserved(self, complex_world):
         _, save_id, expected_health = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         # System health is managed by the DamageModel and synced on restore.
@@ -448,7 +448,7 @@ class TestAlertLevelPreserved:
     def test_alert_level_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert world.ship.alert_level == "yellow"
@@ -463,7 +463,7 @@ class TestWeaponsStatePreserved:
         expected_ammo = glw.get_ammo()
 
         # Reset.
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         world = World()
         ss.restore_game(save_id, world)
 
@@ -480,7 +480,7 @@ class TestEnemyEntitiesPreserved:
     def test_enemy_entities_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert len(world.enemies) == 2
@@ -504,7 +504,7 @@ class TestStationEntitiesPreserved:
     def test_station_entities_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert len(world.stations) == 1
@@ -527,7 +527,7 @@ class TestSectorVisibilityPreserved:
     def test_sector_visibility_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         assert world.sector_grid is not None
@@ -544,7 +544,7 @@ class TestDifficultyPreserved:
     def test_difficulty_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         d = world.ship.difficulty
@@ -563,14 +563,14 @@ class TestDCStatePreserved:
     def test_dc_state_preserved(self, complex_world):
         _, save_id, _ = complex_world
 
-        expected = gldc.serialise()
+        expected = glhc.serialise()
 
         # Reset.
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         world = World()
         ss.restore_game(save_id, world)
 
-        restored = gldc.serialise()
+        restored = glhc.serialise()
         assert restored["active_dcts"] == expected["active_dcts"]
         assert len(restored["active_dcts"]) > 0  # we dispatched a DCT
         assert restored["fire_spread_timer"] == pytest.approx(
@@ -583,7 +583,7 @@ class TestInteriorStatePreserved:
     def test_interior_state_preserved(self, complex_world):
         _, save_id, _ = complex_world
         world = World()
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         ss.restore_game(save_id, world)
 
         rooms = list(world.ship.interior.rooms.values())
@@ -602,7 +602,7 @@ class TestEngineeringStatePreserved:
         expected = gle.serialise()
 
         # Reset.
-        glw.reset(); gldc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
+        glw.reset(); glhc.reset(); gle.reset(); gldo.reset(); glmed.reset(); gls.reset()
         world = World()
         ss.restore_game(save_id, world)
 

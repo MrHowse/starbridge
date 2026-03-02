@@ -21,7 +21,7 @@ const STATIONS = [
   { role: 'flight_ops',         label: 'FLIGHT OPS' },
   { role: 'electronic_warfare', label: 'ELEC WARFARE' },
   { role: 'operations',         label: 'OPERATIONS' },
-  { role: 'damage_control',     label: 'DAMAGE CTRL' },
+  { role: 'hazard_control',     label: 'HAZCON' },
 ];
 
 // Per-station stat keys to show in mini-panels (derived from ship.systems).
@@ -36,7 +36,7 @@ const STATION_SYSTEM_MAP = {
   flight_ops:         ['flight_deck'],
   electronic_warfare: ['ecm_suite'],
   operations:         [],
-  damage_control:     [],
+  hazard_control:     [],
   captain:            [],
 };
 

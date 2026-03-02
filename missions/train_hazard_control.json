@@ -1,7 +1,7 @@
 {
-  "id": "train_damage_control",
-  "name": "Damage Control Training",
-  "briefing": "Welcome to Damage Control Training. Practice dispatching repair teams to damaged ship sections, monitoring repair progress, and cancelling dispatch orders. Fast damage control keeps the ship operational.",
+  "id": "train_hazard_control",
+  "name": "Hazard Control Training",
+  "briefing": "Welcome to Hazard Control Training. Practice dispatching repair teams to damaged ship sections, monitoring repair progress, and cancelling dispatch orders. Fast hazard control keeps the ship operational.",
   "spawn": [],
   "is_training": true,
   "target_role": "engineering",
@@ -17,7 +17,7 @@
         "type": "timer_elapsed",
         "seconds": 8
       },
-      "hint": "The Damage Control panel shows the ship interior with room-level status. Damaged sections are highlighted. Repair teams (DCTs) are shown as icons. Scroll the panel to see all decks."
+      "hint": "The Hazard Control panel shows the ship interior with room-level status. Damaged sections are highlighted. Repair teams (DCTs) are shown as icons. Scroll the panel to see all decks."
     },
     {
       "id": "dc_02_dispatch",

@@ -66,7 +66,7 @@ MODULES: dict[str, dict] = {
         "id": "armour_plating",
         "name": "Armour Plating",
         "description": "Adds +15 armour, +20 hull, but -10% max speed.",
-        "station_benefit": "damage_control",
+        "station_benefit": "hazard_control",
     },
     "cloaking_device": {
         "id": "cloaking_device",

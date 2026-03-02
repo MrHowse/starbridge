@@ -27,7 +27,7 @@ const ROLE_URLS = {
   flight_ops:         '/client/flight_ops/',
   electronic_warfare: '/client/ew/',
   operations:         '/client/operations/',
-  damage_control:     '/client/damage_control/',
+  hazard_control:     '/client/hazard_control/',
   janitor:            '/client/janitor/',
 };
 
@@ -43,7 +43,7 @@ const ROLE_LABELS = {
   flight_ops:         'FLIGHT OPS',
   electronic_warfare: 'ELECTRONIC WARFARE',
   operations:         'OPERATIONS',
-  damage_control:     'DAMAGE CONTROL',
+  hazard_control:     'HAZARD CONTROL',
   janitor:            'JANITOR',
 };
 

@@ -23,7 +23,7 @@ import random
 import pytest
 
 import server.game_loop_medical_v2 as glmed
-import server.game_loop_damage_control as gldc
+import server.game_loop_hazard_control as glhc
 from server.models.crew_roster import (
     CrewMember,
     IndividualCrewRoster,
@@ -383,7 +383,7 @@ class TestSupplyExhaustion:
 
 
 # ---------------------------------------------------------------------------
-# 5. Damage Control Fire Cascade
+# 5. Hazard Control Fire Cascade
 # ---------------------------------------------------------------------------
 
 
@@ -392,7 +392,7 @@ class TestFireCascade:
 
     def test_fire_stays_within_interior(self):
         """Fire spread doesn't exceed number of rooms."""
-        gldc.reset()
+        glhc.reset()
         interior = make_default_interior()
 
         # Set one room on fire
@@ -401,7 +401,7 @@ class TestFireCascade:
 
         # Tick fire spread many times
         for _ in range(500):
-            gldc.tick(interior, 0.1)
+            glhc.tick(interior, 0.1)
 
         # Every room should have a valid state
         for room in interior.rooms.values():
@@ -409,48 +409,48 @@ class TestFireCascade:
 
     def test_dct_repairs_fire_to_normal(self):
         """DCT can bring a fire room back to normal through damaged."""
-        gldc.reset()
+        glhc.reset()
         interior = make_default_interior()
 
         room = list(interior.rooms.values())[0]
         room.state = "fire"
         room_id = room.id
 
-        ok = gldc.dispatch_dct(room_id, interior)
+        ok = glhc.dispatch_dct(room_id, interior)
         assert ok
 
         # Tick until fire → damaged → normal
         for _ in range(2000):
-            gldc.tick(interior, 0.1)
+            glhc.tick(interior, 0.1)
 
         assert room.state == "normal"
 
     def test_multiple_fires_all_repaired(self):
         """Multiple concurrent fires can all be repaired by DCTs."""
-        gldc.reset()
+        glhc.reset()
         interior = make_default_interior()
 
         fire_rooms = list(interior.rooms.values())[:3]
         for r in fire_rooms:
             r.state = "fire"
-            gldc.dispatch_dct(r.id, interior)
+            glhc.dispatch_dct(r.id, interior)
 
         for _ in range(3000):
-            gldc.tick(interior, 0.1)
+            glhc.tick(interior, 0.1)
 
         for r in fire_rooms:
             assert r.state == "normal"
 
     def test_hull_damage_triggers_room_event(self):
         """apply_hull_damage above threshold triggers a room state change."""
-        gldc.reset()
+        glhc.reset()
         interior = make_default_interior()
 
         # Record initial state
         initial_states = {r.id: r.state for r in interior.rooms.values()}
 
         # Apply enough damage to trigger at least one room event
-        gldc.apply_hull_damage(gldc.HULL_DAMAGE_THRESHOLD, interior)
+        glhc.apply_hull_damage(glhc.HULL_DAMAGE_THRESHOLD, interior)
 
         # At least one room should have changed (statistically likely with 20 rooms)
         changed = sum(

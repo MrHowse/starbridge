@@ -311,7 +311,7 @@ def test_save_game_creates_file(tmp_saves):
     with patch.multiple(
         "server.save_system",
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
-        glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
+        glfo=_mock_modules(), glhc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
         glops=_mock_modules(), glm=_mock_modules(),
     ):
@@ -325,7 +325,7 @@ def test_save_game_returns_save_id(tmp_saves):
     with patch.multiple(
         "server.save_system",
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
-        glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
+        glfo=_mock_modules(), glhc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
         glops=_mock_modules(), glm=_mock_modules(),
     ):
@@ -339,7 +339,7 @@ def test_save_game_file_contains_metadata(tmp_saves):
     with patch.multiple(
         "server.save_system",
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
-        glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
+        glfo=_mock_modules(), glhc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
         glops=_mock_modules(), glm=_mock_modules(),
     ):
@@ -418,7 +418,7 @@ def test_restore_game_returns_metadata(tmp_saves):
     with patch.multiple(
         "server.save_system",
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
-        glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
+        glfo=_mock_modules(), glhc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
         glops=_mock_modules(), glm=_mock_modules(),
     ):
@@ -453,7 +453,7 @@ def test_restore_game_restores_ship_hull(tmp_saves):
     with patch.multiple(
         "server.save_system",
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
-        glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
+        glfo=_mock_modules(), glhc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
         glops=_mock_modules(), glm=_mock_modules(),
     ):

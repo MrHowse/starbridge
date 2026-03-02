@@ -1,9 +1,9 @@
-"""Tests for server/game_loop_damage_control.py — room damage, fire spread, DCT dispatch."""
+"""Tests for server/game_loop_hazard_control.py — room damage, fire spread, DCT dispatch."""
 from __future__ import annotations
 
 import pytest
 
-import server.game_loop_damage_control as gldc
+import server.game_loop_hazard_control as glhc
 from server.models.interior import make_default_interior
 from server.models.messages import EngineeringDispatchDCTPayload, EngineeringCancelDCTPayload
 from server.models.messages.base import validate_payload, Message
@@ -21,7 +21,7 @@ def fresh_interior():
 
 def setup_function():
     """Reset damage-control state before each test."""
-    gldc.reset()
+    glhc.reset()
 
 
 # ---------------------------------------------------------------------------
@@ -33,29 +33,29 @@ def test_reset_clears_active_dcts():
     interior = fresh_interior()
     room_id = next(iter(interior.rooms))
     interior.rooms[room_id].state = "damaged"
-    gldc.dispatch_dct(room_id, interior)
-    assert gldc._active_dcts  # DCT was added
+    glhc.dispatch_dct(room_id, interior)
+    assert glhc._active_dcts  # DCT was added
 
-    gldc.reset()
-    assert not gldc._active_dcts
+    glhc.reset()
+    assert not glhc._active_dcts
 
 
 def test_reset_clears_pending_hull_damage():
     interior = fresh_interior()
     # Accumulate some damage without crossing threshold.
-    gldc.apply_hull_damage(3.0, interior)
-    assert gldc._pending_hull_damage == pytest.approx(3.0)
+    glhc.apply_hull_damage(3.0, interior)
+    assert glhc._pending_hull_damage == pytest.approx(3.0)
 
-    gldc.reset()
-    assert gldc._pending_hull_damage == pytest.approx(0.0)
+    glhc.reset()
+    assert glhc._pending_hull_damage == pytest.approx(0.0)
 
 
 def test_reset_resets_fire_spread_timer():
     interior = fresh_interior()
     # Advance the timer.
-    gldc.tick(interior, 10.0)
-    gldc.reset()
-    assert gldc._fire_spread_timer == pytest.approx(gldc.FIRE_SPREAD_INTERVAL)
+    glhc.tick(interior, 10.0)
+    glhc.reset()
+    assert glhc._fire_spread_timer == pytest.approx(glhc.FIRE_SPREAD_INTERVAL)
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ def test_apply_hull_damage_below_threshold_no_room_change():
     all_normal = all(r.state == "normal" for r in interior.rooms.values())
     assert all_normal
 
-    gldc.apply_hull_damage(gldc.HULL_DAMAGE_THRESHOLD - 0.01, interior)
+    glhc.apply_hull_damage(glhc.HULL_DAMAGE_THRESHOLD - 0.01, interior)
 
     still_all_normal = all(r.state == "normal" for r in interior.rooms.values())
     assert still_all_normal
@@ -77,8 +77,8 @@ def test_apply_hull_damage_below_threshold_no_room_change():
 def test_apply_hull_damage_at_threshold_triggers_event():
     interior = fresh_interior()
     # Fix the RNG to always pick 'damaged' (not fire).
-    gldc._rng.seed(0)
-    gldc.apply_hull_damage(gldc.HULL_DAMAGE_THRESHOLD, interior)
+    glhc._rng.seed(0)
+    glhc.apply_hull_damage(glhc.HULL_DAMAGE_THRESHOLD, interior)
 
     non_normal = [r for r in interior.rooms.values() if r.state != "normal"]
     assert len(non_normal) >= 1
@@ -86,35 +86,35 @@ def test_apply_hull_damage_at_threshold_triggers_event():
 
 def test_apply_hull_damage_zero_no_change():
     interior = fresh_interior()
-    gldc.apply_hull_damage(0.0, interior)
-    assert gldc._pending_hull_damage == pytest.approx(0.0)
+    glhc.apply_hull_damage(0.0, interior)
+    assert glhc._pending_hull_damage == pytest.approx(0.0)
     assert all(r.state == "normal" for r in interior.rooms.values())
 
 
 def test_apply_hull_damage_negative_no_change():
     interior = fresh_interior()
-    gldc.apply_hull_damage(-5.0, interior)
-    assert gldc._pending_hull_damage == pytest.approx(0.0)
+    glhc.apply_hull_damage(-5.0, interior)
+    assert glhc._pending_hull_damage == pytest.approx(0.0)
 
 
 def test_apply_hull_damage_accumulates_across_calls():
     interior = fresh_interior()
-    half = gldc.HULL_DAMAGE_THRESHOLD / 2
-    gldc.apply_hull_damage(half, interior)
+    half = glhc.HULL_DAMAGE_THRESHOLD / 2
+    glhc.apply_hull_damage(half, interior)
     assert all(r.state == "normal" for r in interior.rooms.values())
 
     # Second call crosses threshold.
-    gldc._rng.seed(42)
-    gldc.apply_hull_damage(half + 0.01, interior)
+    glhc._rng.seed(42)
+    glhc.apply_hull_damage(half + 0.01, interior)
     non_normal = [r for r in interior.rooms.values() if r.state != "normal"]
     assert len(non_normal) >= 1
 
 
 def test_apply_hull_damage_large_triggers_multiple_events():
     interior = fresh_interior()
-    gldc._rng.seed(7)
+    glhc._rng.seed(7)
     # 3× threshold should trigger 3 events (rooms may overlap, so just check ≥ 1 non-normal).
-    gldc.apply_hull_damage(gldc.HULL_DAMAGE_THRESHOLD * 3, interior)
+    glhc.apply_hull_damage(glhc.HULL_DAMAGE_THRESHOLD * 3, interior)
     non_normal = [r for r in interior.rooms.values() if r.state != "normal"]
     assert len(non_normal) >= 1
 
@@ -126,8 +126,8 @@ def test_apply_hull_damage_large_triggers_multiple_events():
 
 def test_trigger_event_sets_normal_to_damaged_or_fire():
     interior = fresh_interior()
-    gldc._rng.seed(0)
-    gldc.apply_hull_damage(gldc.HULL_DAMAGE_THRESHOLD, interior)
+    glhc._rng.seed(0)
+    glhc.apply_hull_damage(glhc.HULL_DAMAGE_THRESHOLD, interior)
     states = {r.state for r in interior.rooms.values()}
     assert states & {"damaged", "fire"}
 
@@ -142,14 +142,14 @@ def test_trigger_event_escalates_damaged_room_to_fire():
     # We rely on statistical likelihood — run enough times to hit the escalation.
     fired = False
     for seed in range(100):
-        gldc.reset()
+        glhc.reset()
         interior.rooms[room_id].state = "damaged"
-        gldc._rng.seed(seed)
+        glhc._rng.seed(seed)
         # Make all other rooms decompressed so only our room is eligible.
         for rid, room in interior.rooms.items():
             if rid != room_id:
                 room.state = "decompressed"
-        gldc.apply_hull_damage(gldc.HULL_DAMAGE_THRESHOLD, interior)
+        glhc.apply_hull_damage(glhc.HULL_DAMAGE_THRESHOLD, interior)
         if interior.rooms[room_id].state == "fire":
             fired = True
             break
@@ -169,62 +169,62 @@ def test_dispatch_dct_on_damaged_room_returns_true():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "damaged"
-    result = gldc.dispatch_dct(room_id, interior)
+    result = glhc.dispatch_dct(room_id, interior)
     assert result is True
-    assert room_id in gldc._active_dcts
+    assert room_id in glhc._active_dcts
 
 
 def test_dispatch_dct_on_fire_room_returns_true():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "fire"
-    assert gldc.dispatch_dct(room_id, interior) is True
+    assert glhc.dispatch_dct(room_id, interior) is True
 
 
 def test_dispatch_dct_on_normal_room_returns_false():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     # Room is normal by default.
-    result = gldc.dispatch_dct(room_id, interior)
+    result = glhc.dispatch_dct(room_id, interior)
     assert result is False
-    assert room_id not in gldc._active_dcts
+    assert room_id not in glhc._active_dcts
 
 
 def test_dispatch_dct_on_decompressed_room_returns_false():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "decompressed"
-    assert gldc.dispatch_dct(room_id, interior) is False
+    assert glhc.dispatch_dct(room_id, interior) is False
 
 
 def test_dispatch_dct_on_unknown_room_returns_false():
     interior = fresh_interior()
-    assert gldc.dispatch_dct("nonexistent_room", interior) is False
+    assert glhc.dispatch_dct("nonexistent_room", interior) is False
 
 
 def test_dispatch_dct_preserves_progress():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "fire"
-    gldc.dispatch_dct(room_id, interior)
+    glhc.dispatch_dct(room_id, interior)
     # Simulate partial progress.
-    gldc._active_dcts[room_id] = 4.0
+    glhc._active_dcts[room_id] = 4.0
     # Dispatching again should NOT reset progress.
-    gldc.dispatch_dct(room_id, interior)
-    assert gldc._active_dcts[room_id] == pytest.approx(4.0)
+    glhc.dispatch_dct(room_id, interior)
+    assert glhc._active_dcts[room_id] == pytest.approx(4.0)
 
 
 def test_cancel_dct_active_returns_true():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "damaged"
-    gldc.dispatch_dct(room_id, interior)
-    assert gldc.cancel_dct(room_id) is True
-    assert room_id not in gldc._active_dcts
+    glhc.dispatch_dct(room_id, interior)
+    assert glhc.cancel_dct(room_id) is True
+    assert room_id not in glhc._active_dcts
 
 
 def test_cancel_dct_inactive_returns_false():
-    assert gldc.cancel_dct("nonexistent_room") is False
+    assert glhc.cancel_dct("nonexistent_room") is False
 
 
 # ---------------------------------------------------------------------------
@@ -236,51 +236,51 @@ def test_tick_advances_dct_elapsed_time():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "damaged"
-    gldc.dispatch_dct(room_id, interior)
+    glhc.dispatch_dct(room_id, interior)
 
-    gldc.tick(interior, 1.0)
-    assert gldc._active_dcts[room_id] == pytest.approx(1.0)
+    glhc.tick(interior, 1.0)
+    assert glhc._active_dcts[room_id] == pytest.approx(1.0)
 
 
 def test_dct_reduces_fire_to_damaged_after_duration():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "fire"
-    gldc.dispatch_dct(room_id, interior)
+    glhc.dispatch_dct(room_id, interior)
 
     # Tick just over the repair duration.
-    gldc.tick(interior, gldc.DCT_REPAIR_DURATION + 0.01)
+    glhc.tick(interior, glhc.DCT_REPAIR_DURATION + 0.01)
 
     assert interior.rooms[room_id].state == "damaged"
     # Timer should have reset for next level, not be removed.
-    assert room_id in gldc._active_dcts
-    assert gldc._active_dcts[room_id] == pytest.approx(0.0)
+    assert room_id in glhc._active_dcts
+    assert glhc._active_dcts[room_id] == pytest.approx(0.0)
 
 
 def test_dct_reduces_damaged_to_normal_after_duration():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "damaged"
-    gldc.dispatch_dct(room_id, interior)
+    glhc.dispatch_dct(room_id, interior)
 
-    gldc.tick(interior, gldc.DCT_REPAIR_DURATION + 0.01)
+    glhc.tick(interior, glhc.DCT_REPAIR_DURATION + 0.01)
 
     assert interior.rooms[room_id].state == "normal"
     # DCT should be auto-cancelled once room is normal.
-    assert room_id not in gldc._active_dcts
+    assert room_id not in glhc._active_dcts
 
 
 def test_dct_auto_cancels_when_room_already_normal():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "damaged"
-    gldc.dispatch_dct(room_id, interior)
+    glhc.dispatch_dct(room_id, interior)
 
     # Room repaired externally before DCT completes.
     interior.rooms[room_id].state = "normal"
-    gldc.tick(interior, 0.1)
+    glhc.tick(interior, 0.1)
 
-    assert room_id not in gldc._active_dcts
+    assert room_id not in glhc._active_dcts
 
 
 # ---------------------------------------------------------------------------
@@ -290,15 +290,15 @@ def test_dct_auto_cancels_when_room_already_normal():
 
 def test_fire_spread_timer_decrements():
     interior = fresh_interior()
-    initial = gldc._fire_spread_timer
-    gldc.tick(interior, 5.0)
-    assert gldc._fire_spread_timer == pytest.approx(initial - 5.0)
+    initial = glhc._fire_spread_timer
+    glhc.tick(interior, 5.0)
+    assert glhc._fire_spread_timer == pytest.approx(initial - 5.0)
 
 
 def test_fire_spread_resets_timer_after_expiry():
     interior = fresh_interior()
-    gldc.tick(interior, gldc.FIRE_SPREAD_INTERVAL + 0.01)
-    assert gldc._fire_spread_timer == pytest.approx(gldc.FIRE_SPREAD_INTERVAL)
+    glhc.tick(interior, glhc.FIRE_SPREAD_INTERVAL + 0.01)
+    assert glhc._fire_spread_timer == pytest.approx(glhc.FIRE_SPREAD_INTERVAL)
 
 
 def test_fire_spread_ignites_adjacent_room():
@@ -312,10 +312,10 @@ def test_fire_spread_ignites_adjacent_room():
     assert fire_room is not None
 
     fire_room.state = "fire"
-    gldc._rng.seed(0)
+    glhc._rng.seed(0)
 
     # Advance past the spread timer.
-    gldc.tick(interior, gldc.FIRE_SPREAD_INTERVAL + 0.01)
+    glhc.tick(interior, glhc.FIRE_SPREAD_INTERVAL + 0.01)
 
     # At least one adjacent room should be non-normal.
     adj_states = {interior.rooms[rid].state for rid in fire_room.connections if rid in interior.rooms}
@@ -329,7 +329,7 @@ def test_fire_spread_ignites_adjacent_room():
 
 def test_build_dc_state_empty_when_all_normal():
     interior = fresh_interior()
-    state = gldc.build_dc_state(interior)
+    state = glhc.build_dc_state(interior)
     assert state["rooms"] == {}
     assert state["active_dcts"] == {}
 
@@ -339,7 +339,7 @@ def test_build_dc_state_includes_damaged_rooms():
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "fire"
 
-    state = gldc.build_dc_state(interior)
+    state = glhc.build_dc_state(interior)
     assert room_id in state["rooms"]
     assert state["rooms"][room_id]["state"] == "fire"
     assert "name" in state["rooms"][room_id]
@@ -351,7 +351,7 @@ def test_build_dc_state_excludes_normal_rooms():
     ids = list(interior.rooms.keys())
     interior.rooms[ids[0]].state = "damaged"
 
-    state = gldc.build_dc_state(interior)
+    state = glhc.build_dc_state(interior)
     # Only the damaged room should appear.
     assert len(state["rooms"]) == 1
     assert ids[0] in state["rooms"]
@@ -361,10 +361,10 @@ def test_build_dc_state_includes_active_dct_progress():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "damaged"
-    gldc.dispatch_dct(room_id, interior)
-    gldc._active_dcts[room_id] = gldc.DCT_REPAIR_DURATION / 2  # 50 % progress
+    glhc.dispatch_dct(room_id, interior)
+    glhc._active_dcts[room_id] = glhc.DCT_REPAIR_DURATION / 2  # 50 % progress
 
-    state = gldc.build_dc_state(interior)
+    state = glhc.build_dc_state(interior)
     assert state["active_dcts"][room_id] == pytest.approx(0.5)
 
 
@@ -372,10 +372,10 @@ def test_build_dc_state_dct_progress_capped_at_one():
     interior = fresh_interior()
     room_id = list(interior.rooms.keys())[0]
     interior.rooms[room_id].state = "damaged"
-    gldc.dispatch_dct(room_id, interior)
-    gldc._active_dcts[room_id] = gldc.DCT_REPAIR_DURATION * 2  # over 100 %
+    glhc.dispatch_dct(room_id, interior)
+    glhc._active_dcts[room_id] = glhc.DCT_REPAIR_DURATION * 2  # over 100 %
 
-    state = gldc.build_dc_state(interior)
+    state = glhc.build_dc_state(interior)
     assert state["active_dcts"][room_id] == pytest.approx(1.0)
 
 

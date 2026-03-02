@@ -46,7 +46,7 @@ from server.models.injuries import (
     generate_injuries, tick_contagion_spread, CONTAGION_SPREAD_CHANCE,
     CONTAGION_SPREAD_INTERVAL,
 )
-from server.game_loop_damage_control import (
+from server.game_loop_hazard_control import (
     DCT_REPAIR_DURATION, reset as dc_reset, dispatch_dct, tick as dc_tick,
     build_dc_state,
 )

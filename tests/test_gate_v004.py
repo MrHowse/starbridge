@@ -9,7 +9,7 @@ Sub-releases covered:
   v0.04b — Mission Graph Migration
   v0.04c — New Graph-Native Missions
   v0.04d — Mission Editor (validator + REST endpoints)
-  v0.04e — Damage Control client station
+  v0.04e — Hazard Control client station
   v0.04f — Save & Resume system
   v0.04g — Player Profiles + Achievements
   v0.04h — Admin Dashboard

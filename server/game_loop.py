@@ -201,7 +201,7 @@ import server.game_loop_medical_v2 as glmed
 import server.game_loop_security as gls
 import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
-import server.game_loop_damage_control as gldc
+import server.game_loop_hazard_control as glhc
 import server.game_loop_flight_ops as glfo
 import server.game_loop_ew as glew
 import server.game_loop_operations as glops
@@ -539,7 +539,7 @@ async def start(
     gls.init_interior_config(sc.id)
     glco.reset()
     glcap.reset()
-    gldc.reset()
+    glhc.reset()
     # v0.07 §3.5: Drone loadout override.
     _drone_override = None
     if _loadout_config and _loadout_config.drone_loadout is not None:
@@ -949,7 +949,7 @@ async def _loop() -> None:
         # 3.1 Training auto-simulation (only active during training missions).
         gltr.auto_helm_tick(_world.ship, TICK_DT)
         gltr.auto_engineering_tick(_world.ship, TICK_DT)
-        gldc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty,
+        glhc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty,
                  resources=_world.ship.resources)
         # Build lightweight contact list for drone AI from world entities.
         _fo_contacts: list[dict] = []
@@ -1194,7 +1194,7 @@ async def _loop() -> None:
         combat_damage_events, combat_casualties = await glw.handle_enemy_beam_hits(
             list(beam_hit_events) + list(station_beam_hits) + creature_beam_hits, _world, _manager
         )
-        gldc.apply_hull_damage(_hull_before_combat - _world.ship.hull, _world.ship.interior)
+        glhc.apply_hull_damage(_hull_before_combat - _world.ship.hull, _world.ship.interior)
         # v0.07 §2.1: Break stealth on damage; suppress shield regen during active stealth.
         if _world.ship.hull < _hull_before_combat and glew.is_stealth_engaged():
             glew.break_stealth("damage")
@@ -1974,9 +1974,9 @@ async def _loop() -> None:
                 "velocity_cap": hazard_system.get_velocity_cap(),
             }))
 
-        # 11i. Engineering damage-control state → Engineering + Damage Control stations.
+        # 11i. Engineering hazard-control state → Engineering + Hazard Control stations.
         # Performance: only broadcast if state has changed since last tick.
-        _dc_state_msg = gldc.build_dc_state(_world.ship.interior, difficulty=_world.ship.difficulty)
+        _dc_state_msg = glhc.build_dc_state(_world.ship.interior, difficulty=_world.ship.difficulty)
         _dc_json = json.dumps(_dc_state_msg, separators=(",", ":"), sort_keys=True)
         if _dc_json != _last_dc_state_json:
             _last_dc_state_json = _dc_json
@@ -1985,8 +1985,8 @@ async def _loop() -> None:
                 Message.build("engineering.dc_state", _dc_state_msg),
             )
             await _manager.broadcast_to_roles(
-                ["damage_control"],
-                Message.build("damage_control.state", _dc_state_msg),
+                ["hazard_control"],
+                Message.build("hazard_control.state", _dc_state_msg),
             )
 
         # 11i-b. Engineering system state → Engineering station.
@@ -2348,12 +2348,12 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             gle.add_repair_order(payload.system)
             gl.log_event("engineering", "repair_started", {"system": payload.system})
             _set_training_flag(glm, "engineering_repair_set")
-        elif msg_type in ("engineering.dispatch_dct", "damage_control.dispatch_dct") and isinstance(payload, EngineeringDispatchDCTPayload):
-            gldc.dispatch_dct(payload.room_id, ship.interior)
+        elif msg_type in ("engineering.dispatch_dct", "hazard_control.dispatch_dct") and isinstance(payload, EngineeringDispatchDCTPayload):
+            glhc.dispatch_dct(payload.room_id, ship.interior)
             gl.log_event("engineering", "dct_dispatched", {"room_id": payload.room_id})
             _set_training_flag(glm, "dc_team_dispatched")
-        elif msg_type in ("engineering.cancel_dct", "damage_control.cancel_dct") and isinstance(payload, EngineeringCancelDCTPayload):
-            gldc.cancel_dct(payload.room_id)
+        elif msg_type in ("engineering.cancel_dct", "hazard_control.cancel_dct") and isinstance(payload, EngineeringCancelDCTPayload):
+            glhc.cancel_dct(payload.room_id)
             gl.log_event("engineering", "dct_cancelled", {"room_id": payload.room_id})
         elif msg_type == "engineering.dispatch_team" and isinstance(payload, EngineeringDispatchTeamPayload):
             gle.dispatch_team(payload.team_id, payload.system, ship.interior)

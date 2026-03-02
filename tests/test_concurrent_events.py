@@ -32,7 +32,7 @@ from server.systems.combat import (
     CombatHitResult,
     CREW_CASUALTY_PER_HULL_DAMAGE,
 )
-import server.game_loop_damage_control as gldc
+import server.game_loop_hazard_control as glhc
 import server.game_loop_medical_v2 as glmed
 import server.game_loop_engineering as gle
 import server.game_loop_security as gls
@@ -281,7 +281,7 @@ class TestFirePlusDCTConcurrent:
     def test_dct_progresses_while_fire_present(self):
         """Dispatch DCT to a room on fire, tick — DCT timer advances even
         though the fire is still burning."""
-        gldc.reset()
+        glhc.reset()
         interior = make_default_interior()
 
         # Set a room on fire.
@@ -289,14 +289,14 @@ class TestFirePlusDCTConcurrent:
         room.state = "fire"
 
         # Dispatch DCT.
-        assert gldc.dispatch_dct("weapons_bay", interior)
+        assert glhc.dispatch_dct("weapons_bay", interior)
 
         # Tick a few seconds (< DCT_REPAIR_DURATION=8.0).
         for _ in range(30):  # 3.0 seconds
-            gldc.tick(interior, 0.1)
+            glhc.tick(interior, 0.1)
 
         # DCT should have progress but room is still on fire (not yet 8s).
-        dc_state = gldc.build_dc_state(interior)
+        dc_state = glhc.build_dc_state(interior)
         assert "weapons_bay" in dc_state["active_dcts"]
         progress = dc_state["active_dcts"]["weapons_bay"]
         assert progress > 0.0
@@ -305,17 +305,17 @@ class TestFirePlusDCTConcurrent:
 
     def test_dct_completes_fire_to_damaged(self):
         """After DCT_REPAIR_DURATION ticks, fire is reduced to damaged."""
-        gldc.reset()
+        glhc.reset()
         interior = make_default_interior()
 
         room = interior.rooms["sensor_array"]
         room.state = "fire"
 
-        gldc.dispatch_dct("sensor_array", interior)
+        glhc.dispatch_dct("sensor_array", interior)
 
         # Tick for 8.1 seconds (just past DCT_REPAIR_DURATION=8.0).
         for _ in range(81):
-            gldc.tick(interior, 0.1)
+            glhc.tick(interior, 0.1)
 
         # Room should now be "damaged" (one severity level down from fire).
         assert room.state == "damaged"

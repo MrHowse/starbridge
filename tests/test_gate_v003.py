@@ -35,7 +35,7 @@ import server.game_loop_medical_v2 as glmed
 import server.game_loop_security as gls
 import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
-import server.game_loop_damage_control as gldc
+import server.game_loop_hazard_control as glhc
 import server.game_loop_flight_ops as glfo
 import server.game_loop_ew as glew
 import server.game_loop_operations as glops
@@ -53,7 +53,7 @@ TRAINING_MISSION_IDS = [
     "train_medical",
     "train_security",
     "train_comms",
-    "train_damage_control",
+    "train_hazard_control",
     "train_flight_ops",
     "train_ew",
     "train_operations",
@@ -399,8 +399,8 @@ class TestGameLoopModuleResetGate:
     def test_glcap_reset(self):
         glcap.reset()
 
-    def test_gldc_reset(self):
-        gldc.reset()
+    def test_glhc_reset(self):
+        glhc.reset()
 
     def test_glfo_reset(self):
         glfo.reset()
@@ -466,7 +466,7 @@ class TestLobbyRolesGate:
     def test_lobby_has_expanded_roles(self):
         from server.lobby import LobbySession
         session = LobbySession()
-        for role in ("medical", "security", "comms", "flight_ops", "electronic_warfare", "operations", "damage_control"):
+        for role in ("medical", "security", "comms", "flight_ops", "electronic_warfare", "operations", "hazard_control"):
             assert role in session.roles
 
     def test_lobby_role_count(self):

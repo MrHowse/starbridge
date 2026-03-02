@@ -147,12 +147,12 @@ All entries in `_PAYLOAD_SCHEMAS` — the server accepts and validates these.
 | `tactical.create_strike_plan` | TacticalCreateStrikePlanPayload | target_id, plan_type |
 | `tactical.execute_strike_plan` | TacticalExecuteStrikePlanPayload | strike_id |
 
-### Damage Control
+### Hazard Control
 
 | Message Type | Payload Model | Key Fields |
 |---|---|---|
-| `damage_control.dispatch_dct` | EngineeringDispatchDCTPayload | room_id |
-| `damage_control.cancel_dct` | EngineeringCancelDCTPayload | room_id |
+| `hazard_control.dispatch_dct` | EngineeringDispatchDCTPayload | room_id |
+| `hazard_control.cancel_dct` | EngineeringCancelDCTPayload | room_id |
 
 ### Creatures
 
@@ -257,7 +257,7 @@ All entries in `_PAYLOAD_SCHEMAS` — the server accepts and validates these.
 | `engineering.state` | game_loop.py | hull, systems, repair_focus, overclocked_systems |
 | `engineering.dc_state` | game_loop.py | decks, fire_spread_timer |
 | `engineering.repair_team_event` | game_loop.py | type, team_id, location |
-| `damage_control.state` | game_loop.py | decks, fire_spread_timer |
+| `hazard_control.state` | game_loop.py | decks, fire_spread_timer |
 
 ### Weapons & Combat
 
@@ -412,7 +412,7 @@ All entries in `_PAYLOAD_SCHEMAS` — the server accepts and validates these.
 | `flight_ops` | handle_flight_ops_message | server/flight_ops.py |
 | `ew` | handle_ew_message | server/ew.py |
 | `tactical` | handle_tactical_message | server/tactical.py |
-| `damage_control` | handle_damage_control_message | server/damage_control.py |
+| `hazard_control` | handle_hazard_control_message | server/hazard_control.py |
 | `game` | _handle_game_message | server/main.py |
 | `puzzle` | _queue_forward_handler | server/main.py |
 | `creature` | _queue_forward_handler | server/main.py |

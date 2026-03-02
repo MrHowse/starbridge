@@ -1,20 +1,20 @@
 /**
- * Starbridge — Damage Control Station
+ * Starbridge — Hazard Control Station
  *
  * Displays the ship interior as a room grid with severity-coded cards.
- * Allows the DC officer to dispatch/cancel Damage Control Teams (DCTs).
+ * Allows the HazCon officer to dispatch/cancel Damage Control Teams (DCTs).
  *
  * Server messages received:
  *   game.started          — reveal station UI; store interior layout
- *   damage_control.state  — rooms (non-normal only) + active DCTs
+ *   hazard_control.state  — rooms (non-normal only) + active DCTs
  *   ship.alert_changed    — update alert colour
  *   ship.hull_hit         — hit-flash border
  *   game.over             — victory/defeat overlay
  *
  * Server messages sent:
- *   lobby.claim_role          { role: 'damage_control', player_name }
- *   damage_control.dispatch_dct { room_id }
- *   damage_control.cancel_dct   { room_id }
+ *   lobby.claim_role            { role: 'hazard_control', player_name }
+ *   hazard_control.dispatch_dct { room_id }
+ *   hazard_control.cancel_dct   { room_id }
  */
 
 import { initConnection } from '../shared/connection.js';
@@ -170,12 +170,12 @@ function renderSelectedRoom() {
 
   document.getElementById('dc-btn-dispatch')?.addEventListener('click', () => {
     if (!_send || !_selectedId) return;
-    _send('damage_control.dispatch_dct', { room_id: _selectedId });
+    _send('hazard_control.dispatch_dct', { room_id: _selectedId });
   });
 
   document.getElementById('dc-btn-cancel')?.addEventListener('click', () => {
     if (!_send || !_selectedId) return;
-    _send('damage_control.cancel_dct', { room_id: _selectedId });
+    _send('hazard_control.cancel_dct', { room_id: _selectedId });
   });
 }
 
@@ -259,7 +259,7 @@ function handleMessage(msg) {
     case 'game.started':
       handleGameStarted(msg.payload);
       break;
-    case 'damage_control.state':
+    case 'hazard_control.state':
       handleDcState(msg.payload);
       break;
     case 'ship.alert_changed':
@@ -286,7 +286,7 @@ function handleMessage(msg) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const { send } = initConnection({
-    role: 'damage_control',
+    role: 'hazard_control',
     onStatusChange: (connected) => {
       setStatusDot(statusDotEl, connected ? 'connected' : 'disconnected');
       statusLabelEl.textContent = connected ? 'CONNECTED' : 'DISCONNECTED';
@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   _send = send;
-  initRoleBar(send, 'damage_control');
+  initRoleBar(send, 'hazard_control');
   initCrewRoster(send);
   SoundBank.init();
   wireButtonSounds(SoundBank);
