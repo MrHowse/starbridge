@@ -613,6 +613,7 @@ async def start(
     _world.ship.beam_fire_rate = _wep.get("beam_fire_rate", 0.0)
     _world.ship.beam_arc_deg = _wep.get("beam_arc", 45.0)
     _world.ship.beam_count = int(_wep.get("beam_count", 1))
+    _world.ship.beam_range = float(_wep.get("beam_range", 8_000.0))
     _world.ship.torpedo_tube_count = int(_wep.get("torpedo_tubes", 2))
     _world.ship.pd_turret_count = int(_wep.get("point_defence_turrets", 2))
     # v0.07 §1.8: Engine characteristics from ship class.
@@ -3058,6 +3059,8 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "armour": ship.armour,
             "armour_max": ship.armour_max,
             "beam_count": ship.beam_count,
+            "beam_range": ship.beam_range,
+            "beam_arc_deg": ship.beam_arc_deg,
             "torpedo_tube_count": ship.torpedo_tube_count,
             "pd_turret_count": ship.pd_turret_count,
             "fuel_multiplier": ship.fuel_multiplier,

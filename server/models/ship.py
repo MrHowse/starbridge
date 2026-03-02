@@ -150,6 +150,7 @@ class Ship:
     beam_fire_rate: float = 0.0       # seconds between beam shots (0 = no cooldown)
     beam_arc_deg: float = 45.0        # ±degrees from heading (default = legacy constant)
     beam_count: int = 1               # number of independent beam arrays
+    beam_range: float = 8_000.0       # beam engagement range (world units)
     torpedo_tube_count: int = 2        # torpedo tubes (0 = no torpedoes)
     pd_turret_count: int = 2           # point defence turrets
 

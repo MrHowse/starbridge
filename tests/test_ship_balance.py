@@ -217,7 +217,7 @@ class TestTorpedoLoadout:
 # ---------------------------------------------------------------------------
 
 class TestWeaponSubfields:
-    REQUIRED_KEYS = {"beam_damage", "beam_fire_rate", "beam_arc", "beam_count"}
+    REQUIRED_KEYS = {"beam_damage", "beam_fire_rate", "beam_arc", "beam_count", "beam_range"}
 
     @pytest.mark.parametrize("class_id", ALL_IDS)
     def test_weapon_fields_present(self, class_id: str):
@@ -225,6 +225,20 @@ class TestWeaponSubfields:
         assert sc.weapons is not None, f"{class_id} missing weapons"
         for key in self.REQUIRED_KEYS:
             assert key in sc.weapons, f"{class_id}: weapons missing {key}"
+
+    @pytest.mark.parametrize("class_id", ALL_IDS)
+    def test_beam_range_scales_with_class(self, class_id: str):
+        sc = load_ship_class(class_id)
+        rng = sc.weapons["beam_range"]
+        if class_id == "medical_ship":
+            assert rng == 0, "Medical ship should have zero beam range"
+        else:
+            assert 4000 <= rng <= 15000, f"{class_id}: beam_range {rng} out of bounds"
+
+    def test_battleship_has_longest_beam_range(self):
+        classes = {cid: load_ship_class(cid) for cid in ALL_IDS}
+        ranges = {cid: sc.weapons["beam_range"] for cid, sc in classes.items()}
+        assert ranges["battleship"] == max(ranges.values())
 
 
 # ---------------------------------------------------------------------------

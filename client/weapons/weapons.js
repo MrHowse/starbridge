@@ -358,6 +358,7 @@ function handleShipState(payload) {
   updateTubeUI(payload);
   updateMagazinePanel();
   _updateLoadButtons();
+  _updateWeaponRangeRings();
 
   // Shield focus update (from server state).
   if (payload.shield_distribution) {
@@ -939,8 +940,8 @@ function updateTargetPanel() {
     targetBearing.textContent = `${Math.round(brg).toString().padStart(3,'0')}°`;
 
     // Beam arc check (client-side for status display).
-    const BEAM_RANGE = 8_000;
-    const ARC        = 45;
+    const BEAM_RANGE = shipState.beam_range ?? 8_000;
+    const ARC        = shipState.beam_arc_deg ?? 45;
     const shipHead   = shipState.heading;
     const diff       = Math.abs(((brg - shipHead + 180 + 360) % 360) - 180);
     if (dist > BEAM_RANGE) {
@@ -1285,9 +1286,10 @@ function _onRangeChange(key, worldUnits) {
 /** Update range rings showing beam range, torpedo range. */
 function _updateWeaponRangeRings() {
   if (!radarRenderer) return;
+  const beamRange = (shipState && shipState.beam_range) ? shipState.beam_range : 8_000;
   radarRenderer.setRangeRings([
-    { range: 8_000,  label: 'BEAM',  style: 'dotted' },
-    { range: 40_000, label: 'TORP',  style: 'dashed' },
+    { range: beamRange, label: 'BEAM', style: 'dotted' },
+    { range: 40_000,    label: 'TORP', style: 'dashed' },
   ]);
 }
 

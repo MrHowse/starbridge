@@ -27,7 +27,6 @@ from server.models.messages import Message
 from server.models.ship import Ship
 from server.models.world import Torpedo, World
 from server.systems.combat import (
-    BEAM_PLAYER_RANGE,
     CombatHitResult,
     apply_hit_to_enemy,
     apply_hit_to_player,
@@ -427,7 +426,7 @@ def _find_auto_fire_target(ship: Ship, world: World):
         if getattr(enemy, "scan_state", None) != "scanned":
             continue
         dist = distance(ship.x, ship.y, enemy.x, enemy.y)
-        if dist > BEAM_PLAYER_RANGE:
+        if dist > ship.beam_range:
             continue
         brg = bearing_to(ship.x, ship.y, enemy.x, enemy.y)
         if not beam_in_arc(ship.heading, brg, arc):
@@ -650,7 +649,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
     target = next((e for e in world.enemies if e.id == _weapons_target), None)
     if target is not None:
         dist = distance(ship.x, ship.y, target.x, target.y)
-        if dist > BEAM_PLAYER_RANGE:
+        if dist > ship.beam_range:
             return None
         brg = bearing_to(ship.x, ship.y, target.x, target.y)
         if not beam_in_arc(ship.heading, brg, arc):
@@ -686,7 +685,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
     creature = next((c for c in world.creatures if c.id == _weapons_target), None)
     if creature is not None:
         dist = distance(ship.x, ship.y, creature.x, creature.y)
-        if dist > BEAM_PLAYER_RANGE:
+        if dist > ship.beam_range:
             return None
         brg = bearing_to(ship.x, ship.y, creature.x, creature.y)
         if not beam_in_arc(ship.heading, brg, arc):
@@ -716,7 +715,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
     if comp_result is not None:
         station, comp = comp_result
         dist = distance(ship.x, ship.y, station.x, station.y)
-        if dist > BEAM_PLAYER_RANGE:
+        if dist > ship.beam_range:
             return None
         brg = bearing_to(ship.x, ship.y, station.x, station.y)
         if not beam_in_arc(ship.heading, brg, arc):
@@ -751,7 +750,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
     station = _find_station_by_id(world, _weapons_target)
     if station is not None and station.faction != "friendly":
         dist = distance(ship.x, ship.y, station.x, station.y)
-        if dist > BEAM_PLAYER_RANGE:
+        if dist > ship.beam_range:
             return None
         brg = bearing_to(ship.x, ship.y, station.x, station.y)
         if not beam_in_arc(ship.heading, brg, arc):

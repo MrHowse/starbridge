@@ -93,6 +93,7 @@ def _serialise_ship(ship: Ship) -> dict:
         "beam_fire_rate": ship.beam_fire_rate,
         "beam_arc_deg": ship.beam_arc_deg,
         "beam_count": ship.beam_count,
+        "beam_range": ship.beam_range,
         "torpedo_tube_count": ship.torpedo_tube_count,
         "pd_turret_count": ship.pd_turret_count,
         "fuel_multiplier": ship.fuel_multiplier,
@@ -321,6 +322,7 @@ def _deserialise_ship(data: dict, ship: Ship) -> None:
     ship.beam_fire_rate = float(data.get("beam_fire_rate", ship.beam_fire_rate))
     ship.beam_arc_deg = float(data.get("beam_arc_deg", ship.beam_arc_deg))
     ship.beam_count = int(data.get("beam_count", ship.beam_count))
+    ship.beam_range = float(data.get("beam_range", ship.beam_range))
     ship.torpedo_tube_count = int(data.get("torpedo_tube_count", ship.torpedo_tube_count))
     ship.pd_turret_count = int(data.get("pd_turret_count", ship.pd_turret_count))
     ship.fuel_multiplier = float(data.get("fuel_multiplier", ship.fuel_multiplier))

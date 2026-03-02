@@ -24,7 +24,7 @@ from server.utils.math_helpers import distance
 # ---------------------------------------------------------------------------
 
 TORPEDO_RANGE: float = 15_000.0     # estimated torpedo engagement range
-BEAM_RANGE: float = 8_000.0         # estimated beam engagement range
+BEAM_RANGE_DEFAULT: float = 8_000.0  # fallback beam engagement range
 DRAWING_TYPES = frozenset({"waypoint", "arrow", "danger_zone", "objective"})
 MAX_DRAWINGS: int = 20
 MAX_PRIORITY_TARGETS: int = 10
@@ -190,7 +190,7 @@ def compute_timeline(world: World, ship: Ship) -> list[dict]:
         dist = distance(ship.x, ship.y, enemy.x, enemy.y)
         if dist == 0.0:
             # Already overlapping — both ranges at ETA 0.
-            for rtype, rng, lbl in _RANGE_DEFS:
+            for rtype, rng, lbl in _range_defs(ship):
                 entries.append({
                     "type": rtype,
                     "label": f"{enemy.type} in {lbl}",
@@ -212,7 +212,7 @@ def compute_timeline(world: World, ship: Ship) -> list[dict]:
         sep_rate = ((enemy.x - ship.x) * rel_vx + (enemy.y - ship.y) * rel_vy) / dist
         closing = -sep_rate  # positive = approaching
 
-        for rtype, rng, lbl in _RANGE_DEFS:
+        for rtype, rng, lbl in _range_defs(ship):
             gap = dist - rng
             if gap <= 0.0:
                 entries.append({
@@ -233,11 +233,12 @@ def compute_timeline(world: World, ship: Ship) -> list[dict]:
     return entries
 
 
-# (type_key, range_value, human_label)
-_RANGE_DEFS: list[tuple[str, float, str]] = [
-    ("torpedo_range", TORPEDO_RANGE, "torpedo range"),
-    ("beam_range", BEAM_RANGE, "beam range"),
-]
+def _range_defs(ship) -> list[tuple[str, float, str]]:
+    """Per-ship engagement range thresholds for timeline computation."""
+    return [
+        ("torpedo_range", TORPEDO_RANGE, "torpedo range"),
+        ("beam_range", getattr(ship, "beam_range", BEAM_RANGE_DEFAULT), "beam range"),
+    ]
 
 # ---------------------------------------------------------------------------
 # Fleet coordination stubs (§2.4.5)

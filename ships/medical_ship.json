@@ -24,6 +24,7 @@
     "beam_damage": 0.0,
     "beam_fire_rate": 0.0,
     "beam_arc": 0,
+    "beam_range": 0,
     "beam_count": 0,
     "torpedo_tubes": 0,
     "point_defence_turrets": 3
