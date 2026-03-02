@@ -1162,6 +1162,7 @@ async def _loop() -> None:
                 await _manager.broadcast(
                     Message.build("station.destroyed", {"station_id": station.id})
                 )
+                glops.add_feed_event("WEAPONS", f"Station destroyed: {station.id}", "info")
                 _world.stations = [s for s in _world.stations if s.id != station.id]
             elif (not station.captured
                   and station.defenses is not None
@@ -1669,7 +1670,7 @@ async def _loop() -> None:
             ghost_contacts=_ghost_contacts,
         )
         await _manager.broadcast_to_roles(
-            ["weapons", "science", "flight_ops"],
+            ["weapons", "science", "flight_ops", "operations"],
             _sensor_contacts_payload,
         )
 
@@ -1822,6 +1823,7 @@ async def _loop() -> None:
                     "results": sensors.build_scan_result(ce),
                 }))
                 gl.log_event("science", "scan_completed", {"entity_id": cid})
+                glops.add_feed_event("SCIENCE", f"Scan complete: {cid}", "info")
             # Notify dynamic missions of scan completion.
             gldm.notify_scan_completed(cid)
 
@@ -2034,6 +2036,13 @@ async def _loop() -> None:
                     [_role],
                     Message.build("flight_ops.events", {"events": _evts}),
                 )
+            # A.5.2: Feed notable flight ops events to operations.
+            for _foe in _fo_events:
+                _ft = _foe.get("type", "")
+                if _ft == "drone_launched":
+                    glops.add_feed_event("FLIGHT OPS", f"Drone launched: {_foe.get('drone_id', '')}", "info")
+                elif _ft in ("drone_destroyed", "drone_crash_on_deck"):
+                    glops.add_feed_event("FLIGHT OPS", f"Drone lost: {_foe.get('drone_id', '')}", "warning")
 
         # 11k. EW state → Electronic Warfare station.
         await _manager.broadcast_to_roles(
@@ -2109,6 +2118,7 @@ async def _loop() -> None:
                 "component_health": round(_oc_comp_hit.get("health", 0.0), 1),
                 "effect": _oc_comp_hit.get("effect", ""),
             })
+            glops.add_feed_event("ENGINEERING", f"Overclock damage: {_oc_sys} {round(_oc_health)}%", "warning")
         # 12a-b. Overheat warnings (from gle.tick).
         for _ow_evt in _eng_result.overclock_warnings:
             await _manager.broadcast_to_roles(
@@ -2137,6 +2147,8 @@ async def _loop() -> None:
                     "component_health": round(_combat_comp_hit.get("health", 0.0), 1),
                     "effect": _combat_comp_hit.get("effect", ""),
                 }))
+            _sev = "critical" if h < 25.0 else ("warning" if h < 50.0 else "info")
+            glops.add_feed_event("ENGINEERING", f"{s} damaged: {round(h)}%", _sev)
             gl.log_event("combat", "system_damaged", {
                 "system": s, "new_health": round(h, 1),
                 "component": _combat_comp_hit.get("component_id", ""),
@@ -2182,6 +2194,11 @@ async def _loop() -> None:
                 "torpedo_type": evt["torpedo_type"],
                 "damage": evt["damage"],
             })
+            glops.add_feed_event(
+                "WEAPONS",
+                f"Torpedo hit: {evt['target_id']} ({evt['torpedo_type']})",
+                "info",
+            )
             # Probe torpedo: broadcast scan data as a completed scan result.
             if evt.get("torpedo_type") == "probe" and "probe_scan" in evt:
                 await _manager.broadcast(Message.build("science.scan_complete", {
@@ -2201,6 +2218,11 @@ async def _loop() -> None:
                 "security.squad_eliminated",
             ):
                 await _manager.broadcast_to_roles(["captain"], Message.build(evt_type, evt_data))
+            # A.5.2: Feed security events to operations.
+            if evt_type == "security.boarding_alert":
+                glops.add_feed_event("SECURITY", "Boarding detected", "critical")
+            elif evt_type == "security.party_eliminated":
+                glops.add_feed_event("SECURITY", "Intruders repelled", "info")
             if evt_type in ("security.squad_casualty",):
                 await _manager.broadcast_to_roles(["medical"], Message.build(evt_type, evt_data))
         for evt_type, evt_data in station_boarding_events:

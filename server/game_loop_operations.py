@@ -215,6 +215,10 @@ _evasion_cooldown: float = 0.0
 _objectives_marked: set[str] = set()  # objective IDs marked "in progress" by Ops
 _station_advisories: dict[str, tuple[str, float]] = {}  # station → (message, timer)
 
+# A.5 — information feed state
+_feed_events: list[dict] = []
+_feed_event_id: int = 0
+
 
 # ---------------------------------------------------------------------------
 # Public API — Game loop interface
@@ -227,6 +231,7 @@ def reset() -> None:
     global _weapons_helm_sync, _sync_cooldown, _sensor_focus
     global _damage_coordination, _evasion_alert, _evasion_cooldown
     global _objectives_marked, _station_advisories
+    global _feed_events, _feed_event_id
     _assessments = {}
     _active_id = None
     _pending_broadcasts = []
@@ -239,6 +244,8 @@ def reset() -> None:
     _evasion_cooldown = 0.0
     _objectives_marked = set()
     _station_advisories = {}
+    _feed_events = []
+    _feed_event_id = 0
 
 
 def tick(world: World, ship: Ship, dt: float) -> None:
@@ -339,6 +346,30 @@ def pop_pending_broadcasts() -> list[tuple[list[str], dict]]:
     return result
 
 
+def add_feed_event(source: str, text: str, severity: str = "info") -> None:
+    """Push an event to the operations information feed (A.5.2)."""
+    global _feed_event_id
+    if severity not in ("info", "warning", "critical"):
+        severity = "info"
+    _feed_event_id += 1
+    _feed_events.append({
+        "id": _feed_event_id,
+        "source": source,
+        "text": text,
+        "severity": severity,
+    })
+    # Cap server-side buffer at 100 events (client caps at 50).
+    if len(_feed_events) > 100:
+        _feed_events.pop(0)
+
+
+def _drain_feed_events() -> list[dict]:
+    """Return and clear pending feed events."""
+    events = list(_feed_events)
+    _feed_events.clear()
+    return events
+
+
 def build_state(world: World, ship: Ship) -> dict:
     """Serialise full operations state for broadcast to the operations station."""
     assessments: dict[str, dict] = {}
@@ -378,7 +409,7 @@ def build_state(world: World, ship: Ship) -> dict:
         "coordination_bonuses": _build_coordination_state(ship),
         "mission_tracking": _build_mission_tracking(),
         "station_advisories": _build_advisories_state(),
-        "feed_events": [],            # Stub for A.5
+        "feed_events": _drain_feed_events(),
     }
 
 
@@ -659,6 +690,8 @@ def set_threat_level(contact_id: str, level: str) -> dict:
             {"type": "threat_level", "contact_id": contact_id, "level": level},
         )
     )
+    sev = "critical" if level == "critical" else ("warning" if level == "high" else "info")
+    add_feed_event("OPS", f"Threat {level.upper()}: {contact_id}", sev)
     return {"ok": True}
 
 
@@ -685,6 +718,7 @@ def set_weapons_helm_sync(contact_id: str, world: World, ship: Ship) -> dict:
             {"type": "weapons_helm_sync", "contact_id": contact_id},
         )
     )
+    add_feed_event("OPS", f"Sync initiated: {contact_id}", "info")
     return {"ok": True}
 
 
@@ -762,6 +796,7 @@ def issue_evasion_alert(bearing: float) -> dict:
             {"type": "evasion_alert", "bearing": bearing % 360.0},
         )
     )
+    add_feed_event("OPS", f"EVASION ALERT bearing {bearing % 360.0:.0f}\u00b0", "critical")
     return {"ok": True}
 
 
@@ -868,6 +903,7 @@ def mark_objective(objective_id: str) -> dict:
             },
         )
     )
+    add_feed_event("OPS", f"Objective marked: {objective_id}", "info")
     return {"ok": True}
 
 
@@ -890,6 +926,7 @@ def send_station_advisory(target_station: str, message: str) -> dict:
             },
         )
     )
+    add_feed_event("OPS", f"Advisory \u2192 {target_station}: {message}", "info")
     return {"ok": True}
 
 
@@ -1048,6 +1085,7 @@ def _emit_assessment_complete(
     if enemy:
         data["system_health"] = _get_system_health(enemy)
     _pending_broadcasts.append((["operations", "captain"], data))
+    add_feed_event("OPS", f"Assessment complete: {asmt.enemy_id}", "info")
 
 
 def _recompute_prediction(asmt: BattleAssessment, enemy: Enemy) -> None:
@@ -1163,6 +1201,7 @@ def _tick_weapons_helm_sync(world: World, ship: Ship, dt: float) -> None:
         # Contact destroyed — end sync and start cooldown.
         _weapons_helm_sync = None
         _sync_cooldown = SYNC_COOLDOWN
+        add_feed_event("OPS", "Sync BROKEN: contact lost", "warning")
         return
     brg = bearing_to(ship.x, ship.y, enemy.x, enemy.y)
     diff = abs(angle_diff(ship.heading, brg))
@@ -1215,6 +1254,7 @@ def _tick_damage_coordination(world: World, ship: Ship, dt: float) -> None:
                     },
                 )
             )
+            add_feed_event("OPS", "Damage assessment complete", "info")
 
 
 def _tick_evasion_alert(ship: Ship, dt: float) -> None:

@@ -88,6 +88,15 @@
 .ops-feed-item--warning { color: #ffaa00; }
 .ops-feed-item--critical { color: #ff4444; }
 
+.ops-feed-item--new {
+  animation: feed-highlight 1s ease-out;
+}
+
+@keyframes feed-highlight {
+  0%   { background: rgba(0, 255, 65, 0.2); }
+  100% { background: transparent; }
+}
+
 /* Advisory composer */
 .ops-advisory {
   display: flex;
@@ -121,4 +130,161 @@
   cursor: pointer;
   font-family: inherit;
   font-size: 0.8rem;
+}
+
+/* ── Analysis panel ── */
+
+.ops-contact-header {
+  padding: 0.2rem 0;
+  font-size: 0.85rem;
+}
+
+.ops-assessed-badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  background: rgba(0, 255, 65, 0.15);
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  color: #00ff41;
+  font-size: 0.75rem;
+  margin: 0.2rem 0;
+}
+
+.ops-section-label {
+  font-size: 0.7rem;
+  color: rgba(0, 255, 65, 0.5);
+  margin-top: 0.4rem;
+  padding-bottom: 0.1rem;
+  border-bottom: 1px solid rgba(0, 255, 65, 0.1);
+}
+
+/* Progress bar */
+.ops-progress {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0.2rem 0;
+}
+
+.ops-progress-bar {
+  height: 100%;
+  background: rgba(0, 170, 255, 0.6);
+  transition: width 0.1s linear;
+}
+
+/* Horizontal bars (shields, systems) */
+.ops-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0;
+  font-size: 0.7rem;
+}
+
+.ops-bar-label {
+  width: 3.5rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: right;
+}
+
+.ops-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ops-bar--vuln   { border: 1px solid rgba(255, 136, 0, 0.4); }
+.ops-bar--priority { border: 1px solid rgba(255, 68, 68, 0.4); }
+
+.ops-bar-fill {
+  height: 100%;
+  background: rgba(0, 255, 65, 0.5);
+  transition: width 0.2s linear;
+}
+
+.ops-bar-fill--warning  { background: #ffaa00; }
+.ops-bar-fill--critical { background: #ff4444; }
+
+.ops-bar-value {
+  width: 2.5rem;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Threat level selector */
+.ops-threat-selector {
+  display: flex;
+  gap: 0.2rem;
+  margin: 0.3rem 0;
+}
+
+.ops-threat-btn {
+  flex: 1;
+  padding: 0.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.ops-threat-btn--low.ops-threat--active       { background: rgba(0, 255, 65, 0.2); color: #00ff41; border-color: #00ff41; }
+.ops-threat-btn--medium.ops-threat--active     { background: rgba(255, 170, 0, 0.2); color: #ffaa00; border-color: #ffaa00; }
+.ops-threat-btn--high.ops-threat--active       { background: rgba(255, 136, 0, 0.2); color: #ff8800; border-color: #ff8800; }
+.ops-threat-btn--critical.ops-threat--active   { background: rgba(255, 68, 68, 0.2); color: #ff4444; border-color: #ff4444; }
+
+/* ── Coordination items ── */
+
+.ops-coord-item {
+  padding: 0.15rem 0.3rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ops-coord-item--critical {
+  color: #ff4444;
+}
+
+.text-good { color: #00ff41; }
+
+/* ── Mission tracker ── */
+
+.ops-mission-title {
+  font-size: 0.85rem;
+  color: rgba(0, 255, 65, 0.8);
+  padding: 0.15rem 0.3rem;
+}
+
+.ops-obj-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ops-obj {
+  padding: 0.15rem 0.3rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.ops-obj:hover {
+  background: rgba(0, 255, 65, 0.05);
+}
+
+.ops-obj--marked {
+  border-left: 2px solid #00ff41;
+  color: rgba(0, 255, 65, 0.8);
+}
+
+.ops-obj-icon {
+  display: inline-block;
+  width: 1.2em;
+  text-align: center;
+}
+
+.ops-obj-station {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.7rem;
 }
