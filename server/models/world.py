@@ -44,6 +44,7 @@ ENEMY_TYPE_PARAMS: dict[str, dict] = {
         "beam_cooldown":    1.0,
         "flee_threshold":   0.0,   # fighters never flee
         "target_profile":   0.4,   # v0.07: small, fast, hard to hit
+        "shield_init":      0.0,   # fighters have no shields
     },
     "scout": {
         "hull":           40.0,
@@ -55,6 +56,7 @@ ENEMY_TYPE_PARAMS: dict[str, dict] = {
         "beam_cooldown":    1.5,
         "flee_threshold":   0.30,
         "target_profile":   0.5,   # v0.07: small
+        "shield_init":     30.0,   # light shields
     },
     "cruiser": {
         "hull":           70.0,
@@ -66,6 +68,7 @@ ENEMY_TYPE_PARAMS: dict[str, dict] = {
         "beam_cooldown":    2.0,
         "flee_threshold":   0.20,
         "target_profile":   0.85,  # v0.07: large, easy to hit
+        "shield_init":     60.0,   # medium shields
     },
     "destroyer": {
         "hull":          100.0,
@@ -77,6 +80,7 @@ ENEMY_TYPE_PARAMS: dict[str, dict] = {
         "beam_cooldown":    3.0,
         "flee_threshold":   0.15,
         "target_profile":   0.7,   # v0.07: medium-large
+        "shield_init":    100.0,   # heavy shields
     },
 }
 
@@ -576,8 +580,7 @@ def spawn_creature(creature_id: str, creature_type: str, x: float, y: float) -> 
 def spawn_enemy(type_: Literal["fighter", "scout", "cruiser", "destroyer"], x: float, y: float, entity_id: str) -> Enemy:
     """Create a new Enemy with type-appropriate starting stats."""
     params = ENEMY_TYPE_PARAMS[type_]
-    # Fighters have no shields.
-    init_shields = 0.0 if type_ == "fighter" else 100.0
+    init_shields = params.get("shield_init", 100.0)
     return Enemy(
         id=entity_id,
         type=type_,

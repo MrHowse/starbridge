@@ -44,6 +44,16 @@ class TestEnemyShieldFrequency:
         freqs = {spawn_enemy("scout", 0.0, 0.0, f"e{i}").shield_frequency for i in range(40)}
         assert len(freqs) > 1, "shield_frequency should vary across spawned enemies"
 
+    def test_spawn_enemy_per_type_shields(self):
+        """Shields scale by type: fighter=0, scout<cruiser<destroyer."""
+        f = spawn_enemy("fighter", 0, 0, "f")
+        s = spawn_enemy("scout", 0, 0, "s")
+        c = spawn_enemy("cruiser", 0, 0, "c")
+        d = spawn_enemy("destroyer", 0, 0, "d")
+        assert f.shield_front == 0.0
+        assert s.shield_front < c.shield_front < d.shield_front
+        assert s.shield_front > 0.0
+
 
 # ---------------------------------------------------------------------------
 # Damage calculation
