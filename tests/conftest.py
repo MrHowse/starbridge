@@ -29,3 +29,12 @@ def _reset_operations_state():
     glops.reset()
     yield
     glops.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_atmosphere_state():
+    """Reset atmosphere module state before each test to prevent leakage."""
+    import server.game_loop_atmosphere as glatm
+    glatm.reset()
+    yield
+    glatm.reset()

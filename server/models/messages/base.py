@@ -127,6 +127,14 @@ from server.models.messages.hazard_control import (
     HazConCancelVentPayload,
     HazConDispatchFireTeamPayload,
     HazConCancelFireTeamPayload,
+    HazConForceFieldPayload,
+    HazConSealBulkheadPayload,
+    HazConUnsealBulkheadPayload,
+    HazConOrderEvacuationPayload,
+    HazConCycleVentPayload,
+    HazConSetVentPayload,
+    HazConEmergencyVentSpacePayload,
+    HazConCancelSpaceVentPayload,
 )
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
@@ -365,6 +373,15 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "hazard_control.cancel_vent":         HazConCancelVentPayload,
     "hazard_control.dispatch_fire_team":  HazConDispatchFireTeamPayload,
     "hazard_control.cancel_fire_team":    HazConCancelFireTeamPayload,
+    # Atmosphere (v0.08 B.3)
+    "hazard_control.force_field":          HazConForceFieldPayload,
+    "hazard_control.seal_bulkhead":        HazConSealBulkheadPayload,
+    "hazard_control.unseal_bulkhead":      HazConUnsealBulkheadPayload,
+    "hazard_control.order_evacuation":     HazConOrderEvacuationPayload,
+    "hazard_control.cycle_vent":           HazConCycleVentPayload,
+    "hazard_control.set_vent":             HazConSetVentPayload,
+    "hazard_control.emergency_vent_space": HazConEmergencyVentSpacePayload,
+    "hazard_control.cancel_space_vent":    HazConCancelSpaceVentPayload,
     # Creatures (v0.05k)
     "creature.sedate":            CreatureSedatePayload,
     "creature.ew_disrupt":        CreatureEWDisruptPayload,

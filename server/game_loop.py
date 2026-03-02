@@ -182,6 +182,14 @@ from server.models.messages import (
     HazConCancelVentPayload,
     HazConDispatchFireTeamPayload,
     HazConCancelFireTeamPayload,
+    HazConForceFieldPayload,
+    HazConSealBulkheadPayload,
+    HazConUnsealBulkheadPayload,
+    HazConOrderEvacuationPayload,
+    HazConCycleVentPayload,
+    HazConSetVentPayload,
+    HazConEmergencyVentSpacePayload,
+    HazConCancelSpaceVentPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -231,6 +239,7 @@ import server.game_loop_vendor as glvr
 import server.game_loop_negotiation as glng
 import server.game_loop_salvage as glsalv
 import server.game_loop_rationing as glrat
+import server.game_loop_atmosphere as glatm
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -546,6 +555,8 @@ async def start(
     glco.reset()
     glcap.reset()
     glhc.reset()
+    glatm.reset()
+    glatm.init_atmosphere(_world.ship.interior)
     # v0.07 §3.5: Drone loadout override.
     _drone_override = None
     if _loadout_config and _loadout_config.drone_loadout is not None:
@@ -957,6 +968,8 @@ async def _loop() -> None:
         gltr.auto_engineering_tick(_world.ship, TICK_DT)
         glhc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty,
                  resources=_world.ship.resources, ship=_world.ship)
+        glatm.tick(_world.ship.interior, TICK_DT, ship=_world.ship,
+                   fires=glhc.get_fires())
         # Build lightweight contact list for drone AI from world entities.
         _fo_contacts: list[dict] = []
         for _foe in _world.enemies:
@@ -1995,6 +2008,13 @@ async def _loop() -> None:
                 Message.build("hazard_control.state", _dc_state_msg),
             )
 
+        # 11i-a. Atmosphere state → Hazard Control station.
+        _atm_state_msg = glatm.build_atmosphere_state(_world.ship.interior)
+        await _manager.broadcast_to_roles(
+            ["hazard_control"],
+            Message.build("hazard_control.atmosphere", _atm_state_msg),
+        )
+
         # 11i-b. Engineering system state → Engineering station.
         await _manager.broadcast_to_roles(
             ["engineering"],
@@ -2387,6 +2407,31 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "hazard_control.cancel_fire_team" and isinstance(payload, HazConCancelFireTeamPayload):
             glhc.cancel_fire_team(payload.room_id)
             gl.log_event("hazard_control", "cancel_fire_team", {"room_id": payload.room_id})
+        # --- Atmosphere (B.3) ---
+        elif msg_type == "hazard_control.force_field" and isinstance(payload, HazConForceFieldPayload):
+            glatm.apply_force_field(payload.room_id)
+            gl.log_event("hazard_control", "force_field", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.seal_bulkhead" and isinstance(payload, HazConSealBulkheadPayload):
+            glatm.seal_bulkhead(payload.room_id)
+            gl.log_event("hazard_control", "seal_bulkhead", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.unseal_bulkhead" and isinstance(payload, HazConUnsealBulkheadPayload):
+            glatm.unseal_bulkhead(payload.room_id)
+            gl.log_event("hazard_control", "unseal_bulkhead", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.order_evacuation" and isinstance(payload, HazConOrderEvacuationPayload):
+            glatm.order_evacuation(payload.room_id, ship.interior)
+            gl.log_event("hazard_control", "order_evacuation", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.cycle_vent" and isinstance(payload, HazConCycleVentPayload):
+            glatm.cycle_vent_state(payload.room_a, payload.room_b)
+            gl.log_event("hazard_control", "cycle_vent", {"room_a": payload.room_a, "room_b": payload.room_b})
+        elif msg_type == "hazard_control.set_vent" and isinstance(payload, HazConSetVentPayload):
+            glatm.set_vent_state(payload.room_a, payload.room_b, payload.state)
+            gl.log_event("hazard_control", "set_vent", {"room_a": payload.room_a, "room_b": payload.room_b, "state": payload.state})
+        elif msg_type == "hazard_control.emergency_vent_space" and isinstance(payload, HazConEmergencyVentSpacePayload):
+            glatm.emergency_vent_to_space(payload.room_id)
+            gl.log_event("hazard_control", "emergency_vent_space", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.cancel_space_vent" and isinstance(payload, HazConCancelSpaceVentPayload):
+            glatm.cancel_space_vent(payload.room_id)
+            gl.log_event("hazard_control", "cancel_space_vent", {"room_id": payload.room_id})
         elif msg_type == "engineering.dispatch_team" and isinstance(payload, EngineeringDispatchTeamPayload):
             gle.dispatch_team(payload.team_id, payload.system, ship.interior)
             gl.log_event("engineering", "team_dispatched", {"team_id": payload.team_id, "system": payload.system})

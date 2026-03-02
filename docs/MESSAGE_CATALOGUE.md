@@ -159,6 +159,14 @@ All entries in `_PAYLOAD_SCHEMAS` — the server accepts and validates these.
 | `hazard_control.cancel_vent` | HazConCancelVentPayload | room_id |
 | `hazard_control.dispatch_fire_team` | HazConDispatchFireTeamPayload | room_id |
 | `hazard_control.cancel_fire_team` | HazConCancelFireTeamPayload | room_id |
+| `hazard_control.force_field` | HazConForceFieldPayload | room_id |
+| `hazard_control.seal_bulkhead` | HazConSealBulkheadPayload | room_id |
+| `hazard_control.unseal_bulkhead` | HazConUnsealBulkheadPayload | room_id |
+| `hazard_control.order_evacuation` | HazConOrderEvacuationPayload | room_id |
+| `hazard_control.cycle_vent` | HazConCycleVentPayload | room_a, room_b |
+| `hazard_control.set_vent` | HazConSetVentPayload | room_a, room_b, state |
+| `hazard_control.emergency_vent_space` | HazConEmergencyVentSpacePayload | room_id |
+| `hazard_control.cancel_space_vent` | HazConCancelSpaceVentPayload | room_id |
 
 ### Creatures
 

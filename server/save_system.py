@@ -51,6 +51,7 @@ import server.game_loop_vendor as glvr
 import server.game_loop_negotiation as glng
 import server.game_loop_salvage as glsalv
 import server.game_loop_rationing as glrat
+import server.game_loop_atmosphere as glatm
 
 from server.difficulty import DifficultySettings
 from server.models.crew import CrewRoster, DeckCrew
@@ -560,6 +561,7 @@ def save_game(
             "security": gls.serialise(),
             "flight_ops": glfo.serialise(),
             "hazard_control": glhc.serialise(),
+            "atmosphere": glatm.serialise(),
             "comms": glco.serialise(),
             "captain_log": glcap.serialise(),
             "training": gltr.serialise(),
@@ -656,6 +658,8 @@ def restore_game(save_id: str, world: World) -> dict:
         glfo.deserialise(mods["flight_ops"])
     if mods.get("hazard_control"):
         glhc.deserialise(mods["hazard_control"])
+    if mods.get("atmosphere"):
+        glatm.deserialise(mods["atmosphere"])
     if mods.get("comms"):
         glco.deserialise(mods["comms"])
     if mods.get("captain_log"):
