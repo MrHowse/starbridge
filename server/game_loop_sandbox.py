@@ -73,7 +73,15 @@ MISSION_TYPE_BUDGET: list[tuple[str, float, int]] = [
     ("diplomatic",    1.0, 1),
     ("intercept",     0.5, 1),
     ("trap",          1.5, 2),
+    ("patrol",        1.5, 2),
+    ("salvage",       1.5, 2),
 ]
+
+# Target travel time to mission waypoint (seconds).
+MISSION_TARGET_TRAVEL_SECS: tuple[float, float] = (60.0, 120.0)
+
+# First mission is close to teach the crew how missions work.
+FIRST_MISSION_MAX_DIST: float = 5_000.0
 
 # Vessel name pool for generated mission signals.
 _MISSION_VESSEL_NAMES: list[str] = [
@@ -152,6 +160,7 @@ _active: bool = False
 _timers: dict[str, float] = {}
 _entity_counter: int = 0   # offset counter for unique IDs
 _mission_type_counts: dict[str, int] = {}  # per-session mission variety tracking
+_first_mission_generated: bool = False  # first mission gets close distance
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -160,11 +169,12 @@ _mission_type_counts: dict[str, int] = {}  # per-session mission variety trackin
 
 def reset(active: bool = False) -> None:
     """Reset sandbox scheduler.  Pass active=True to start the scheduler."""
-    global _active, _entity_counter
+    global _active, _entity_counter, _first_mission_generated
     _active = active
     _entity_counter = 1000    # offset well above mission-spawned entity IDs
     _timers.clear()
     _mission_type_counts.clear()
+    _first_mission_generated = False
     if active:
         # Stagger initial timers so all events don't fire simultaneously.
         _timers["enemy_spawn"]          = random.uniform(30.0,  60.0)   # first wave sooner
@@ -219,13 +229,26 @@ def _build_mission_signal(mission_type: str, world: "World") -> dict | None:
 
     Returns None if the type is unrecognised.
     """
-    global _entity_counter
+    global _entity_counter, _first_mission_generated
     _entity_counter += 1
     entity_id = f"sb_m{_entity_counter}"
 
     ship = world.ship
+
+    # Calculate max distance based on ship speed (60-120 seconds of travel)
+    from server.systems.physics import max_speed as _phys_max_speed
+    effective_speed = max(_phys_max_speed(ship), ship.max_speed_base * 0.5)
+
+    if not _first_mission_generated:
+        # First mission is close to teach the crew how missions work
+        dist = random.uniform(2_000.0, FIRST_MISSION_MAX_DIST)
+        _first_mission_generated = True
+    else:
+        min_dist = effective_speed * MISSION_TARGET_TRAVEL_SECS[0]
+        max_dist = effective_speed * MISSION_TARGET_TRAVEL_SECS[1]
+        dist = random.uniform(min_dist, max_dist)
+
     angle = random.uniform(0.0, 360.0)
-    dist = random.uniform(25_000.0, 55_000.0)
     px = max(5_000.0, min(world.width - 5_000.0,
                           ship.x + math.cos(math.radians(angle)) * dist))
     py = max(5_000.0, min(world.height - 5_000.0,
@@ -352,6 +375,41 @@ def _build_mission_signal(mission_type: str, world: "World") -> dict | None:
             faction=faction,
             threat_level="distress",
             location_data={**loc, "is_trap": True},
+        )
+
+    elif mission_type == "patrol":
+        faction = random.choice(["federation", "imperial"])
+        params = dict(
+            source=f"fleet_command_{entity_id}",
+            source_name=f"{faction.title()} Fleet Command",
+            frequency=_MISSION_FACTION_FREQ.get(faction, 0.65),
+            signal_type="broadcast",
+            priority="normal",
+            raw_content=f"Patrol sector grid reference {random.randint(1,9)}-{random.randint(1,9)}. Report contacts.",
+            decoded_content=f"Patrol sector grid. Scan and report all contacts in area.",
+            auto_decoded=True,
+            requires_decode=False,
+            faction=faction,
+            threat_level="low",
+            intel_category="fleet",
+            location_data=loc,
+        )
+
+    elif mission_type == "salvage":
+        params = dict(
+            source=f"nav_beacon_{entity_id}",
+            source_name="Navigation Beacon",
+            frequency=0.55,
+            signal_type="broadcast",
+            priority="low",
+            raw_content=f"Debris field detected at nav reference. Possible salvage opportunity.",
+            decoded_content=f"Debris field with potential salvage. Caution: hazards present.",
+            auto_decoded=True,
+            requires_decode=False,
+            faction="civilian",
+            threat_level="low",
+            intel_category="navigation",
+            location_data=loc,
         )
 
     else:

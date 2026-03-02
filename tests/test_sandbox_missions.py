@@ -90,10 +90,8 @@ class TestMissionSignalTimer:
 class TestMissionTypeSelection:
     def test_pick_returns_valid_type(self) -> None:
         result = glsb._pick_mission_type()
-        assert result in (
-            "rescue", "investigation", "escort", "trade",
-            "diplomatic", "intercept", "trap", None,
-        )
+        valid_types = {t[0] for t in glsb.MISSION_TYPE_BUDGET} | {None}
+        assert result in valid_types
 
     def test_pick_respects_per_session_caps(self) -> None:
         """Once a type hits its max, it should not be selected again."""
@@ -201,15 +199,19 @@ class TestSignalParams:
         assert glsb._build_mission_signal("nonexistent", world) is None
 
     def test_position_near_ship(self) -> None:
-        """Generated signal position should be 25k-55k from ship."""
+        """Generated signal position should be within ship-speed-based range."""
         world = _make_world()
-        evt = glsb._build_mission_signal("rescue", world)
+        # Reset to clear first-mission flag, then generate a second mission
+        glsb.reset(active=True)
+        glsb._build_mission_signal("rescue", world)  # consume first-mission (close)
+        evt = glsb._build_mission_signal("rescue", world)  # second: speed-based
         assert evt is not None
         pos = evt["signal_params"]["location_data"]["position"]
         dx = pos[0] - world.ship.x
         dy = pos[1] - world.ship.y
         dist = (dx ** 2 + dy ** 2) ** 0.5
-        assert 5_000 <= dist <= 80_000  # generous bounds for clamping
+        max_dist = world.ship.max_speed_base * glsb.MISSION_TARGET_TRAVEL_SECS[1]
+        assert dist <= max_dist + 500  # generous bounds for clamping
 
     def test_position_within_world_bounds(self) -> None:
         world = _make_world()
@@ -510,3 +512,58 @@ class TestSandboxMissionPipeline:
         # No mission yet (requires decode)
         pending = glco.pop_pending_generated_missions()
         assert len(pending) == 0
+
+
+# ---------------------------------------------------------------------------
+# Mission distance scaling (playtest-fix-04)
+# ---------------------------------------------------------------------------
+
+
+class TestMissionDistanceScaling:
+    def test_mission_waypoints_within_speed_range(self) -> None:
+        """All mission waypoints should be reachable within ~120 seconds."""
+        import math
+        glsb.reset(active=True)
+        world = _make_world()
+        ship = world.ship
+        ship.max_speed_base = 120.0  # cruiser
+
+        for _ in range(10):
+            for mtype in ("rescue", "escort", "investigation", "trade",
+                          "patrol", "salvage"):
+                evt = glsb._build_mission_signal(mtype, world)
+                if evt is None:
+                    continue
+                loc = evt["signal_params"].get("location_data", {})
+                pos = loc.get("position")
+                if pos is None:
+                    continue
+                dx = pos[0] - ship.x
+                dy = pos[1] - ship.y
+                dist = math.sqrt(dx * dx + dy * dy)
+                max_dist = ship.max_speed_base * 120  # 2 minutes at max speed
+                assert dist <= max_dist + 100, (
+                    f"{mtype} waypoint at {dist:.0f} exceeds "
+                    f"max reachable {max_dist:.0f}"
+                )
+
+    def test_first_mission_is_close(self) -> None:
+        """First mission generated should be within FIRST_MISSION_MAX_DIST."""
+        import math
+        glsb.reset(active=True)
+        world = _make_world()
+        ship = world.ship
+
+        evt = glsb._build_mission_signal("rescue", world)
+        assert evt is not None
+        pos = evt["signal_params"]["location_data"]["position"]
+        dx = pos[0] - ship.x
+        dy = pos[1] - ship.y
+        dist = math.sqrt(dx * dx + dy * dy)
+        assert dist <= glsb.FIRST_MISSION_MAX_DIST + 100
+
+    def test_mission_type_variety_includes_patrol_and_salvage(self) -> None:
+        """Mission type budget should include patrol and salvage."""
+        type_keys = [t[0] for t in glsb.MISSION_TYPE_BUDGET]
+        assert "patrol" in type_keys
+        assert "salvage" in type_keys

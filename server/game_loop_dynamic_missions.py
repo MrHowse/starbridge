@@ -25,6 +25,9 @@ from server.models.dynamic_mission import (
 
 logger = logging.getLogger("starbridge.dynamic_missions")
 
+# Buffer added to completion deadline beyond travel time
+_COMPLETION_BUFFER_SECS: float = 60.0
+
 # ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
@@ -86,6 +89,35 @@ def next_mission_id() -> str:
 # Offer / Accept / Decline
 # ---------------------------------------------------------------------------
 
+def adjust_deadlines_for_travel(
+    mission: DynamicMission,
+    ship_x: float, ship_y: float, ship_speed: float,
+) -> None:
+    """Extend mission deadlines to account for travel distance.
+
+    Called before offering so completion deadline includes travel time.
+    """
+    if not mission.waypoint or ship_speed <= 0:
+        return
+    # Estimate travel distance
+    import math
+    wx, wy = mission.waypoint
+    dx = wx - ship_x
+    dy = wy - ship_y
+    travel_dist = math.sqrt(dx * dx + dy * dy)
+    travel_secs = travel_dist / ship_speed
+
+    # Extend completion deadline by travel time + buffer
+    obj_time = (mission.completion_deadline or DEFAULT_COMPLETION_DEADLINE)
+    new_deadline = travel_secs + obj_time + _COMPLETION_BUFFER_SECS
+    mission.completion_deadline = new_deadline
+
+    # Accept deadline: at least travel_time * 0.5 (gives time to consider while moving)
+    min_accept = max(DEFAULT_ACCEPT_DEADLINE, travel_secs * 0.5)
+    if mission.accept_deadline is not None and mission.accept_deadline < min_accept:
+        mission.accept_deadline = min_accept
+
+
 def offer_mission(mission: DynamicMission) -> bool:
     """Add a mission to the offered list.
 
@@ -104,6 +136,8 @@ def offer_mission(mission: DynamicMission) -> bool:
         mission.offered_tick = _tick
     if mission.deadline_tick is None and mission.accept_deadline is not None:
         mission.deadline_tick = _tick + int(mission.accept_deadline * 10)  # 10Hz ticks
+    if mission.completion_deadline_tick is None and mission.completion_deadline is not None:
+        mission.completion_deadline_tick = _tick + int(mission.completion_deadline * 10)
     _missions.append(mission)
 
     _pending_mission_events.append({
