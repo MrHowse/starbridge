@@ -513,7 +513,12 @@ def tick(
     # --- Crew casualty — accident on a random deck (Medical) --------------
     if _timers.get("crew_casualty", 1.0) <= 0.0:
         deck = random.choice(CREW_DECKS)
-        events.append({"type": "crew_casualty", "deck": deck, "count": 1})
+        _casualty_cause = random.choice([
+            "system_malfunction", "system_malfunction",
+            "fire", "explosion", "hull_breach",
+        ])
+        events.append({"type": "crew_casualty", "deck": deck, "count": 1,
+                        "cause": _casualty_cause})
         _timers["crew_casualty"] = random.uniform(*CREW_CASUALTY_INTERVAL) * _evt_mult
 
     # --- Boarding attempt (Security) --------------------------------------

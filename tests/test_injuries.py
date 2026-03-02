@@ -620,3 +620,73 @@ def test_severity_progression_constants():
     assert SEVERITY_PROGRESSION["moderate"] == "serious"
     assert SEVERITY_PROGRESSION["serious"] == "critical"
     assert "critical" not in SEVERITY_PROGRESSION
+
+
+# ---------------------------------------------------------------------------
+# Playtest Fix 7: Injury variety
+# ---------------------------------------------------------------------------
+
+
+def test_system_malfunction_has_all_severity_levels():
+    """system_malfunction templates now cover minor through critical."""
+    from server.models.injuries import INJURY_TEMPLATES
+    templates = INJURY_TEMPLATES["system_malfunction"]
+    severities = {t.severity for t in templates}
+    assert "minor" in severities
+    assert "moderate" in severities
+    assert "serious" in severities
+    assert "critical" in severities
+
+
+def test_system_malfunction_has_at_least_five_types():
+    """system_malfunction should have enough variety for a 12-min session."""
+    from server.models.injuries import INJURY_TEMPLATES
+    templates = INJURY_TEMPLATES["system_malfunction"]
+    types = {t.type for t in templates}
+    assert len(types) >= 5
+
+
+def test_no_repeat_body_regions_on_same_crew():
+    """When a crew member gets 2 injuries, body regions should differ."""
+    from server.models.injuries import generate_injuries, INJURY_TEMPLATES
+    rng = random.Random(123)
+    # Force every crew member to get 2 injuries.
+    roster = make_roster_with_deck(1, count=10)
+    # Run many trials to find someone with 2 injuries on different regions.
+    all_results = []
+    for seed in range(50):
+        rng = random.Random(seed)
+        results = generate_injuries("explosion", 1, roster, severity_scale=5.0, rng=rng)
+        # Group by crew
+        by_crew: dict[str, list] = {}
+        for cid, inj in results:
+            by_crew.setdefault(cid, []).append(inj)
+        for cid, injuries in by_crew.items():
+            if len(injuries) >= 2:
+                regions = [inj.body_region for inj in injuries]
+                # With the fix, regions should be different.
+                all_results.append(len(set(regions)) == len(regions))
+    # Over many trials, most should have distinct regions.
+    if all_results:
+        assert sum(all_results) / len(all_results) > 0.8
+
+
+def test_sandbox_crew_casualty_cause_varies():
+    """Sandbox crew casualties should use varied injury causes."""
+    import server.game_loop_sandbox as sb
+    from server.models.world import World
+    from server.models.ship import Ship
+    causes: set[str] = set()
+    for seed in range(50):
+        random.seed(seed)
+        sb.reset(active=True)
+        sb._timers["crew_casualty"] = 0.05
+        ship = Ship()
+        ship.x, ship.y = 50000.0, 50000.0
+        world = World(ship=ship, width=100_000, height=100_000)
+        events = sb.tick(world, dt=0.1)
+        for e in events:
+            if e["type"] == "crew_casualty":
+                causes.add(e.get("cause", "system_malfunction"))
+    # Should see at least 2 different causes over 50 trials.
+    assert len(causes) >= 2, f"Only saw causes: {causes}"

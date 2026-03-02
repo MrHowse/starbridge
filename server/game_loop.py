@@ -1465,8 +1465,9 @@ async def _loop() -> None:
                 if _sb_roster is not None:
                     _DECK_NAME_TO_NUM = {"bridge": 1, "sensors": 2, "weapons": 3, "shields": 3, "engineering": 5, "medical": 4}
                     _sb_phys_deck = _DECK_NAME_TO_NUM.get(sb_evt["deck"], 1)
+                    _sb_cause = sb_evt.get("cause", "system_malfunction")
                     _sb_injuries = generate_injuries(
-                        "system_malfunction", _sb_phys_deck, _sb_roster,
+                        _sb_cause, _sb_phys_deck, _sb_roster,
                         severity_scale=1.0, tick=_tick_count,
                         difficulty=_world.ship.difficulty,
                     )

@@ -177,6 +177,16 @@ INJURY_TEMPLATES: dict[str, list[InjuryTemplate]] = {
                         "Limb caught in failed mechanism"),
         InjuryTemplate("electrical_shock", "torso", "serious", "stabilise", 25.0,
                         "Cardiac involvement from electrical shock"),
+        InjuryTemplate("plasma_burn", "random", "critical", "intensive_care", 45.0,
+                        "Plasma conduit rupture burn to [region]"),
+        InjuryTemplate("contusion", "random", "minor", "first_aid", 10.0,
+                        "Bruising from equipment shift"),
+        InjuryTemplate("sprain", "random_limb", "minor", "first_aid", 8.0,
+                        "Twisted [region] during system failure"),
+        InjuryTemplate("chemical_exposure", "random", "moderate", "stabilise", 20.0,
+                        "Coolant leak exposure to [region]"),
+        InjuryTemplate("debris_laceration", "random", "moderate", "first_aid", 12.0,
+                        "Cut from falling panel on [region]"),
     ],
 }
 
@@ -265,6 +275,7 @@ def generate_injuries(
         # Number of injuries: 1-2
         num_injuries = 1 if rng.random() < 0.7 else 2
 
+        used_regions: set[str] = set()
         for _ in range(num_injuries):
             # Severity bias: higher bias weights toward more severe templates.
             if severity_bias != 0.5 and len(templates) > 1:
@@ -285,6 +296,12 @@ def generate_injuries(
             else:
                 template = rng.choice(templates)
             body_region = _resolve_body_region(template.body_region, rng)
+            # Avoid repeating body regions on the same crew member.
+            if body_region in used_regions and body_region != "whole_body":
+                alt_regions = [r for r in BODY_REGIONS if r not in used_regions]
+                if alt_regions:
+                    body_region = rng.choice(alt_regions)
+            used_regions.add(body_region)
             description = _resolve_description(template.description, body_region)
 
             severity = template.severity
