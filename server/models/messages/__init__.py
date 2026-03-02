@@ -170,6 +170,8 @@ from server.models.messages.operations import (
     OpsCancelSensorFocusPayload,
     OpsStartDamageCoordinationPayload,
     OpsIssueEvasionAlertPayload,
+    OpsMarkObjectivePayload,
+    OpsStationAdvisoryPayload,
 )
 
 # Game lifecycle
@@ -404,6 +406,8 @@ __all__ = [
     "OpsCancelSensorFocusPayload",
     "OpsStartDamageCoordinationPayload",
     "OpsIssueEvasionAlertPayload",
+    "OpsMarkObjectivePayload",
+    "OpsStationAdvisoryPayload",
     # game
     "ErrorValidationPayload",
     "ErrorPermissionPayload",

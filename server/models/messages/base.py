@@ -117,6 +117,8 @@ from server.models.messages.operations import (
     OpsCancelSensorFocusPayload,
     OpsStartDamageCoordinationPayload,
     OpsIssueEvasionAlertPayload,
+    OpsMarkObjectivePayload,
+    OpsStationAdvisoryPayload,
 )
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
@@ -344,6 +346,8 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "operations.cancel_sensor_focus": OpsCancelSensorFocusPayload,
     "operations.start_damage_coordination": OpsStartDamageCoordinationPayload,
     "operations.issue_evasion_alert": OpsIssueEvasionAlertPayload,
+    "operations.mark_objective": OpsMarkObjectivePayload,
+    "operations.station_advisory": OpsStationAdvisoryPayload,
     # Damage Control (aliases engineering DCT payloads)
     "damage_control.dispatch_dct": EngineeringDispatchDCTPayload,
     "damage_control.cancel_dct":   EngineeringCancelDCTPayload,

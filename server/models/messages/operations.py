@@ -78,3 +78,17 @@ class OpsStartDamageCoordinationPayload(BaseModel):
 class OpsIssueEvasionAlertPayload(BaseModel):
     """Issue evasion alert with recommended heading (A.3.4.1)."""
     bearing: float
+
+
+# --- A.4 Mission Management ---
+
+
+class OpsMarkObjectivePayload(BaseModel):
+    """Mark an objective as 'IN PROGRESS' (A.4.3)."""
+    objective_id: str
+
+
+class OpsStationAdvisoryPayload(BaseModel):
+    """Send a station advisory message (A.4.4–A.4.5)."""
+    target_station: str
+    message: str

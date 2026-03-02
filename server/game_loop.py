@@ -135,6 +135,8 @@ from server.models.messages import (
     OpsCancelSensorFocusPayload,
     OpsStartDamageCoordinationPayload,
     OpsIssueEvasionAlertPayload,
+    OpsMarkObjectivePayload,
+    OpsStationAdvisoryPayload,
     FlagBridgeAddDrawingPayload,
     FlagBridgeRemoveDrawingPayload,
     FlagBridgeClearDrawingsPayload,
@@ -2778,6 +2780,12 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "operations.issue_evasion_alert" and isinstance(payload, OpsIssueEvasionAlertPayload):
             result = glops.issue_evasion_alert(payload.bearing)
             gl.log_event("operations", "issue_evasion_alert", {"bearing": payload.bearing, **result})
+        elif msg_type == "operations.mark_objective" and isinstance(payload, OpsMarkObjectivePayload):
+            result = glops.mark_objective(payload.objective_id)
+            gl.log_event("operations", "mark_objective", {"objective_id": payload.objective_id, **result})
+        elif msg_type == "operations.station_advisory" and isinstance(payload, OpsStationAdvisoryPayload):
+            result = glops.send_station_advisory(payload.target_station, payload.message)
+            gl.log_event("operations", "station_advisory", {"target": payload.target_station, **result})
         # --- Flag Bridge (v0.07 §2.4) ---
         elif msg_type == "captain.flag_add_drawing" and isinstance(payload, FlagBridgeAddDrawingPayload):
             result = glfb.add_drawing(

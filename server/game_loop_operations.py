@@ -82,6 +82,35 @@ EVASION_ALERT_RESPONSE_WINDOW: float = 5.0  # seconds (A.3.4.3)
 EVASION_ALERT_TORPEDO_REDUCTION: float = 0.15  # -15% (A.3.4.3)
 EVASION_HELM_TOLERANCE: float = 30.0       # degrees tolerance for "following" (A.3.4.3)
 
+# ---------------------------------------------------------------------------
+# Constants (A.4)
+# ---------------------------------------------------------------------------
+
+ADVISORY_DURATION: float = 15.0   # seconds (A.4.5)
+ADVISORY_MAX_LENGTH: int = 80     # characters (A.4.5)
+
+_VALID_ADVISORY_STATIONS = (
+    "helm", "weapons", "science", "engineering", "medical", "security",
+    "comms", "flight_ops", "electronic_warfare", "damage_control",
+    "captain", "operations",
+)
+
+# Keyword → station mapping for inferring responsible station from objective text.
+_STATION_KEYWORDS: list[tuple[str, list[str]]] = [
+    ("weapons", ["destroy", "neutralis", "neutraliz", "fire", "attack", "engage",
+                  "hostil", "enemy", "enemies", "torpedo", "beam", "combat"]),
+    ("helm", ["navigate", "waypoint", "heading", "course", "position", "approach",
+              "distance", "move", "fly", "dock", "undock"]),
+    ("science", ["scan", "sensor", "detect", "survey", "analy"]),
+    ("comms", ["hail", "signal", "comm", "decode", "contact", "frequency"]),
+    ("engineering", ["repair", "power", "system", "engine", "reactor"]),
+    ("medical", ["medical", "treat", "patient", "casualt", "heal", "injur"]),
+    ("security", ["board", "intrud", "secur", "breach"]),
+    ("flight_ops", ["drone", "launch", "recover", "flight", "deploy"]),
+    ("electronic_warfare", ["jam", "stealth", "electronic", "ecm", "ghost"]),
+    ("damage_control", ["hull", "fire", "breach", "damage"]),
+]
+
 
 # ---------------------------------------------------------------------------
 # Assessment dataclass
@@ -182,6 +211,10 @@ _damage_coordination: DamageCoordination | None = None
 _evasion_alert: EvasionAlert | None = None
 _evasion_cooldown: float = 0.0
 
+# A.4 — mission management state
+_objectives_marked: set[str] = set()  # objective IDs marked "in progress" by Ops
+_station_advisories: dict[str, tuple[str, float]] = {}  # station → (message, timer)
+
 
 # ---------------------------------------------------------------------------
 # Public API — Game loop interface
@@ -193,6 +226,7 @@ def reset() -> None:
     global _assessments, _active_id, _pending_broadcasts, _elapsed
     global _weapons_helm_sync, _sync_cooldown, _sensor_focus
     global _damage_coordination, _evasion_alert, _evasion_cooldown
+    global _objectives_marked, _station_advisories
     _assessments = {}
     _active_id = None
     _pending_broadcasts = []
@@ -203,6 +237,8 @@ def reset() -> None:
     _damage_coordination = None
     _evasion_alert = None
     _evasion_cooldown = 0.0
+    _objectives_marked = set()
+    _station_advisories = {}
 
 
 def tick(world: World, ship: Ship, dt: float) -> None:
@@ -292,6 +328,9 @@ def tick(world: World, ship: Ship, dt: float) -> None:
     _tick_damage_coordination(world, ship, dt)
     _tick_evasion_alert(ship, dt)
 
+    # --- A.4 Advisory ticks ---
+    _tick_advisories(dt)
+
 
 def pop_pending_broadcasts() -> list[tuple[list[str], dict]]:
     """Return and clear pending broadcasts."""
@@ -337,7 +376,8 @@ def build_state(world: World, ship: Ship) -> dict:
         "assessments": assessments,
         "active_assessment_id": _active_id,
         "coordination_bonuses": _build_coordination_state(ship),
-        "mission_tracking": [],       # Stub for A.4
+        "mission_tracking": _build_mission_tracking(),
+        "station_advisories": _build_advisories_state(),
         "feed_events": [],            # Stub for A.5
     }
 
@@ -397,6 +437,11 @@ def serialise() -> dict:
         "active_id": _active_id,
         "elapsed": _elapsed,
         "coordination": coord,
+        "objectives_marked": list(_objectives_marked),
+        "station_advisories": {
+            st: {"message": msg, "timer": t}
+            for st, (msg, t) in _station_advisories.items()
+        },
     }
 
 
@@ -405,10 +450,17 @@ def deserialise(data: dict) -> None:
     global _assessments, _active_id, _elapsed, _pending_broadcasts
     global _weapons_helm_sync, _sync_cooldown, _sensor_focus
     global _damage_coordination, _evasion_alert, _evasion_cooldown
+    global _objectives_marked, _station_advisories
     _pending_broadcasts = []
     _assessments = {}
     _active_id = data.get("active_id")
     _elapsed = data.get("elapsed", 0.0)
+
+    # Restore A.4 mission management state.
+    _objectives_marked = set(data.get("objectives_marked", []))
+    _station_advisories = {}
+    for st, ad in data.get("station_advisories", {}).items():
+        _station_advisories[st] = (ad["message"], ad["timer"])
 
     # Restore A.3 coordination state.
     coord = data.get("coordination", {})
@@ -791,6 +843,57 @@ def check_vulnerable_facing_bonus(
 
 
 # ---------------------------------------------------------------------------
+# Public API — A.4 Mission Management message handlers
+# ---------------------------------------------------------------------------
+
+
+def mark_objective(objective_id: str) -> dict:
+    """Mark an objective as 'IN PROGRESS' — appears on Captain's display (A.4.3)."""
+    import server.game_loop_mission as glm
+
+    engine = glm.get_mission_engine()
+    if engine is None:
+        return {"ok": False, "reason": "No active mission."}
+    # Verify objective exists and is active.
+    valid_ids = {o.id for o in engine.get_objectives()}
+    if objective_id not in valid_ids:
+        return {"ok": False, "reason": f"Unknown objective: {objective_id}"}
+    _objectives_marked.add(objective_id)
+    _pending_broadcasts.append(
+        (
+            ["captain", "operations"],
+            {
+                "type": "objective_marked",
+                "objective_id": objective_id,
+            },
+        )
+    )
+    return {"ok": True}
+
+
+def send_station_advisory(target_station: str, message: str) -> dict:
+    """Send a station advisory to a specific station (A.4.4–A.4.5)."""
+    if target_station not in _VALID_ADVISORY_STATIONS:
+        return {"ok": False, "reason": f"Invalid station: {target_station}"}
+    if len(message) > ADVISORY_MAX_LENGTH:
+        message = message[:ADVISORY_MAX_LENGTH]
+    if not message.strip():
+        return {"ok": False, "reason": "Message cannot be empty."}
+    _station_advisories[target_station] = (message, ADVISORY_DURATION)
+    _pending_broadcasts.append(
+        (
+            [target_station],
+            {
+                "type": "station_advisory",
+                "from": "operations",
+                "message": message,
+            },
+        )
+    )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Public API — A.3 Coordination query functions
 # ---------------------------------------------------------------------------
 
@@ -845,6 +948,24 @@ def get_evasion_alert_active() -> tuple[bool, float]:
     if _evasion_alert is not None and _evasion_alert.helm_following:
         return (True, EVASION_ALERT_TORPEDO_REDUCTION)
     return (False, 0.0)
+
+
+# ---------------------------------------------------------------------------
+# Public API — A.4 Mission Management query functions
+# ---------------------------------------------------------------------------
+
+
+def get_station_advisory(station: str) -> str | None:
+    """Return the active advisory message for a station, or None (A.4.5)."""
+    entry = _station_advisories.get(station)
+    if entry is None:
+        return None
+    return entry[0]
+
+
+def get_objectives_marked() -> set[str]:
+    """Return the set of objective IDs marked 'in progress' by Ops (A.4.3)."""
+    return set(_objectives_marked)
 
 
 # ---------------------------------------------------------------------------
@@ -960,6 +1081,69 @@ def _recompute_prediction(asmt: BattleAssessment, enemy: Enemy) -> None:
             asmt.prediction_confidence = "low"
     else:
         asmt.prediction_confidence = "medium"
+
+
+# ---------------------------------------------------------------------------
+# A.4 Mission management helpers
+# ---------------------------------------------------------------------------
+
+
+def _tick_advisories(dt: float) -> None:
+    """Tick station advisory timers — expire after ADVISORY_DURATION (A.4.5)."""
+    expired: list[str] = []
+    for station, (msg, timer) in _station_advisories.items():
+        new_timer = timer - dt
+        if new_timer <= 0.0:
+            expired.append(station)
+        else:
+            _station_advisories[station] = (msg, new_timer)
+    for station in expired:
+        del _station_advisories[station]
+
+
+def _infer_responsible_station(text: str) -> str:
+    """Infer which station is primarily responsible for an objective (A.4.2)."""
+    lower = text.lower()
+    for station, keywords in _STATION_KEYWORDS:
+        for kw in keywords:
+            if kw in lower:
+                return station
+    return "operations"
+
+
+def _build_mission_tracking() -> dict:
+    """Build mission tracking data for build_state (A.4.1–A.4.3)."""
+    import server.game_loop_mission as glm
+
+    engine = glm.get_mission_engine()
+    if engine is None:
+        return {"title": None, "objectives": []}
+    mission_dict = glm.get_mission_dict()
+    title = mission_dict.get("title", "Unknown Mission")
+    objectives = engine.get_objectives()
+
+    obj_list: list[dict] = []
+    for obj in objectives:
+        entry: dict = {
+            "id": obj.id,
+            "text": obj.text,
+            "status": obj.status,
+            "ops_marked": obj.id in _objectives_marked,
+            "responsible_station": _infer_responsible_station(obj.text),
+        }
+        obj_list.append(entry)
+    return {"title": title, "objectives": obj_list}
+
+
+def _build_advisories_state() -> dict:
+    """Build station advisories state for build_state (A.4.4–A.4.5)."""
+    return {
+        station: {
+            "message": msg,
+            "timer": round(timer, 2),
+        }
+        for station, (msg, timer) in _station_advisories.items()
+    }
 
 
 # ---------------------------------------------------------------------------
