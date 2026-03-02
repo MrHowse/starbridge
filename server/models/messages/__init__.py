@@ -164,6 +164,12 @@ from server.models.messages.operations import (
     OpsSetPrioritySubsystemPayload,
     OpsTogglePredictionPayload,
     OpsSetThreatLevelPayload,
+    OpsSetWeaponsHelmSyncPayload,
+    OpsCancelWeaponsHelmSyncPayload,
+    OpsSetSensorFocusPayload,
+    OpsCancelSensorFocusPayload,
+    OpsStartDamageCoordinationPayload,
+    OpsIssueEvasionAlertPayload,
 )
 
 # Game lifecycle
@@ -392,6 +398,12 @@ __all__ = [
     "OpsSetPrioritySubsystemPayload",
     "OpsTogglePredictionPayload",
     "OpsSetThreatLevelPayload",
+    "OpsSetWeaponsHelmSyncPayload",
+    "OpsCancelWeaponsHelmSyncPayload",
+    "OpsSetSensorFocusPayload",
+    "OpsCancelSensorFocusPayload",
+    "OpsStartDamageCoordinationPayload",
+    "OpsIssueEvasionAlertPayload",
     # game
     "ErrorValidationPayload",
     "ErrorPermissionPayload",

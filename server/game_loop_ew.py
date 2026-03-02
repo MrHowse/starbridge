@@ -555,6 +555,15 @@ def tick(world: World, ship: Ship, dt: float) -> None:
     effective_range = JAM_BASE_RANGE * ecm_eff
     buildup_rate = JAM_BUILDUP_RATE * ecm_eff
 
+    # v0.08 A.3.2.2: sensor focus jam effectiveness bonus (+20% if target in zone).
+    import server.game_loop_operations as _glops
+    if _jam_target_id:
+        _jam_enemy = next((e for e in world.enemies if e.id == _jam_target_id), None)
+        if _jam_enemy:
+            _jb = _glops.get_sensor_focus_bonus(_jam_enemy.x, _jam_enemy.y)
+            if "jam" in _jb:
+                buildup_rate *= (1.0 + _jb["jam"])
+
     for enemy in world.enemies:
         if enemy.id == _jam_target_id and effective_range > 0.0:
             dist = distance(ship.x, ship.y, enemy.x, enemy.y)

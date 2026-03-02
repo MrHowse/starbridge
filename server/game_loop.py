@@ -129,6 +129,12 @@ from server.models.messages import (
     OpsSetPrioritySubsystemPayload,
     OpsTogglePredictionPayload,
     OpsSetThreatLevelPayload,
+    OpsSetWeaponsHelmSyncPayload,
+    OpsCancelWeaponsHelmSyncPayload,
+    OpsSetSensorFocusPayload,
+    OpsCancelSensorFocusPayload,
+    OpsStartDamageCoordinationPayload,
+    OpsIssueEvasionAlertPayload,
     FlagBridgeAddDrawingPayload,
     FlagBridgeRemoveDrawingPayload,
     FlagBridgeClearDrawingsPayload,
@@ -2754,6 +2760,24 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "operations.set_threat_level" and isinstance(payload, OpsSetThreatLevelPayload):
             result = glops.set_threat_level(payload.contact_id, payload.level)
             gl.log_event("operations", "set_threat_level", {"contact_id": payload.contact_id, "level": payload.level, **result})
+        elif msg_type == "operations.set_weapons_helm_sync" and isinstance(payload, OpsSetWeaponsHelmSyncPayload):
+            result = glops.set_weapons_helm_sync(payload.contact_id, _world, _world.ship)
+            gl.log_event("operations", "set_weapons_helm_sync", {"contact_id": payload.contact_id, **result})
+        elif msg_type == "operations.cancel_weapons_helm_sync" and isinstance(payload, OpsCancelWeaponsHelmSyncPayload):
+            result = glops.cancel_weapons_helm_sync()
+            gl.log_event("operations", "cancel_weapons_helm_sync", result)
+        elif msg_type == "operations.set_sensor_focus" and isinstance(payload, OpsSetSensorFocusPayload):
+            result = glops.set_sensor_focus(payload.center_x, payload.center_y, payload.radius)
+            gl.log_event("operations", "set_sensor_focus", {"center_x": payload.center_x, "center_y": payload.center_y, "radius": payload.radius, **result})
+        elif msg_type == "operations.cancel_sensor_focus" and isinstance(payload, OpsCancelSensorFocusPayload):
+            result = glops.cancel_sensor_focus()
+            gl.log_event("operations", "cancel_sensor_focus", result)
+        elif msg_type == "operations.start_damage_coordination" and isinstance(payload, OpsStartDamageCoordinationPayload):
+            result = glops.start_damage_coordination()
+            gl.log_event("operations", "start_damage_coordination", result)
+        elif msg_type == "operations.issue_evasion_alert" and isinstance(payload, OpsIssueEvasionAlertPayload):
+            result = glops.issue_evasion_alert(payload.bearing)
+            gl.log_event("operations", "issue_evasion_alert", {"bearing": payload.bearing, **result})
         # --- Flag Bridge (v0.07 §2.4) ---
         elif msg_type == "captain.flag_add_drawing" and isinstance(payload, FlagBridgeAddDrawingPayload):
             result = glfb.add_drawing(

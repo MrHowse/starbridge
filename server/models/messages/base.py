@@ -111,6 +111,12 @@ from server.models.messages.operations import (
     OpsSetPrioritySubsystemPayload,
     OpsTogglePredictionPayload,
     OpsSetThreatLevelPayload,
+    OpsSetWeaponsHelmSyncPayload,
+    OpsCancelWeaponsHelmSyncPayload,
+    OpsSetSensorFocusPayload,
+    OpsCancelSensorFocusPayload,
+    OpsStartDamageCoordinationPayload,
+    OpsIssueEvasionAlertPayload,
 )
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
@@ -332,6 +338,12 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "operations.set_priority_subsystem": OpsSetPrioritySubsystemPayload,
     "operations.toggle_prediction": OpsTogglePredictionPayload,
     "operations.set_threat_level": OpsSetThreatLevelPayload,
+    "operations.set_weapons_helm_sync": OpsSetWeaponsHelmSyncPayload,
+    "operations.cancel_weapons_helm_sync": OpsCancelWeaponsHelmSyncPayload,
+    "operations.set_sensor_focus": OpsSetSensorFocusPayload,
+    "operations.cancel_sensor_focus": OpsCancelSensorFocusPayload,
+    "operations.start_damage_coordination": OpsStartDamageCoordinationPayload,
+    "operations.issue_evasion_alert": OpsIssueEvasionAlertPayload,
     # Damage Control (aliases engineering DCT payloads)
     "damage_control.dispatch_dct": EngineeringDispatchDCTPayload,
     "damage_control.cancel_dct":   EngineeringCancelDCTPayload,

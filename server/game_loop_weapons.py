@@ -660,8 +660,10 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         if not beam_in_arc(ship.heading, brg, arc):
             return None
 
+        # v0.08 A.3.1.3: Ops weapons-helm sync bonus.
+        sync_acc, sync_dmg = glops.get_weapons_helm_sync_bonus()
         # v0.07: target profile affects hit chance (spec 1.2.5).
-        hit_chance = min(1.0, getattr(target, "target_profile", 1.0))
+        hit_chance = min(1.0, getattr(target, "target_profile", 1.0) + sync_acc)
         if hit_chance < 1.0 and _rng.random() > hit_chance:
             _beam_cooldown = ship.beam_fire_rate
             return ("weapons.beam_miss", {"target_id": target.id})
@@ -670,7 +672,7 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         vf_bonus = glops.check_vulnerable_facing_bonus(target.id, target, ship.x, ship.y)
         # v0.08 A.2.4.2: Ops prediction accuracy bonus (+10% damage).
         pred_bonus = glops.get_prediction_accuracy_bonus(target.id, target.x, target.y)
-        dmg *= (1.0 + vf_bonus + pred_bonus)
+        dmg *= (1.0 + vf_bonus + pred_bonus + sync_dmg)
         # v0.08 A.2.3.2: Ops priority subsystem — passed to combat damage roll.
         priority_sub = glops.get_priority_subsystem(target.id)
         apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency, priority_subsystem=priority_sub)
@@ -926,6 +928,19 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
         if torp.distance_travelled >= Torpedo.MAX_RANGE:
             dead_torpedo_ids.append(torp.id)
             continue
+
+        # v0.08 A.3.4.3: Evasion alert — dodge incoming torpedoes.
+        if torp.owner != "player" and ship is not None:
+            evasion_active, evasion_reduction = glops.get_evasion_alert_active()
+            if evasion_active and _rng.random() < evasion_reduction:
+                dead_torpedo_ids.append(torp.id)
+                events.append({
+                    "type": "evasion_dodge",
+                    "torpedo_id": torp.id,
+                    "x": round(torp.x, 1),
+                    "y": round(torp.y, 1),
+                })
+                continue
 
         # Point defence: passive intercept of incoming (non-player) torpedoes.
         # Intercept chance scales with turret count (v0.07 §1.5).

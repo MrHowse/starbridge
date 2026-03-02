@@ -43,3 +43,38 @@ class OpsSetThreatLevelPayload(BaseModel):
     """Set threat level on a contact (A.2.5.1)."""
     contact_id: str
     level: Literal["low", "medium", "high", "critical"]
+
+
+# --- A.3 Coordination Bonuses ---
+
+
+class OpsSetWeaponsHelmSyncPayload(BaseModel):
+    """Set weapons-helm sync on a contact (A.3.1.1)."""
+    contact_id: str
+
+
+class OpsCancelWeaponsHelmSyncPayload(BaseModel):
+    """Cancel weapons-helm sync (A.3.1.4)."""
+    pass
+
+
+class OpsSetSensorFocusPayload(BaseModel):
+    """Set sensor focus zone (A.3.2.1)."""
+    center_x: float
+    center_y: float
+    radius: float
+
+
+class OpsCancelSensorFocusPayload(BaseModel):
+    """Cancel sensor focus zone (A.3.2.4)."""
+    pass
+
+
+class OpsStartDamageCoordinationPayload(BaseModel):
+    """Start damage coordination assessment (A.3.3.1)."""
+    pass
+
+
+class OpsIssueEvasionAlertPayload(BaseModel):
+    """Issue evasion alert with recommended heading (A.3.4.1)."""
+    bearing: float

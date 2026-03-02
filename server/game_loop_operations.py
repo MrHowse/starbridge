@@ -1,5 +1,5 @@
 """
-Operations Station — Game Loop Integration (v0.08 A.2).
+Operations Station — Game Loop Integration (v0.08 A.2–A.3).
 
 The crew's analyst and coordinator.  Processes data from Science and other
 stations into tactical intelligence, and pushes concrete bonuses to Weapons,
@@ -55,6 +55,33 @@ _VALID_SUBSYSTEMS = ("engines", "weapons", "shields", "sensors", "propulsion")
 _VALID_THREAT_LEVELS = ("low", "medium", "high", "critical")
 _FACING_OFFSETS = {"fore": 0.0, "aft": 180.0, "starboard": 90.0, "port": 270.0}
 
+# ---------------------------------------------------------------------------
+# Constants (A.3)
+# ---------------------------------------------------------------------------
+
+SYNC_HEADING_TOLERANCE: float = 15.0       # degrees (A.3.1.3)
+SYNC_ACCURACY_BONUS: float = 0.15          # +15% beam accuracy (A.3.1.3)
+SYNC_DAMAGE_BONUS: float = 0.10            # +10% beam damage (A.3.1.3)
+SYNC_COOLDOWN: float = 15.0               # seconds (A.3.1.4)
+
+SENSOR_FOCUS_MIN_RADIUS: float = 5000.0    # world units (A.3.2.1)
+SENSOR_FOCUS_MAX_RADIUS: float = 20000.0   # world units (A.3.2.1)
+SENSOR_FOCUS_SCAN_BONUS: float = 0.25      # +25% scan speed (A.3.2.2)
+SENSOR_FOCUS_DETECTION_BONUS: float = 0.15  # +15% detection range (A.3.2.2)
+SENSOR_FOCUS_JAM_BONUS: float = 0.20       # +20% jam effectiveness (A.3.2.2)
+SENSOR_FOCUS_DECODE_BONUS: float = 0.15    # +15% decode speed (A.3.2.2)
+SENSOR_FOCUS_DRONE_BONUS: float = 0.15     # +15% drone sensor range (A.3.2.2)
+SENSOR_FOCUS_INACTIVITY_TIMEOUT: float = 60.0  # seconds (A.3.2.4)
+
+DAMAGE_ASSESSMENT_DURATION: float = 5.0    # seconds (A.3.3.1)
+DAMAGE_ASSESSMENT_COOLDOWN: float = 45.0   # seconds (A.3.3.2)
+DAMAGE_ASSESSMENT_OVERLAY_DURATION: float = 30.0  # seconds (A.3.3.1)
+
+EVASION_ALERT_COOLDOWN: float = 20.0       # seconds (A.3.4.4)
+EVASION_ALERT_RESPONSE_WINDOW: float = 5.0  # seconds (A.3.4.3)
+EVASION_ALERT_TORPEDO_REDUCTION: float = 0.15  # -15% (A.3.4.3)
+EVASION_HELM_TOLERANCE: float = 30.0       # degrees tolerance for "following" (A.3.4.3)
+
 
 # ---------------------------------------------------------------------------
 # Assessment dataclass
@@ -96,6 +123,49 @@ class BattleAssessment:
 
 
 # ---------------------------------------------------------------------------
+# Coordination dataclasses (A.3)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class WeaponsHelmSync:
+    """Weapons-Helm coordination link (A.3.1)."""
+
+    contact_id: str
+    active: bool = False  # True when ship heading within tolerance of target bearing
+
+
+@dataclass
+class SensorFocus:
+    """Sensor focus zone (A.3.2)."""
+
+    center_x: float = 0.0
+    center_y: float = 0.0
+    radius: float = SENSOR_FOCUS_MAX_RADIUS
+    inactivity_timer: float = 0.0
+
+
+@dataclass
+class DamageCoordination:
+    """Damage coordination assessment (A.3.3)."""
+
+    progress: float = 0.0
+    complete: bool = False
+    cooldown_timer: float = 0.0
+    overlay_timer: float = 0.0
+    priority_list: list[dict] = field(default_factory=list)
+
+
+@dataclass
+class EvasionAlert:
+    """Active evasion alert (A.3.4)."""
+
+    bearing: float = 0.0
+    response_timer: float = EVASION_ALERT_RESPONSE_WINDOW
+    helm_following: bool = False
+
+
+# ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
 
@@ -103,6 +173,14 @@ _assessments: dict[str, BattleAssessment] = {}
 _active_id: str | None = None  # enemy_id currently being assessed (in progress)
 _pending_broadcasts: list[tuple[list[str], dict]] = []
 _elapsed: float = 0.0  # total game time for history tracking
+
+# A.3 — coordination state
+_weapons_helm_sync: WeaponsHelmSync | None = None
+_sync_cooldown: float = 0.0
+_sensor_focus: SensorFocus | None = None
+_damage_coordination: DamageCoordination | None = None
+_evasion_alert: EvasionAlert | None = None
+_evasion_cooldown: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -113,10 +191,18 @@ _elapsed: float = 0.0  # total game time for history tracking
 def reset() -> None:
     """Reset all operations state.  Called at game start."""
     global _assessments, _active_id, _pending_broadcasts, _elapsed
+    global _weapons_helm_sync, _sync_cooldown, _sensor_focus
+    global _damage_coordination, _evasion_alert, _evasion_cooldown
     _assessments = {}
     _active_id = None
     _pending_broadcasts = []
     _elapsed = 0.0
+    _weapons_helm_sync = None
+    _sync_cooldown = 0.0
+    _sensor_focus = None
+    _damage_coordination = None
+    _evasion_alert = None
+    _evasion_cooldown = 0.0
 
 
 def tick(world: World, ship: Ship, dt: float) -> None:
@@ -200,6 +286,12 @@ def tick(world: World, ship: Ship, dt: float) -> None:
                 asmt.prediction_timer = 0.0
                 _recompute_prediction(asmt, enemy)
 
+    # --- A.3 Coordination ticks ---
+    _tick_weapons_helm_sync(world, ship, dt)
+    _tick_sensor_focus(dt)
+    _tick_damage_coordination(world, ship, dt)
+    _tick_evasion_alert(ship, dt)
+
 
 def pop_pending_broadcasts() -> list[tuple[list[str], dict]]:
     """Return and clear pending broadcasts."""
@@ -244,7 +336,7 @@ def build_state(world: World, ship: Ship) -> dict:
     return {
         "assessments": assessments,
         "active_assessment_id": _active_id,
-        "coordination_bonuses": {},   # Stub for A.3
+        "coordination_bonuses": _build_coordination_state(ship),
         "mission_tracking": [],       # Stub for A.4
         "feed_events": [],            # Stub for A.5
     }
@@ -271,20 +363,93 @@ def serialise() -> dict:
             "threat_level": asmt.threat_level,
             "out_of_range_timer": asmt.out_of_range_timer,
         }
+    coord: dict = {}
+    if _weapons_helm_sync is not None:
+        coord["weapons_helm_sync"] = {
+            "contact_id": _weapons_helm_sync.contact_id,
+            "active": _weapons_helm_sync.active,
+        }
+    coord["sync_cooldown"] = _sync_cooldown
+    if _sensor_focus is not None:
+        coord["sensor_focus"] = {
+            "center_x": _sensor_focus.center_x,
+            "center_y": _sensor_focus.center_y,
+            "radius": _sensor_focus.radius,
+            "inactivity_timer": _sensor_focus.inactivity_timer,
+        }
+    if _damage_coordination is not None:
+        coord["damage_coordination"] = {
+            "progress": _damage_coordination.progress,
+            "complete": _damage_coordination.complete,
+            "cooldown_timer": _damage_coordination.cooldown_timer,
+            "overlay_timer": _damage_coordination.overlay_timer,
+            "priority_list": _damage_coordination.priority_list,
+        }
+    if _evasion_alert is not None:
+        coord["evasion_alert"] = {
+            "bearing": _evasion_alert.bearing,
+            "response_timer": _evasion_alert.response_timer,
+            "helm_following": _evasion_alert.helm_following,
+        }
+    coord["evasion_cooldown"] = _evasion_cooldown
     return {
         "assessments": serialised_assessments,
         "active_id": _active_id,
         "elapsed": _elapsed,
+        "coordination": coord,
     }
 
 
 def deserialise(data: dict) -> None:
     """Restore operations state from save data."""
     global _assessments, _active_id, _elapsed, _pending_broadcasts
+    global _weapons_helm_sync, _sync_cooldown, _sensor_focus
+    global _damage_coordination, _evasion_alert, _evasion_cooldown
     _pending_broadcasts = []
     _assessments = {}
     _active_id = data.get("active_id")
     _elapsed = data.get("elapsed", 0.0)
+
+    # Restore A.3 coordination state.
+    coord = data.get("coordination", {})
+    whs = coord.get("weapons_helm_sync")
+    if whs:
+        _weapons_helm_sync = WeaponsHelmSync(contact_id=whs["contact_id"])
+        _weapons_helm_sync.active = whs.get("active", False)
+    else:
+        _weapons_helm_sync = None
+    _sync_cooldown = coord.get("sync_cooldown", 0.0)
+    sf = coord.get("sensor_focus")
+    if sf:
+        _sensor_focus = SensorFocus(
+            center_x=sf["center_x"],
+            center_y=sf["center_y"],
+            radius=sf["radius"],
+            inactivity_timer=sf.get("inactivity_timer", 0.0),
+        )
+    else:
+        _sensor_focus = None
+    dcd = coord.get("damage_coordination")
+    if dcd:
+        _damage_coordination = DamageCoordination()
+        _damage_coordination.progress = dcd.get("progress", 0.0)
+        _damage_coordination.complete = dcd.get("complete", False)
+        _damage_coordination.cooldown_timer = dcd.get("cooldown_timer", 0.0)
+        _damage_coordination.overlay_timer = dcd.get("overlay_timer", 0.0)
+        _damage_coordination.priority_list = dcd.get("priority_list", [])
+    else:
+        _damage_coordination = None
+    ead = coord.get("evasion_alert")
+    if ead:
+        _evasion_alert = EvasionAlert(
+            bearing=ead["bearing"],
+            response_timer=ead.get("response_timer", EVASION_ALERT_RESPONSE_WINDOW),
+            helm_following=ead.get("helm_following", False),
+        )
+    else:
+        _evasion_alert = None
+    _evasion_cooldown = coord.get("evasion_cooldown", 0.0)
+
     for eid, ad in data.get("assessments", {}).items():
         asmt = BattleAssessment(enemy_id=ad["enemy_id"])
         asmt.progress = ad.get("progress", 0.0)
@@ -446,6 +611,109 @@ def set_threat_level(contact_id: str, level: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Public API — A.3 Coordination message handlers
+# ---------------------------------------------------------------------------
+
+
+def set_weapons_helm_sync(contact_id: str, world: World, ship: Ship) -> dict:
+    """Set weapons-helm sync on a contact (A.3.1.1)."""
+    global _weapons_helm_sync
+    if _sync_cooldown > 0.0:
+        return {
+            "ok": False,
+            "reason": f"Cooldown active ({_sync_cooldown:.1f}s remaining).",
+        }
+    enemy = _find_enemy(world, contact_id)
+    if enemy is None:
+        return {"ok": False, "reason": "Contact not found."}
+    _weapons_helm_sync = WeaponsHelmSync(contact_id=contact_id)
+    _pending_broadcasts.append(
+        (
+            ["weapons", "helm", "operations"],
+            {"type": "weapons_helm_sync", "contact_id": contact_id},
+        )
+    )
+    return {"ok": True}
+
+
+def cancel_weapons_helm_sync() -> dict:
+    """Cancel weapons-helm sync (A.3.1.4)."""
+    global _weapons_helm_sync, _sync_cooldown
+    if _weapons_helm_sync is None:
+        return {"ok": False, "reason": "No sync active."}
+    _weapons_helm_sync = None
+    _sync_cooldown = SYNC_COOLDOWN
+    return {"ok": True}
+
+
+def set_sensor_focus(center_x: float, center_y: float, radius: float) -> dict:
+    """Set sensor focus zone (A.3.2.1)."""
+    global _sensor_focus
+    clamped = max(SENSOR_FOCUS_MIN_RADIUS, min(SENSOR_FOCUS_MAX_RADIUS, radius))
+    _sensor_focus = SensorFocus(center_x=center_x, center_y=center_y, radius=clamped)
+    _pending_broadcasts.append(
+        (
+            ["science", "electronic_warfare", "flight_ops", "operations"],
+            {
+                "type": "sensor_focus",
+                "center_x": center_x,
+                "center_y": center_y,
+                "radius": clamped,
+            },
+        )
+    )
+    return {"ok": True}
+
+
+def cancel_sensor_focus() -> dict:
+    """Cancel sensor focus zone (A.3.2.4)."""
+    global _sensor_focus
+    if _sensor_focus is None:
+        return {"ok": False, "reason": "No sensor focus active."}
+    _sensor_focus = None
+    _pending_broadcasts.append(
+        (
+            ["science", "electronic_warfare", "flight_ops", "operations"],
+            {"type": "sensor_focus_cancelled"},
+        )
+    )
+    return {"ok": True}
+
+
+def start_damage_coordination() -> dict:
+    """Start damage coordination assessment (A.3.3.1)."""
+    global _damage_coordination
+    if (
+        _damage_coordination is not None
+        and _damage_coordination.cooldown_timer > 0.0
+    ):
+        return {
+            "ok": False,
+            "reason": f"Cooldown active ({_damage_coordination.cooldown_timer:.1f}s remaining).",
+        }
+    _damage_coordination = DamageCoordination()
+    return {"ok": True}
+
+
+def issue_evasion_alert(bearing: float) -> dict:
+    """Issue evasion alert with recommended heading (A.3.4.1)."""
+    global _evasion_alert
+    if _evasion_cooldown > 0.0:
+        return {
+            "ok": False,
+            "reason": f"Cooldown active ({_evasion_cooldown:.1f}s remaining).",
+        }
+    _evasion_alert = EvasionAlert(bearing=bearing % 360.0)
+    _pending_broadcasts.append(
+        (
+            ["helm", "captain", "operations"],
+            {"type": "evasion_alert", "bearing": bearing % 360.0},
+        )
+    )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Public API — Query functions (used by combat / weapons for REAL bonuses)
 # ---------------------------------------------------------------------------
 
@@ -520,6 +788,63 @@ def check_vulnerable_facing_bonus(
     if diff <= VULNERABLE_FACING_ARC:
         return VULNERABLE_FACING_BONUS
     return 0.0
+
+
+# ---------------------------------------------------------------------------
+# Public API — A.3 Coordination query functions
+# ---------------------------------------------------------------------------
+
+
+def get_weapons_helm_sync_bonus() -> tuple[float, float]:
+    """Return (accuracy_bonus, damage_bonus) if sync active, else (0, 0).
+
+    Weapons should call this during fire calculations (A.3.1.3).
+    """
+    if _weapons_helm_sync is not None and _weapons_helm_sync.active:
+        return (SYNC_ACCURACY_BONUS, SYNC_DAMAGE_BONUS)
+    return (0.0, 0.0)
+
+
+def get_sensor_focus_bonus(entity_x: float, entity_y: float) -> dict[str, float]:
+    """Return bonus dict if entity is within sensor focus zone, else empty.
+
+    Possible keys: scan, detection, jam, decode, drone (A.3.2.2).
+    Callers check for the relevant key and apply the bonus multiplier.
+    """
+    if _sensor_focus is None:
+        return {}
+    dist = distance(
+        _sensor_focus.center_x, _sensor_focus.center_y, entity_x, entity_y
+    )
+    if dist > _sensor_focus.radius:
+        return {}
+    return {
+        "scan": SENSOR_FOCUS_SCAN_BONUS,
+        "detection": SENSOR_FOCUS_DETECTION_BONUS,
+        "jam": SENSOR_FOCUS_JAM_BONUS,
+        "decode": SENSOR_FOCUS_DECODE_BONUS,
+        "drone": SENSOR_FOCUS_DRONE_BONUS,
+    }
+
+
+def get_damage_priority_list() -> list[dict]:
+    """Return current damage priority list if overlay active (A.3.3.1)."""
+    if _damage_coordination is None:
+        return []
+    if not _damage_coordination.complete or _damage_coordination.overlay_timer <= 0.0:
+        return []
+    return list(_damage_coordination.priority_list)
+
+
+def get_evasion_alert_active() -> tuple[bool, float]:
+    """Return (active, torpedo_reduction) for torpedo dodge calculations.
+
+    Returns (True, EVASION_ALERT_TORPEDO_REDUCTION) if alert active AND
+    helm is following the evasion bearing.  (A.3.4.3)
+    """
+    if _evasion_alert is not None and _evasion_alert.helm_following:
+        return (True, EVASION_ALERT_TORPEDO_REDUCTION)
+    return (False, 0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -635,3 +960,151 @@ def _recompute_prediction(asmt: BattleAssessment, enemy: Enemy) -> None:
             asmt.prediction_confidence = "low"
     else:
         asmt.prediction_confidence = "medium"
+
+
+# ---------------------------------------------------------------------------
+# A.3 Coordination tick helpers
+# ---------------------------------------------------------------------------
+
+
+def _tick_weapons_helm_sync(world: World, ship: Ship, dt: float) -> None:
+    """Tick weapons-helm sync — check heading alignment each frame."""
+    global _weapons_helm_sync, _sync_cooldown
+    if _sync_cooldown > 0.0:
+        _sync_cooldown = max(0.0, _sync_cooldown - dt)
+    if _weapons_helm_sync is None:
+        return
+    enemy = _find_enemy(world, _weapons_helm_sync.contact_id)
+    if enemy is None:
+        # Contact destroyed — end sync and start cooldown.
+        _weapons_helm_sync = None
+        _sync_cooldown = SYNC_COOLDOWN
+        return
+    brg = bearing_to(ship.x, ship.y, enemy.x, enemy.y)
+    diff = abs(angle_diff(ship.heading, brg))
+    _weapons_helm_sync.active = diff <= SYNC_HEADING_TOLERANCE
+
+
+def _tick_sensor_focus(dt: float) -> None:
+    """Tick sensor focus inactivity timer (A.3.2.4)."""
+    global _sensor_focus
+    if _sensor_focus is None:
+        return
+    _sensor_focus.inactivity_timer += dt
+    if _sensor_focus.inactivity_timer >= SENSOR_FOCUS_INACTIVITY_TIMEOUT:
+        _sensor_focus = None
+
+
+def _tick_damage_coordination(world: World, ship: Ship, dt: float) -> None:
+    """Tick damage coordination assessment and timers (A.3.3)."""
+    global _damage_coordination
+    if _damage_coordination is None:
+        return
+    dc = _damage_coordination
+    # Tick cooldown.
+    if dc.cooldown_timer > 0.0:
+        dc.cooldown_timer = max(0.0, dc.cooldown_timer - dt)
+    # Tick overlay.
+    if dc.overlay_timer > 0.0:
+        dc.overlay_timer = max(0.0, dc.overlay_timer - dt)
+        if dc.overlay_timer <= 0.0 and dc.complete:
+            dc.priority_list = []
+    # Clean up when fully expired.
+    if dc.complete and dc.cooldown_timer <= 0.0 and dc.overlay_timer <= 0.0:
+        _damage_coordination = None
+        return
+    # Tick assessment progress.
+    if not dc.complete:
+        dc.progress += dt
+        if dc.progress >= DAMAGE_ASSESSMENT_DURATION:
+            dc.progress = DAMAGE_ASSESSMENT_DURATION
+            dc.complete = True
+            dc.overlay_timer = DAMAGE_ASSESSMENT_OVERLAY_DURATION
+            dc.priority_list = _generate_damage_priority_list(ship)
+            dc.cooldown_timer = DAMAGE_ASSESSMENT_COOLDOWN
+            _pending_broadcasts.append(
+                (
+                    ["engineering", "damage_control", "medical", "operations"],
+                    {
+                        "type": "damage_coordination_complete",
+                        "priority_list": dc.priority_list,
+                    },
+                )
+            )
+
+
+def _tick_evasion_alert(ship: Ship, dt: float) -> None:
+    """Tick evasion alert response window and helm tracking (A.3.4)."""
+    global _evasion_alert, _evasion_cooldown
+    if _evasion_cooldown > 0.0:
+        _evasion_cooldown = max(0.0, _evasion_cooldown - dt)
+    if _evasion_alert is None:
+        return
+    _evasion_alert.response_timer -= dt
+    diff = abs(angle_diff(ship.heading, _evasion_alert.bearing))
+    _evasion_alert.helm_following = diff <= EVASION_HELM_TOLERANCE
+    if _evasion_alert.response_timer <= 0.0:
+        _evasion_alert = None
+        _evasion_cooldown = EVASION_ALERT_COOLDOWN
+
+
+def _generate_damage_priority_list(ship: Ship) -> list[dict]:
+    """Generate repair priority list from current ship damage (A.3.3.1)."""
+    priorities: list[dict] = []
+    for name, system in ship.systems.items():
+        if system.health < 100.0:
+            if system.health < 25.0:
+                prio = "critical"
+            elif system.health < 50.0:
+                prio = "high"
+            elif system.health < 75.0:
+                prio = "medium"
+            else:
+                prio = "low"
+            priorities.append(
+                {"system": name, "health": round(system.health, 1), "priority": prio}
+            )
+    priorities.sort(key=lambda p: p["health"])
+    return priorities
+
+
+def _build_coordination_state(ship: Ship) -> dict:
+    """Build coordination bonuses state for broadcast (A.3)."""
+    state: dict = {}
+    if _weapons_helm_sync is not None:
+        state["weapons_helm_sync"] = {
+            "contact_id": _weapons_helm_sync.contact_id,
+            "active": _weapons_helm_sync.active,
+        }
+    else:
+        state["weapons_helm_sync"] = None
+    state["sync_cooldown"] = round(_sync_cooldown, 2)
+    if _sensor_focus is not None:
+        state["sensor_focus"] = {
+            "center_x": round(_sensor_focus.center_x, 1),
+            "center_y": round(_sensor_focus.center_y, 1),
+            "radius": round(_sensor_focus.radius, 1),
+            "inactivity_timer": round(_sensor_focus.inactivity_timer, 2),
+        }
+    else:
+        state["sensor_focus"] = None
+    if _damage_coordination is not None:
+        state["damage_coordination"] = {
+            "progress": round(_damage_coordination.progress, 2),
+            "complete": _damage_coordination.complete,
+            "cooldown_timer": round(_damage_coordination.cooldown_timer, 2),
+            "overlay_timer": round(_damage_coordination.overlay_timer, 2),
+            "priority_list": _damage_coordination.priority_list,
+        }
+    else:
+        state["damage_coordination"] = None
+    if _evasion_alert is not None:
+        state["evasion_alert"] = {
+            "bearing": round(_evasion_alert.bearing, 1),
+            "response_timer": round(_evasion_alert.response_timer, 2),
+            "helm_following": _evasion_alert.helm_following,
+        }
+    else:
+        state["evasion_alert"] = None
+    state["evasion_cooldown"] = round(_evasion_cooldown, 2)
+    return state

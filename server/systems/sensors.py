@@ -115,6 +115,16 @@ def tick(world: World, ship: Ship, dt: float) -> list[str]:
     # _scan_speed_modifier <1.0 = faster scans (equipment module).
     effective_scan_time = BASE_SCAN_TIME * max(0.1, scan_time_mult) * _scan_speed_modifier
     progress_per_sec = 100.0 / (effective_scan_time / efficiency)
+
+    # v0.08 A.3.2.2: sensor focus scan speed bonus (+25% if target in zone).
+    import server.game_loop_operations as _glops
+    for _ent in world.enemies:
+        if _ent.id == _active_scan.entity_id:
+            _fb = _glops.get_sensor_focus_bonus(_ent.x, _ent.y)
+            if "scan" in _fb:
+                progress_per_sec *= (1.0 + _fb["scan"])
+            break
+
     _active_scan.progress = min(100.0, _active_scan.progress + progress_per_sec * dt)
 
     if _active_scan.progress >= 100.0:
