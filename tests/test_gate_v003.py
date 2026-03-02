@@ -472,5 +472,5 @@ class TestLobbyRolesGate:
     def test_lobby_role_count(self):
         from server.lobby import LobbySession
         session = LobbySession()
-        # 13 distinct player roles (12 standard + 1 secret janitor; viewscreen is passive display, not a role)
-        assert len(session.roles) == 13
+        # 14 distinct player roles (12 standard + janitor + quartermaster; viewscreen is passive display)
+        assert len(session.roles) == 14

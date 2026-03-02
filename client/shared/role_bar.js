@@ -34,6 +34,7 @@ const ROLE_URLS = {
   electronic_warfare: '/client/ew/',
   tactical:           '/client/tactical/',
   damage_control:     '/client/damage_control/',
+  quartermaster:      '/client/quartermaster/',
 };
 
 const ROLE_LABELS = {
@@ -49,6 +50,7 @@ const ROLE_LABELS = {
   electronic_warfare: 'EW',
   tactical:           'TAC',
   damage_control:     'DC',
+  quartermaster:      'QM',
 };
 
 // Janitor names that unlock the secret station.

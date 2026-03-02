@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STARBRIDGE — QUARTERMASTER</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="../shared/accessibility.css">
+  <link rel="stylesheet" href="quartermaster.css">
+</head>
+<body>
+  <div class="station-container">
+    <main class="qm-main" id="qm-main">
+
+      <!-- Header -->
+      <header class="qm-header">
+        <h1 class="station-title">QUARTERMASTER</h1>
+        <div class="qm-header__credits" id="credits-display">CREDITS: 0</div>
+      </header>
+
+      <!-- Three-panel layout -->
+      <div class="qm-panels">
+
+        <!-- Left panel: Resources -->
+        <section class="qm-panel qm-panel--resources" aria-label="Resources">
+          <h2 class="qm-panel__title">RESOURCES</h2>
+          <div class="qm-resource-list" id="resource-list">
+            <p class="text-label">Awaiting resource data...</p>
+          </div>
+          <div class="qm-ration-controls" id="ration-controls">
+            <h3 class="qm-panel__subtitle">RATION LEVEL</h3>
+            <div class="qm-ration-btns" id="ration-btns"></div>
+          </div>
+        </section>
+
+        <!-- Centre panel: Vendor / Trade -->
+        <section class="qm-panel qm-panel--vendor" aria-label="Vendor">
+          <h2 class="qm-panel__title">VENDOR</h2>
+          <div class="qm-vendor-list" id="vendor-list">
+            <p class="text-label">No vendors in range.</p>
+          </div>
+        </section>
+
+        <!-- Right panel: Salvage -->
+        <section class="qm-panel qm-panel--salvage" aria-label="Salvage">
+          <h2 class="qm-panel__title">SALVAGE</h2>
+          <div class="qm-salvage-list" id="salvage-list">
+            <p class="text-label">No salvage targets detected.</p>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Event log -->
+      <footer class="qm-log">
+        <div class="qm-log__entries" id="qm-log" role="log" aria-live="polite"></div>
+      </footer>
+
+    </main>
+  </div>
+
+  <script type="module" src="quartermaster.js"></script>
+  <script type="module" src="../shared/a11y_widget.js"></script>
+</body>
+</html>

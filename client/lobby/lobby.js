@@ -24,6 +24,7 @@ let _latestRoles = {};
 const ROLES = [
   'captain', 'helm', 'weapons', 'engineering', 'science', 'medical',
   'security', 'comms', 'flight_ops', 'electronic_warfare', 'tactical', 'damage_control',
+  'quartermaster',
 ];
 
 /** Callsign names that unlock the secret janitor station. */
@@ -41,6 +42,7 @@ const ROLE_LABELS = {
   electronic_warfare: 'ELEC WARFARE',
   tactical:           'TACTICAL',
   damage_control:     'DAMAGE CTRL',
+  quartermaster:      'QUARTERMASTER',
 };
 
 /** Minimum crew per ship class (matches ships/*.json min_crew field). */

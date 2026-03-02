@@ -66,7 +66,7 @@ class LobbySession:
     roles: dict[str, tuple[str, str] | None] = field(
         default_factory=lambda: {
             r: None
-            for r in ("captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "flight_ops", "electronic_warfare", "tactical", "damage_control", "janitor")
+            for r in ("captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "flight_ops", "electronic_warfare", "tactical", "damage_control", "janitor", "quartermaster")
         }
     )
     host_connection_id: str | None = None

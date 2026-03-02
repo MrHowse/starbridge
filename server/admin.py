@@ -26,6 +26,7 @@ ALL_STATION_ROLES: list[str] = [
     "captain", "helm", "weapons", "engineering", "science",
     "medical", "security", "comms", "flight_ops",
     "electronic_warfare", "tactical", "damage_control",
+    "quartermaster",
 ]
 
 # ---------------------------------------------------------------------------

@@ -1680,7 +1680,7 @@ async def _loop() -> None:
         _vendor_events = glvr.pop_pending_events()
         for _ve in _vendor_events:
             await _manager.broadcast_to_roles(
-                ["captain", "comms"],
+                ["captain", "comms", "quartermaster"],
                 Message.build(f"vendor.{_ve['type']}", _ve),
             )
 
@@ -1688,7 +1688,7 @@ async def _loop() -> None:
         _neg_events = glng.pop_pending_events()
         for _ne in _neg_events:
             await _manager.broadcast_to_roles(
-                ["captain", "comms"],
+                ["captain", "comms", "quartermaster"],
                 Message.build(f"negotiation.{_ne['type']}", _ne),
             )
 
@@ -1696,7 +1696,7 @@ async def _loop() -> None:
         _salvage_events = glsalv.pop_pending_events()
         for _se in _salvage_events:
             await _manager.broadcast_to_roles(
-                ["captain", "engineering"],
+                ["captain", "engineering", "quartermaster"],
                 Message.build(f"salvage.{_se['type']}", _se),
             )
 
@@ -1704,7 +1704,7 @@ async def _loop() -> None:
         _rationing_events = glrat.pop_pending_events()
         for _re in _rationing_events:
             await _manager.broadcast_to_roles(
-                ["captain", "engineering"],
+                ["captain", "engineering", "quartermaster"],
                 Message.build(f"rationing.{_re['type']}", _re),
             )
 
