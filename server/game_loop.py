@@ -190,6 +190,8 @@ from server.models.messages import (
     HazConSetVentPayload,
     HazConEmergencyVentSpacePayload,
     HazConCancelSpaceVentPayload,
+    HazConDispatchDeconTeamPayload,
+    HazConCancelDeconTeamPayload,
 )
 from server.models.crew import CrewRoster
 from server.models.crew_roster import IndividualCrewRoster
@@ -2233,6 +2235,9 @@ async def _loop() -> None:
                 f"Torpedo hit: {evt['target_id']} ({evt['torpedo_type']})",
                 "info",
             )
+            # B.4: Nuclear torpedo radiation splash on player ship
+            if evt.get("torpedo_type") == "nuclear" and _world is not None:
+                glatm.apply_nuclear_radiation(_world.ship.interior, "weapons")
             # Probe torpedo: broadcast scan data as a completed scan result.
             if evt.get("torpedo_type") == "probe" and "probe_scan" in evt:
                 await _manager.broadcast(Message.build("science.scan_complete", {
@@ -2432,6 +2437,13 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "hazard_control.cancel_space_vent" and isinstance(payload, HazConCancelSpaceVentPayload):
             glatm.cancel_space_vent(payload.room_id)
             gl.log_event("hazard_control", "cancel_space_vent", {"room_id": payload.room_id})
+        # --- Radiation (B.4) ---
+        elif msg_type == "hazard_control.dispatch_decon_team" and isinstance(payload, HazConDispatchDeconTeamPayload):
+            glatm.dispatch_decon_team(payload.room_id)
+            gl.log_event("hazard_control", "dispatch_decon_team", {"room_id": payload.room_id})
+        elif msg_type == "hazard_control.cancel_decon_team" and isinstance(payload, HazConCancelDeconTeamPayload):
+            glatm.cancel_decon_team(payload.room_id)
+            gl.log_event("hazard_control", "cancel_decon_team", {"room_id": payload.room_id})
         elif msg_type == "engineering.dispatch_team" and isinstance(payload, EngineeringDispatchTeamPayload):
             gle.dispatch_team(payload.team_id, payload.system, ship.interior)
             gl.log_event("engineering", "team_dispatched", {"team_id": payload.team_id, "system": payload.system})

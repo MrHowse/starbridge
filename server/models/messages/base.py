@@ -135,6 +135,8 @@ from server.models.messages.hazard_control import (
     HazConSetVentPayload,
     HazConEmergencyVentSpacePayload,
     HazConCancelSpaceVentPayload,
+    HazConDispatchDeconTeamPayload,
+    HazConCancelDeconTeamPayload,
 )
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
@@ -382,6 +384,9 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "hazard_control.set_vent":             HazConSetVentPayload,
     "hazard_control.emergency_vent_space": HazConEmergencyVentSpacePayload,
     "hazard_control.cancel_space_vent":    HazConCancelSpaceVentPayload,
+    # Radiation (v0.08 B.4)
+    "hazard_control.dispatch_decon_team":  HazConDispatchDeconTeamPayload,
+    "hazard_control.cancel_decon_team":    HazConCancelDeconTeamPayload,
     # Creatures (v0.05k)
     "creature.sedate":            CreatureSedatePayload,
     "creature.ew_disrupt":        CreatureEWDisruptPayload,

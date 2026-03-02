@@ -80,6 +80,45 @@ HIGH_CONTAM_THRESHOLD: float = 50.0
 # Fire oxygen starvation threshold
 FIRE_O2_STARVATION: float = 5.0
 
+# ---------------------------------------------------------------------------
+# Radiation constants (B.4)
+# ---------------------------------------------------------------------------
+
+# Reactor leak
+REACTOR_LEAK_THRESHOLD: float = 60.0
+REACTOR_SERIOUS_THRESHOLD: float = 30.0
+REACTOR_LEAK_RATE: float = 0.5          # radiation/s to engineering rooms
+REACTOR_SERIOUS_LEAK_RATE: float = 2.0  # radiation/s to eng + adjacent
+
+# Shield leak
+SHIELD_LEAK_THRESHOLD: float = 25.0
+SHIELD_LEAK_RATE: float = 0.1           # radiation/s to outer decks
+
+# Nuclear torpedo
+NUCLEAR_HIT_RADIATION: float = 80.0     # contamination on hit deck
+NUCLEAR_ADJACENT_RADIATION: float = 40.0
+
+# Decontamination teams
+DECON_INTERVAL: float = 30.0
+DECON_REDUCTION: float = 10.0           # % per interval
+DECON_TEAM_DAMAGE_REDUCTION: float = 0.50
+
+# Radiation zone tiers
+RAD_AMBER_THRESHOLD: float = 11.0
+RAD_ORANGE_THRESHOLD: float = 31.0
+RAD_RED_THRESHOLD: float = 61.0
+RAD_AMBER_HP_RATE: float = 0.0083       # 0.5 HP/60s
+RAD_ORANGE_HP_RATE: float = 0.033       # 1 HP/30s
+RAD_RED_HP_RATE: float = 0.3            # 3 HP/10s
+
+# Radiation sickness timers (seconds of exposure)
+RAD_AMBER_SICKNESS_TIME: float = 180.0  # 3 minutes
+RAD_ORANGE_SICKNESS_TIME: float = 60.0  # 1 minute
+
+# Cross-station
+RAD_ENGINEERING_EFF_PENALTY: float = 0.30
+RAD_SENSOR_MAX_PENALTY: float = 0.30
+
 
 # ---------------------------------------------------------------------------
 # Dataclasses
@@ -132,6 +171,8 @@ _breaches: dict[str, Breach] = {}              # room_id → breach
 _vent_states: dict[tuple[str, str], str] = {}  # sorted (room_a, room_b) → "open"/"filtered"/"sealed"
 _space_vent_rooms: set[str] = set()            # rooms being vented to space
 _coolant_leaks: set[str] = set()               # rooms with active coolant leaks
+_decon_teams: dict[str, float] = {}            # room_id → elapsed seconds (B.4)
+_radiation_exposure: dict[str, float] = {}     # deck_name → cumulative seconds in radiation zone (B.4)
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +186,8 @@ def reset() -> None:
     _vent_states.clear()
     _space_vent_rooms.clear()
     _coolant_leaks.clear()
+    _decon_teams.clear()
+    _radiation_exposure.clear()
 
 
 def init_atmosphere(interior: ShipInterior) -> None:
@@ -201,6 +244,8 @@ def serialise() -> dict:
         "vent_states": vent_data,
         "space_vent_rooms": list(_space_vent_rooms),
         "coolant_leaks": list(_coolant_leaks),
+        "decon_teams": dict(_decon_teams),
+        "radiation_exposure": dict(_radiation_exposure),
     }
 
 
@@ -238,6 +283,10 @@ def deserialise(data: dict) -> None:
     _space_vent_rooms.update(data.get("space_vent_rooms", []))
     _coolant_leaks.clear()
     _coolant_leaks.update(data.get("coolant_leaks", []))
+    _decon_teams.clear()
+    _decon_teams.update(data.get("decon_teams", {}))
+    _radiation_exposure.clear()
+    _radiation_exposure.update(data.get("radiation_exposure", {}))
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +411,63 @@ def stop_coolant_leak(room_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Decon team management (B.4)
+# ---------------------------------------------------------------------------
+
+def dispatch_decon_team(room_id: str) -> bool:
+    """Dispatch a decontamination team to a room. Returns True if created."""
+    if room_id not in _atmosphere:
+        return False
+    if room_id in _decon_teams:
+        return False  # already dispatched
+    _decon_teams[room_id] = 0.0
+    logger.info("Decon team dispatched to room %s", room_id)
+    return True
+
+
+def cancel_decon_team(room_id: str) -> bool:
+    """Recall a decontamination team. Returns True if cancelled."""
+    if room_id in _decon_teams:
+        del _decon_teams[room_id]
+        logger.info("Decon team recalled from room %s", room_id)
+        return True
+    return False
+
+
+def get_decon_teams() -> dict[str, float]:
+    """Return current decon team state (read-only intent)."""
+    return _decon_teams
+
+
+# ---------------------------------------------------------------------------
+# Nuclear torpedo radiation (B.4)
+# ---------------------------------------------------------------------------
+
+def apply_nuclear_radiation(interior: ShipInterior, deck_name: str) -> None:
+    """Apply radiation from nuclear torpedo detonation.
+
+    Hit deck rooms → NUCLEAR_HIT_RADIATION, adjacent deck rooms → NUCLEAR_ADJACENT_RADIATION.
+    """
+    hit_deck_number: int | None = None
+    for room in interior.rooms.values():
+        if room.deck == deck_name:
+            hit_deck_number = room.deck_number
+            break
+    if hit_deck_number is None:
+        return
+
+    for room_id, room in interior.rooms.items():
+        atm = _atmosphere.get(room_id)
+        if atm is None:
+            continue
+        if room.deck == deck_name:
+            atm.radiation = min(100.0, max(atm.radiation, NUCLEAR_HIT_RADIATION))
+        elif abs(room.deck_number - hit_deck_number) == 1:
+            atm.radiation = min(100.0, max(atm.radiation, NUCLEAR_ADJACENT_RADIATION))
+    logger.info("Nuclear radiation applied: deck %s (hit), adjacent decks", deck_name)
+
+
+# ---------------------------------------------------------------------------
 # Query API
 # ---------------------------------------------------------------------------
 
@@ -391,7 +497,28 @@ def get_repair_speed_modifier(room_id: str) -> float:
     return 1.0
 
 
-def get_atmosphere_penalties() -> dict[str, dict]:
+def get_sensor_radiation_penalty(interior: ShipInterior) -> float:
+    """Return sensor accuracy penalty (0.0–0.30) from radiation on the sensors deck."""
+    max_rad = 0.0
+    for room_id, room in interior.rooms.items():
+        if room.deck != "sensors":
+            continue
+        atm = _atmosphere.get(room_id)
+        if atm is not None and atm.radiation > max_rad:
+            max_rad = atm.radiation
+    if max_rad <= RAD_AMBER_THRESHOLD:
+        return 0.0
+    # Scale linearly from 0 at AMBER threshold to RAD_SENSOR_MAX_PENALTY at 100
+    return min(RAD_SENSOR_MAX_PENALTY,
+               RAD_SENSOR_MAX_PENALTY * (max_rad - RAD_AMBER_THRESHOLD) / (100.0 - RAD_AMBER_THRESHOLD))
+
+
+def get_radiation_exposure() -> dict[str, float]:
+    """Return current radiation exposure tracking (read-only intent)."""
+    return _radiation_exposure
+
+
+def get_atmosphere_penalties(interior: ShipInterior | None = None) -> dict[str, dict]:
     """Return per-room atmosphere penalties for cross-station effects.
 
     Returns {room_id: {"crew_eff_penalty": float, "crew_hp_rate": float,
@@ -409,17 +536,30 @@ def get_atmosphere_penalties() -> dict[str, dict]:
         if atm.temperature_c > HIGH_TEMP_THRESHOLD:
             p["crew_eff_penalty"] = max(p["crew_eff_penalty"], HIGH_TEMP_PENALTY)
             p["equip_degrade_rate"] += HIGH_TEMP_EQUIP_RATE
-        # High contamination
+        # High contamination (non-radiation types use old flat thresholds)
         if atm.contamination_level > HIGH_CONTAM_THRESHOLD:
             ctype = atm.contamination_type
             if ctype == "smoke":
                 p["crew_hp_rate"] += 0.017    # minor: ~0.5 HP/30s
             elif ctype == "coolant":
                 p["crew_hp_rate"] += 0.033    # moderate: 1 HP/30s
-            elif ctype == "radiation":
-                p["crew_hp_rate"] += 0.067    # serious: 2 HP/30s
             elif ctype == "chemical":
                 p["crew_hp_rate"] += 0.050    # 1.5 HP/30s
+        # B.4: Tiered radiation damage (replaces flat radiation penalty)
+        if atm.radiation >= RAD_RED_THRESHOLD:
+            p["crew_hp_rate"] += RAD_RED_HP_RATE
+        elif atm.radiation >= RAD_ORANGE_THRESHOLD:
+            p["crew_hp_rate"] += RAD_ORANGE_HP_RATE
+        elif atm.radiation >= RAD_AMBER_THRESHOLD:
+            p["crew_hp_rate"] += RAD_AMBER_HP_RATE
+        # B.4: Engineering deck radiation → crew efficiency penalty
+        if interior is not None and atm.radiation >= RAD_AMBER_THRESHOLD:
+            room = interior.rooms.get(room_id)
+            if room is not None and room.deck == "engineering":
+                p["crew_eff_penalty"] = max(p["crew_eff_penalty"], RAD_ENGINEERING_EFF_PENALTY)
+        # Decon team: 50% reduced crew damage in room
+        if room_id in _decon_teams:
+            p["crew_hp_rate"] *= (1.0 - DECON_TEAM_DAMAGE_REDUCTION)
         # Vacuum
         if atm.pressure_kpa <= 0.0:
             p["crew_hp_rate"] = VACUUM_CREW_DAMAGE
@@ -507,12 +647,24 @@ def build_atmosphere_state(interior: ShipInterior) -> dict:
     vents_out: dict[str, str] = {}
     for key, state in _vent_states.items():
         vents_out[f"{key[0]}|{key[1]}"] = state
+    # B.4: Radiation zone tier per room
+    for room_id in rooms:
+        rad = rooms[room_id]["radiation"]
+        if rad >= RAD_RED_THRESHOLD:
+            rooms[room_id]["rad_zone"] = "red"
+        elif rad >= RAD_ORANGE_THRESHOLD:
+            rooms[room_id]["rad_zone"] = "orange"
+        elif rad >= RAD_AMBER_THRESHOLD:
+            rooms[room_id]["rad_zone"] = "amber"
+        else:
+            rooms[room_id]["rad_zone"] = "green"
     return {
         "rooms": rooms,
         "breaches": breaches_out,
         "vents": vents_out,
         "space_venting": list(_space_vent_rooms),
         "coolant_leaks": list(_coolant_leaks),
+        "decon_teams": {rid: round(elapsed, 1) for rid, elapsed in _decon_teams.items()},
     }
 
 
@@ -554,6 +706,15 @@ def tick(interior: ShipInterior, dt: float, ship=None, fires: dict | None = None
 
     # 3. Coolant leak effects
     _tick_coolant_leaks(dt)
+
+    # 3.5. Radiation sources (B.4)
+    _tick_radiation_sources(interior, dt, ship)
+
+    # 3.6. Decontamination teams (B.4)
+    _tick_decon_teams(dt, events)
+
+    # 3.7. Radiation exposure tracking (B.4)
+    _tick_radiation_exposure(interior, dt, events)
 
     # 4. Ventilation exchange between open-connected rooms
     _tick_vent_exchange(dt)
@@ -768,6 +929,130 @@ def _tick_fire_starvation(fires: dict, events: list[dict]) -> None:
                 fire.intensity = 0
             events.append({"type": "fire_starved", "room_id": rid})
             logger.info("Fire starved of oxygen in room %s", rid)
+
+
+# ---------------------------------------------------------------------------
+# Tick helpers — Radiation (B.4)
+# ---------------------------------------------------------------------------
+
+def _tick_radiation_sources(interior: ShipInterior, dt: float, ship) -> None:
+    """Generate radiation from reactor damage and weak shields."""
+    if ship is None:
+        return
+
+    # Reactor leak
+    systems = getattr(ship, "systems", None)
+    if systems:
+        # Use power grid reactor_health if available
+        pg = None
+        try:
+            import server.game_loop_engineering as _gle
+            pg = _gle.get_power_grid()
+        except Exception:
+            pass
+        reactor_health = pg.reactor_health if pg else 100.0
+        if reactor_health < REACTOR_LEAK_THRESHOLD:
+            _apply_reactor_leak(interior, reactor_health, dt)
+
+        # Shield system leak
+        shield_sys = systems.get("shields")
+        if shield_sys is not None and shield_sys.health < SHIELD_LEAK_THRESHOLD:
+            _apply_shield_leak(interior, shield_sys.health, dt)
+
+
+def _apply_reactor_leak(interior: ShipInterior, reactor_health: float, dt: float) -> None:
+    """Apply reactor radiation leak to engineering rooms (+ adjacent if serious)."""
+    serious = reactor_health < REACTOR_SERIOUS_THRESHOLD
+    rate = REACTOR_SERIOUS_LEAK_RATE if serious else REACTOR_LEAK_RATE
+    eng_deck_number: int | None = None
+
+    for room_id, room in interior.rooms.items():
+        if room.deck == "engineering":
+            if eng_deck_number is None:
+                eng_deck_number = room.deck_number
+            atm = _atmosphere.get(room_id)
+            if atm is not None:
+                atm.radiation = min(100.0, atm.radiation + rate * dt)
+
+    # Serious leak: also affect adjacent deck rooms
+    if serious and eng_deck_number is not None:
+        for room_id, room in interior.rooms.items():
+            if room.deck != "engineering" and abs(room.deck_number - eng_deck_number) == 1:
+                atm = _atmosphere.get(room_id)
+                if atm is not None:
+                    atm.radiation = min(100.0, atm.radiation + rate * dt)
+
+
+def _apply_shield_leak(interior: ShipInterior, shield_health: float, dt: float) -> None:
+    """Apply shield radiation leak to outer deck rooms (weapons/shields deck)."""
+    for room_id, room in interior.rooms.items():
+        if room.deck in ("weapons", "shields"):
+            atm = _atmosphere.get(room_id)
+            if atm is not None:
+                atm.radiation = min(100.0, atm.radiation + SHIELD_LEAK_RATE * dt)
+
+
+def _tick_decon_teams(dt: float, events: list[dict]) -> None:
+    """Decontamination teams: reduce radiation by DECON_REDUCTION every DECON_INTERVAL."""
+    completed: list[str] = []
+    for room_id in list(_decon_teams):
+        atm = _atmosphere.get(room_id)
+        if atm is None or atm.radiation <= 0.0:
+            completed.append(room_id)
+            continue
+
+        _decon_teams[room_id] += dt
+        prev_intervals = int((_decon_teams[room_id] - dt) / DECON_INTERVAL)
+        cur_intervals = int(_decon_teams[room_id] / DECON_INTERVAL)
+
+        if cur_intervals > prev_intervals:
+            atm.radiation = max(0.0, atm.radiation - DECON_REDUCTION)
+            events.append({"type": "decon_progress", "room_id": room_id,
+                           "radiation": round(atm.radiation, 1)})
+            if atm.radiation <= 0.0:
+                completed.append(room_id)
+
+    for room_id in completed:
+        _decon_teams.pop(room_id, None)
+
+
+def _tick_radiation_exposure(interior: ShipInterior, dt: float, events: list[dict]) -> None:
+    """Track cumulative radiation exposure per deck and emit sickness events."""
+    # Aggregate max radiation per deck
+    deck_max_rad: dict[str, float] = {}
+    for room_id, atm in _atmosphere.items():
+        room = interior.rooms.get(room_id)
+        if room is None:
+            continue
+        deck_max_rad[room.deck] = max(deck_max_rad.get(room.deck, 0.0), atm.radiation)
+
+    for deck_name, max_rad in deck_max_rad.items():
+        if max_rad < RAD_AMBER_THRESHOLD:
+            # Reset exposure when below threshold
+            _radiation_exposure.pop(deck_name, None)
+            continue
+
+        prev_exposure = _radiation_exposure.get(deck_name, 0.0)
+        new_exposure = prev_exposure + dt
+        _radiation_exposure[deck_name] = new_exposure
+
+        # Determine sickness threshold for current tier
+        if max_rad >= RAD_RED_THRESHOLD:
+            threshold = 0.0  # immediate
+        elif max_rad >= RAD_ORANGE_THRESHOLD:
+            threshold = RAD_ORANGE_SICKNESS_TIME
+        else:
+            threshold = RAD_AMBER_SICKNESS_TIME
+
+        # Emit sickness event at threshold crossing
+        if prev_exposure < threshold <= new_exposure or (threshold == 0.0 and prev_exposure == 0.0):
+            events.append({
+                "type": "radiation_sickness",
+                "deck": deck_name,
+                "severity": "red" if max_rad >= RAD_RED_THRESHOLD
+                           else "orange" if max_rad >= RAD_ORANGE_THRESHOLD
+                           else "amber",
+            })
 
 
 def _clamp_all() -> None:

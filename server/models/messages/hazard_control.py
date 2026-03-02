@@ -64,3 +64,14 @@ class HazConEmergencyVentSpacePayload(BaseModel):
 
 class HazConCancelSpaceVentPayload(BaseModel):
     room_id: str
+
+
+# --- B.4: Radiation System ---
+
+
+class HazConDispatchDeconTeamPayload(BaseModel):
+    room_id: str
+
+
+class HazConCancelDeconTeamPayload(BaseModel):
+    room_id: str
