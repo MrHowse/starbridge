@@ -1,0 +1,124 @@
+/* ── Operations Station Styles (v0.08) ── */
+
+/* Three-panel layout: left (analysis) | centre (tactical map) | right (feed + missions) */
+.ops-main {
+  display: grid;
+  grid-template-columns: 280px 1fr 300px;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  height: calc(100vh - 5rem);
+  box-sizing: border-box;
+}
+
+/* Left panel: Analysis */
+.ops-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+/* Centre panel: Tactical Map */
+.ops-map-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+#ops-canvas {
+  width: 100%;
+  flex: 1;
+  background: #0a0a0a;
+  border: 1px solid rgba(0, 255, 65, 0.15);
+  cursor: crosshair;
+}
+
+/* Right panel: Feed + Mission Tracker */
+.ops-feed-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+/* Bottom bar */
+.ops-bottom-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(8, 8, 8, 0.95);
+  border-top: 1px solid rgba(0, 255, 65, 0.15);
+  font-size: 0.8rem;
+  color: rgba(0, 255, 65, 0.6);
+}
+
+/* Standby overlay */
+.ops-standby {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 10;
+  font-size: 1.2rem;
+  color: rgba(0, 255, 65, 0.4);
+  letter-spacing: 0.15em;
+}
+
+.ops-standby--hidden { display: none; }
+
+/* Feed items */
+.ops-feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+}
+
+.ops-feed-item {
+  padding: 0.15rem 0.3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ops-feed-item--info    { color: rgba(255, 255, 255, 0.7); }
+.ops-feed-item--warning { color: #ffaa00; }
+.ops-feed-item--critical { color: #ff4444; }
+
+/* Advisory composer */
+.ops-advisory {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.3rem;
+}
+
+.ops-advisory input {
+  flex: 1;
+  background: #111;
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  color: #00ff41;
+  padding: 0.25rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+.ops-advisory select {
+  background: #111;
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  color: #00ff41;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+.ops-advisory button {
+  background: rgba(0, 255, 65, 0.15);
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  color: #00ff41;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.8rem;
+}

@@ -1,30 +1,30 @@
 {
-  "id": "train_tactical",
-  "name": "Tactical Officer Training",
-  "briefing": "Welcome to Tactical Training. Learn to assess threats, assign engagement priorities, set intercept targets for Helm, and create strike plans. The Tactical Officer coordinates the crew's combat effectiveness.",
+  "id": "train_operations",
+  "name": "Operations Officer Training",
+  "briefing": "Welcome to Operations Training. Learn to assess threats, assign engagement priorities, set intercept targets for Helm, and create strike plans. The Operations Officer coordinates the crew's combat effectiveness.",
   "spawn": [
     {
       "type": "scout",
       "x": 58000,
       "y": 36000,
-      "id": "tac_target_1"
+      "id": "ops_target_1"
     },
     {
       "type": "cruiser",
       "x": 40000,
       "y": 60000,
-      "id": "tac_target_2"
+      "id": "ops_target_2"
     }
   ],
   "is_training": true,
-  "target_role": "tactical",
+  "target_role": "operations",
   "auto_roles": [
     "helm",
     "engineering"
   ],
   "nodes": [
     {
-      "id": "tac_01_orient",
+      "id": "ops_01_orient",
       "type": "objective",
       "text": "Review the tactical plot \u2014 observe threat levels for both contacts",
       "trigger": {
@@ -34,56 +34,56 @@
       "hint": "Your tactical plot auto-rates contacts by threat level (CRITICAL / HIGH / MEDIUM / LOW) based on their type, distance, and behaviour. The cruiser-class contact is more dangerous than the scout. Review the Threat Board on the right."
     },
     {
-      "id": "tac_02_priority",
+      "id": "ops_02_priority",
       "type": "objective",
       "text": "Designate the cruiser as PRIMARY target",
       "trigger": {
         "type": "training_flag",
-        "flag": "tactical_priority_set"
+        "flag": "ops_priority_set"
       },
       "hint": "In the Threat Board, click on the cruiser contact. Press PRIMARY to mark it as the primary engagement target. Weapons will see this designation on their radar. Secondary targets should be engaged after the primary is neutralised."
     },
     {
-      "id": "tac_03_intercept",
+      "id": "ops_03_intercept",
       "type": "objective",
       "text": "Set an intercept target for Helm",
       "trigger": {
         "type": "training_flag",
-        "flag": "tactical_intercept_set"
+        "flag": "ops_intercept_set"
       },
       "hint": "Click on a contact on the tactical map or Threat Board, then press INTERCEPT. This sends a bearing and ETA to the Helm station. The Helm officer sees the suggested heading and can choose to follow it. Coordinate by voice."
     },
     {
-      "id": "tac_04_plan",
+      "id": "ops_04_plan",
       "type": "objective",
       "text": "Create a strike plan with at least two steps",
       "trigger": {
         "type": "training_flag",
-        "flag": "tactical_plan_created"
+        "flag": "ops_plan_created"
       },
       "hint": "In the Strike Plans section, add steps using the Role / Action / T+ fields. Example: 'helm / turn to 270 / T-5' and 'weapons / fire torpedoes / T+0'. Press CREATE PLAN when done. Execute the plan to broadcast countdown cards to each station."
     }
   ],
   "edges": [
     {
-      "from": "tac_01_orient",
-      "to": "tac_02_priority",
+      "from": "ops_01_orient",
+      "to": "ops_02_priority",
       "type": "sequence"
     },
     {
-      "from": "tac_02_priority",
-      "to": "tac_03_intercept",
+      "from": "ops_02_priority",
+      "to": "ops_03_intercept",
       "type": "sequence"
     },
     {
-      "from": "tac_03_intercept",
-      "to": "tac_04_plan",
+      "from": "ops_03_intercept",
+      "to": "ops_04_plan",
       "type": "sequence"
     }
   ],
-  "start_node": "tac_01_orient",
+  "start_node": "ops_01_orient",
   "victory_nodes": [
-    "tac_04_plan"
+    "ops_04_plan"
   ],
   "defeat_condition": {
     "type": "player_hull_zero"

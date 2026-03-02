@@ -89,7 +89,7 @@ const ROLE_LABELS = {
   comms:               'COMMS',
   flight_ops:          'FLIGHT OPS',
   electronic_warfare:  'EW',
-  tactical:            'TACTICAL',
+  operations:          'OPERATIONS',
   captain:             'CAPTAIN',
 };
 

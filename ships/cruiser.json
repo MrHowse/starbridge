@@ -1,7 +1,7 @@
 {
   "id": "cruiser",
   "name": "Endeavour-class Cruiser",
-  "description": "Command ship. Strong across the board with enhanced tactical capabilities. Captain and Tactical are the star stations.",
+  "description": "Command ship. Strong across the board with enhanced tactical capabilities. Captain and Operations are the star stations.",
   "max_hull": 180,
   "max_speed": 120,
   "acceleration": 20,

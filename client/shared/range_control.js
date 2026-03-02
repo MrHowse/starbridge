@@ -41,7 +41,7 @@ export const STATION_RANGES = {
   helm:     { available: ['25','50','100','500','1K','SEC'],           default: '50'  },
   weapons:  { available: ['25','50','100'],                            default: '50'  },
   science:  { available: ['25','50','100','500','1K','SEC','STR'],     default: '100' },
-  tactical: { available: ['25','50','100','500','1K','SEC','STR'],     default: '100' },
+  operations: { available: ['25','50','100','500','1K','SEC','STR'],   default: '100' },
   flight_ops: { available: ['25','50','100','500'],                    default: '50'  },
   electronic_warfare: { available: ['25','50','100'],                  default: '50'  },
 };

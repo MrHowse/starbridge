@@ -323,7 +323,7 @@ class TestInterceptContact:
         assert cc.confidence == "probable"
         assert cc.icon == "hostile"
 
-    def test_intercept_visible_to_tactical(self):
+    def test_intercept_visible_to_operations(self):
         co = fresh_comms()
         _add_intercept_signal(co, auto=True)
         cc = co.get_comms_contacts()[0]

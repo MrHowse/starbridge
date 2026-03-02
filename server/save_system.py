@@ -15,7 +15,7 @@ Save format:
     "ship": { ... },
     "entities": { enemies, torpedoes, stations, asteroids, hazards },
     "modules": { weapons, medical, security, flight_ops, damage_control,
-                 comms, captain_log, training, ew, tactical, mission, game_state },
+                 comms, captain_log, training, ew, operations, mission, game_state },
   }
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ import server.game_loop_comms as glco
 import server.game_loop_captain as glcap
 import server.game_loop_training as gltr
 import server.game_loop_ew as glew
-import server.game_loop_tactical as gltac
+import server.game_loop_operations as glops
 import server.game_loop_mission as glm
 import server.game_loop_docking as gldo
 import server.game_loop_engineering as gle
@@ -564,7 +564,7 @@ def save_game(
             "captain_log": glcap.serialise(),
             "training": gltr.serialise(),
             "ew": glew.serialise(),
-            "tactical": gltac.serialise(),
+            "operations": glops.serialise(),
             "mission": glm.serialise_mission(),
             "docking": gldo.serialise(),
             "engineering": gle.serialise(),
@@ -664,8 +664,8 @@ def restore_game(save_id: str, world: World) -> dict:
         gltr.deserialise(mods["training"])
     if mods.get("ew"):
         glew.deserialise(mods["ew"])
-    if mods.get("tactical"):
-        gltac.deserialise(mods["tactical"])
+    if mods.get("operations") or mods.get("tactical"):
+        glops.deserialise(mods.get("operations") or mods.get("tactical") or {})
     if mods.get("mission"):
         glm.deserialise_mission(mods["mission"], mission_id)
     if mods.get("docking"):

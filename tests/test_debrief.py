@@ -222,7 +222,7 @@ class TestComputeDebriefAwards:
 
     def test_mastermind_award(self):
         events = [
-            {"tick": 1, "ts": 1.0, "cat": "tactical", "event": "strike_plan_created", "data": {}},
+            {"tick": 1, "ts": 1.0, "cat": "operations", "event": "strike_plan_created", "data": {}},
         ]
         d = gdb.compute_debrief(events)
         award_names = [a["award"] for a in d["awards"]]

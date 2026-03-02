@@ -19,7 +19,7 @@ Covers:
   - Navigation events: route_plotted, route_cleared
   - Flight ops events: drone_launched, drone_recalled, probe_deployed
   - EW events: jam_target_set, countermeasures_toggled, intrusion_started
-  - Tactical events: engagement_priority, intercept_target, annotation_*, strike_plan_*
+  - Operations events: engagement_priority, intercept_target, annotation_*, strike_plan_*
   - Sandbox events: enemy_spawned, crew_casualty, hull_micro_damage, etc.
   - Security events: boarding_started, squad_moved, door_toggled
   - Creature events: sedate, ew_disrupt, comm_progress, leech_removed
@@ -497,7 +497,7 @@ class TestScienceEvents:
 
 
 # ---------------------------------------------------------------------------
-# 9. Navigation, FlightOps, EW, Tactical, Security, Creature Events
+# 9. Navigation, FlightOps, EW, Operations, Security, Creature Events
 # ---------------------------------------------------------------------------
 
 
@@ -563,31 +563,31 @@ class TestEWEvents:
         assert len(recs) == 1
 
 
-class TestTacticalEvents:
+class TestOperationsEvents:
     def test_engagement_priority(self):
         logger, logfile = start_logger_in_tmpdir()
-        logger.log("tactical", "engagement_priority_set", {"entity_id": "e1", "priority": "high"})
+        logger.log("operations", "engagement_priority_set", {"entity_id": "e1", "priority": "high"})
         close_logger(logger)
         recs = [r for r in read_records(logfile) if r["event"] == "engagement_priority_set"]
         assert len(recs) == 1
 
     def test_intercept_target(self):
         logger, logfile = start_logger_in_tmpdir()
-        logger.log("tactical", "intercept_target_set", {"entity_id": "e1"})
+        logger.log("operations", "intercept_target_set", {"entity_id": "e1"})
         close_logger(logger)
         recs = [r for r in read_records(logfile) if r["event"] == "intercept_target_set"]
         assert len(recs) == 1
 
     def test_annotation_added(self):
         logger, logfile = start_logger_in_tmpdir()
-        logger.log("tactical", "annotation_added", {"id": "a1", "type": "waypoint"})
+        logger.log("operations", "annotation_added", {"id": "a1", "type": "waypoint"})
         close_logger(logger)
         recs = [r for r in read_records(logfile) if r["event"] == "annotation_added"]
         assert len(recs) == 1
 
     def test_strike_plan_created(self):
         logger, logfile = start_logger_in_tmpdir()
-        logger.log("tactical", "strike_plan_created", {"plan_id": "sp1", "step_count": 3})
+        logger.log("operations", "strike_plan_created", {"plan_id": "sp1", "step_count": 3})
         close_logger(logger)
         recs = [r for r in read_records(logfile) if r["event"] == "strike_plan_created"]
         assert len(recs) == 1

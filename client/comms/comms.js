@@ -90,7 +90,7 @@ const COMMUNICABLE_TYPES = new Set(['rift_stalker', 'leviathan', 'void_whale']);
 
 const INTEL_ROUTE_TARGETS = [
   "helm", "science", "weapons", "engineering", "captain", "security",
-  "electronic_warfare", "tactical",
+  "electronic_warfare", "operations",
 ];
 
 // ── State ────────────────────────────────────────────────────────────────────

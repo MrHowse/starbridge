@@ -32,7 +32,7 @@ const ROLE_URLS = {
   comms:              '/client/comms/',
   flight_ops:         '/client/flight_ops/',
   electronic_warfare: '/client/ew/',
-  tactical:           '/client/tactical/',
+  operations:         '/client/operations/',
   damage_control:     '/client/damage_control/',
   quartermaster:      '/client/quartermaster/',
 };
@@ -48,7 +48,7 @@ const ROLE_LABELS = {
   comms:              'COM',
   flight_ops:         'FLT',
   electronic_warfare: 'EW',
-  tactical:           'TAC',
+  operations:         'OPS',
   damage_control:     'DC',
   quartermaster:      'QM',
 };

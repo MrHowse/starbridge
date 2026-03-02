@@ -20,7 +20,7 @@ const STATIONS = [
   { role: 'comms',              label: 'COMMS' },
   { role: 'flight_ops',         label: 'FLIGHT OPS' },
   { role: 'electronic_warfare', label: 'ELEC WARFARE' },
-  { role: 'tactical',           label: 'TACTICAL' },
+  { role: 'operations',         label: 'OPERATIONS' },
   { role: 'damage_control',     label: 'DAMAGE CTRL' },
 ];
 
@@ -35,7 +35,7 @@ const STATION_SYSTEM_MAP = {
   comms:              [],
   flight_ops:         ['flight_deck'],
   electronic_warfare: ['ecm_suite'],
-  tactical:           [],
+  operations:         [],
   damage_control:     [],
   captain:            [],
 };

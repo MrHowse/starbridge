@@ -4,7 +4,7 @@
     {"id": "bridge",           "name": "Bridge",           "crew_deck": "bridge",  "deck_number": 1, "position": [2, 0], "connections": ["flag_bridge", "tactical_centre"]},
     {"id": "flag_bridge",      "name": "Flag Bridge",      "crew_deck": "bridge",  "deck_number": 1, "position": [1, 0], "connections": ["bridge", "war_room", "conn"]},
     {"id": "war_room",         "name": "War Room",         "crew_deck": "bridge",  "deck_number": 1, "position": [0, 0], "connections": ["flag_bridge"]},
-    {"id": "tactical_centre",  "name": "Tactical Centre",  "crew_deck": "bridge",  "deck_number": 1, "position": [3, 0], "connections": ["bridge", "comm_suite", "astrogation"]},
+    {"id": "tactical_centre",  "name": "Operations Centre",  "crew_deck": "bridge",  "deck_number": 1, "position": [3, 0], "connections": ["bridge", "comm_suite", "astrogation"]},
     {"id": "comm_suite",       "name": "Comm Suite",       "crew_deck": "bridge",  "deck_number": 1, "position": [4, 0], "connections": ["tactical_centre"]},
 
     {"id": "chart_room",     "name": "Chart Room",     "crew_deck": "bridge",  "deck_number": 2, "position": [0, 1], "connections": ["conn"]},

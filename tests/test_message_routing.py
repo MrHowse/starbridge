@@ -38,7 +38,7 @@ from server.models.messages.security import SecurityMoveSquadPayload, SecurityTo
 from server.models.messages.comms import CommsTuneFrequencyPayload, CommsHailPayload
 from server.models.messages.flight_ops import FlightOpsLaunchDronePayload, FlightOpsDeployDecoyPayload
 from server.models.messages.ew import EWSetJamTargetPayload, EWToggleCountermeasuresPayload
-from server.models.messages.tactical import TacticalSetEngagementPriorityPayload, TacticalAddAnnotationPayload
+from server.models.messages.operations import OperationsPingPayload
 from server.models.messages.puzzle import PuzzleSubmitPayload, PuzzleCancelPayload
 from server.models.messages.creatures import CreatureSedatePayload, CreatureEWDisruptPayload
 from server.models.messages.docking import (
@@ -96,7 +96,7 @@ def _drain_test_queue(queue: asyncio.Queue) -> list[tuple[str, object]]:
 
 _STATION_PREFIXES = [
     "lobby", "helm", "engineering", "weapons", "science", "captain",
-    "medical", "security", "comms", "flight_ops", "ew", "tactical",
+    "medical", "security", "comms", "flight_ops", "ew", "operations",
     "damage_control",
 ]
 
@@ -287,21 +287,11 @@ class TestEWValidation:
         assert result.active is True
 
 
-class TestTacticalValidation:
-    def test_tactical_set_engagement_priority(self):
-        msg = _msg("tactical.set_engagement_priority", {
-            "entity_id": "enemy_1", "priority": "primary",
-        })
+class TestOperationsValidation:
+    def test_operations_ping(self):
+        msg = _msg("operations.ping", {})
         result = validate_payload(msg)
-        assert isinstance(result, TacticalSetEngagementPriorityPayload)
-
-    def test_tactical_add_annotation(self):
-        msg = _msg("tactical.add_annotation", {
-            "annotation_type": "waypoint", "x": 100.0, "y": 200.0,
-            "label": "Target", "text": "Attack here",
-        })
-        result = validate_payload(msg)
-        assert isinstance(result, TacticalAddAnnotationPayload)
+        assert isinstance(result, OperationsPingPayload)
 
 
 class TestDamageControlValidation:
@@ -764,19 +754,17 @@ class TestStationHandlerQueueIntegration:
         assert isinstance(payload, EWSetJamTargetPayload)
 
     @pytest.mark.asyncio
-    async def test_tactical_handler_queues_message(self):
-        from server import tactical
+    async def test_operations_handler_queues_message(self):
+        from server import operations
         mock_sender = MockManager()
         queue: asyncio.Queue = asyncio.Queue()
-        tactical.init(mock_sender, queue)
-        msg = _msg("tactical.set_engagement_priority", {
-            "entity_id": "enemy_1", "priority": "primary",
-        })
-        await tactical.handle_tactical_message("conn1", msg)
+        operations.init(mock_sender, queue)
+        msg = _msg("operations.ping", {})
+        await operations.handle_operations_message("conn1", msg)
         assert not queue.empty()
         msg_type, payload = queue.get_nowait()
-        assert msg_type == "tactical.set_engagement_priority"
-        assert isinstance(payload, TacticalSetEngagementPriorityPayload)
+        assert msg_type == "operations.ping"
+        assert isinstance(payload, OperationsPingPayload)
 
     @pytest.mark.asyncio
     async def test_damage_control_handler_queues_message(self):

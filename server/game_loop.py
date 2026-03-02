@@ -52,12 +52,6 @@ from server.models.messages import (
     EWRecallGhostPayload,
     EWSetGhostClassPayload,
     EWSetFreqLockPayload,
-    TacticalSetEngagementPriorityPayload,
-    TacticalSetInterceptTargetPayload,
-    TacticalAddAnnotationPayload,
-    TacticalRemoveAnnotationPayload,
-    TacticalCreateStrikePlanPayload,
-    TacticalExecuteStrikePlanPayload,
     FlightOpsAbortLandingPayload,
     FlightOpsCancelLaunchPayload,
     FlightOpsClearToLandPayload,
@@ -196,7 +190,7 @@ import server.game_loop_captain as glcap
 import server.game_loop_damage_control as gldc
 import server.game_loop_flight_ops as glfo
 import server.game_loop_ew as glew
-import server.game_loop_tactical as gltac
+import server.game_loop_operations as glops
 import server.game_loop_training as gltr
 import server.game_loop_sandbox as glsb
 import server.game_loop_navigation as gln
@@ -544,7 +538,7 @@ async def start(
     # v0.07 §2.3: Cloaking Device — enable scout-style stealth on frigate.
     if gleq.has_module("cloaking_device"):
         glew.enable_cloak_module()
-    gltac.reset()
+    glops.reset()
     glfb.reset(active=(ship_class == "cruiser"))
     glsm.reset(
         active=(ship_class == "battleship"),
@@ -1034,7 +1028,7 @@ async def _loop() -> None:
         # Corvette ECM: forward intercepted signals to comms station.
         for _isig in glew.pop_intercepted_signals():
             glco.add_signal(**_isig)
-        gltac.tick(_world, _world.ship, TICK_DT)
+        glops.tick(_world, _world.ship, TICK_DT)
         # Tick crew reassignment timers before updating crew factors.
         _reassignment_roster = glmed.get_roster()
         _reassignment_events = _reassignment_roster.tick_reassignments(TICK_DT) if _reassignment_roster else []
@@ -2033,24 +2027,15 @@ async def _loop() -> None:
             Message.build("ew.state", glew.build_state(_world, _world.ship)),
         )
 
-        # 11l. Tactical state → Tactical station + cross-station broadcasts.
+        # 11l. Operations state → Operations station.
         await _manager.broadcast_to_roles(
-            ["tactical"],
-            Message.build("tactical.state", gltac.build_state(_world, _world.ship)),
+            ["operations"],
+            Message.build("operations.state", glops.build_state(_world, _world.ship)),
         )
-        await _manager.broadcast_to_roles(
-            ["weapons"],
-            Message.build("tactical.designations", gltac.get_designations()),
-        )
-        _intercept = gltac.calc_intercept(_world, _world.ship)
-        await _manager.broadcast_to_roles(
-            ["helm"],
-            Message.build("tactical.intercept", _intercept or {}),
-        )
-        for _roles, _cdata in gltac.pop_pending_broadcasts():
+        for _roles, _cdata in glops.pop_pending_broadcasts():
             await _manager.broadcast_to_roles(
                 _roles,
-                Message.build("tactical.strike_countdown", _cdata),
+                Message.build("operations.event", _cdata),
             )
 
         # 11l2. Flag Bridge state → Captain (cruiser only).
@@ -2060,7 +2045,7 @@ async def _loop() -> None:
                 Message.build("flag_bridge.state", glfb.build_state(_world, _world.ship)),
             )
             await _manager.broadcast_to_roles(
-                ["helm", "tactical"],
+                ["helm", "operations"],
                 Message.build("flag_bridge.drawings", {"drawings": glfb.get_drawings()}),
             )
             await _manager.broadcast_to_roles(
@@ -2742,32 +2727,9 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "ew.set_freq_lock" and isinstance(payload, EWSetFreqLockPayload):
             result = glew.set_freq_lock_target(payload.entity_id, payload.frequency)
             gl.log_event("ew", "freq_lock_set", result)
-        elif msg_type == "tactical.set_engagement_priority" and isinstance(payload, TacticalSetEngagementPriorityPayload):
-            gltac.set_engagement_priority(payload.entity_id, payload.priority)
-            gl.log_event("tactical", "engagement_priority_set", {
-                "entity_id": payload.entity_id, "priority": payload.priority,
-            })
-            _set_training_flag(glm, "tactical_priority_set")
-        elif msg_type == "tactical.set_intercept_target" and isinstance(payload, TacticalSetInterceptTargetPayload):
-            gltac.set_intercept_target(payload.entity_id)
-            gl.log_event("tactical", "intercept_target_set", {"entity_id": payload.entity_id})
-            _set_training_flag(glm, "tactical_intercept_set")
-        elif msg_type == "tactical.add_annotation" and isinstance(payload, TacticalAddAnnotationPayload):
-            ann_id = gltac.add_annotation(
-                payload.annotation_type, payload.x, payload.y, payload.label, payload.text,
-            )
-            gl.log_event("tactical", "annotation_added", {"id": ann_id, "type": payload.annotation_type})
-        elif msg_type == "tactical.remove_annotation" and isinstance(payload, TacticalRemoveAnnotationPayload):
-            gltac.remove_annotation(payload.annotation_id)
-            gl.log_event("tactical", "annotation_removed", {"id": payload.annotation_id})
-        elif msg_type == "tactical.create_strike_plan" and isinstance(payload, TacticalCreateStrikePlanPayload):
-            plan_id = gltac.create_strike_plan([s.model_dump() for s in payload.steps])
-            gl.log_event("tactical", "strike_plan_created", {"plan_id": plan_id, "step_count": len(payload.steps)})
-            if len(payload.steps) >= 2:
-                _set_training_flag(glm, "tactical_plan_created")
-        elif msg_type == "tactical.execute_strike_plan" and isinstance(payload, TacticalExecuteStrikePlanPayload):
-            ok = gltac.execute_strike_plan(payload.plan_id)
-            gl.log_event("tactical", "strike_plan_executed", {"plan_id": payload.plan_id, "found": ok})
+        # --- Operations (replaces Tactical — v0.08) ---
+        elif msg_type == "operations.ping":
+            pass  # Heartbeat; real message handling added in A.2–A.5.
         # --- Flag Bridge (v0.07 §2.4) ---
         elif msg_type == "captain.flag_add_drawing" and isinstance(payload, FlagBridgeAddDrawingPayload):
             result = glfb.add_drawing(

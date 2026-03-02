@@ -376,7 +376,7 @@ class TestRangePresetSpec:
         "helm":     "50",
         "weapons":  "50",
         "science":  "100",
-        "tactical": "100",
+        "operations": "100",
         "flight_ops": "50",
         "electronic_warfare": "50",
     }
@@ -386,7 +386,7 @@ class TestRangePresetSpec:
         "helm":     ["25", "50", "100", "500", "1K", "SEC"],
         "weapons":  ["25", "50", "100"],
         "science":  ["25", "50", "100", "500", "1K", "SEC", "STR"],
-        "tactical": ["25", "50", "100", "500", "1K", "SEC", "STR"],
+        "operations": ["25", "50", "100", "500", "1K", "SEC", "STR"],
         "flight_ops": ["25", "50", "100", "500"],
         "electronic_warfare": ["25", "50", "100"],
     }
@@ -417,7 +417,7 @@ class TestRangePresetSpec:
         """All map-capable stations have range config."""
         assert set(self.EXPECTED_STATION_RANGES.keys()) == {
             "captain", "helm", "weapons", "science",
-            "tactical", "flight_ops", "electronic_warfare",
+            "operations", "flight_ops", "electronic_warfare",
         }
 
 

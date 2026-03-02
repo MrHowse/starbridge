@@ -23,7 +23,7 @@ let _latestRoles = {};
 
 const ROLES = [
   'captain', 'helm', 'weapons', 'engineering', 'science', 'medical',
-  'security', 'comms', 'flight_ops', 'electronic_warfare', 'tactical', 'damage_control',
+  'security', 'comms', 'flight_ops', 'electronic_warfare', 'operations', 'damage_control',
   'quartermaster',
 ];
 
@@ -40,7 +40,7 @@ const ROLE_LABELS = {
   comms:              'COMMS',
   flight_ops:         'FLIGHT OPS',
   electronic_warfare: 'ELEC WARFARE',
-  tactical:           'TACTICAL',
+  operations:         'OPERATIONS',
   damage_control:     'DAMAGE CTRL',
   quartermaster:      'QUARTERMASTER',
 };

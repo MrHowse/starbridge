@@ -14,7 +14,7 @@ const ACTION_TYPES = [
   { value: "start_outbreak",label: "Start outbreak" },
 ];
 
-const PUZZLE_STATIONS = ["science","engineering","helm","weapons","medical","security","comms","tactical","flight_ops"];
+const PUZZLE_STATIONS = ["science","engineering","helm","weapons","medical","security","comms","operations","flight_ops"];
 
 /**
  * Render an edge edit form into containerEl.

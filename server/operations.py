@@ -1,12 +1,11 @@
 """
-Tactical Officer Station Handler.
+Operations Station Handler.
 
-Receives tactical control messages from the client, validates them against
-their Pydantic schemas, and queues them for the game loop to apply.
+Receives operations.* messages from the Operations client, validates them
+against their Pydantic schemas, and queues them for the game loop to apply
+at the start of the next tick.
 
-Follows the same pattern as engineering.py, ew.py, etc.:
-  init(sender, queue) — inject dependencies from main.py
-  handle_tactical_message(connection_id, message) — validate and enqueue
+Call init(sender, queue) from main.py before the game starts.
 """
 from __future__ import annotations
 
@@ -18,7 +17,7 @@ from pydantic import BaseModel, ValidationError
 
 from server.models.messages import Message, validate_payload
 
-logger = logging.getLogger("starbridge.tactical")
+logger = logging.getLogger("starbridge.operations")
 
 
 class _SenderProtocol(Protocol):
@@ -39,8 +38,8 @@ def init(
     _queue = queue
 
 
-async def handle_tactical_message(connection_id: str, message: Message) -> None:
-    """Validate and queue a Tactical Officer control message for the game loop."""
+async def handle_operations_message(connection_id: str, message: Message) -> None:
+    """Validate and queue an Operations control message for the game loop."""
     assert _sender is not None and _queue is not None
 
     try:
@@ -53,12 +52,12 @@ async def handle_tactical_message(connection_id: str, message: Message) -> None:
                 {"message": str(exc), "original_type": message.type},
             ),
         )
-        logger.warning("Tactical validation error from %s: %s", connection_id, exc)
+        logger.warning("Operations validation error from %s: %s", connection_id, exc)
         return
 
     if payload is None:
         logger.warning(
-            "Unhandled tactical message type '%s' from %s", message.type, connection_id
+            "Unhandled operations message type '%s' from %s", message.type, connection_id
         )
         return
 

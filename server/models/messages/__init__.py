@@ -155,15 +155,8 @@ from server.models.messages.ew import (
     EWToggleStealthPayload,
 )
 
-# Tactical Officer
-from server.models.messages.tactical import (
-    TacticalSetEngagementPriorityPayload,
-    TacticalSetInterceptTargetPayload,
-    TacticalAddAnnotationPayload,
-    TacticalRemoveAnnotationPayload,
-    TacticalCreateStrikePlanPayload,
-    TacticalExecuteStrikePlanPayload,
-)
+# Operations (replaces Tactical Officer — v0.08)
+from server.models.messages.operations import OperationsPingPayload
 
 # Game lifecycle
 from server.models.messages.game import (
@@ -383,13 +376,8 @@ __all__ = [
     "EWSetGhostClassPayload",
     "EWSetFreqLockPayload",
     "EWBeginIntrusionPayload",
-    # tactical officer
-    "TacticalSetEngagementPriorityPayload",
-    "TacticalSetInterceptTargetPayload",
-    "TacticalAddAnnotationPayload",
-    "TacticalRemoveAnnotationPayload",
-    "TacticalCreateStrikePlanPayload",
-    "TacticalExecuteStrikePlanPayload",
+    # operations (replaces tactical officer — v0.08)
+    "OperationsPingPayload",
     # game
     "ErrorValidationPayload",
     "ErrorPermissionPayload",

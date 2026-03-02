@@ -103,14 +103,7 @@ from server.models.messages.ew import (
     EWSetFreqLockPayload,
     EWBeginIntrusionPayload,
 )
-from server.models.messages.tactical import (
-    TacticalSetEngagementPriorityPayload,
-    TacticalSetInterceptTargetPayload,
-    TacticalAddAnnotationPayload,
-    TacticalRemoveAnnotationPayload,
-    TacticalCreateStrikePlanPayload,
-    TacticalExecuteStrikePlanPayload,
-)
+from server.models.messages.operations import OperationsPingPayload
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
     EngineeringCancelRepairOrderPayload,
@@ -323,13 +316,8 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "ew.recall_ghost":           EWRecallGhostPayload,
     "ew.set_ghost_class":        EWSetGhostClassPayload,
     "ew.set_freq_lock":          EWSetFreqLockPayload,
-    # Tactical Officer
-    "tactical.set_engagement_priority": TacticalSetEngagementPriorityPayload,
-    "tactical.set_intercept_target":    TacticalSetInterceptTargetPayload,
-    "tactical.add_annotation":          TacticalAddAnnotationPayload,
-    "tactical.remove_annotation":       TacticalRemoveAnnotationPayload,
-    "tactical.create_strike_plan":      TacticalCreateStrikePlanPayload,
-    "tactical.execute_strike_plan":     TacticalExecuteStrikePlanPayload,
+    # Operations (replaces Tactical — v0.08)
+    "operations.ping": OperationsPingPayload,
     # Damage Control (aliases engineering DCT payloads)
     "damage_control.dispatch_dct": EngineeringDispatchDCTPayload,
     "damage_control.cancel_dct":   EngineeringCancelDCTPayload,

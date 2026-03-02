@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 # Roles that receive map.sector_grid and map.route_updated broadcasts.
 MAP_CAPABLE_ROLES: list[str] = [
-    "captain", "helm", "science", "tactical", "comms", "flight_ops",
+    "captain", "helm", "science", "operations", "comms", "flight_ops",
 ]
 
 _active_route: dict | None = None

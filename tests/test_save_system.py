@@ -313,7 +313,7 @@ def test_save_game_creates_file(tmp_saves):
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
         glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
-        gltac=_mock_modules(), glm=_mock_modules(),
+        glops=_mock_modules(), glm=_mock_modules(),
     ):
         save_id = ss.save_game(world, "first_contact", "officer", "frigate", 500)
 
@@ -327,7 +327,7 @@ def test_save_game_returns_save_id(tmp_saves):
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
         glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
-        gltac=_mock_modules(), glm=_mock_modules(),
+        glops=_mock_modules(), glm=_mock_modules(),
     ):
         save_id = ss.save_game(world, "first_contact", "officer", "frigate", 100)
 
@@ -341,7 +341,7 @@ def test_save_game_file_contains_metadata(tmp_saves):
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
         glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
-        gltac=_mock_modules(), glm=_mock_modules(),
+        glops=_mock_modules(), glm=_mock_modules(),
     ):
         save_id = ss.save_game(world, "defend_station", "admiral", "cruiser", 250)
 
@@ -420,7 +420,7 @@ def test_restore_game_returns_metadata(tmp_saves):
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
         glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
-        gltac=_mock_modules(), glm=_mock_modules(),
+        glops=_mock_modules(), glm=_mock_modules(),
     ):
         result = ss.restore_game("r1", world)
 
@@ -455,7 +455,7 @@ def test_restore_game_restores_ship_hull(tmp_saves):
         glw=_mock_modules(), glmed=_mock_modules(), gls=_mock_modules(),
         glfo=_mock_modules(), gldc=_mock_modules(), glco=_mock_modules(),
         glcap=_mock_modules(), gltr=_mock_modules(), glew=_mock_modules(),
-        gltac=_mock_modules(), glm=_mock_modules(),
+        glops=_mock_modules(), glm=_mock_modules(),
     ):
         ss.restore_game("r2", world)
 

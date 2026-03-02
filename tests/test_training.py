@@ -366,7 +366,7 @@ class TestTrainingMissionsLoad:
         "train_damage_control",
         "train_flight_ops",
         "train_ew",
-        "train_tactical",
+        "train_operations",
         "train_captain",
     ])
     def test_mission_loads(self, mission_id):
@@ -387,7 +387,7 @@ class TestTrainingMissionsLoad:
         "train_damage_control",
         "train_flight_ops",
         "train_ew",
-        "train_tactical",
+        "train_operations",
         "train_captain",
     ])
     def test_mission_has_hints(self, mission_id):
@@ -408,7 +408,7 @@ class TestTrainingMissionsLoad:
         "train_damage_control",
         "train_flight_ops",
         "train_ew",
-        "train_tactical",
+        "train_operations",
         "train_captain",
     ])
     def test_mission_has_valid_triggers(self, mission_id):

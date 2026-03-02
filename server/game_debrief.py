@@ -32,7 +32,7 @@ _CAT_TO_ROLE: dict[str, str] = {
     "comms":            "comms",
     "flight_ops":       "flight_ops",
     "ew":               "electronic_warfare",
-    "tactical":         "tactical",
+    "operations":       "operations",
     "captain":          "captain",
     "dynamic_mission":  "captain",  # mission events count toward captain
     "maintenance":      "janitor",
@@ -51,7 +51,7 @@ _AWARD_DEFS: list[tuple[str, str, str, int, str]] = [
     ("engineering",      "Quick Fix",         "Dispatched {n} damage team(s)",    1,  "dct_dispatched"),
     ("flight_ops",       "Ace Pilot",         "Launched {n} drone(s)",            1,  "drone_launched"),
     ("electronic_warfare", "Ghost",           "Jammed {n} target(s)",             1,  "jam_target_set"),
-    ("tactical",         "Mastermind",        "Created {n} strike plan(s)",       1,  "strike_plan_created"),
+    ("operations",       "Mastermind",        "Created {n} strike plan(s)",       1,  "strike_plan_created"),
     ("captain",          "Decisive Leader",   "Changed alert level {n} time(s)",  1,  "alert_changed"),
     ("janitor",          "Employee of the Month (14 months running)", "Toilets fixed, floors mopped, coffee restocked. {n} task(s) completed. Nobody will ever know.", 1, "general"),
 ]

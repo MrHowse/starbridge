@@ -361,5 +361,5 @@ class TestPayloads:
         assert "helm" in gln.MAP_CAPABLE_ROLES
 
     def test_map_capable_roles_count(self) -> None:
-        # captain, helm, science, tactical, comms, flight_ops
+        # captain, helm, science, operations, comms, flight_ops
         assert len(gln.MAP_CAPABLE_ROLES) == 6
