@@ -110,6 +110,7 @@ let _selectedId = null;
 let _mapRenderer  = null;
 let _rangeControl = null;
 let _rafId = null;
+let _flagBridgeState = null;
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -131,6 +132,7 @@ function init() {
   on('operations.state',   handleOpsState);
   on('operations.event',   handleOpsEvent);
   on('sensor.contacts',    handleSensorContacts);
+  on('flag_bridge.state',  (p) => { _flagBridgeState = p; });
 
   setupAdvisory();
   SoundBank.init();

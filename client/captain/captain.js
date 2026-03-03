@@ -263,6 +263,8 @@ function init() {
   on('mission.mission_failed',        handleMissionFailed);
   on('mission.mission_expired',       handleMissionExpired);
   on('mission.objective_completed',   handleMissionObjectiveCompleted);
+  on('flag_bridge.state',             handleFlagBridgeState);
+  on('spinal.state',                  handleSpinalState);
 
   // Mission accept/decline buttons
   if (acceptMissionBtn) {
@@ -814,6 +816,53 @@ function handleMissionExpired({ mission_id }) {
 
 function handleMissionObjectiveCompleted({ mission_id, objective_id, description }) {
   // Active missions list will re-render on next dynamic_list tick
+}
+
+// ---------------------------------------------------------------------------
+// Flag Bridge (cruiser only)
+// ---------------------------------------------------------------------------
+
+let _flagBridgeState = null;
+
+function handleFlagBridgeState(payload) {
+  _flagBridgeState = payload;
+  const el = document.getElementById('flag-bridge-panel');
+  if (!el) return;
+  if (!payload.flag_bridge_active) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const tl = (payload.timeline || []).slice(0, 4)
+    .map(e => `${e.label} ${Math.round(e.eta_s)}s`).join(' | ');
+  const pq = (payload.priority_queue || []).length;
+  el.innerHTML =
+    `<div class="panel-header">FLAG BRIDGE</div>` +
+    `<div class="panel-body">` +
+    `<div>Priority targets: ${pq}${payload.weapons_override ? ' (WPN OVERRIDE)' : ''}</div>` +
+    `<div>Fleet ships: ${(payload.fleet_ships || []).length}</div>` +
+    (tl ? `<div class="flag-timeline">${tl}</div>` : '') +
+    `</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Spinal Mount (battleship only)
+// ---------------------------------------------------------------------------
+
+let _spinalState = null;
+
+function handleSpinalState(payload) {
+  _spinalState = payload;
+  const el = document.getElementById('spinal-panel');
+  if (!el) return;
+  if (!payload.active) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const charge = payload.charge_progress || 0;
+  const state = (payload.state || 'idle').toUpperCase();
+  const cd = payload.cooldown_remaining > 0 ? ` CD:${Math.round(payload.cooldown_remaining)}s` : '';
+  el.innerHTML =
+    `<div class="panel-header">SPINAL MOUNT</div>` +
+    `<div class="panel-body">` +
+    `<div>${state} ${charge}%${cd}</div>` +
+    `<div>Alignment: ${payload.alignment || 'N/A'}</div>` +
+    `</div>`;
 }
 
 // ---------------------------------------------------------------------------

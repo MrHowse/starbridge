@@ -221,6 +221,8 @@ function init() {
   on('weapons.diplomatic_incident',    handleDiplomaticIncident);
   on('game.over',                      handleGameOver);
   on('comms.contacts',                 handleCommsContacts);
+  on('flag_bridge.priority',           handleFlagBridgePriority);
+  on('spinal.state',                   handleSpinalState);
 
   initPuzzleRenderer(send);
   setupControls();
@@ -398,6 +400,44 @@ function handleSensorContacts(payload) {
 function handleCommsContacts(payload) {
   if (!gameActive) return;
   if (radarRenderer) radarRenderer.updateCommsContacts(payload.contacts || []);
+}
+
+// ---------------------------------------------------------------------------
+// Flag Bridge priority (cruiser) + Spinal Mount (battleship)
+// ---------------------------------------------------------------------------
+
+let _flagPriorityQueue = [];
+let _spinalState = null;
+
+function handleFlagBridgePriority(payload) {
+  _flagPriorityQueue = payload.priority_queue || [];
+  const el = document.getElementById('flag-priority-panel');
+  if (!el) return;
+  if (!_flagPriorityQueue.length && !payload.weapons_override) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const override = payload.weapons_override ? ' (OVERRIDE)' : '';
+  el.innerHTML =
+    `<div class="panel-header">FLAG BRIDGE PRIORITY${override}</div>` +
+    `<div class="panel-body">${_flagPriorityQueue.length} target(s) queued</div>`;
+}
+
+function handleSpinalState(payload) {
+  _spinalState = payload;
+  const el = document.getElementById('spinal-mount-panel');
+  if (!el) return;
+  if (!payload.active) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const charge = payload.charge_progress || 0;
+  const state = (payload.state || 'idle').toUpperCase();
+  const cd = payload.cooldown_remaining > 0 ? ` CD:${Math.round(payload.cooldown_remaining)}s` : '';
+  const align = typeof payload.alignment === 'number' ? `${Math.round(payload.alignment)}%` : 'N/A';
+  const content = document.getElementById('spinal-mount-content');
+  if (content) {
+    content.innerHTML =
+      `<div>${state} ${charge}%${cd}</div>` +
+      `<div>Alignment: ${align}</div>` +
+      `<div>Power draw: ${payload.power_draw || 0}</div>`;
+  }
 }
 
 function handleHullHit() {

@@ -76,6 +76,7 @@ const ctx = mapCanvas.getContext('2d');
 
 let shipState = null;
 let foState   = null;
+let _carrierState = null;
 
 // Sensor contacts from ship.state for drawing on tactical map.
 let _sensorContacts = [];
@@ -186,6 +187,11 @@ on('flight_ops.state', payload => {
   renderExpendables();
   renderStatusBar();
   renderMap();
+});
+
+on('carrier.state', payload => {
+  _carrierState = payload;
+  renderCarrierPanel();
 });
 
 on('flight_ops.events', ({ events }) => {
@@ -1464,6 +1470,29 @@ deployDecoyBtn.addEventListener('click', () => {
     enterDecoyMode();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Carrier panel (carrier-class only)
+// ---------------------------------------------------------------------------
+
+function renderCarrierPanel() {
+  const el = document.getElementById('carrier-panel');
+  if (!el) return;
+  if (!_carrierState || !_carrierState.active) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const sq = _carrierState.squadrons || {};
+  const sqCount = Object.keys(sq).length;
+  const cap = _carrierState.cap_zone;
+  const scramble = _carrierState.scramble_active ? 'ACTIVE' : 'OFF';
+  const capInfo = cap && cap.active ? `R:${cap.radius} (${cap.assigned_drone_ids.length} drones)` : 'NONE';
+  el.innerHTML =
+    `<div class="panel-header">CARRIER OPS</div>` +
+    `<div class="panel-body">` +
+    `<div>Squadrons: ${sqCount}</div>` +
+    `<div>CAP zone: ${capInfo}</div>` +
+    `<div>Scramble: ${scramble}${_carrierState.scramble_queue_remaining ? ' (' + _carrierState.scramble_queue_remaining + ' queued)' : ''}</div>` +
+    `</div>`;
+}
 
 // ---------------------------------------------------------------------------
 // Status bar

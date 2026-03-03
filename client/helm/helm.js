@@ -138,6 +138,7 @@ let _scanIndicatorText = null;
 // Docking state (v0.05f).
 let _dockedAt      = null;   // station ID if docked, null otherwise
 let _approachInfo  = null;   // latest docking.approach_info payload
+let _flagBridgeDrawings = []; // flag bridge tactical drawings (cruiser)
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -188,6 +189,7 @@ function init() {
   on('docking.undocked',      () => { _dockedAt = null; });
   on('comms.contacts',        (p) => { if (_mapRenderer) _mapRenderer.updateCommsContacts(p.contacts || []); });
   on('operations.overlay',    (p) => { if (_mapRenderer) _mapRenderer.updateOpsOverlay(p); });
+  on('flag_bridge.drawings',  (p) => { _flagBridgeDrawings = p.drawings || []; if (_mapRenderer && _mapRenderer.updateFlagBridgeDrawings) _mapRenderer.updateFlagBridgeDrawings(_flagBridgeDrawings); });
 
   initPuzzleRenderer(send);
   setupKeyboard();

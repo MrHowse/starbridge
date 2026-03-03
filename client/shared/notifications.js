@@ -77,6 +77,8 @@ export function initNotifications(send, fromRole = 'crew') {
   _buildSendPanel();
 
   on('crew.notification', _handleNotification);
+  on('ship.reactor_shutdown', _handleReactorShutdown);
+  on('resources.critical', _handleResourceCritical);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +93,42 @@ function _handleNotification(payload) {
   if (_log.length > MAX_LOG) _log.shift();
   _refreshLogUI();
   _showToast(message, from_role);
+}
+
+// ---------------------------------------------------------------------------
+// System alert handlers
+// ---------------------------------------------------------------------------
+
+function _handleReactorShutdown(payload) {
+  const systems = (payload.emergency_systems || []).join(', ').toUpperCase() || 'NONE';
+  _showAlertToast(
+    'REACTOR SHUTDOWN',
+    `All systems losing power. Emergency: ${systems}`,
+    'critical',
+    10000,
+  );
+}
+
+function _handleResourceCritical(payload) {
+  const res = (payload.resource || 'UNKNOWN').toUpperCase().replace(/_/g, ' ');
+  const pct = payload.fraction != null ? Math.round(payload.fraction * 100) : '?';
+  _showAlertToast('RESOURCE', `${res} CRITICAL (${pct}%)`, 'warning', 6000);
+}
+
+function _showAlertToast(label, message, severity, duration) {
+  if (!_toastContainer) return;
+  const cls = severity === 'critical' ? 'notify-toast--critical' : 'notify-toast--warning';
+  const toast = document.createElement('div');
+  toast.className = `notify-toast ${cls}`;
+  toast.innerHTML =
+    `<span class="notify-toast__role">[${_esc(label)}]</span>` +
+    `<span class="notify-toast__msg">${_esc(message)}</span>`;
+  _toastContainer.appendChild(toast);
+  const dur = duration || TOAST_DURATION;
+  setTimeout(() => {
+    toast.classList.add('notify-toast--fade');
+    setTimeout(() => toast.remove(), TOAST_FADE);
+  }, dur - TOAST_FADE);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,6 +338,21 @@ function _injectCSS() {
 .notify-toast--fade {
   opacity: 0;
 }
+
+.notify-toast--critical {
+  border-color: rgba(255, 60, 60, 0.8);
+  box-shadow: 0 0 12px rgba(255, 60, 60, 0.35);
+  max-width: 100%;
+}
+.notify-toast--critical .notify-toast__role { color: #ff4444; }
+.notify-toast--critical .notify-toast__msg  { color: #ffcccc; }
+
+.notify-toast--warning {
+  border-color: rgba(255, 180, 0, 0.7);
+  box-shadow: 0 0 10px rgba(255, 180, 0, 0.25);
+}
+.notify-toast--warning .notify-toast__role { color: #ffb400; }
+.notify-toast--warning .notify-toast__msg  { color: #ffe0a0; }
 
 .notify-toast__role {
   color: rgba(0, 255, 65, 0.7);
