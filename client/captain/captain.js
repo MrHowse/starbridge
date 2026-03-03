@@ -265,6 +265,12 @@ function init() {
   on('mission.objective_completed',   handleMissionObjectiveCompleted);
   on('flag_bridge.state',             handleFlagBridgeState);
   on('spinal.state',                  handleSpinalState);
+  on('resources.warning', (p) => {
+    const res = (p.resource || 'UNKNOWN').toUpperCase().replace(/_/g, ' ');
+    const pct = p.fraction != null ? Math.round(p.fraction * 100) : '?';
+    const el = document.getElementById('resource-warning');
+    if (el) { el.textContent = `${res} LOW (${pct}%)`; el.style.display = ''; setTimeout(() => { el.style.display = 'none'; }, 8000); }
+  });
 
   // Mission accept/decline buttons
   if (acceptMissionBtn) {

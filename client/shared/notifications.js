@@ -79,6 +79,27 @@ export function initNotifications(send, fromRole = 'crew') {
   on('crew.notification', _handleNotification);
   on('ship.reactor_shutdown', _handleReactorShutdown);
   on('resources.critical', _handleResourceCritical);
+  on('ship.resupplied', (p) => {
+    const detail = p.resource ? (p.resource.toUpperCase().replace(/_/g, ' ')) : 'supplies';
+    _showAlertToast('RESUPPLY', `${detail} replenished`, 'positive', 5000);
+  });
+  on('crew.reassignment_complete', () => {
+    _showAlertToast('CREW', 'Reassignment complete', 'positive', 3000);
+  });
+  on('hazard.status', _handleHazardStatus);
+  on('station.reinforcement_call', () => {
+    _showAlertToast('TACTICAL', 'Enemy station calling reinforcements!', 'warning', 5000);
+  });
+  on('station.component_destroyed', (p) => {
+    const comp = p.component ? p.component.toUpperCase() : 'COMPONENT';
+    _showAlertToast('TACTICAL', `Enemy station: ${comp} destroyed`, 'positive', 3000);
+  });
+  on('station.destroyed', () => {
+    _showAlertToast('TACTICAL', 'ENEMY STATION DESTROYED', 'positive', 5000);
+  });
+  on('station.captured', () => {
+    _showAlertToast('TACTICAL', 'Station captured!', 'positive', 5000);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -115,9 +136,18 @@ function _handleResourceCritical(payload) {
   _showAlertToast('RESOURCE', `${res} CRITICAL (${pct}%)`, 'warning', 6000);
 }
 
+function _handleHazardStatus(payload) {
+  const types = payload.active_types || [];
+  if (!types.length) return;
+  const list = types.map(t => t.toUpperCase().replace(/_/g, ' ')).join(', ');
+  _showAlertToast('HAZARD', list, 'warning', 5000);
+}
+
 function _showAlertToast(label, message, severity, duration) {
   if (!_toastContainer) return;
-  const cls = severity === 'critical' ? 'notify-toast--critical' : 'notify-toast--warning';
+  const cls = severity === 'critical' ? 'notify-toast--critical'
+    : severity === 'positive' ? 'notify-toast--positive'
+    : 'notify-toast--warning';
   const toast = document.createElement('div');
   toast.className = `notify-toast ${cls}`;
   toast.innerHTML =
@@ -353,6 +383,13 @@ function _injectCSS() {
 }
 .notify-toast--warning .notify-toast__role { color: #ffb400; }
 .notify-toast--warning .notify-toast__msg  { color: #ffe0a0; }
+
+.notify-toast--positive {
+  border-color: rgba(0, 200, 80, 0.7);
+  box-shadow: 0 0 10px rgba(0, 200, 80, 0.25);
+}
+.notify-toast--positive .notify-toast__role { color: #00c850; }
+.notify-toast--positive .notify-toast__msg  { color: #b0ffc0; }
 
 .notify-toast__role {
   color: rgba(0, 255, 65, 0.7);
