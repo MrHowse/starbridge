@@ -157,6 +157,10 @@ _auto_fire_delay: float = 0.0
 _weapons_crewed: bool = False
 _auto_fire_status_changed: bool | None = None
 
+# C.6: Combat effects + fire rate tracking.
+_pending_combat_effects: list[dict] = []
+_torpedo_fire_times: list[float] = []
+
 
 def reset(initial_loadout: dict[str, int] | None = None,
           tube_count: int = 2) -> None:
@@ -191,6 +195,9 @@ def reset(initial_loadout: dict[str, int] | None = None,
     _auto_fire_delay = 0.0
     _weapons_crewed = True   # assume crewed — first set_weapons_crewed(False) starts delay
     _auto_fire_status_changed = None
+    # C.6
+    _pending_combat_effects.clear()
+    _torpedo_fire_times.clear()
 
 
 def serialise() -> dict:
@@ -357,6 +364,31 @@ def pop_auto_fire_status_changed() -> bool | None:
     result = _auto_fire_status_changed
     _auto_fire_status_changed = None
     return result
+
+
+# ---------------------------------------------------------------------------
+# C.6: Combat effects + torpedo consumption tracking
+# ---------------------------------------------------------------------------
+
+
+def pop_combat_effects() -> list[dict]:
+    """Drain and return pending combat effect events."""
+    effects = list(_pending_combat_effects)
+    _pending_combat_effects.clear()
+    return effects
+
+
+def get_torpedo_consumption_level() -> str:
+    """Return torpedo fire rate classification: LOW, MEDIUM, or HIGH."""
+    import time as _time
+    now = _time.monotonic()
+    cutoff = now - 60.0
+    recent = [t for t in _torpedo_fire_times if t >= cutoff]
+    if len(recent) >= 2:  # >1 per 30s
+        return "HIGH"
+    elif len(recent) >= 1:
+        return "MEDIUM"
+    return "LOW"
 
 
 def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]]:
@@ -697,6 +729,11 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         if target.hull <= 0.0:
             glsalv.spawn_wreck("enemy", target.id, target.type, target.x, target.y)
             _destroyed_id2 = target.id
+            # C.6: Queue enemy_destroyed combat effect.
+            _pending_combat_effects.append({
+                "effect": "enemy_destroyed", "target_id": _destroyed_id2,
+                "target_type": target.type,
+            })
             world.enemies = [e for e in world.enemies if e.id != _destroyed_id2]
             if _weapons_target == _destroyed_id2:
                 _weapons_target = None
@@ -704,6 +741,9 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
             glcord.on_entity_destroyed(_destroyed_id2)
 
         _beam_cooldown = ship.beam_fire_rate
+        # C.9: Record weapons fire for emission tracking.
+        import server.game_loop_ew as _glew
+        _glew.record_weapons_fire("beam")
         return (
             "weapons.beam_fired",
             {
@@ -897,6 +937,17 @@ def _do_fire(
     )
     world.torpedoes.append(torp)
 
+    # C.6: Track fire time for consumption rate.
+    import time as _time
+    _torpedo_fire_times.append(_time.monotonic())
+    # C.9: Record weapons fire for emission tracking.
+    import server.game_loop_ew as _glew
+    _glew.record_weapons_fire("torpedo")
+    # Trim to last 60 seconds.
+    _cutoff = _torpedo_fire_times[-1] - 60.0
+    while _torpedo_fire_times and _torpedo_fire_times[0] < _cutoff:
+        _torpedo_fire_times.pop(0)
+
     return (
         "weapons.torpedo_fired",
         {"torpedo_id": torp.id, "tube": tube_idx + 1, "torpedo_type": torpedo_type},
@@ -1009,6 +1060,11 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                         if h_enemy.hull <= 0.0:
                             glsalv.spawn_wreck("enemy", h_enemy.id, h_enemy.type, h_enemy.x, h_enemy.y)
                             destroyed_ids.append(h_enemy.id)
+                            # C.6: Queue enemy_destroyed combat effect.
+                            _pending_combat_effects.append({
+                                "effect": "enemy_destroyed", "target_id": h_enemy.id,
+                                "target_type": h_enemy.type,
+                            })
                             gl.log_event("combat", "enemy_destroyed", {
                                 "enemy_id": h_enemy.id,
                                 "cause": "torpedo",
@@ -1060,9 +1116,23 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                             hit_enemy.stun_ticks = ION_STUN_TICKS
                             event["shield_drained"] = True
                             event["stun_duration"] = ION_STUN_TICKS / 10.0
+                            # C.6: Queue ion_hit combat effect.
+                            _pending_combat_effects.append({
+                                "effect": "ion_hit", "target_id": hit_enemy.id,
+                            })
+                        if torp_type == "nuclear":
+                            # C.6: Queue nuclear_hit combat effect.
+                            _pending_combat_effects.append({
+                                "effect": "nuclear_hit", "target_id": hit_enemy.id,
+                            })
 
                     if hit_enemy.hull <= 0.0:
                         glsalv.spawn_wreck("enemy", hit_enemy.id, hit_enemy.type, hit_enemy.x, hit_enemy.y)
+                        # C.6: Queue enemy_destroyed combat effect.
+                        _pending_combat_effects.append({
+                            "effect": "enemy_destroyed", "target_id": hit_enemy.id,
+                            "target_type": hit_enemy.type,
+                        })
                         world.enemies = [e for e in world.enemies
                                          if e.id != hit_enemy.id]
                         gl.log_event("combat", "enemy_destroyed", {

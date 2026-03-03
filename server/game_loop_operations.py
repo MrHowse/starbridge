@@ -219,6 +219,10 @@ _station_advisories: dict[str, tuple[str, float]] = {}  # station → (message, 
 _feed_events: list[dict] = []
 _feed_event_id: int = 0
 
+# C.8 / C.9 — intel analysis + intrusion data
+_pending_intel_analysis: list[dict] = []
+_intrusion_intel_data: list[dict] = []
+
 
 # ---------------------------------------------------------------------------
 # Public API — Game loop interface
@@ -246,6 +250,9 @@ def reset() -> None:
     _station_advisories = {}
     _feed_events = []
     _feed_event_id = 0
+    # C.8 / C.9
+    _pending_intel_analysis.clear()
+    _intrusion_intel_data.clear()
 
 
 def tick(world: World, ship: Ship, dt: float) -> None:
@@ -379,6 +386,93 @@ def _drain_feed_events() -> list[dict]:
     return events
 
 
+# ---------------------------------------------------------------------------
+# C.9: Intrusion intel + jammed status
+# ---------------------------------------------------------------------------
+
+
+def receive_intrusion_intel(intel: dict) -> None:
+    """Receive intrusion intel from EW for ops assessment enrichment (C.9)."""
+    _intrusion_intel_data.append(intel)
+    add_feed_event("EW", f"Intrusion intel: {intel.get('target_type', '?')} systems compromised", "info")
+
+
+# ---------------------------------------------------------------------------
+# C.8: Comms intel pipeline + action requests + feasibility
+# ---------------------------------------------------------------------------
+
+_INTEL_CATEGORIES = {
+    "tactical": "Tactical",
+    "navigation": "Navigation",
+    "distress": "Distress",
+    "general": "General",
+}
+
+
+def receive_comms_intel(intel: dict) -> None:
+    """Analyse comms intel and generate recommendation for Captain (C.8)."""
+    category = intel.get("intel_category", "general")
+    label = _INTEL_CATEGORIES.get(category, "General")
+    risk = "high" if intel.get("threat_level") in ("high", "critical") else "low"
+    rec = "Recommend caution" if risk == "high" else "No immediate action required"
+    analysis = {
+        "signal_id": intel.get("signal_id"),
+        "category": category,
+        "category_label": label,
+        "risk_level": risk,
+        "recommendation": rec,
+        "source": intel.get("source_name", "unknown"),
+    }
+    _pending_intel_analysis.append(analysis)
+    add_feed_event("COMMS", f"Intel analysed: {label} ({risk} risk)", "info")
+
+
+def pop_intel_analysis() -> list[dict]:
+    """Drain and return pending intel analysis for Captain."""
+    analyses = list(_pending_intel_analysis)
+    _pending_intel_analysis.clear()
+    return analyses
+
+
+def request_comms_action(action: str, details: str = "") -> dict:
+    """Queue advisory action for Comms station (C.8).
+
+    Valid actions: monitor_frequency, hail_contact, decode_priority, scan_band.
+    """
+    valid_actions = ("monitor_frequency", "hail_contact", "decode_priority", "scan_band")
+    if action not in valid_actions:
+        return {"ok": False, "error": "invalid_action"}
+    _pending_broadcasts.append((
+        ["comms"],
+        {"type": "ops_advisory", "action": action, "details": details},
+    ))
+    add_feed_event("OPS", f"Comms advisory: {action}", "info")
+    return {"ok": True, "action": action}
+
+
+def assess_mission_feasibility(mission: dict, ship: object, world: object) -> dict:
+    """Assess whether a mission is feasible given current ship state (C.8)."""
+    hull = getattr(ship, "hull", 100.0)
+    hull_max = getattr(ship, "hull_max", 100.0)
+    hull_frac = hull / hull_max if hull_max > 0 else 1.0
+    res = getattr(ship, "resources", None)
+    fuel_frac = res.fraction("fuel") if res and hasattr(res, "fraction") else 1.0
+    risk = "low"
+    if hull_frac < 0.3 or fuel_frac < 0.2:
+        risk = "high"
+    elif hull_frac < 0.6 or fuel_frac < 0.4:
+        risk = "medium"
+    rec = "Proceed with caution" if risk != "low" else "Mission feasible"
+    if risk == "high":
+        rec = "Not recommended — resources critical"
+    return {
+        "risk_level": risk,
+        "hull_status": round(hull_frac, 2),
+        "fuel_status": round(fuel_frac, 2),
+        "recommendation": rec,
+    }
+
+
 def build_state(world: World, ship: Ship) -> dict:
     """Serialise full operations state for broadcast to the operations station."""
     assessments: dict[str, dict] = {}
@@ -410,6 +504,10 @@ def build_state(world: World, ship: Ship) -> dict:
                 }
             else:
                 entry["prediction"] = {"active": False}
+        # C.9: Flag jammed enemies in assessment.
+        enemy_for_jam = _find_enemy(world, eid)
+        if enemy_for_jam and getattr(enemy_for_jam, "jam_factor", 0.0) >= 0.5:
+            entry["jammed"] = True
         assessments[eid] = entry
 
     return {

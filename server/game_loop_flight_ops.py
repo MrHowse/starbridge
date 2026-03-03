@@ -177,6 +177,45 @@ def get_drone_by_id(drone_id: str) -> Drone | None:
     return None
 
 
+def retarget_drones_from(destroyed_id: str) -> None:
+    """Clear target_id on drone missions referencing a destroyed entity (C.6)."""
+    for mission in _missions.values():
+        if getattr(mission, "target_id", None) == destroyed_id:
+            mission.target_id = None
+
+
+def get_rescue_drone_eta() -> list[dict]:
+    """Return ETA info for RTB rescue drones carrying survivors (C.10)."""
+    results: list[dict] = []
+    for drone_id, mission in _missions.items():
+        drone = get_drone_by_id(drone_id)
+        if drone is None or drone.status != "returning":
+            continue
+        survivors = getattr(mission, "survivors", 0)
+        if survivors <= 0:
+            continue
+        eta = getattr(mission, "eta_seconds", 0.0)
+        results.append({
+            "drone_id": drone_id,
+            "callsign": drone.callsign if hasattr(drone, "callsign") else drone_id,
+            "survivors": survivors,
+            "eta_seconds": round(eta, 1),
+        })
+    return results
+
+
+def get_ecm_drone_effectiveness() -> float:
+    """Return total ECM jam factor from active ECM drones (C.10)."""
+    total = 0.0
+    for drone_id, mission in _missions.items():
+        drone = get_drone_by_id(drone_id)
+        if drone is None or drone.status != "deployed":
+            continue
+        if getattr(mission, "mission_type", "") == "ecm":
+            total += getattr(mission, "jam_strength", 0.0)
+    return round(total, 3)
+
+
 # ---------------------------------------------------------------------------
 # Public API — message handlers (called from _drain_queue)
 # ---------------------------------------------------------------------------

@@ -1037,6 +1037,9 @@ async def _loop() -> None:
                                 _enemy, _dmg,
                                 _atk_drone.position[0], _atk_drone.position[1],
                             )
+                            # C.10: Drone kill → morale boost.
+                            if _enemy.hull <= 0:
+                                glcord.on_entity_destroyed(_enemy.id)
                             break
             # ECM drone jamming → apply jam_factor buildup (EW integration).
             elif _foe_type == "ecm_jamming":
@@ -1083,6 +1086,9 @@ async def _loop() -> None:
         # Corvette ECM: forward intercepted signals to comms station.
         for _isig in glew.pop_intercepted_signals():
             glco.add_signal(**_isig)
+        # C.9: Route intrusion intel to Ops.
+        for _ii in glew.pop_intrusion_intel():
+            glops.receive_intrusion_intel(_ii)
         glops.tick(_world, _world.ship, TICK_DT)
         # Tick crew reassignment timers before updating crew factors.
         _reassignment_roster = glmed.get_roster()
@@ -1114,6 +1120,31 @@ async def _loop() -> None:
         combat_events = gls.tick_combat(_world.ship.interior, _world.ship, TICK_DT,
                                         resources=_world.ship.resources)
         security_events.extend(combat_events)
+        # C.11: Environmental hazard damage to marines and boarders.
+        _c11_fire_rooms: dict[str, int] = {}
+        _c11_vacuum_rooms: set[str] = set()
+        _c11_rad_rooms: set[str] = set()
+        for _rid, _fire in glhc.get_fires().items():
+            if _fire.intensity >= 3:
+                _c11_fire_rooms[_rid] = _fire.intensity
+        for _rid in _world.ship.interior.rooms:
+            if glatm.is_vacuum(_rid):
+                _c11_vacuum_rooms.add(_rid)
+            _c11_atm = glatm.get_atmosphere(_rid)
+            if _c11_atm and _c11_atm.radiation >= 0.3:
+                _c11_rad_rooms.add(_rid)
+        security_events.extend(
+            gls.apply_hazard_damage_to_marines(_c11_fire_rooms, _c11_vacuum_rooms, _c11_rad_rooms, TICK_DT))
+        security_events.extend(
+            gls.apply_vent_damage_to_boarders(_c11_vacuum_rooms, TICK_DT))
+        # C.11: Sabotage fires.
+        for _sab_room in gls.pop_sabotage_fires():
+            glhc.start_fire(_sab_room, 2, _world.ship.interior, _tick_count)
+            glops.add_feed_event("SECURITY", f"Sabotage fire: {_sab_room}", "warning")
+            await _manager.broadcast_to_roles(
+                ["hazard_control"],
+                Message.build("hazcon.sabotage_fire", {"room_id": _sab_room}),
+            )
         station_boarding_events = gls.tick_station_boarding(_world.ship, TICK_DT)
         glco.set_tick(_tick_count)
         gldm.set_tick(_tick_count)
@@ -1925,6 +1956,9 @@ async def _loop() -> None:
                 [_target],
                 Message.build("comms.intel_routed", intel_route),
             )
+            # C.8: Route intel through Ops for analysis.
+            if _target in ("captain", "operations"):
+                glops.receive_comms_intel(intel_route)
             gl.log_event("comms", "intel_routed", {
                 "target": _target,
                 "signal_id": intel_route.get("signal_id"),
@@ -2054,6 +2088,27 @@ async def _loop() -> None:
             Message.build("hazard_control.atmosphere", _atm_state_msg),
         )
 
+        # C.7: Hazard injury predictions → Medical (every 5s).
+        if _tick_count % 50 == 0:
+            _injury_preds = glhc.get_hazard_injury_predictions(_world.ship.interior)
+            if _injury_preds:
+                await _manager.broadcast_to_roles(
+                    ["medical"],
+                    Message.build("hazcon.injury_predictions", {"predictions": _injury_preds}),
+                )
+
+        # C.7: Evacuation warnings → Medical + Ops feed.
+        for _evac_warn in glhc.pop_evacuation_warnings():
+            await _manager.broadcast_to_roles(
+                ["medical"],
+                Message.build("hazcon.evacuation_warning", _evac_warn),
+            )
+            glops.add_feed_event(
+                "HAZCON",
+                f"Evacuation warning: {_evac_warn.get('deck', '?')} — est. {_evac_warn.get('estimated_casualties', '?')} casualties",
+                "critical",
+            )
+
         # 11i-b. Engineering system state → Engineering station.
         await _manager.broadcast_to_roles(
             ["engineering"],
@@ -2085,6 +2140,8 @@ async def _loop() -> None:
                 _foe_type = _foe.get("type", "")
                 _targets: list[str] = []
                 if _foe_type == "contact_detected":
+                    # C.10: Tag drone-sourced contacts.
+                    _foe["source_tag"] = "DRONE"
                     _targets = ["science"]
                 elif _foe_type == "drone_attack":
                     _targets = ["weapons"]
@@ -2109,6 +2166,15 @@ async def _loop() -> None:
                 elif _ft in ("drone_destroyed", "drone_crash_on_deck"):
                     glops.add_feed_event("FLIGHT OPS", f"Drone lost: {_foe.get('drone_id', '')}", "warning")
 
+        # C.10: Rescue drone ETA → Medical (throttled to every 5s).
+        if _tick_count % 50 == 0:
+            _rescue_eta = glfo.get_rescue_drone_eta()
+            if _rescue_eta:
+                await _manager.broadcast_to_roles(
+                    ["medical"],
+                    Message.build("flight_ops.rescue_eta", {"drones": _rescue_eta}),
+                )
+
         # 11k. EW state → Electronic Warfare station.
         await _manager.broadcast_to_roles(
             ["electronic_warfare"],
@@ -2124,6 +2190,12 @@ async def _loop() -> None:
             await _manager.broadcast_to_roles(
                 _roles,
                 Message.build("operations.event", _cdata),
+            )
+        # C.8: Intel analysis → Captain.
+        for _ia in glops.pop_intel_analysis():
+            await _manager.broadcast_to_roles(
+                ["captain"],
+                Message.build("operations.intel_analysis", _ia),
             )
 
         # 11l2. Flag Bridge state → Captain (cruiser only).
@@ -2218,6 +2290,9 @@ async def _loop() -> None:
                 _br_room = _rt_evt.get("room_id")
                 if _br_room:
                     glatm.repair_breach(_br_room)
+                    # C.12: Breach repair consumes repair_materials.
+                    _world.ship.resources.consume("repair_materials", 2.0)
+                    glrat.record_consumption("repair_materials", 2.0, 0.0)
                     await _manager.broadcast_to_roles(
                         ["hazard_control", "engineering"],
                         Message.build("hazcon.breach_repaired", {"room_id": _br_room}),
@@ -2296,6 +2371,46 @@ async def _loop() -> None:
                     "entity_id": evt["target_id"],
                     "results":   evt["probe_scan"],
                 }))
+        # C.6: Combat effects fan-out.
+        for _ce in glw.pop_combat_effects():
+            _ce_eff = _ce.get("effect", "")
+            if _ce_eff == "ion_hit":
+                await _manager.broadcast_to_roles(
+                    ["science"],
+                    Message.build("weapons.ion_effect", {"target_id": _ce.get("target_id")}),
+                )
+                glops.add_feed_event("WEAPONS", "Ion torpedo impact — shields drained", "info")
+            elif _ce_eff == "nuclear_hit":
+                await _manager.broadcast_to_roles(
+                    ["medical"],
+                    Message.build("weapons.nuclear_warning", {"target_id": _ce.get("target_id")}),
+                )
+                await _manager.broadcast_to_roles(
+                    ["hazard_control"],
+                    Message.build("weapons.nuclear_radiation", {"target_id": _ce.get("target_id")}),
+                )
+                glops.add_feed_event("WEAPONS", "Nuclear torpedo detonation — radiation warning", "critical")
+            elif _ce_eff == "enemy_destroyed":
+                glfo.retarget_drones_from(_ce.get("target_id", ""))
+                # 30% chance of surrender signal.
+                if random.random() < 0.30:
+                    glco.add_signal(
+                        source="enemy",
+                        source_name="Unknown",
+                        signal_type="broadcast",
+                        priority="medium",
+                        raw_content="Surrender transmission detected from enemy forces.",
+                        auto_decoded=True,
+                        decoded_content="We surrender. Cease fire.",
+                        faction="hostile",
+                        threat_level="low",
+                    )
+        # C.6: Torpedo consumption rate → ops feed (every 5s).
+        if _tick_count % 50 == 0:
+            _torp_consumption = glw.get_torpedo_consumption_level()
+            if _torp_consumption != "LOW":
+                glops.add_feed_event("WEAPONS", f"Torpedo expenditure: {_torp_consumption}", "warning")
+
         for evt in action_events:
             await _manager.broadcast(Message.build(evt[0], evt[1]))
         for evt in auto_fire_events:
@@ -2499,6 +2614,13 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             glatm.set_vent_state(payload.room_a, payload.room_b, payload.state)
             gl.log_event("hazard_control", "set_vent", {"room_a": payload.room_a, "room_b": payload.room_b, "state": payload.state})
         elif msg_type == "hazard_control.emergency_vent_space" and isinstance(payload, HazConEmergencyVentSpacePayload):
+            # C.7: Warn medical before venting to space.
+            _vent_room = _world.ship.interior.rooms.get(payload.room_id) if _world else None
+            _vent_crew_est = 2  # default crew estimate per room
+            glhc.queue_evacuation_warning(
+                _vent_room.deck if _vent_room else "unknown",
+                _vent_crew_est,
+            )
             glatm.emergency_vent_to_space(payload.room_id)
             gl.log_event("hazard_control", "emergency_vent_space", {"room_id": payload.room_id})
         elif msg_type == "hazard_control.cancel_space_vent" and isinstance(payload, HazConCancelSpaceVentPayload):

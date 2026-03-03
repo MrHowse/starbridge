@@ -105,6 +105,14 @@ _cloak_module: bool = False
 _cloak_active_timer: float = 0.0
 _cloak_cooldown: float = 0.0
 
+# C.9: Emission tracking and intrusion intel.
+EMISSION_BEAM_SPIKE: float = 0.15
+EMISSION_TORPEDO_SPIKE: float = 0.20
+EMISSION_DECAY_RATE: float = 0.05   # per second
+WEAPONS_MASK_COST_MOD: float = 0.15
+_emission_level: float = 0.0
+_pending_intrusion_intel: list[dict] = []
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -140,6 +148,10 @@ def reset(ship_class: str = "") -> None:
     _cloak_module = False
     _cloak_active_timer = 0.0
     _cloak_cooldown = 0.0
+    # C.9: Emission + intrusion intel.
+    global _emission_level
+    _emission_level = 0.0
+    _pending_intrusion_intel.clear()
 
 
 def set_jam_target(entity_id: str | None) -> None:
@@ -175,7 +187,54 @@ def apply_intrusion_success(entity_id: str, world: World) -> None:
     for enemy in world.enemies:
         if enemy.id == entity_id:
             enemy.intrusion_stun_ticks = max(enemy.intrusion_stun_ticks, INTRUSION_STUN_DURATION)
+            # C.9: Extract system data for Ops intel.
+            _pending_intrusion_intel.append({
+                "target_id": entity_id,
+                "target_type": enemy.type,
+                "systems_stunned": True,
+                "stun_duration": INTRUSION_STUN_DURATION / 10.0,
+            })
             break
+
+
+# ---------------------------------------------------------------------------
+# C.9: Emission tracking + intrusion intel
+# ---------------------------------------------------------------------------
+
+
+def record_weapons_fire(fire_type: str = "beam") -> None:
+    """Spike emission level on weapons fire (C.9)."""
+    global _emission_level
+    if fire_type == "torpedo":
+        _emission_level = min(1.0, _emission_level + EMISSION_TORPEDO_SPIKE)
+    else:
+        _emission_level = min(1.0, _emission_level + EMISSION_BEAM_SPIKE)
+
+
+def get_emission_level() -> float:
+    """Return current emission level (0.0–1.0)."""
+    return _emission_level
+
+
+def get_mask_cost_modifier() -> float:
+    """Return extra mask cost while emitting (C.9)."""
+    return WEAPONS_MASK_COST_MOD if _emission_level > 0 else 0.0
+
+
+def pop_intrusion_intel() -> list[dict]:
+    """Drain and return pending intrusion intel events."""
+    intel = list(_pending_intrusion_intel)
+    _pending_intrusion_intel.clear()
+    return intel
+
+
+def _get_ecm_drone_bonus() -> float:
+    """Lazy-import flight ops for ECM drone effectiveness (C.10)."""
+    try:
+        import server.game_loop_flight_ops as _glfo
+        return _glfo.get_ecm_drone_effectiveness()
+    except Exception:
+        return 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -515,6 +574,10 @@ def tick(world: World, ship: Ship, dt: float) -> None:
     Also advances the stealth state machine timer and enforces stealth constraints.
     """
     global _stealth_state, _stealth_timer, _cloak_active_timer, _cloak_cooldown
+    global _emission_level
+    # C.9: Decay emission level.
+    if _emission_level > 0:
+        _emission_level = max(0.0, _emission_level - EMISSION_DECAY_RATE * dt)
     # --- Cloak module: decay overheat cooldown ---
     if _cloak_module and _cloak_cooldown > 0.0:
         _cloak_cooldown = max(0.0, _cloak_cooldown - dt)
@@ -668,6 +731,11 @@ def build_state(world: World, ship: Ship) -> dict:
         "freq_lock_progress": round(_freq_lock_progress, 3),
         "freq_lock_active": _freq_lock_active,
         "intercept_timer": round(_intercept_timer, 1),
+        # C.9: Emission tracking.
+        "emission_level": round(_emission_level, 3),
+        "mask_cost_modifier": round(get_mask_cost_modifier(), 3),
+        # C.10: ECM drone bonus.
+        "ecm_drone_bonus": _get_ecm_drone_bonus(),
     }
 
 

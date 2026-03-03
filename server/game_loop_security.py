@@ -131,6 +131,15 @@ _arming_progress: dict[int, float] = {}  # deck -> progress toward arming
 # Quarantine
 _quarantined_rooms: set[str] = set()     # room_ids under quarantine
 
+# C.11: Security ↔ Hazard Control integration
+_door_lock_origins: dict[str, str] = {}         # room_id → "security"|"hazard_control"
+_pending_sabotage_fires: list[str] = []         # room_ids where sabotage sparked fire
+FIRE_MARINE_DMG: float = 0.5    # HP/s from intensity ≥ 3 fire
+VACUUM_MARINE_DMG: float = 2.0  # HP/s in vacuum
+RAD_MARINE_DMG: float = 0.3     # HP/s in radiation zone
+BOARDER_VACUUM_DMG: float = 3.0  # HP/s for boarders in vacuum
+SABOTAGE_FIRE_CHANCE: float = 0.20  # chance of fire on sabotage complete
+
 
 def reset() -> None:
     """Clear all boarding state. Called at game start."""
@@ -159,6 +168,9 @@ def reset() -> None:
     _armed_decks.clear()
     _arming_progress.clear()
     _quarantined_rooms.clear()
+    # C.11: Security ↔ HC integration.
+    _door_lock_origins.clear()
+    _pending_sabotage_fires.clear()
 
 
 
@@ -182,6 +194,8 @@ def serialise() -> dict:
         "deck_alerts": {str(k): v for k, v in _deck_alerts.items()},
         "armed_decks": sorted(_armed_decks),
         "quarantined_rooms": sorted(_quarantined_rooms),
+        # C.11
+        "door_lock_origins": dict(_door_lock_origins),
     }
 
 
@@ -223,6 +237,9 @@ def deserialise(data: dict) -> None:
     _armed_decks.update(data.get("armed_decks", []))
     _quarantined_rooms.clear()
     _quarantined_rooms.update(data.get("quarantined_rooms", []))
+    # C.11
+    _door_lock_origins.clear()
+    _door_lock_origins.update(data.get("door_lock_origins", {}))
 
 
 # ---------------------------------------------------------------------------
@@ -896,8 +913,12 @@ def _room_deck(room_id: str) -> int:
 # ---- Door control ----
 
 
-def lock_door(interior: ShipInterior, room_id: str) -> bool:
-    """Lock a door. Returns False if room unknown or already breached."""
+def lock_door(interior: ShipInterior, room_id: str,
+              origin: str = "security") -> bool:
+    """Lock a door. Returns False if room unknown or already breached.
+
+    *origin* — "security" or "hazard_control" (C.11: origin tracking).
+    """
     if room_id not in interior.rooms:
         return False
     if room_id in _breached_doors:
@@ -905,6 +926,7 @@ def lock_door(interior: ShipInterior, room_id: str) -> bool:
     room = interior.rooms[room_id]
     room.door_sealed = True
     _locked_doors.add(room_id)
+    _door_lock_origins[room_id] = origin
     return True
 
 
@@ -916,6 +938,92 @@ def unlock_door(interior: ShipInterior, room_id: str) -> bool:
     room.door_sealed = False
     _locked_doors.discard(room_id)
     return True
+
+
+# ---------------------------------------------------------------------------
+# C.11: Security ↔ Hazard Control public API
+# ---------------------------------------------------------------------------
+
+
+def get_door_lock_origins() -> dict[str, str]:
+    """Return room_id → origin mapping for locked doors."""
+    return dict(_door_lock_origins)
+
+
+def pop_sabotage_fires() -> list[str]:
+    """Drain and return room_ids where sabotage sparked a fire."""
+    fires = list(_pending_sabotage_fires)
+    _pending_sabotage_fires.clear()
+    return fires
+
+
+def apply_hazard_damage_to_marines(
+    fire_rooms: dict[str, int],
+    vacuum_rooms: set[str],
+    radiation_rooms: set[str],
+    dt: float,
+) -> list[tuple[str, dict]]:
+    """Apply environmental hazard damage to marine teams.
+
+    *fire_rooms* — room_id → intensity (only rooms with intensity ≥ 3).
+    Returns list of (event_type, payload) tuples.
+    """
+    events: list[tuple[str, dict]] = []
+    for team in _marine_teams:
+        if team.is_incapacitated or team.size <= 0:
+            continue
+        loc = team.location
+        dmg = 0.0
+        cause = ""
+        if loc in fire_rooms and fire_rooms[loc] >= 3:
+            dmg += FIRE_MARINE_DMG * dt
+            cause = "fire"
+        if loc in vacuum_rooms:
+            dmg += VACUUM_MARINE_DMG * dt
+            cause = cause or "vacuum"
+        if loc in radiation_rooms:
+            dmg += RAD_MARINE_DMG * dt
+            cause = cause or "radiation"
+        if dmg <= 0:
+            continue
+        key = f"marine_{team.id}"
+        _damage_accum[key] = _damage_accum.get(key, 0.0) + dmg
+        while _damage_accum[key] >= 1.0 and team.size > 0:
+            _damage_accum[key] -= 1.0
+            if team.members:
+                team.members.pop()
+            team.size = max(0, team.size - 1)
+            events.append((
+                "security.marine_hazard_casualty",
+                {"team_id": team.id, "cause": cause, "remaining": team.size},
+            ))
+    return events
+
+
+def apply_vent_damage_to_boarders(
+    vacuum_rooms: set[str],
+    dt: float,
+) -> list[tuple[str, dict]]:
+    """Apply vacuum damage to boarding parties in vented rooms.
+
+    Returns list of (event_type, payload) tuples.
+    """
+    events: list[tuple[str, dict]] = []
+    for party in _boarding_parties:
+        if party.is_eliminated:
+            continue
+        if party.location not in vacuum_rooms:
+            continue
+        key = f"boarder_{party.id}"
+        _damage_accum[key] = _damage_accum.get(key, 0.0) + BOARDER_VACUUM_DMG * dt
+        while _damage_accum[key] >= 1.0 and party.members > 0:
+            _damage_accum[key] -= 1.0
+            party.members -= 1
+            events.append((
+                "security.boarder_vacuum_casualty",
+                {"party_id": party.id, "remaining": party.members},
+            ))
+    return events
 
 
 def lockdown_deck(interior: ShipInterior, deck: int) -> int:
@@ -1251,6 +1359,9 @@ def _tick_boarding_parties(
                     {"party_id": party.id, "objective": party.objective,
                      "room_id": party.location},
                 ))
+                # C.11: Sabotage may spark a fire.
+                if _random.random() < SABOTAGE_FIRE_CHANCE:
+                    _pending_sabotage_fires.append(party.location)
                 party.status = "retreating"
         elif party.status == "retreating":
             _retreat_party(party, interior, dt, events)

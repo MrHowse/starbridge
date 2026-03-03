@@ -65,3 +65,30 @@ def _reset_engineering_state():
     gle.reset()
     yield
     gle.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_security_state():
+    """Reset security module state before each test to prevent leakage."""
+    import server.game_loop_security as gls
+    gls.reset()
+    yield
+    gls.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_ew_state():
+    """Reset EW module state before each test to prevent leakage."""
+    import server.game_loop_ew as glew
+    glew.reset()
+    yield
+    glew.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_weapons_state():
+    """Reset weapons module state before each test to prevent leakage."""
+    import server.game_loop_weapons as glw
+    glw.reset()
+    yield
+    glw.reset()

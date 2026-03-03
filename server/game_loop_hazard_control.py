@@ -249,6 +249,13 @@ _evacuation_order: list[int] = []          # deck_numbers in priority order
 FIRE_SUPPRESSION_MIN_EFFICIENCY: float = 0.10
 _fire_suppression_powered: bool = True
 
+# C.12: QM resource consumption tracking.
+DECON_SUPPLY_COST: float = 1.5
+_resource_consumption: dict[str, float] = {}  # resource_type → total consumed
+
+# C.7: Medical injury prediction + evacuation warnings.
+_pending_evac_warnings: list[dict] = []
+
 _rng: random.Random = random.Random()
 
 
@@ -281,6 +288,10 @@ def reset() -> None:
     _evacuation_order.clear()
     # C.3.1: Fire suppression power gate.
     _fire_suppression_powered = True
+    # C.12: QM resource consumption tracking.
+    _resource_consumption.clear()
+    # C.7: Medical evacuation warnings.
+    _pending_evac_warnings.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -1170,6 +1181,9 @@ def suppress_local(room_id: str, resources: object | None = None) -> bool:
             return False
         if hasattr(resources, "consume"):
             resources.consume("suppressant", LOCAL_SUPPRESS_COST)
+        # C.12: Track consumption for QM.
+        glrat.record_consumption("suppressant", LOCAL_SUPPRESS_COST, 0.0)
+        _resource_consumption["suppressant"] = _resource_consumption.get("suppressant", 0.0) + LOCAL_SUPPRESS_COST
 
     fire = _fires[room_id]
     fire.suppression_timer = LOCAL_SUPPRESS_TIME
@@ -1203,6 +1217,9 @@ def suppress_deck(deck_name: str, interior: ShipInterior,
             return False
         if hasattr(resources, "consume"):
             resources.consume("suppressant", DECK_SUPPRESS_COST)
+        # C.12: Track consumption for QM.
+        glrat.record_consumption("suppressant", DECK_SUPPRESS_COST, 0.0)
+        _resource_consumption["suppressant"] = _resource_consumption.get("suppressant", 0.0) + DECK_SUPPRESS_COST
 
     _deck_suppression[deck_name] = DECK_SUPPRESS_TIME
     logger.debug("Deck-wide suppression started: %s", deck_name)
@@ -1250,6 +1267,106 @@ def cancel_fire_team(room_id: str) -> bool:
         del _fire_teams[room_id]
         return True
     return False
+
+
+# ---------------------------------------------------------------------------
+# Public API — C.12 QM resource consumption
+# ---------------------------------------------------------------------------
+
+
+def dispatch_decon_team(room_id: str, resources: object | None = None) -> bool:
+    """Dispatch a decontamination team.  Costs DECON_SUPPLY_COST medical_supplies.
+
+    Returns False if insufficient supplies.
+    """
+    if resources is not None:
+        avail = getattr(resources, "medical_supplies", 0.0)
+        if avail < DECON_SUPPLY_COST:
+            return False
+        if hasattr(resources, "consume"):
+            resources.consume("medical_supplies", DECON_SUPPLY_COST)
+        glrat.record_consumption("medical_supplies", DECON_SUPPLY_COST, 0.0)
+        _resource_consumption["medical_supplies"] = (
+            _resource_consumption.get("medical_supplies", 0.0) + DECON_SUPPLY_COST
+        )
+    return True
+
+
+def request_suppressant(quantity: float, reason: str, tick: int,
+                        ship: object | None = None) -> dict:
+    """Request suppressant via QM allocation system."""
+    return glrat.submit_request("hazard_control", "suppressant", quantity, reason,
+                                tick, ship=ship)
+
+
+def get_resource_consumption_summary() -> dict:
+    """Return cumulative resource consumption by type."""
+    return dict(_resource_consumption)
+
+
+# ---------------------------------------------------------------------------
+# Public API — C.7 Medical injury predictions + evacuation warnings
+# ---------------------------------------------------------------------------
+
+
+def get_hazard_injury_predictions(interior: ShipInterior) -> list[dict]:
+    """Predict injuries from active hazards for Medical station.
+
+    Checks fire intensity (≥3 → burns/smoke), atmosphere radiation (≥0.3 →
+    radiation sickness), and chemical contamination (≥0.2 → poisoning).
+    """
+    import server.game_loop_atmosphere as glatm
+
+    predictions: list[dict] = []
+    # Fire hazards.
+    for room_id, fire in _fires.items():
+        if fire.intensity >= 3:
+            room = interior.rooms.get(room_id)
+            deck = room.deck if room else "unknown"
+            predictions.append({
+                "deck": deck,
+                "room_id": room_id,
+                "hazard_type": "fire",
+                "injury_types": ["burns", "smoke_inhalation"],
+                "severity": fire.intensity,
+            })
+    # Atmosphere hazards.
+    atm_all = glatm.get_all_atmosphere()
+    for room_id, atm in atm_all.items():
+        room = interior.rooms.get(room_id)
+        deck = room.deck if room else "unknown"
+        if atm.radiation >= 0.3:
+            predictions.append({
+                "deck": deck,
+                "room_id": room_id,
+                "hazard_type": "radiation",
+                "injury_types": ["radiation_sickness"],
+                "severity": round(atm.radiation, 2),
+            })
+        if atm.chemical >= 0.2:
+            predictions.append({
+                "deck": deck,
+                "room_id": room_id,
+                "hazard_type": "contamination",
+                "injury_types": ["poisoning"],
+                "severity": round(atm.chemical, 2),
+            })
+    return predictions
+
+
+def queue_evacuation_warning(deck: str, estimated_casualties: int) -> None:
+    """Queue an evacuation warning for Medical station."""
+    _pending_evac_warnings.append({
+        "deck": deck,
+        "estimated_casualties": estimated_casualties,
+    })
+
+
+def pop_evacuation_warnings() -> list[dict]:
+    """Drain and return pending evacuation warnings."""
+    warnings = list(_pending_evac_warnings)
+    _pending_evac_warnings.clear()
+    return warnings
 
 
 # ---------------------------------------------------------------------------

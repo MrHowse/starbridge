@@ -484,6 +484,11 @@ def get_atmosphere(room_id: str) -> AtmosphereState | None:
     return _atmosphere.get(room_id)
 
 
+def get_all_atmosphere() -> dict[str, "AtmosphereState"]:
+    """Return the full atmosphere state dict (read-only intent)."""
+    return _atmosphere
+
+
 def get_breaches() -> dict[str, Breach]:
     """Return all active breaches (read-only intent)."""
     return _breaches

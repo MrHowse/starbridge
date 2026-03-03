@@ -36,6 +36,7 @@ AUTO_APPROVE_THRESHOLD: float = 0.50     # auto-approve allocation if stock frac
 RESOURCE_TYPES: tuple[str, ...] = (
     "fuel", "medical_supplies", "repair_materials",
     "drone_fuel", "drone_parts", "ammunition", "provisions",
+    "suppressant",
 )
 
 REQUEST_STATUSES: tuple[str, ...] = ("pending", "approved", "denied")
