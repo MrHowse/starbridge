@@ -920,7 +920,7 @@ function init() {
   on('ship.alert_changed',      (p) => setAlertLevel(p.level));
   on('ship.hull_hit',           handleHullHit);
   on('game.over',               (p) => { SoundBank.play(p.result === 'victory' ? 'victory' : 'defeat'); showGameOver(p.result, p.stats); });
-  on('security.boarding_started', () => SoundBank.play('boarding_alert'));
+  on('security.boarding_alert', () => SoundBank.play('boarding_alert'));
   on('security.incident', handleSecurityIncident);
 
   SoundBank.init();

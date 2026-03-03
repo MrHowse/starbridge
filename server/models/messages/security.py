@@ -61,6 +61,11 @@ class SecurityLockdownDeckPayload(BaseModel):
     deck: int
 
 
+class SecurityLockdownAllPayload(BaseModel):
+    """Lock all doors on all decks."""
+    pass
+
+
 class SecurityLiftLockdownPayload(BaseModel):
     """Lift lockdown on a deck or all decks."""
     deck: int | None = None

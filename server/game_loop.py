@@ -109,6 +109,7 @@ from server.models.messages import (
     SecurityAssignEscortPayload,
     SecurityLockDoorPayload,
     SecurityUnlockDoorPayload,
+    SecurityLockdownAllPayload,
     SecurityLockdownDeckPayload,
     SecurityLiftLockdownPayload,
     SecuritySealBulkheadPayload,
@@ -2922,6 +2923,9 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "security.lockdown_deck" and isinstance(payload, SecurityLockdownDeckPayload):
             count = gls.lockdown_deck(ship.interior, payload.deck)
             gl.log_event("security", "deck_lockdown", {"deck": payload.deck, "locked": count})
+        elif msg_type == "security.lockdown_all" and isinstance(payload, SecurityLockdownAllPayload):
+            count = gls.lockdown_all(ship.interior)
+            gl.log_event("security", "lockdown_all", {"locked": count})
         elif msg_type == "security.lift_lockdown" and isinstance(payload, SecurityLiftLockdownPayload):
             if payload.all:
                 count = gls.lift_lockdown_all(ship.interior)
