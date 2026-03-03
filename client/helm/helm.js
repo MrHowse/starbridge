@@ -187,6 +187,7 @@ function init() {
   on('docking.complete',      ({ station_name }) => { _approachInfo = null; console.log('[helm] Docked at', station_name); });
   on('docking.undocked',      () => { _dockedAt = null; });
   on('comms.contacts',        (p) => { if (_mapRenderer) _mapRenderer.updateCommsContacts(p.contacts || []); });
+  on('operations.overlay',    (p) => { if (_mapRenderer) _mapRenderer.updateOpsOverlay(p); });
 
   initPuzzleRenderer(send);
   setupKeyboard();
@@ -235,6 +236,8 @@ function handleGameStarted(payload) {
       showGrid:       true,
       showRangeRings: true,
       zoom:           { enabled: true },
+      opsOverlayArc:        true,   // Fix 1: vulnerable facing arc
+      opsOverlayPrediction: true,   // Fix 3: prediction line
     });
   }
 

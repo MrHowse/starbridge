@@ -110,6 +110,12 @@ export class MapRenderer {
     this._overlayDamage = false;
     this._beamFlash     = null;  // { sx, sy, tx, ty, time } — screen coords
 
+    // Ops assessment overlay (A-patch: predictions, shields, facing arcs).
+    this._opsOverlay         = {};   // { contact_id: { prediction, shield_harmonics, vulnerable_facing } }
+    this._opsOverlayArc      = opts.opsOverlayArc        ?? false;
+    this._opsOverlayShields  = opts.opsOverlayShields    ?? false;
+    this._opsOverlayPrediction = opts.opsOverlayPrediction ?? false;
+
     // Meaningful range rings (beam/torpedo/sensor).
     this._rangeRingDefs = [];   // [{range, label, style}] in world units
 
@@ -125,6 +131,10 @@ export class MapRenderer {
 
   updateCommsContacts(contacts = []) {
     this._commsContacts = contacts;
+  }
+
+  updateOpsOverlay(data) {
+    this._opsOverlay = data?.assessments || {};
   }
 
   updateContacts(contacts = [], torpedoes = []) {
@@ -537,6 +547,19 @@ export class MapRenderer {
         if (contact.id === priorityId) {
           this._drawPriorityDiamond(ctx, sx, sy, now);
         }
+        // A-patch: Ops assessment overlay (arc, shields, prediction).
+        const opsOv = this._opsOverlay[contact.id];
+        if (opsOv) {
+          if (this._opsOverlayArc && opsOv.vulnerable_facing) {
+            this._drawVulnerableArc(ctx, sx, sy, contact, opsOv.vulnerable_facing, now);
+          }
+          if (this._opsOverlayShields && opsOv.shield_harmonics) {
+            this._drawShieldDiagram(ctx, sx, sy, opsOv.shield_harmonics, opsOv.vulnerable_facing, now);
+          }
+          if (this._opsOverlayPrediction && opsOv.prediction?.active) {
+            this._drawPredictionLine(ctx, sx, sy, opsOv.prediction, cw, ch, camX, camY, zoom, now);
+          }
+        }
       } else {
         // Off-screen indicator: arrow at canvas edge pointing toward contact.
         _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact, this._shipState);
@@ -563,6 +586,128 @@ export class MapRenderer {
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('PRIORITY', sx, sy - size - 4);
+    ctx.restore();
+  }
+
+  // ── A-patch: Ops assessment overlay methods ─────────────────────────────
+
+  /** Fix 1: Green arc on contact showing vulnerable facing direction (±30°). */
+  _drawVulnerableArc(ctx, sx, sy, contact, facing, now) {
+    // Map facing to angle (0° = north/fore, clockwise).
+    const FACING_ANGLES = { fore: 0, starboard: 90, aft: 180, port: 270 };
+    const baseAngle = FACING_ANGLES[facing];
+    if (baseAngle === undefined) return;
+
+    // Use the CONTACT's heading to orient the arc in world space.
+    const contactHeading = contact.heading ?? 0;
+    const worldAngle = contactHeading + baseAngle;
+
+    // Convert to canvas radians (0° = up, clockwise → canvas: -90° offset).
+    const centreRad = (worldAngle - 90) * Math.PI / 180;
+    const halfArc   = 30 * Math.PI / 180;  // ±30°
+    const radius    = 28;
+
+    const pulse = 0.5 + 0.3 * Math.sin(now / 500);
+    ctx.save();
+    // Semi-transparent green fill.
+    ctx.fillStyle   = `rgba(0, 255, 65, ${0.08 + 0.04 * pulse})`;
+    ctx.strokeStyle = `rgba(0, 255, 65, ${0.5 + 0.3 * pulse})`;
+    ctx.lineWidth   = 1.5;
+
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.arc(sx, sy, radius, centreRad - halfArc, centreRad + halfArc);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Label at the arc's outer edge.
+    const labelRad = centreRad;
+    const lx = sx + Math.cos(labelRad) * (radius + 10);
+    const ly = sy + Math.sin(labelRad) * (radius + 10);
+    ctx.fillStyle   = `rgba(0, 255, 65, ${0.6 + 0.2 * pulse})`;
+    ctx.font        = 'bold 7px monospace';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('OPS: WEAK FACING', lx, ly);
+    ctx.restore();
+  }
+
+  /** Fix 2: Compact 4-facing shield diagram on Captain's tactical map. */
+  _drawShieldDiagram(ctx, sx, sy, harmonics, vulnerableFacing, now) {
+    const SIZE = 8;
+    const GAP  = 12;  // Offset from contact centre.
+    const ox   = sx + GAP;
+    const oy   = sy - GAP;
+
+    // Each facing: short bar segment around a tiny square.
+    // Layout: fore=top, aft=bottom, port=left, starboard=right.
+    const facings = [
+      { key: 'fore',      x1: ox - SIZE, y1: oy - SIZE, x2: ox + SIZE, y2: oy - SIZE },
+      { key: 'aft',       x1: ox - SIZE, y1: oy + SIZE, x2: ox + SIZE, y2: oy + SIZE },
+      { key: 'port',      x1: ox - SIZE, y1: oy - SIZE, x2: ox - SIZE, y2: oy + SIZE },
+      { key: 'starboard', x1: ox + SIZE, y1: oy - SIZE, x2: ox + SIZE, y2: oy + SIZE },
+    ];
+
+    ctx.save();
+    for (const f of facings) {
+      const val = harmonics[f.key] ?? 0;
+      // Colour: green (>60%), amber (30-60%), red (<30%).
+      let color;
+      if (val > 60) color = '#00ff41';
+      else if (val > 30) color = '#ffaa00';
+      else color = '#ff4040';
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(f.x1, f.y1);
+      ctx.lineTo(f.x2, f.y2);
+      ctx.stroke();
+
+      // Pulsing highlight on vulnerable facing.
+      if (vulnerableFacing === f.key) {
+        const pulse = 0.3 + 0.7 * Math.abs(Math.sin(now / 300));
+        ctx.strokeStyle = `rgba(255, 65, 65, ${pulse})`;
+        ctx.lineWidth   = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(f.x1, f.y1);
+        ctx.lineTo(f.x2, f.y2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /** Fix 3: Dashed prediction line + ghost marker at predicted position. */
+  _drawPredictionLine(ctx, sx, sy, prediction, cw, ch, camX, camY, zoom, now) {
+    const px = cw / 2 + (prediction.predicted_x - camX) / zoom;
+    const py = ch / 2 + (prediction.predicted_y - camY) / zoom;
+
+    const confColor = {
+      high: '#00ff41', medium: '#ffaa00', low: '#ff4040',
+    }[prediction.confidence] || '#ff4040';
+
+    ctx.save();
+    // Dashed line from contact to predicted position.
+    ctx.strokeStyle = confColor;
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+
+    // Ghost marker at predicted position (semi-transparent circle).
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = confColor;
+    ctx.fill();
+
+    ctx.setLineDash([]);
     ctx.restore();
   }
 

@@ -520,6 +520,31 @@ def build_state(world: World, ship: Ship) -> dict:
     }
 
 
+def build_overlay() -> dict:
+    """Build lightweight assessment overlay for Helm/Captain map displays."""
+    overlay: dict[str, dict] = {}
+    for eid, asmt in _assessments.items():
+        if not asmt.complete:
+            continue
+        entry: dict = {}
+        if asmt.shield_harmonics:
+            entry["shield_harmonics"] = {
+                k: round(v, 2) for k, v in asmt.shield_harmonics.items()
+            }
+        if asmt.vulnerable_facing:
+            entry["vulnerable_facing"] = asmt.vulnerable_facing
+        if asmt.prediction_active:
+            entry["prediction"] = {
+                "active": True,
+                "predicted_x": round(asmt.predicted_x, 1),
+                "predicted_y": round(asmt.predicted_y, 1),
+                "confidence": asmt.prediction_confidence,
+            }
+        if entry:
+            overlay[eid] = entry
+    return overlay
+
+
 def serialise() -> dict:
     """Serialise operations state for save system."""
     serialised_assessments = {}

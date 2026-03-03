@@ -2191,6 +2191,13 @@ async def _loop() -> None:
                 _roles,
                 Message.build("operations.event", _cdata),
             )
+        # Ops assessment overlay → helm + captain (predictions, shields, facings).
+        _ops_overlay = glops.build_overlay()
+        if _ops_overlay:
+            await _manager.broadcast_to_roles(
+                ["helm", "captain"],
+                Message.build("operations.overlay", {"assessments": _ops_overlay}),
+            )
         # C.8: Intel analysis → Captain.
         for _ia in glops.pop_intel_analysis():
             await _manager.broadcast_to_roles(

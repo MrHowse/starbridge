@@ -253,6 +253,7 @@ function init() {
   on('weapons.auto_fire_status',      handleAutoFireStatus);
   on('crew.roster',                   handleCrewRoster);
   on('comms.contacts',                handleCommsContacts);
+  on('operations.overlay',            (p) => { if (mapRenderer) mapRenderer.updateOpsOverlay(p); });
   on('comms.contact_merged',          handleCommsContactMerged);
   on('mission.dynamic_list',          handleDynamicMissionList);
   on('mission.mission_offered',       handleMissionOffered);
@@ -381,6 +382,8 @@ function handleGameStarted(payload) {
       showRangeRings: true,
       zoom:           { enabled: true },
       interactive:    true,
+      opsOverlayShields:    true,   // Fix 2: shield harmonics diagram
+      opsOverlayPrediction: true,   // Fix 3: prediction line
     });
     mapRenderer.onContactClick((contactId) => {
       send('captain.set_priority_target', { entity_id: contactId });
