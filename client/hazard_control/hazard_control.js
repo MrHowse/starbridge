@@ -1159,6 +1159,17 @@ function diffAndTriggerAudio() {
     }
   }
 
+  // Crew evacuation (B.2.3.3)
+  const prevEvac = new Set(_prevDcState?.evacuated_rooms || []);
+  const currEvac = new Set(_dcState?.evacuated_rooms || []);
+  for (const rid of currEvac) {
+    if (!prevEvac.has(rid)) {
+      hcAudio.deckEvacuated();
+      addLogEntry(`Crew evacuated: ${roomName(rid)}`, 'evac');
+      break;  // one audio cue per tick
+    }
+  }
+
   // Deck-level severity changes (evacuated / uninhabitable)
   const prevDecks = _prevDeckSeverities || {};
   const currDecks = {};

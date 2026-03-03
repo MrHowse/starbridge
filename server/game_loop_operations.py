@@ -514,7 +514,7 @@ def build_state(world: World, ship: Ship) -> dict:
         "assessments": assessments,
         "active_assessment_id": _active_id,
         "coordination_bonuses": _build_coordination_state(ship),
-        "mission_tracking": _build_mission_tracking(),
+        "mission_tracking": _build_mission_tracking(ship),
         "station_advisories": _build_advisories_state(),
         "feed_events": _drain_feed_events(),
     }
@@ -1301,9 +1301,10 @@ def _infer_responsible_station(text: str) -> str:
     return "operations"
 
 
-def _build_mission_tracking() -> dict:
+def _build_mission_tracking(ship: Ship) -> dict:
     """Build mission tracking data for build_state (A.4.1–A.4.3)."""
     import server.game_loop_mission as glm
+    from server.utils.math_helpers import distance
 
     engine = glm.get_mission_engine()
     if engine is None:
@@ -1320,7 +1321,19 @@ def _build_mission_tracking() -> dict:
             "status": obj.status,
             "ops_marked": obj.id in _objectives_marked,
             "responsible_station": _infer_responsible_station(obj.text),
+            "estimated_time": None,
         }
+        # ETA for travel-based objectives (A.4.2).
+        if obj.status == "active":
+            trigger = engine.get_node_trigger(obj.id)
+            t_type = trigger.get("type", "")
+            if t_type in ("player_in_area", "proximity_with_shields"):
+                tx = trigger.get("x", 0.0)
+                ty = trigger.get("y", 0.0)
+                dist = distance(ship.x, ship.y, tx, ty)
+                speed = max(ship.velocity, 1.0)  # avoid div-by-zero
+                eta_s = dist / speed
+                entry["estimated_time"] = round(eta_s, 1)
         obj_list.append(entry)
     return {"title": title, "objectives": obj_list}
 

@@ -493,7 +493,7 @@ def _apply_section_damage(
     # Ops warning when crossing 50%.
     if old_integrity >= 50.0 and section.integrity < 50.0:
         glops.add_feed_event(
-            "HAZARD",
+            "HAZCON",
             f"STRUCTURAL WARNING: {section.id} at {section.integrity:.0f}%",
             "warning",
         )

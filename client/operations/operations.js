@@ -630,8 +630,17 @@ function updateMissionTracker() {
       const icon = STATUS_ICONS[obj.status] || '\u25cb';
       const marked = obj.ops_marked ? ' ops-obj--marked' : '';
       const station = obj.responsible_station ? ` <span class="ops-obj-station">[${obj.responsible_station}]</span>` : '';
+      let eta = '';
+      if (obj.status === 'active' && obj.estimated_time != null) {
+        const s = Math.round(obj.estimated_time);
+        const m = Math.floor(s / 60);
+        const rem = s % 60;
+        eta = ` <span class="ops-obj-eta">ETA: ${m}m ${String(rem).padStart(2, '0')}s</span>`;
+      } else if (obj.status === 'active') {
+        eta = ' <span class="ops-obj-eta">\u2014</span>';
+      }
       html += `<li class="ops-obj${marked}" data-obj-id="${obj.id}">`;
-      html += `<span class="ops-obj-icon">${icon}</span> ${obj.text}${station}`;
+      html += `<span class="ops-obj-icon">${icon}</span> ${obj.text}${station}${eta}`;
       html += `</li>`;
     }
     html += '</ul>';

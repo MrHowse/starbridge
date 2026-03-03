@@ -45,6 +45,22 @@ const ROLE_LABELS = {
   quartermaster:      'QUARTERMASTER',
 };
 
+const ROLE_DESCRIPTIONS = {
+  captain:            'Commands the ship. Sets priorities, issues orders, and makes the decisions that matter.',
+  helm:               'Pilots the ship. Navigation, speed, evasive manoeuvres, and getting the crew where they need to be.',
+  weapons:            'Controls beams, torpedoes, and targeting. Puts fire on target.',
+  engineering:        'Manages power, repairs systems, and keeps the ship running under pressure.',
+  science:            'Scans contacts, analyses anomalies, and provides the sensor data everyone else depends on.',
+  medical:            'Treats casualties, manages triage, and keeps the crew alive.',
+  security:           'Manages internal defence, marine teams, and repels boarders.',
+  comms:              'Handles communications, decodes signals, and manages faction relations.',
+  flight_ops:         'Launches and recovers drones — scouts, combat, rescue, and electronic countermeasures.',
+  electronic_warfare: 'Jams enemy sensors, runs intrusion attacks, and masks the ship\'s signature.',
+  operations:         'Analyses threats, coordinates crew actions, and manages mission execution. The crew\'s brain — turning raw data into tactical advantage.',
+  hazard_control:     'Manages fires, atmosphere, radiation, and structural integrity. Keeps the ship\'s environment survivable so the crew can do their jobs.',
+  quartermaster:      'Manages resources, supplies, and trade. Makes sure the ship has what it needs.',
+};
+
 /** Minimum crew per ship class (matches ships/*.json min_crew field). */
 const MIN_CREW = {
   scout:        3,
@@ -164,11 +180,13 @@ function buildRoleCards() {
     card.className = 'role-card panel';
     card.dataset.roleCard = role;
 
+    const desc = ROLE_DESCRIPTIONS[role] || '';
     card.innerHTML = `
       <div class="panel__header role-card__header">
         <span class="text-header">${ROLE_LABELS[role]}</span>
       </div>
       <div class="role-card__body">
+        <p class="role-card__desc text-dim">${desc}</p>
         <span class="role-card__occupant text-data" data-occupant="${role}">VACANT</span>
         <div class="role-card__actions">
           <button class="btn btn--primary role-card__claim" data-claim="${role}" aria-label="Claim ${ROLE_LABELS[role]}">CLAIM</button>

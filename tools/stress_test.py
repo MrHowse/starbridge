@@ -50,7 +50,7 @@ except ImportError:
 ROLES = [
     "captain", "helm", "weapons", "engineering",
     "science", "medical", "security", "comms",
-    "flight_ops", "electronic_warfare", "operations", "damage_control",
+    "flight_ops", "electronic_warfare", "operations", "hazard_control",
 ]
 
 ROLE_CALLSIGNS = {r: f"Bot_{r[:4].upper()}" for r in ROLES}
@@ -83,7 +83,7 @@ _ROLE_MESSAGES: dict[str, list[tuple[str, Any, float]]] = {
     "flight_ops": [],
     "electronic_warfare": [],
     "operations": [],
-    "damage_control": [],
+    "hazard_control": [],
 }
 
 # ---------------------------------------------------------------------------

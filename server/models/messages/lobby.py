@@ -11,6 +11,22 @@ VALID_ROLES: frozenset[str] = frozenset(
     {"captain", "helm", "weapons", "engineering", "science", "medical", "security", "comms", "viewscreen", "flight_ops", "electronic_warfare", "operations", "hazard_control", "janitor", "quartermaster"}
 )
 
+STATION_CALLSIGNS: dict[str, str] = {
+    "captain": "CAP",
+    "helm": "HELM",
+    "weapons": "WEPS",
+    "engineering": "ENG",
+    "science": "SCI",
+    "comms": "COMMS",
+    "electronic_warfare": "EW",
+    "security": "SEC",
+    "medical": "MED",
+    "flight_ops": "FOPS",
+    "quartermaster": "QM",
+    "operations": "OPS",
+    "hazard_control": "HAZCON",
+}
+
 
 class LobbyClaimRolePayload(BaseModel):
     role: Role

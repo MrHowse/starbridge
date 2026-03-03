@@ -70,6 +70,9 @@ class FakeMissionEngine:
     def get_active_node_ids(self):
         return [o.id for o in self._objectives if o.status == "active"]
 
+    def get_node_trigger(self, node_id: str) -> dict:
+        return {}
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # A.5.2 — Feed Event Basics

@@ -649,6 +649,13 @@ class MissionGraph:
         """Return all registered nodes in registration order."""
         return [self._graph_nodes[nid] for nid in self._node_order]
 
+    def get_node_trigger(self, node_id: str) -> dict:
+        """Return the trigger definition for a node, or {} if none."""
+        node_def = self._all_nodes.get(node_id)
+        if node_def is None:
+            return {}
+        return node_def.get("trigger", {})
+
     def get_active_node_ids(self) -> list[str]:
         """Return IDs of currently active nodes."""
         return list(self._active_set)

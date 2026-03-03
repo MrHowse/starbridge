@@ -288,3 +288,9 @@
   color: rgba(255, 255, 255, 0.3);
   font-size: 0.7rem;
 }
+
+.ops-obj-eta {
+  color: rgba(0, 255, 65, 0.5);
+  font-size: 0.7rem;
+  margin-left: 0.3em;
+}
