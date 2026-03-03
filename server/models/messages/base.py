@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from server.models.messages.captain import CaptainAcceptMissionPayload, CaptainAddLogPayload, CaptainAuthorizePayload, CaptainDeclineMissionPayload, CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
+from server.models.messages.captain import CaptainAcceptMissionPayload, CaptainAcknowledgeAllStopPayload, CaptainAddLogPayload, CaptainAuthorizePayload, CaptainDeclineMissionPayload, CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSetGeneralOrderPayload, CaptainSetPriorityTargetPayload, CaptainSystemOverridePayload
 from server.models.messages.negotiation import (
     NegotiationOpenChannelPayload,
     NegotiationCloseChannelPayload,
@@ -291,6 +291,9 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "captain.accept_mission": CaptainAcceptMissionPayload,
     "captain.decline_mission": CaptainDeclineMissionPayload,
     "captain.undock": CaptainUndockPayload,
+    "captain.set_priority_target": CaptainSetPriorityTargetPayload,
+    "captain.set_general_order": CaptainSetGeneralOrderPayload,
+    "captain.acknowledge_all_stop": CaptainAcknowledgeAllStopPayload,
     # Medical (legacy)
     "medical.treat_crew": MedicalTreatCrewPayload,
     "medical.cancel_treatment": MedicalCancelTreatmentPayload,

@@ -1585,3 +1585,80 @@ def tick_combat(
             pass  # Keep boarding_active managed by legacy system
 
     return events
+
+
+# ---------------------------------------------------------------------------
+# C.2.1: Boarding Area Impact — occupied rooms + system penalties
+# ---------------------------------------------------------------------------
+
+
+def get_occupied_rooms() -> dict[str, str]:
+    """Return {room_id: "contested"|"controlled"} for rooms with boarders.
+
+    "controlled" = boarders present, no marines.
+    "contested"  = both boarders and marines present.
+    """
+    occupied: dict[str, str] = {}
+    # Gather rooms with boarding parties.
+    boarder_rooms: set[str] = set()
+    for party in _boarding_parties:
+        if not party.is_eliminated and hasattr(party, "location") and party.location:
+            boarder_rooms.add(party.location)
+
+    # Gather rooms with marines.
+    marine_rooms: set[str] = set()
+    for team in _marine_teams:
+        if team.status != "eliminated" and len(team.members) > 0 and team.location:
+            marine_rooms.add(team.location)
+
+    for room_id in boarder_rooms:
+        if room_id in marine_rooms:
+            occupied[room_id] = "contested"
+        else:
+            occupied[room_id] = "controlled"
+    return occupied
+
+
+def get_boarding_system_penalties(interior: ShipInterior) -> dict[str, float]:
+    """Return {system_name: multiplier} for systems in boarder-occupied rooms.
+
+    0.0 = fully controlled by boarders (system disabled).
+    0.5 = contested (system at half effectiveness).
+    """
+    occupied = get_occupied_rooms()
+    if not occupied:
+        return {}
+    system_rooms = getattr(interior, "system_rooms", {})
+    penalties: dict[str, float] = {}
+    for sys_name, room_id in system_rooms.items():
+        status = occupied.get(room_id)
+        if status == "controlled":
+            penalties[sys_name] = 0.0
+        elif status == "contested":
+            penalties[sys_name] = 0.5
+    return penalties
+
+
+def get_boarder_proximity_rooms(interior: ShipInterior) -> set[str]:
+    """Return rooms adjacent to boarder-occupied rooms (warning zone)."""
+    occupied = get_occupied_rooms()
+    if not occupied:
+        return set()
+    proximity: set[str] = set()
+    for room_id in occupied:
+        room = interior.rooms.get(room_id)
+        if room:
+            for conn_id in room.connections:
+                if conn_id not in occupied:
+                    proximity.add(conn_id)
+    return proximity
+
+
+def get_casualty_prediction() -> dict:
+    """Return casualty prediction data for medical cross-station alert."""
+    contested = sum(1 for s in get_occupied_rooms().values() if s == "contested")
+    # Rough estimate: each contested room causes ~1 casualty per minute.
+    return {
+        "contested_rooms": contested,
+        "estimated_casualties_per_minute": contested * 1.0,
+    }

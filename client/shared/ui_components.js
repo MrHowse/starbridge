@@ -136,3 +136,44 @@ export function showGameOver(result, stats = {}) {
     </div>`;
   el.style.display = 'flex';
 }
+
+// ---------------------------------------------------------------------------
+// C.2.2: Boarding indicator (cross-station)
+// ---------------------------------------------------------------------------
+
+let _boardingIndicator = null;
+
+/**
+ * Update the boarding indicator in the station header.
+ * Creates the indicator element on first call if it doesn't exist.
+ * @param {object} shipState - The ship.state payload.
+ */
+export function updateBoardingIndicator(shipState) {
+  const active = shipState.boarding_active ?? false;
+  const penalties = shipState.boarding_system_penalties ?? {};
+  const affected = Object.keys(penalties).length;
+
+  if (!_boardingIndicator) {
+    _boardingIndicator = document.getElementById('boarding-indicator');
+    if (!_boardingIndicator) {
+      // Auto-create and append to the first header element.
+      const header = document.querySelector('header');
+      if (!header) return;
+      _boardingIndicator = document.createElement('span');
+      _boardingIndicator.id = 'boarding-indicator';
+      _boardingIndicator.className = 'text-label boarding-indicator';
+      _boardingIndicator.style.cssText = 'color:#ff4444;font-weight:bold;margin-left:0.5rem;display:none;';
+      header.appendChild(_boardingIndicator);
+    }
+  }
+
+  if (active && affected > 0) {
+    _boardingIndicator.textContent = `BOARDING: ${affected} system${affected !== 1 ? 's' : ''} affected`;
+    _boardingIndicator.style.display = '';
+  } else if (active) {
+    _boardingIndicator.textContent = 'BOARDING ALERT';
+    _boardingIndicator.style.display = '';
+  } else {
+    _boardingIndicator.style.display = 'none';
+  }
+}

@@ -43,3 +43,18 @@ class CaptainAcceptMissionPayload(BaseModel):
 class CaptainDeclineMissionPayload(BaseModel):
     """Sent by Captain station to decline an offered dynamic mission."""
     mission_id: str
+
+
+class CaptainSetPriorityTargetPayload(BaseModel):
+    """Mark or clear a priority target visible to all stations."""
+    entity_id: str | None = None
+
+
+class CaptainSetGeneralOrderPayload(BaseModel):
+    """Issue a ship-wide general order."""
+    order: Literal["battle_stations", "silent_running", "evasive_manoeuvres", "all_stop", "condition_green"]
+
+
+class CaptainAcknowledgeAllStopPayload(BaseModel):
+    """Helm acknowledges ALL STOP to resume control."""
+    model_config = {"extra": "allow"}

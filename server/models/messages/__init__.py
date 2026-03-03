@@ -61,7 +61,7 @@ from server.models.messages.science import (
 )
 
 # Captain
-from server.models.messages.captain import CaptainAcceptMissionPayload, CaptainAddLogPayload, CaptainAuthorizePayload, CaptainDeclineMissionPayload, CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload
+from server.models.messages.captain import CaptainAcceptMissionPayload, CaptainAcknowledgeAllStopPayload, CaptainAddLogPayload, CaptainAuthorizePayload, CaptainDeclineMissionPayload, CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSetGeneralOrderPayload, CaptainSetPriorityTargetPayload, CaptainSystemOverridePayload
 
 # Docking
 from server.models.messages.docking import (
@@ -347,6 +347,9 @@ __all__ = [
     "CaptainReassignCrewPayload",
     "CaptainAcceptMissionPayload",
     "CaptainDeclineMissionPayload",
+    "CaptainSetPriorityTargetPayload",
+    "CaptainSetGeneralOrderPayload",
+    "CaptainAcknowledgeAllStopPayload",
     # docking
     "DockingRequestClearancePayload",
     "DockingStartServicePayload",

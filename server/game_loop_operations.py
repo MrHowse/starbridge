@@ -280,6 +280,15 @@ def tick(world: World, ship: Ship, dt: float) -> None:
         else:
             asmt.out_of_range_timer = 0.0
 
+    # C.1.1: Auto-start assessment for captain priority target.
+    import server.game_loop_captain_orders as _glcord
+    _prio_id = _glcord.get_priority_target()
+    if _prio_id and _prio_id not in _assessments and not _active_id:
+        _prio_enemy = _find_enemy(world, _prio_id)
+        if _prio_enemy is not None and _prio_enemy.scan_state == "scanned":
+            start_assessment(_prio_id, world, ship)
+            send_station_advisory("science", "PRIORITY TARGET \u2014 SCAN REQUESTED")
+
     # --- Advance active assessment timer (A.2.1.2) ---
     if _active_id and _active_id in _assessments:
         asmt = _assessments[_active_id]

@@ -520,6 +520,7 @@ export class MapRenderer {
 
   _drawContacts(ctx, cw, ch, camX, camY, zoom, now) {
     const MARGIN = 20;
+    const priorityId = this._shipState?.captain_priority_target ?? null;
     for (const contact of this._contacts) {
       const sx       = cw / 2 + (contact.x - camX) / zoom;
       const sy       = ch / 2 + (contact.y - camY) / zoom;
@@ -532,11 +533,37 @@ export class MapRenderer {
         } else {
           _drawDefaultContact(ctx, sx, sy, contact, selected);
         }
+        // C.1.1: Priority target diamond overlay.
+        if (contact.id === priorityId) {
+          this._drawPriorityDiamond(ctx, sx, sy, now);
+        }
       } else {
         // Off-screen indicator: arrow at canvas edge pointing toward contact.
         _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact, this._shipState);
       }
     }
+  }
+
+  /** Draw a pulsing gold diamond around the captain's priority target. */
+  _drawPriorityDiamond(ctx, sx, sy, now) {
+    const pulse = 0.6 + 0.4 * Math.sin(now / 400);
+    const size = 14 + 2 * Math.sin(now / 600);
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 215, 0, ${pulse})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - size);
+    ctx.lineTo(sx + size, sy);
+    ctx.lineTo(sx, sy + size);
+    ctx.lineTo(sx - size, sy);
+    ctx.closePath();
+    ctx.stroke();
+    // Label
+    ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('PRIORITY', sx, sy - size - 4);
+    ctx.restore();
   }
 
   _drawDamageOverlay(ctx, cw, ch, camX, camY, zoom, now) {

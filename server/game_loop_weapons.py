@@ -387,7 +387,12 @@ def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]
 
     # Accuracy roll — miss resets cooldown without damage.
     # v0.07: target profile reduces hit chance (spec 1.2.5).
-    eff_accuracy = AUTO_FIRE_ACCURACY * getattr(target, "target_profile", 1.0)
+    # C.1.1: priority target accuracy bonus.
+    import server.game_loop_captain_orders as glcord
+    _af_priority_acc = glcord.PRIORITY_ACCURACY_BONUS if (glcord.get_priority_target() == target.id) else 0.0
+    _af_evasive_acc = glcord.get_accuracy_modifier()
+    eff_accuracy = AUTO_FIRE_ACCURACY * getattr(target, "target_profile", 1.0) + _af_priority_acc + _af_evasive_acc
+    eff_accuracy = max(0.0, min(1.0, eff_accuracy))
     if _rng.random() > eff_accuracy:
         _auto_fire_cooldown = AUTO_FIRE_INTERVAL
         return []
@@ -413,8 +418,11 @@ def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]
 
     if target.hull <= 0.0:
         glsalv.spawn_wreck("enemy", target.id, target.type, target.x, target.y)
-        world.enemies = [e for e in world.enemies if e.id != target.id]
-        gl.log_event("combat", "enemy_destroyed", {"enemy_id": target.id, "cause": "beam_auto"})
+        _destroyed_id = target.id
+        world.enemies = [e for e in world.enemies if e.id != _destroyed_id]
+        gl.log_event("combat", "enemy_destroyed", {"enemy_id": _destroyed_id, "cause": "beam_auto"})
+        if glcord.on_entity_destroyed(_destroyed_id):
+            event_payload["priority_destroyed"] = True
 
     _auto_fire_cooldown = AUTO_FIRE_INTERVAL
     return [("weapons.beam_fired", event_payload)]
@@ -662,8 +670,14 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
 
         # v0.08 A.3.1.3: Ops weapons-helm sync bonus.
         sync_acc, sync_dmg = glops.get_weapons_helm_sync_bonus()
+        # C.1.1: priority target accuracy bonus + C.1.2 evasive penalty.
+        import server.game_loop_captain_orders as glcord
+        _prio_acc = glcord.PRIORITY_ACCURACY_BONUS if (glcord.get_priority_target() == target.id) else 0.0
+        _evasive_acc = glcord.get_accuracy_modifier()
         # v0.07: target profile affects hit chance (spec 1.2.5).
-        hit_chance = min(1.0, getattr(target, "target_profile", 1.0) + sync_acc)
+        hit_chance = min(1.0, getattr(target, "target_profile", 1.0) + sync_acc + _prio_acc + _evasive_acc)
+        hit_chance *= glcord.get_target_profile_modifier()
+        hit_chance = max(0.0, min(1.0, hit_chance))
         if hit_chance < 1.0 and _rng.random() > hit_chance:
             _beam_cooldown = ship.beam_fire_rate
             return ("weapons.beam_miss", {"target_id": target.id})
@@ -678,10 +692,12 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         apply_hit_to_enemy(target, dmg, ship.x, ship.y, beam_frequency=beam_frequency, priority_subsystem=priority_sub)
         if target.hull <= 0.0:
             glsalv.spawn_wreck("enemy", target.id, target.type, target.x, target.y)
-            world.enemies = [e for e in world.enemies if e.id != target.id]
-            if _weapons_target == target.id:
+            _destroyed_id2 = target.id
+            world.enemies = [e for e in world.enemies if e.id != _destroyed_id2]
+            if _weapons_target == _destroyed_id2:
                 _weapons_target = None
-            gl.log_event("combat", "enemy_destroyed", {"enemy_id": target.id, "cause": "beam"})
+            gl.log_event("combat", "enemy_destroyed", {"enemy_id": _destroyed_id2, "cause": "beam"})
+            glcord.on_entity_destroyed(_destroyed_id2)
 
         _beam_cooldown = ship.beam_fire_rate
         return (

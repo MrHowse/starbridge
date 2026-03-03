@@ -23,9 +23,12 @@ from pydantic import BaseModel
 
 from server.models.messages import (
     CaptainAcceptMissionPayload,
+    CaptainAcknowledgeAllStopPayload,
     CaptainAddLogPayload,
     CaptainAuthorizePayload,
     CaptainDeclineMissionPayload,
+    CaptainSetGeneralOrderPayload,
+    CaptainSetPriorityTargetPayload,
     CaptainUndockPayload,
     CommsAssessDistressPayload,
     CommsDecodeSignalPayload,
@@ -251,6 +254,7 @@ import server.game_loop_negotiation as glng
 import server.game_loop_salvage as glsalv
 import server.game_loop_rationing as glrat
 import server.game_loop_atmosphere as glatm
+import server.game_loop_captain_orders as glcord
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -1009,7 +1013,7 @@ async def _loop() -> None:
             contacts=_fo_contacts,
             in_combat=bool(_world.enemies),
             tick_num=_tick_count,
-            ship_evasive=_is_ship_evasive(_world.ship),
+            ship_evasive=_is_ship_evasive(_world.ship) or glcord.get_active_order() == "evasive_manoeuvres",
             resources=_world.ship.resources,
         )
 
@@ -1084,6 +1088,16 @@ async def _loop() -> None:
         if _res.provisions_crew_penalty > 0.0:
             for _sys_obj in _world.ship.systems.values():
                 _sys_obj._crew_factor = max(0.05, _sys_obj._crew_factor * (1.0 - _res.provisions_crew_penalty))
+        # C.2.1: Boarding area impact — reduce crew factor for occupied rooms.
+        for _bsn, _bmult in gls.get_boarding_system_penalties(_world.ship.interior).items():
+            _bsys = _world.ship.systems.get(_bsn)
+            if _bsys:
+                _bsys._crew_factor *= _bmult
+        # C.1.1: Morale boost from priority target kill.
+        _morale_boost = glcord.get_crew_factor_boost()
+        if _morale_boost > 0:
+            for _sys_obj2 in _world.ship.systems.values():
+                _sys_obj2._crew_factor = min(1.0, _sys_obj2._crew_factor + _morale_boost)
         glj.apply_buffs(_world.ship)
         _crew_factor_events = _check_crew_factor_thresholds(_world.ship)
         glmed.tick_treatments(_world.ship, TICK_DT)
@@ -1103,6 +1117,10 @@ async def _loop() -> None:
         hazard_events = hazard_system.tick_hazards(_world, _world.ship, TICK_DT)
         _hazard_sensor_mod = hazard_system.get_sensor_modifier()
         _hazard_shield_mod = hazard_system.get_shield_regen_modifier()
+        # C.1: Captain orders tick (bridge control timer, morale boost, ALL STOP).
+        _captain_order_events = glcord.tick(TICK_DT, _world.ship, _world.ship.interior)
+        for _co_evt in _captain_order_events:
+            await _manager.broadcast(Message.build(_co_evt[0], _co_evt[1]))
         # 3.8b Janitor maintenance tick.
         _janitor_events = glj.tick(_world.ship, TICK_DT, _world)
         # 3.8b2 Mining tick.
@@ -2281,6 +2299,17 @@ async def _loop() -> None:
                 await _manager.broadcast_to_roles(["medical"], Message.build(evt_type, evt_data))
         for evt_type, evt_data in station_boarding_events:
             await _manager.broadcast_to_roles(["security"], Message.build(evt_type, evt_data))
+        # C.2.2: Boarding cross-station alerts.
+        if gls.is_boarding_active():
+            _casualty_pred = gls.get_casualty_prediction()
+            if _casualty_pred["contested_rooms"] > 0:
+                await _manager.broadcast_to_roles(
+                    ["medical"], Message.build("security.casualty_prediction", _casualty_pred))
+            _prox_rooms = gls.get_boarder_proximity_rooms(_world.ship.interior)
+            if _prox_rooms:
+                _prox_decks = sorted({_world.ship.interior.rooms[r].deck for r in _prox_rooms if r in _world.ship.interior.rooms})
+                await _manager.broadcast_to_roles(
+                    ["hazard_control"], Message.build("security.boarding_prestage_warning", {"decks": _prox_decks}))
 
         # 11m. Navigation: sector grid broadcast (only when changed).
         if _world.sector_grid is not None:
@@ -2382,11 +2411,15 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
             break
 
         if msg_type == "helm.set_heading" and isinstance(payload, HelmSetHeadingPayload):
+            if glcord.is_all_stop_active():
+                continue  # ALL STOP — helm locked
             if payload.heading != ship.target_heading:
                 gl.log_debounced("helm", "heading_changed", {"from": round(ship.target_heading, 1), "to": payload.heading})
             ship.target_heading = payload.heading
             _set_training_flag(glm, "helm_heading_set")
         elif msg_type == "helm.set_throttle" and isinstance(payload, HelmSetThrottlePayload):
+            if glcord.is_all_stop_active():
+                continue  # ALL STOP — helm locked
             if payload.throttle != ship.throttle:
                 gl.log_debounced("helm", "throttle_changed", {"from": ship.throttle, "to": payload.throttle})
             ship.throttle = payload.throttle
@@ -2488,6 +2521,31 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "captain.abandon_ship" and isinstance(payload, AbandonShipPayload):
             glhc.order_abandon_ship(_world.ship if _world else None)
             gl.log_event("captain", "abandon_ship", {})
+        # --- Captain Orders (C.1) ---
+        elif msg_type == "captain.set_priority_target" and isinstance(payload, CaptainSetPriorityTargetPayload):
+            if world is not None:
+                _pt_result = glcord.set_priority_target(payload.entity_id, world)
+                if _pt_result.get("ok"):
+                    gl.log_event("captain", "priority_target_set", {"entity_id": payload.entity_id})
+                else:
+                    events.append(("captain.order_error", {"error": _pt_result.get("reason", "")}))
+        elif msg_type == "captain.set_general_order" and isinstance(payload, CaptainSetGeneralOrderPayload):
+            if world is not None:
+                _go_result = glcord.set_general_order(payload.order, ship, world)
+                if _go_result.get("ok"):
+                    gl.log_event("captain", "general_order_set", {"order": payload.order})
+                    if payload.order == "battle_stations":
+                        events.append(("ship.alert_changed", {"level": "red"}))
+                    elif payload.order == "condition_green":
+                        events.append(("ship.alert_changed", {"level": "green"}))
+                else:
+                    events.append(("captain.order_error", {"error": _go_result.get("reason", "")}))
+        elif msg_type == "captain.acknowledge_all_stop" and isinstance(payload, CaptainAcknowledgeAllStopPayload):
+            _as_result = glcord.acknowledge_all_stop()
+            if _as_result.get("ok"):
+                gl.log_event("captain", "all_stop_acknowledged", {})
+            else:
+                events.append(("captain.order_error", {"error": _as_result.get("reason", "")}))
         elif msg_type == "engineering.dispatch_team" and isinstance(payload, EngineeringDispatchTeamPayload):
             gle.dispatch_team(payload.team_id, payload.system, ship.interior)
             gl.log_event("engineering", "team_dispatched", {"team_id": payload.team_id, "system": payload.system})
@@ -3252,6 +3310,14 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             # v0.06.3: Security status for Captain display.
             "boarding_active": gls.is_boarding_active(),
             "boarding_party_count": len(gls.get_boarding_parties()),
+            # C.2.2: Boarding cross-station alerts.
+            "boarding_system_penalties": gls.get_boarding_system_penalties(ship.interior),
+            "boarding_occupied_rooms": gls.get_occupied_rooms(),
+            "boarder_proximity_rooms": sorted(gls.get_boarder_proximity_rooms(ship.interior)),
+            # C.1: Captain orders.
+            "captain_priority_target": glcord.get_priority_target(),
+            "general_order": glcord.get_active_order(),
+            "all_stop_active": glcord.is_all_stop_active(),
             "marine_squad_count": len([t for t in gls.get_marine_teams() if len(t.members) > 0]),
             "marine_squad_total": len(gls.get_marine_teams()),
             "locked_door_count": len(gls.get_locked_doors()),

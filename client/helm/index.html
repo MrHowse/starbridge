@@ -35,6 +35,15 @@
       <a class="text-label helm-standby__lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
     </div>
 
+    <!-- C.1.2: ALL STOP overlay -->
+    <div class="helm-all-stop-overlay" id="all-stop-overlay" style="display:none">
+      <div class="all-stop-content">
+        <p class="text-header all-stop-title">ALL STOP</p>
+        <p class="text-body">Captain has ordered ALL STOP. Helm controls locked.</p>
+        <button class="btn btn--primary all-stop-ack-btn" id="all-stop-ack-btn">ACKNOWLEDGE</button>
+      </div>
+    </div>
+
     <!-- ─── Main game layout (hidden until game.started) ──────────────── -->
     <main class="helm-main" data-helm-main style="display:none">
 

@@ -149,6 +149,12 @@ function init() {
     statusLabelEl.textContent = status.toUpperCase();
   });
 
+  // C.1.2: ALL STOP acknowledge button.
+  const _allStopAckBtn = document.getElementById('all-stop-ack-btn');
+  if (_allStopAckBtn) {
+    _allStopAckBtn.addEventListener('click', () => send('captain.acknowledge_all_stop', {}));
+  }
+
   on('lobby.welcome',      handleWelcome);
   on('game.started',       handleGameStarted);
   on('ship.state',         handleShipState);
@@ -275,6 +281,14 @@ function handleShipState(payload) {
   if (_sectorMap && payload.position) {
     _sectorMap.updateShipPosition(payload.position.x, payload.position.y, payload.heading ?? 0);
   }
+  // C.1.2: ALL STOP overlay
+  _updateAllStopOverlay(payload.all_stop_active ?? false);
+}
+
+function _updateAllStopOverlay(active) {
+  const overlay = document.getElementById('all-stop-overlay');
+  if (!overlay) return;
+  overlay.style.display = active ? 'flex' : 'none';
 }
 
 function handleWorldEntities(payload) {

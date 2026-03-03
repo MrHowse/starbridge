@@ -211,6 +211,11 @@ function init() {
     btn.addEventListener('click', () => send('captain.set_alert', { level: btn.dataset.alert }));
   });
 
+  // General order buttons (C.1.2)
+  document.querySelectorAll('.order-btn[data-order]').forEach(btn => {
+    btn.addEventListener('click', () => send('captain.set_general_order', { order: btn.dataset.order }));
+  });
+
   // Log panel wiring (HTML elements already exist)
   if (logSubmit) {
     logSubmit.addEventListener('click', _submitLog);
@@ -375,6 +380,10 @@ function handleGameStarted(payload) {
       showGrid:       true,
       showRangeRings: true,
       zoom:           { enabled: true },
+      interactive:    true,
+    });
+    mapRenderer.onContactClick((contactId) => {
+      send('captain.set_priority_target', { entity_id: contactId });
     });
     _sectorMap = new SectorMap({
       allowedLevels: ['tactical', 'sector', 'strategic'],
@@ -427,6 +436,9 @@ function handleShipState(payload) {
 
   // Docking panel visibility
   _updateDockingPanel(payload);
+
+  // C.1.2: General order display
+  _updateOrderButtons(payload.general_order || null);
 }
 
 function handleCrewRoster(payload) {
@@ -571,6 +583,14 @@ function _updateAlertButtons(level) {
   alertBtns.forEach(btn => {
     btn.classList.toggle('alert-btn--active', btn.dataset.alert === level);
   });
+}
+
+function _updateOrderButtons(order) {
+  document.querySelectorAll('.order-btn[data-order]').forEach(btn => {
+    btn.classList.toggle('order-btn--active', btn.dataset.order === order);
+  });
+  const lbl = document.getElementById('active-order-label');
+  if (lbl) lbl.textContent = order ? order.replace(/_/g, ' ').toUpperCase() : '';
 }
 
 // ---------------------------------------------------------------------------

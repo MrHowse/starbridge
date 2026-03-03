@@ -343,6 +343,23 @@ def _tick_combat(
     if drone.attack_cooldown_remaining > 0:
         drone.attack_cooldown_remaining = max(0.0, drone.attack_cooldown_remaining - dt)
 
+    # C.1.1: Auto-engage captain priority target for idle combat drones.
+    if drone.ai_behaviour in ("loiter", "idle") and not drone.contact_of_interest:
+        if drone.engagement_rules == "weapons_free" and drone.ammo > 0:
+            import server.game_loop_captain_orders as _glcord
+            _prio_id = _glcord.get_priority_target()
+            if _prio_id:
+                for _pc in ctx.contacts:
+                    if _pc.get("id") == _prio_id:
+                        drone.contact_of_interest = _prio_id
+                        drone.ai_behaviour = "engage"
+                        events.append(DroneEvent(
+                            event_type="engaging_priority",
+                            drone_id=drone.id,
+                            data={"callsign": drone.callsign, "target_id": _prio_id},
+                        ))
+                        break
+
     if drone.ai_behaviour == "engage" and drone.contact_of_interest:
         # Find target in contacts.
         target = None

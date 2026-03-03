@@ -84,6 +84,42 @@
 }
 
 /* =========================================================================
+   General Orders (C.1.2)
+   ========================================================================= */
+
+.captain-header__orders {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.order-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--neutral);
+  color: var(--neutral);
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.order-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+.order-btn--active {
+  border-color: #ffd700;
+  color: #ffd700;
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+}
+
+.order-active-label {
+  color: #ffd700;
+  font-weight: bold;
+  margin-left: 0.25rem;
+}
+
+/* =========================================================================
    Stand-by
    ========================================================================= */
 

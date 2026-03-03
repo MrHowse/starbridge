@@ -47,3 +47,12 @@ def _reset_hazard_control_state():
     glhc.reset()
     yield
     glhc.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_captain_orders_state():
+    """Reset captain orders module state before each test to prevent leakage."""
+    import server.game_loop_captain_orders as glcord
+    glcord.reset()
+    yield
+    glcord.reset()

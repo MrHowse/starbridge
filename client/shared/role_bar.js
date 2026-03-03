@@ -97,6 +97,13 @@ export function initRoleBar(send, currentRole) {
     if (!_barEl) return; // bar not yet built (game not started)
     _renderBar(_playersFromRoles(payload.roles || {}));
   });
+
+  // C.2.2: Cross-station boarding indicator on all stations.
+  on('ship.state', (payload) => {
+    import('../shared/ui_components.js').then(mod => {
+      if (mod.updateBoardingIndicator) mod.updateBoardingIndicator(payload);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

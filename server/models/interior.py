@@ -61,6 +61,9 @@ class ShipInterior:
     marine_squads: list[MarineSquad] = field(default_factory=list)
     intruders: list[Intruder] = field(default_factory=list)
 
+    # C.2.1: system_name -> room_id mapping (populated from JSON).
+    system_rooms: dict[str, str] = field(default_factory=dict)
+
     def find_path(
         self,
         from_id: str,
@@ -194,7 +197,8 @@ def _build_interior_from_data(data: dict) -> ShipInterior:
             quarantine_lockable=rd.get("quarantine_lockable", False),
             tags=list(rd.get("tags", [])),
         )
-    return ShipInterior(rooms=rooms)
+    system_rooms = dict(data.get("system_rooms", {}))
+    return ShipInterior(rooms=rooms, system_rooms=system_rooms)
 
 
 def make_default_interior(ship_class: str = "frigate") -> ShipInterior:

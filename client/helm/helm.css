@@ -279,3 +279,39 @@
 .telem-row .text-data {
   font-size: 0.95rem;
 }
+
+/* C.1.2: ALL STOP overlay */
+.helm-all-stop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.all-stop-content {
+  text-align: center;
+  padding: 2rem;
+  border: 2px solid #ff4444;
+  background: var(--bg-primary, #111);
+}
+
+.all-stop-title {
+  font-size: 2rem;
+  color: #ff4444;
+  animation: all-stop-pulse 1s ease-in-out infinite;
+}
+
+.all-stop-ack-btn {
+  margin-top: 1rem;
+  padding: 0.5rem 2rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+@keyframes all-stop-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
