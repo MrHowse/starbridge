@@ -216,3 +216,57 @@ class TestPenaltyClears:
         # Clean up like tick_combat does.
         gls._boarding_parties[:] = [p for p in gls._boarding_parties if not p.is_eliminated]
         assert gls.get_boarding_system_penalties(interior) == {}
+
+
+# ---------------------------------------------------------------------------
+# D.11: Room-Type Specific Impact
+# ---------------------------------------------------------------------------
+
+
+class TestRoomTypeSpecificImpact:
+    """Each room type's specific system impact + transitions."""
+
+    def test_bridge_occupation_disables_manoeuvring(self):
+        """Bridge mapped to manoeuvring — controlled → 0.0 penalty."""
+        interior = _make_simple_interior()
+        _setup_boarding(interior, "bridge")
+        penalties = gls.get_boarding_system_penalties(interior)
+        assert "manoeuvring" in penalties
+        assert penalties["manoeuvring"] == 0.0
+
+    def test_weapons_bay_occupation_disables_beams(self):
+        """Weapons bay mapped to beams — controlled → 0.0 penalty."""
+        interior = _make_simple_interior()
+        _setup_boarding(interior, "weapons_bay")
+        penalties = gls.get_boarding_system_penalties(interior)
+        assert "beams" in penalties
+        assert penalties["beams"] == 0.0
+
+    def test_contested_to_cleared_restores_instantly(self):
+        """Boarders eliminated mid-contest → penalties removed immediately."""
+        interior = _make_simple_interior()
+        _setup_boarding(interior, "engine_room", add_marines=True)
+        # Contested — should have a penalty.
+        penalties = gls.get_boarding_system_penalties(interior)
+        assert penalties.get("engines") == 0.5
+        # Eliminate the boarders (marines win).
+        gls._boarding_parties[0].members = 0
+        gls._boarding_parties[0].status = "eliminated"
+        gls._boarding_parties[:] = [p for p in gls._boarding_parties if not p.is_eliminated]
+        # Penalties gone immediately.
+        assert gls.get_boarding_system_penalties(interior) == {}
+
+    def test_three_rooms_occupied_simultaneously(self):
+        """3 boarding parties across 3 system rooms → all 3 penalised."""
+        interior = _make_simple_interior()
+        gls.reset()
+        p1 = BoardingParty(id="bp_a", location="bridge", members=3, max_members=3, status="sabotaging")
+        p2 = BoardingParty(id="bp_b", location="engine_room", members=3, max_members=3, status="sabotaging")
+        p3 = BoardingParty(id="bp_c", location="weapons_bay", members=3, max_members=3, status="sabotaging")
+        gls._boarding_parties.extend([p1, p2, p3])
+        gls._boarding_active = True
+        penalties = gls.get_boarding_system_penalties(interior)
+        assert penalties["manoeuvring"] == 0.0
+        assert penalties["engines"] == 0.0
+        assert penalties["beams"] == 0.0
+        assert len(penalties) == 3
