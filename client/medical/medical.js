@@ -1077,6 +1077,25 @@ function handleHullHit() {
   setTimeout(() => stationEl.classList.remove('hit'), HIT_FLASH_MS);
 }
 
+function handleMedicalShipState(payload) {
+  const panel = document.getElementById('medical-ship-panel');
+  if (!panel) return;
+  if (!payload || !payload.active) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+  const body = document.getElementById('medical-ship-content');
+  if (!body) return;
+  const beacon = payload.rescue_beacon ? 'ACTIVE' : 'OFF';
+  const theatre = payload.surgical_theatre ? 'ACTIVE' : 'OFF';
+  const triage = payload.triage_ai ? 'ACTIVE' : 'OFF';
+  body.innerHTML =
+    `<div class="text-label">Rescue Beacon: <span class="text-data">${beacon}</span></div>` +
+    `<div class="text-label">Surgical Theatre: <span class="text-data">${theatre}</span></div>` +
+    `<div class="text-label">Triage AI: <span class="text-data">${triage}</span></div>`;
+}
+
 // ---------------------------------------------------------------------------
 // Initialisation
 // ---------------------------------------------------------------------------
@@ -1094,6 +1113,7 @@ function init() {
   on('medical.event',         handleMedicalEvent);
   on('ship.alert_changed',    (p) => setAlertLevel(p.level));
   on('ship.hull_hit',         handleHullHit);
+  on('medical_ship.state',    handleMedicalShipState);
   on('game.over',             (p) => { SoundBank.play(p.result === 'victory' ? 'victory' : 'defeat'); showGameOver(p.result, p.stats); });
 
   initPuzzleRenderer(send);

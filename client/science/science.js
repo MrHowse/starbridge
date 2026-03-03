@@ -226,6 +226,7 @@ function init() {
   on('science.scan_interrupted',       handleScanInterrupted);
   on('mission.signal_bearing',         handleSignalBearing);
   on('ship.hull_hit',                  handleHullHit);
+  on('science.sensor_anomaly',         handleSensorAnomaly);
   on('game.over',                      handleGameOver);
   on('comms.contacts',                 handleCommsContacts);
 
@@ -485,6 +486,27 @@ function handleSignalBearing(payload) {
   scanTargetLabel.textContent = `${bearingStr} — ${countStr}`;
 
   console.log(`[science] Signal bearing: ${payload.bearing}° (scan ${payload.scan_count}/2)`);
+}
+
+function handleSensorAnomaly(payload) {
+  if (!gameActive) return;
+  const type = (payload.anomaly_type || 'UNKNOWN').toUpperCase().replace(/_/g, ' ');
+  const id = payload.id || '?';
+  SoundBank.play('scan_complete');
+  // Show as a brief notification via the shared toast system.
+  const container = document.querySelector('.notify-toast-container');
+  if (container) {
+    const toast = document.createElement('div');
+    toast.className = 'notify-toast notify-toast--warning';
+    toast.innerHTML =
+      `<span class="notify-toast__role">[ANOMALY]</span>` +
+      `<span class="notify-toast__msg">${type} detected (${id})</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add('notify-toast--fade');
+      setTimeout(() => toast.remove(), 400);
+    }, 4000);
+  }
 }
 
 function handleHullHit() {

@@ -178,6 +178,7 @@ function init() {
   on('puzzle.assist_available',  handleAssistAvailable);
   on('puzzle.assist_sent',       handleAssistSent);
   on('captain.override_changed', handleCaptainOverride);
+  on('ship.mining_event',        handleMiningEvent);
 
   setupBatteryModeButtons();
   setupOverlayButtons();
@@ -289,6 +290,19 @@ function handleHullHit() {
   el.style.transition = 'outline 0.05s ease';
   el.style.outline    = '3px solid #ff2020';
   setTimeout(() => { el.style.outline = ''; }, 500);
+}
+
+function handleMiningEvent(payload) {
+  if (!gameActive) return;
+  const type = (payload.type || payload.event || 'MINING').toUpperCase();
+  const amount = payload.amount != null ? ` +${payload.amount}` : '';
+  const statusBar = document.getElementById('eng-statusbar-mining');
+  if (statusBar) {
+    statusBar.textContent = `MINING: ${type}${amount}`;
+    statusBar.style.display = '';
+    clearTimeout(statusBar._timer);
+    statusBar._timer = setTimeout(() => { statusBar.style.display = 'none'; }, 3000);
+  }
 }
 
 function handleCaptainOverride({ system, online }) {

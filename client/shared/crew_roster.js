@@ -116,7 +116,6 @@ export function initCrewRoster(send) {
   _buildOverlay();
 
   on('crew.roster', _handleCrewRoster);
-  on('crew.roster_update', _handleRosterUpdate);
   on('ship.state', _handleShipState);
   on('game.started', _handleGameStarted);
 

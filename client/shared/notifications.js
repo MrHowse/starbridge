@@ -100,6 +100,22 @@ export function initNotifications(send, fromRole = 'crew') {
   on('station.captured', () => {
     _showAlertToast('TACTICAL', 'Station captured!', 'positive', 5000);
   });
+
+  // Crew factor threshold alerts (sent to relevant station roles).
+  on('crew.factor_changed', (p) => {
+    const sys = (p.system || '').toUpperCase();
+    const pct = p.crew_factor != null ? Math.round(p.crew_factor * 100) : '?';
+    const sev = p.level === 'critical' ? 'critical'
+      : p.level === 'recovery' ? 'positive'
+      : 'warning';
+    _showAlertToast('CREW', `${sys} crew ${p.level === 'recovery' ? 'restored' : 'reduced'} — ${pct}%`, sev, 4000);
+  });
+
+  // Station hull hit — brief flash for enemy station damage events.
+  on('station.hull_hit', (p) => {
+    const id = p.station_id || 'STATION';
+    _showAlertToast('TACTICAL', `Hit on ${id}`, 'positive', 1500);
+  });
 }
 
 // ---------------------------------------------------------------------------
