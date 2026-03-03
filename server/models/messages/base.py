@@ -184,7 +184,7 @@ from server.models.messages.docking import (
     DockingRequestClearancePayload,
     DockingStartServicePayload,
 )
-from server.models.messages.game import GameBriefingLaunchPayload
+from server.models.messages.game import GameBriefingLaunchPayload, GameBriefingReadyPayload
 from server.models.messages.janitor import JanitorPerformTaskPayload, JanitorDismissStickyPayload
 from server.models.messages.flag_bridge import (
     FlagBridgeAddDrawingPayload,
@@ -432,6 +432,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "crew.notify": CrewNotifyPayload,
     # Game
     "game.briefing_launch": GameBriefingLaunchPayload,
+    "game.briefing_ready": GameBriefingReadyPayload,
     # Janitor (secret station)
     "janitor.perform_task": JanitorPerformTaskPayload,
     "janitor.dismiss_sticky": JanitorDismissStickyPayload,

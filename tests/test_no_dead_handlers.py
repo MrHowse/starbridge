@@ -312,8 +312,8 @@ def test_no_orphaned_schemas():
     lobby_source = inspect.getsource(lobby_mod.handle_lobby_message)
     lobby_direct = set(re.findall(r'message\.type == "([^"]+)"', lobby_source))
 
-    # game.briefing_launch is handled by _handle_game_message in main.py.
-    game_direct = {"game.briefing_launch"}
+    # game.* types are handled by _handle_game_message in main.py.
+    game_direct = {"game.briefing_launch", "game.briefing_ready"}
 
     all_handled = queue_types | cap_direct | lobby_direct | game_direct
 

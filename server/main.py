@@ -123,11 +123,22 @@ SITE_DIR     = Path(__file__).parent.parent / "client" / "site"
 # Handlers have signature: async (connection_id: str, message: Message) -> None
 _MessageHandler = Callable[[str, Message], Awaitable[None]]
 
+_briefing_ready: set[str] = set()
+
+
 async def _handle_game_message(connection_id: str, message: Message) -> None:
     """Handle 'game.*' messages sent from the briefing page."""
     if message.type == "game.briefing_launch":
+        _briefing_ready.clear()
         await manager.broadcast(Message.build("game.all_ready", {}))
         logger.info("Captain launched from briefing — broadcasting game.all_ready")
+    elif message.type == "game.briefing_ready":
+        _briefing_ready.add(connection_id)
+        needed = lobby.occupied_role_count()
+        if needed > 0 and len(_briefing_ready) >= needed:
+            _briefing_ready.clear()
+            await manager.broadcast(Message.build("game.all_ready", {}))
+            logger.info("All %d players ready — broadcasting game.all_ready", needed)
 
 
 async def _queue_forward_handler(connection_id: str, message: Message) -> None:

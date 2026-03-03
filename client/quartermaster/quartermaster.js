@@ -25,7 +25,7 @@
 import { initConnection } from '../shared/connection.js';
 import { initRoleBar } from '../shared/role_bar.js';
 import {
-  setStatusDot, setAlertLevel, showGameOver,
+  setStatusDot, setAlertLevel, showBriefing, showGameOver,
 } from '../shared/ui_components.js';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +40,8 @@ const vendorList    = document.getElementById('vendor-list');
 const salvageList   = document.getElementById('salvage-list');
 const logEl         = document.getElementById('qm-log');
 const stationEl     = document.querySelector('.station-container');
+const standbyEl     = document.querySelector('[data-standby]');
+const qmMainEl      = document.getElementById('qm-main');
 
 let _send = null;
 
@@ -118,6 +120,9 @@ function addLog(text) {
 function handleMessage(msg) {
   switch (msg.type) {
     case 'game.started':
+      if (standbyEl) standbyEl.style.display = 'none';
+      if (qmMainEl) qmMainEl.style.display = '';
+      showBriefing(msg.payload.mission_name, msg.payload.briefing_text);
       addLog('Game started. Quartermaster station online.');
       break;
 

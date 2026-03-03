@@ -48,7 +48,7 @@ from server.models.messages.docking import (
 )
 from server.models.messages.navigation import MapPlotRoutePayload, MapClearRoutePayload
 from server.models.messages.crew import CrewNotifyPayload
-from server.models.messages.game import GameBriefingLaunchPayload
+from server.models.messages.game import GameBriefingLaunchPayload, GameBriefingReadyPayload
 
 from server import captain
 from server.models.ship import Ship
@@ -805,6 +805,11 @@ class TestGameRouting:
         msg = _msg("game.briefing_launch", {})
         result = validate_payload(msg)
         assert isinstance(result, GameBriefingLaunchPayload)
+
+    def test_game_briefing_ready_schema(self):
+        msg = _msg("game.briefing_ready", {})
+        result = validate_payload(msg)
+        assert isinstance(result, GameBriefingReadyPayload)
 
     def test_game_prefix_in_handlers(self):
         assert "game" in _HANDLERS

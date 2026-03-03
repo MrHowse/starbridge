@@ -40,3 +40,8 @@ class GameOverPayload(BaseModel):
 class GameBriefingLaunchPayload(BaseModel):
     """Sent by captain from the briefing screen to advance all players to stations."""
     pass
+
+
+class GameBriefingReadyPayload(BaseModel):
+    """Sent by each player from the briefing screen to indicate readiness."""
+    pass

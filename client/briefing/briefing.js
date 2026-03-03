@@ -29,6 +29,7 @@ const ROLE_URLS = {
   operations:         '/client/operations/',
   hazard_control:     '/client/hazard_control/',
   janitor:            '/client/janitor/',
+  quartermaster:      '/client/quartermaster/',
 };
 
 const ROLE_LABELS = {
@@ -45,6 +46,7 @@ const ROLE_LABELS = {
   operations:         'OPERATIONS',
   hazard_control:     'HAZARD CONTROL',
   janitor:            'JANITOR',
+  quartermaster:      'QUARTERMASTER',
 };
 
 const CORE_ROLES = ['captain', 'helm', 'weapons', 'engineering', 'science', 'medical'];
@@ -152,6 +154,7 @@ function onReadyClick() {
   readyBtnEl.disabled = true;
   readyBtnEl.textContent = 'READY ✓';
   readyStatusEl.textContent = 'STANDING BY FOR LAUNCH…';
+  send('game.briefing_ready', {});
 }
 
 function onLaunchClick() {
@@ -185,9 +188,17 @@ function populateRoster() {
   const players = payload.players || {};
   crewRosterEl.innerHTML = '';
 
-  for (const role of [...CORE_ROLES, 'security', 'comms']) {
+  // Show core roles first (always displayed), then any additional occupied roles.
+  const shown = new Set();
+  const ordered = [...CORE_ROLES];
+  for (const role of Object.keys(players)) {
+    if (!ordered.includes(role)) ordered.push(role);
+  }
+
+  for (const role of ordered) {
+    shown.add(role);
     const name = players[role];
-    // Skip optional roles that have no occupant
+    // Skip non-core roles that have no occupant
     if (!name && !CORE_ROLES.includes(role)) continue;
 
     const row = document.createElement('div');
@@ -333,6 +344,12 @@ function navigateToStation() {
 
   if (starRafId) cancelAnimationFrame(starRafId);
   if (wipeEl) wipeEl.classList.add('briefing-wipe--active');
+
+  // Mark briefing as shown so showBriefing() on the station page won't re-display.
+  const missionName = payload && payload.mission_name;
+  if (missionName) {
+    sessionStorage.setItem('starbridge_briefing_shown', missionName);
+  }
 
   const dest = (myRole && ROLE_URLS[myRole]) ? ROLE_URLS[myRole] : '/client/lobby/';
   // 650 ms — matches CSS transition (0.6 s) with a small buffer

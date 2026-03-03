@@ -600,3 +600,93 @@ async def test_start_game_default_difficulty_is_officer():
     await lobby.handle_lobby_message("a", msg)
 
     assert received_difficulty == ["officer"]
+
+
+# ---------------------------------------------------------------------------
+# occupied_role_count
+# ---------------------------------------------------------------------------
+
+
+async def test_occupied_role_count_empty():
+    """occupied_role_count returns 0 when no roles are claimed."""
+    fresh("a")
+    assert lobby.occupied_role_count() == 0
+
+
+async def test_occupied_role_count_some():
+    """occupied_role_count returns the number of occupied roles."""
+    m = fresh("a", "b")
+    await lobby.on_connect("a")
+    await lobby.on_connect("b")
+
+    claim_a = Message.build("lobby.claim_role", {"role": "captain", "player_name": "Alice"})
+    await lobby.handle_lobby_message("a", claim_a)
+    assert lobby.occupied_role_count() == 1
+
+    claim_b = Message.build("lobby.claim_role", {"role": "helm", "player_name": "Bob"})
+    await lobby.handle_lobby_message("b", claim_b)
+    assert lobby.occupied_role_count() == 2
+
+
+# ---------------------------------------------------------------------------
+# game.briefing_ready → game.all_ready broadcast
+# ---------------------------------------------------------------------------
+
+
+async def test_briefing_ready_triggers_all_ready():
+    """Sending game.briefing_ready from all occupied roles broadcasts game.all_ready."""
+    from unittest.mock import AsyncMock
+    import server.main as _main
+    from server.main import _handle_game_message, _briefing_ready
+    _briefing_ready.clear()
+
+    m = fresh("a", "b")
+    await lobby.on_connect("a")
+    await lobby.on_connect("b")
+
+    claim_a = Message.build("lobby.claim_role", {"role": "captain", "player_name": "Alice"})
+    await lobby.handle_lobby_message("a", claim_a)
+    claim_b = Message.build("lobby.claim_role", {"role": "helm", "player_name": "Bob"})
+    await lobby.handle_lobby_message("b", claim_b)
+
+    # Patch main.manager.broadcast to capture calls.
+    broadcast_msgs: list[Message] = []
+    orig_broadcast = _main.manager.broadcast
+    async def _capture(msg: Message) -> None:
+        broadcast_msgs.append(msg)
+    _main.manager.broadcast = _capture  # type: ignore[assignment]
+    try:
+        ready_msg = Message.build("game.briefing_ready", {})
+        await _handle_game_message("a", ready_msg)
+        # Only 1 of 2 ready — no broadcast yet.
+        assert not any(msg.type == "game.all_ready" for msg in broadcast_msgs)
+
+        await _handle_game_message("b", ready_msg)
+        # Now both ready — should broadcast.
+        assert any(msg.type == "game.all_ready" for msg in broadcast_msgs)
+    finally:
+        _main.manager.broadcast = orig_broadcast  # type: ignore[assignment]
+
+
+async def test_briefing_launch_still_works():
+    """game.briefing_launch independently broadcasts game.all_ready."""
+    import server.main as _main
+    from server.main import _handle_game_message, _briefing_ready
+    _briefing_ready.clear()
+
+    m = fresh("a")
+    await lobby.on_connect("a")
+    claim = Message.build("lobby.claim_role", {"role": "captain", "player_name": "Alice"})
+    await lobby.handle_lobby_message("a", claim)
+
+    broadcast_msgs: list[Message] = []
+    orig_broadcast = _main.manager.broadcast
+    async def _capture(msg: Message) -> None:
+        broadcast_msgs.append(msg)
+    _main.manager.broadcast = _capture  # type: ignore[assignment]
+    try:
+        launch_msg = Message.build("game.briefing_launch", {})
+        await _handle_game_message("a", launch_msg)
+        assert any(msg.type == "game.all_ready" for msg in broadcast_msgs)
+    finally:
+        _main.manager.broadcast = orig_broadcast  # type: ignore[assignment]

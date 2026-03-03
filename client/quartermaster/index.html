@@ -10,7 +10,14 @@
 </head>
 <body>
   <div class="station-container">
-    <main class="qm-main" id="qm-main">
+    <!-- ─── Standby overlay (visible until game.started) ───────────────── -->
+    <div class="qm-standby" data-standby>
+      <p class="text-header">QUARTERMASTER STATION</p>
+      <p class="text-body">Awaiting mission orders.</p>
+      <a class="text-label qm-standby__lobby-link" href="/client/lobby/">← RETURN TO LOBBY</a>
+    </div>
+
+    <main class="qm-main" id="qm-main" style="display:none">
 
       <!-- Header -->
       <header class="qm-header">

@@ -132,6 +132,11 @@ async def on_game_end() -> None:
     logger.info("Game ended — lobby reset to pre-game state")
 
 
+def occupied_role_count() -> int:
+    """Return the number of roles currently occupied by a player."""
+    return sum(1 for v in _session.roles.values() if v is not None)
+
+
 def activate_game(payload: dict) -> None:
     """Activate a resumed game session without calling _on_game_start.
 
