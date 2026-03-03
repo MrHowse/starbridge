@@ -368,6 +368,8 @@ class Enemy:
     system_shields: float = 100.0
     system_sensors: float = 100.0
     system_propulsion: float = 100.0
+    # C.4.2 — scan detail (set by sensors on scan completion)
+    scan_detail: str = "basic"       # "basic" | "detailed"
 
 
 # ---------------------------------------------------------------------------

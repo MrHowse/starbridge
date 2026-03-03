@@ -252,6 +252,7 @@ def _serialise_entities(world: World) -> dict:
                 "scan_state": e.scan_state, "stun_ticks": e.stun_ticks,
                 "jam_factor": e.jam_factor, "intrusion_stun_ticks": e.intrusion_stun_ticks,
                 "shield_frequency": e.shield_frequency,
+                "scan_detail": e.scan_detail,
             }
             for e in world.enemies
         ],
@@ -471,6 +472,7 @@ def _deserialise_entities(data: dict, world: World) -> None:
             jam_factor=float(e.get("jam_factor", 0.0)),
             intrusion_stun_ticks=int(e.get("intrusion_stun_ticks", 0)),
             shield_frequency=e.get("shield_frequency", ""),
+            scan_detail=e.get("scan_detail", "basic"),
         )
         world.enemies.append(enemy)
 

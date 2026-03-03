@@ -425,6 +425,27 @@ def get_repair_manager() -> RepairTeamManager | None:
     return _repair_mgr
 
 
+def get_teams_on_deck(deck_name: str, interior: ShipInterior) -> list[str]:
+    """Return IDs of deployed repair teams on the given deck (C.3.2/C.3.4)."""
+    if _repair_mgr is None:
+        return []
+    result: list[str] = []
+    for team in _repair_mgr.teams.values():
+        if team.status in ("travelling", "repairing"):
+            room = interior.rooms.get(team.room_id)
+            if room and room.deck == deck_name:
+                result.append(team.id)
+    return result
+
+
+def dispatch_breach_repair(team_id: str, room_id: str,
+                           interior: ShipInterior) -> dict:
+    """Dispatch a repair team to fix a hull breach (C.3.2)."""
+    if _repair_mgr is None:
+        return {"ok": False, "reason": "No repair manager."}
+    return _repair_mgr.dispatch_to_room(team_id, room_id, interior)
+
+
 def build_state(ship: Ship) -> dict:
     """Build the full engineering state for broadcasting."""
     pg = _power_grid or PowerGrid()

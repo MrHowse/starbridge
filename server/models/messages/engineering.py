@@ -93,3 +93,8 @@ class EngineeringRequestEscortPayload(BaseModel):
 
 class EngineeringCancelRepairOrderPayload(BaseModel):
     order_id: str
+
+
+class EngineeringDispatchBreachRepairPayload(BaseModel):
+    team_id: str
+    room_id: str

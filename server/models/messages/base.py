@@ -119,6 +119,7 @@ from server.models.messages.operations import (
     OpsIssueEvasionAlertPayload,
     OpsMarkObjectivePayload,
     OpsStationAdvisoryPayload,
+    OpsRequestScanPayload,
 )
 from server.models.messages.hazard_control import (
     HazConSuppressLocalPayload,
@@ -150,6 +151,7 @@ from server.models.messages.hazard_control import (
 from server.models.messages.engineering import (
     EngineeringCancelDCTPayload,
     EngineeringCancelRepairOrderPayload,
+    EngineeringDispatchBreachRepairPayload,
     EngineeringDispatchDCTPayload,
     EngineeringDispatchTeamPayload,
     EngineeringRecallTeamPayload,
@@ -269,6 +271,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "engineering.start_reroute":        EngineeringStartReroutePayload,
     "engineering.request_escort":       EngineeringRequestEscortPayload,
     "engineering.cancel_repair_order":  EngineeringCancelRepairOrderPayload,
+    "engineering.dispatch_breach_repair": EngineeringDispatchBreachRepairPayload,
     # Weapons
     "weapons.select_target": WeaponsSelectTargetPayload,
     "weapons.fire_beams": WeaponsFireBeamsPayload,
@@ -378,6 +381,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "operations.issue_evasion_alert": OpsIssueEvasionAlertPayload,
     "operations.mark_objective": OpsMarkObjectivePayload,
     "operations.station_advisory": OpsStationAdvisoryPayload,
+    "operations.request_scan": OpsRequestScanPayload,
     # Hazard Control
     "hazard_control.dispatch_dct":        EngineeringDispatchDCTPayload,
     "hazard_control.cancel_dct":          EngineeringCancelDCTPayload,

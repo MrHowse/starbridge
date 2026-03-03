@@ -25,6 +25,7 @@ from server.models.ship import Ship
 BASE_SENSOR_RANGE: float = 30_000.0   # world units at 100 % sensor efficiency
 BASE_SCAN_TIME: float = 5.0           # seconds to complete scan at 100 % efficiency
 _MIN_EFFICIENCY: float = 0.01         # guard against division-by-zero
+DETAILED_SCAN_THRESHOLD: float = 0.75  # C.4.2: sensor eff ≥ 75% → detailed scan
 
 
 # ---------------------------------------------------------------------------
@@ -129,9 +130,12 @@ def tick(world: World, ship: Ship, dt: float) -> list[str]:
 
     if _active_scan.progress >= 100.0:
         completed_id = _active_scan.entity_id
+        efficiency = max(_MIN_EFFICIENCY, ship.systems["sensors"].efficiency)
         for enemy in world.enemies:
             if enemy.id == completed_id:
                 enemy.scan_state = "scanned"
+                # C.4.2: Set scan detail based on sensor efficiency at completion.
+                enemy.scan_detail = "detailed" if efficiency >= DETAILED_SCAN_THRESHOLD else "basic"
                 break
         _active_scan = None
         return [completed_id]

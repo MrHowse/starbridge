@@ -56,3 +56,12 @@ def _reset_captain_orders_state():
     glcord.reset()
     yield
     glcord.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_engineering_state():
+    """Reset engineering module state before each test to prevent leakage."""
+    import server.game_loop_engineering as gle
+    gle.reset()
+    yield
+    gle.reset()

@@ -939,6 +939,22 @@ def send_station_advisory(target_station: str, message: str) -> dict:
     return {"ok": True}
 
 
+def request_scan(contact_id: str, world: World) -> dict:
+    """Request Science to scan a contact (C.4.1).
+
+    Validates the contact exists and is not already scanned.
+    Sends a station advisory to Science station.
+    """
+    enemy = _find_enemy(world, contact_id)
+    if enemy is None:
+        return {"ok": False, "reason": "Contact not found."}
+    if enemy.scan_state == "scanned":
+        return {"ok": False, "reason": "Contact already scanned."}
+    send_station_advisory("science", f"Scan requested: {contact_id}")
+    add_feed_event("OPS", f"Scan requested for {contact_id}", "info")
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------------------
 # Public API — A.3 Coordination query functions
 # ---------------------------------------------------------------------------
@@ -1092,7 +1108,11 @@ def _emit_assessment_complete(
         "shield_harmonics": asmt.shield_harmonics,
     }
     if enemy:
-        data["system_health"] = _get_system_health(enemy)
+        scan_quality = getattr(enemy, "scan_detail", "basic")
+        data["scan_quality"] = scan_quality
+        # C.4.2: Only include system health when scan was detailed.
+        if scan_quality == "detailed":
+            data["system_health"] = _get_system_health(enemy)
     _pending_broadcasts.append((["operations", "captain"], data))
     add_feed_event("OPS", f"Assessment complete: {asmt.enemy_id}", "info")
 

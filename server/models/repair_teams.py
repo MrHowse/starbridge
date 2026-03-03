@@ -224,6 +224,44 @@ class RepairTeamManager:
 
         return True
 
+    def dispatch_to_room(self, team_id: str, room_id: str,
+                         interior: ShipInterior) -> dict:
+        """Send a team to a specific room (e.g. breach repair).
+
+        Returns {'ok': True} or {'ok': False, 'reason': ...}.
+        Sets target_system = '__breach__' so _tick_repair emits breach event.
+        """
+        team = self.teams.get(team_id)
+        if team is None or team.is_eliminated:
+            return {"ok": False, "reason": "Team not found or eliminated."}
+        if not team.is_available and team.status != "idle":
+            return {"ok": False, "reason": "Team is busy."}
+        if room_id not in interior.rooms:
+            return {"ok": False, "reason": "Room not found."}
+
+        # Calculate path
+        if team.room_id == room_id:
+            path: list[str] = []
+        else:
+            full_path = interior.find_path(team.room_id, room_id)
+            if not full_path:
+                return {"ok": False, "reason": "No path to room."}
+            path = full_path[1:]
+
+        self._clear_team_assignment(team)
+        team.target_system = "__breach__"
+        team.target_room_id = room_id
+        team.path = path
+        team.travel_progress = 0.0
+        team.repair_progress = 0.0
+
+        if not path:
+            team.status = "repairing"
+        else:
+            team.status = "travelling"
+
+        return {"ok": True}
+
     def recall(self, team_id: str, interior: ShipInterior) -> bool:
         """Recall a team back to its base room.
 
@@ -406,6 +444,19 @@ class RepairTeamManager:
 
         hp = team.repair_rate * dt
         team.repair_progress += hp
+
+        # C.3.2: Breach repair — emit special event when repair completes.
+        if team.target_system == "__breach__":
+            if team.repair_progress >= 8.0:  # same duration as DCT_REPAIR_DURATION
+                room_id = team.target_room_id
+                self._clear_team_assignment(team)
+                team.status = "idle"
+                return [{
+                    "type": "breach_repaired",
+                    "team_id": team.id,
+                    "room_id": room_id,
+                }]
+            return []
 
         return [{
             "type": "repair_hp",

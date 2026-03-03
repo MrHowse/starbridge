@@ -73,6 +73,7 @@ from server.models.messages import (
     FlightOpsSetWaypointsPayload,
     EngineeringCancelDCTPayload,
     EngineeringCancelRepairOrderPayload,
+    EngineeringDispatchBreachRepairPayload,
     EngineeringDispatchDCTPayload,
     EngineeringDispatchTeamPayload,
     EngineeringRecallTeamPayload,
@@ -140,6 +141,7 @@ from server.models.messages import (
     OpsIssueEvasionAlertPayload,
     OpsMarkObjectivePayload,
     OpsStationAdvisoryPayload,
+    OpsRequestScanPayload,
     FlagBridgeAddDrawingPayload,
     FlagBridgeRemoveDrawingPayload,
     FlagBridgeClearDrawingsPayload,
@@ -984,6 +986,8 @@ async def _loop() -> None:
         # 3.1 Training auto-simulation (only active during training missions).
         gltr.auto_helm_tick(_world.ship, TICK_DT)
         gltr.auto_engineering_tick(_world.ship, TICK_DT)
+        # C.3.1: Update fire suppression power gate before HC tick.
+        glhc.update_fire_suppression_power(_world.ship)
         glhc.tick(_world.ship.interior, TICK_DT, difficulty=_world.ship.difficulty,
                  resources=_world.ship.resources, ship=_world.ship)
         glatm.tick(_world.ship.interior, TICK_DT, ship=_world.ship,
@@ -2030,7 +2034,7 @@ async def _loop() -> None:
 
         # 11i. Engineering hazard-control state → Engineering + Hazard Control stations.
         # Performance: only broadcast if state has changed since last tick.
-        _dc_state_msg = glhc.build_dc_state(_world.ship.interior, difficulty=_world.ship.difficulty)
+        _dc_state_msg = glhc.build_dc_state(_world.ship.interior, difficulty=_world.ship.difficulty, ship=_world.ship)
         _dc_json = json.dumps(_dc_state_msg, separators=(",", ":"), sort_keys=True)
         if _dc_json != _last_dc_state_json:
             _last_dc_state_json = _dc_json
@@ -2188,6 +2192,12 @@ async def _loop() -> None:
                 if _oc_room_id and _oc_room_id in _world.ship.interior.rooms:
                     glhc.start_fire(_oc_room_id, glhc.OVERCLOCK_FIRE_INTENSITY, _world.ship.interior, _tick_count)
                     gl.log_event("hazard_control", "overclock_fire", {"system": _oc_sys, "room_id": _oc_room_id})
+                    # C.3.5: Notify Hazard Control of overclock fire.
+                    await _manager.broadcast_to_roles(
+                        ["hazard_control"],
+                        Message.build("hazcon.overclock_fire", {"system": _oc_sys, "room_id": _oc_room_id}),
+                    )
+                    glops.add_feed_event("HAZCON", f"Overclock fire: {_oc_sys} in {_oc_room_id}", "warning")
         # 12a-b. Overheat warnings (from gle.tick).
         for _ow_evt in _eng_result.overclock_warnings:
             await _manager.broadcast_to_roles(
@@ -2196,13 +2206,22 @@ async def _loop() -> None:
             )
 
         # 12b. Repair team notable events.
-        _NOTABLE_TEAM_EVENTS = {"team_arrived", "team_returned", "casualty", "team_eliminated"}
+        _NOTABLE_TEAM_EVENTS = {"team_arrived", "team_returned", "casualty", "team_eliminated", "breach_repaired"}
         for _rt_evt in _eng_result.repair_team_events:
             if _rt_evt.get("type") in _NOTABLE_TEAM_EVENTS:
                 await _manager.broadcast_to_roles(
                     ["engineering"],
                     Message.build("engineering.repair_team_event", _rt_evt),
                 )
+            # C.3.2: Breach repair complete → remove breach from atmosphere.
+            if _rt_evt.get("type") == "breach_repaired":
+                _br_room = _rt_evt.get("room_id")
+                if _br_room:
+                    glatm.repair_breach(_br_room)
+                    await _manager.broadcast_to_roles(
+                        ["hazard_control", "engineering"],
+                        Message.build("hazcon.breach_repaired", {"room_id": _br_room}),
+                    )
         for s, h in combat_damage_events:
             _combat_delta = _combat_health_snapshot.get(s, 100.0) - h
             _combat_comp_events: list[dict] = []
@@ -2579,6 +2598,12 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "engineering.cancel_repair_order" and isinstance(payload, EngineeringCancelRepairOrderPayload):
             gle.cancel_repair_order(payload.order_id)
             gl.log_event("engineering", "repair_order_cancelled", {"order_id": payload.order_id})
+        elif msg_type == "engineering.dispatch_breach_repair" and isinstance(payload, EngineeringDispatchBreachRepairPayload):
+            _br_result = gle.dispatch_breach_repair(payload.team_id, payload.room_id, ship.interior)
+            if _br_result.get("ok"):
+                gl.log_event("engineering", "breach_repair_dispatched", {"team_id": payload.team_id, "room_id": payload.room_id})
+            else:
+                events.append(("engineering.error", {"error": _br_result.get("reason", "")}))
         elif msg_type == "weapons.select_target" and isinstance(payload, WeaponsSelectTargetPayload):
             if world is not None:
                 denial = glw.try_select_target(payload.entity_id, world)
@@ -2999,6 +3024,10 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "operations.station_advisory" and isinstance(payload, OpsStationAdvisoryPayload):
             result = glops.send_station_advisory(payload.target_station, payload.message)
             gl.log_event("operations", "station_advisory", {"target": payload.target_station, **result})
+        elif msg_type == "operations.request_scan" and isinstance(payload, OpsRequestScanPayload):
+            if world is not None:
+                _rs_result = glops.request_scan(payload.contact_id, world)
+                gl.log_event("operations", "request_scan", {"contact_id": payload.contact_id, **_rs_result})
         # --- Flag Bridge (v0.07 §2.4) ---
         elif msg_type == "captain.flag_add_drawing" and isinstance(payload, FlagBridgeAddDrawingPayload):
             result = glfb.add_drawing(
@@ -3232,6 +3261,32 @@ def _apply_engineering(ship: Ship) -> list[tuple[str, float]]:
     return damaged
 
 
+def _compute_threat_bearing(ship: Ship, world: World) -> dict | None:
+    """Return nearest enemy bearing info for Helm display (C.5.4)."""
+    from server.utils.math_helpers import distance as _dist, bearing_to as _brg, angle_diff as _adiff
+    if not world.enemies:
+        return None
+    nearest = min(world.enemies, key=lambda e: _dist(ship.x, ship.y, e.x, e.y))
+    d = _dist(ship.x, ship.y, nearest.x, nearest.y)
+    brg = _brg(ship.x, ship.y, nearest.x, nearest.y)
+    # Determine which shield facing the threat is from relative to ship heading.
+    rel = _adiff(ship.heading, brg)  # -180..180
+    if -45 <= rel <= 45:
+        facing = "fore"
+    elif rel > 135 or rel < -135:
+        facing = "aft"
+    elif rel > 0:
+        facing = "starboard"
+    else:
+        facing = "port"
+    return {
+        "enemy_id": nearest.id,
+        "bearing": round(brg, 1),
+        "distance": round(d, 1),
+        "facing": facing,
+    }
+
+
 def _build_ship_state(ship: Ship, tick: int) -> Message:
     """Serialise the ship into a ship.state envelope ready to broadcast."""
     return Message.build(
@@ -3353,6 +3408,8 @@ def _build_ship_state(ship: Ship, tick: int) -> Message:
             "trade_reputation": round(ship.trade_reputation, 2),
             "ration_levels": glrat.get_ration_levels(),
             "forecasts": {k: v.to_dict() for k, v in glrat.get_forecasts().items()},
+            # C.5.4: Threat bearing for Helm.
+            "threat_bearing": _compute_threat_bearing(ship, _world) if _world else None,
         },
         tick=tick,
     )

@@ -342,6 +342,14 @@ def unseal_bulkhead(room_id: str) -> bool:
     return True
 
 
+def repair_breach(room_id: str) -> bool:
+    """Permanently remove a breach from a room (C.3.2). Returns True if removed."""
+    if room_id in _breaches:
+        del _breaches[room_id]
+        return True
+    return False
+
+
 def order_evacuation(room_id: str, interior: ShipInterior) -> bool:
     """Order crew evacuation from a room. 10s delay. Returns True if started."""
     breach = _breaches.get(room_id)

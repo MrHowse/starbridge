@@ -96,6 +96,10 @@ PROXIMITY_BLAST_RADIUS: float = 2_000.0
 #: Ion torpedo: drain shields + stun ticks (100 ticks @ 10 Hz = 10 seconds).
 ION_STUN_TICKS: int = 100
 
+# C.5.2: High-speed torpedo bonus.
+HIGH_SPEED_THRESHOLD: float = 0.75       # throttle fraction
+HIGH_SPEED_TORPEDO_BONUS: float = 0.05   # +5% damage
+
 #: Homing torpedo turn rate (degrees / second).
 HOMING_TURN_RATE: float = 90.0
 
@@ -920,6 +924,13 @@ def _steer_homing(torp: Torpedo, world: World, dt: float) -> None:
     torp.heading = wrap_angle(torp.heading + turn)
 
 
+def get_high_speed_torpedo_bonus(ship: Ship) -> float:
+    """Return torpedo damage bonus from high throttle (C.5.2)."""
+    if ship.throttle >= HIGH_SPEED_THRESHOLD:
+        return HIGH_SPEED_TORPEDO_BONUS
+    return 0.0
+
+
 def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
     """Move all torpedoes and check for collisions. Returns hit event dicts.
 
@@ -979,6 +990,9 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
         if torp.owner == "player":
             torp_type = torp.torpedo_type
             damage = TORPEDO_DAMAGE_BY_TYPE.get(torp_type, 50.0)
+            # C.5.2: High-speed torpedo bonus.
+            if ship is not None:
+                damage *= (1.0 + get_high_speed_torpedo_bonus(ship))
 
             if torp_type == "proximity":
                 # Proximity: detonate when any enemy enters blast radius.

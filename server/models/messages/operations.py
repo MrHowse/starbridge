@@ -92,3 +92,8 @@ class OpsStationAdvisoryPayload(BaseModel):
     """Send a station advisory message (A.4.4–A.4.5)."""
     target_station: str
     message: str
+
+
+class OpsRequestScanPayload(BaseModel):
+    """Request a scan from Science for a contact (C.4.1)."""
+    contact_id: str

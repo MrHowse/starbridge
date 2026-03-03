@@ -32,6 +32,7 @@ from server.models.messages.engineering import (
     VALID_SYSTEMS,
     EngineeringCancelDCTPayload,
     EngineeringCancelRepairOrderPayload,
+    EngineeringDispatchBreachRepairPayload,
     EngineeringDispatchDCTPayload,
     EngineeringDispatchTeamPayload,
     EngineeringRecallTeamPayload,
@@ -172,6 +173,7 @@ from server.models.messages.operations import (
     OpsIssueEvasionAlertPayload,
     OpsMarkObjectivePayload,
     OpsStationAdvisoryPayload,
+    OpsRequestScanPayload,
 )
 
 # Hazard Control (v0.08 B.2–B.6)
@@ -326,6 +328,7 @@ __all__ = [
     "EngineeringStartReroutePayload",
     "EngineeringRequestEscortPayload",
     "EngineeringCancelRepairOrderPayload",
+    "EngineeringDispatchBreachRepairPayload",
     # weapons
     "WeaponsSelectTargetPayload",
     "WeaponsFireBeamsPayload",
@@ -440,6 +443,7 @@ __all__ = [
     "OpsIssueEvasionAlertPayload",
     "OpsMarkObjectivePayload",
     "OpsStationAdvisoryPayload",
+    "OpsRequestScanPayload",
     # hazard control (v0.08 B.2 + B.3 + B.4)
     "HazConSuppressLocalPayload",
     "HazConSuppressDeckPayload",

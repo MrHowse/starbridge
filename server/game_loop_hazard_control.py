@@ -245,6 +245,10 @@ _life_pods: list[LifePod] = []
 _abandon_ship: bool = False
 _evacuation_order: list[int] = []          # deck_numbers in priority order
 
+# C.3.1: Fire suppression power gate.
+FIRE_SUPPRESSION_MIN_EFFICIENCY: float = 0.10
+_fire_suppression_powered: bool = True
+
 _rng: random.Random = random.Random()
 
 
@@ -255,7 +259,7 @@ _rng: random.Random = random.Random()
 
 def reset() -> None:
     """Clear all hazard-control state.  Called at game start."""
-    global _pending_hull_damage, _abandon_ship
+    global _pending_hull_damage, _abandon_ship, _fire_suppression_powered
     _active_dcts.clear()
     _pending_hull_damage = 0.0
     _fires.clear()
@@ -275,6 +279,8 @@ def reset() -> None:
     _life_pods.clear()
     _abandon_ship = False
     _evacuation_order.clear()
+    # C.3.1: Fire suppression power gate.
+    _fire_suppression_powered = True
 
 
 # ---------------------------------------------------------------------------
@@ -902,13 +908,16 @@ def serialise() -> dict:
         "life_pods": pods_data,
         "abandon_ship": _abandon_ship,
         "evacuation_order": list(_evacuation_order),
+        # C.3.1
+        "fire_suppression_powered": _fire_suppression_powered,
     }
 
 
 def deserialise(data: dict) -> None:
-    global _pending_hull_damage
+    global _pending_hull_damage, _fire_suppression_powered
     _active_dcts.clear()
     _active_dcts.update(data.get("active_dcts", {}))
+    _fire_suppression_powered = data.get("fire_suppression_powered", True)
     _pending_hull_damage = data.get("pending_hull_damage", 0.0)
 
     _fires.clear()
@@ -1101,6 +1110,45 @@ def cancel_dct(room_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Public API — fire suppression power gate (C.3.1)
+# ---------------------------------------------------------------------------
+
+
+def is_fire_suppression_powered() -> bool:
+    """Return whether fire suppression systems have enough power."""
+    return _fire_suppression_powered
+
+
+def update_fire_suppression_power(ship) -> None:
+    """Compute avg system efficiency; set _fire_suppression_powered flag."""
+    global _fire_suppression_powered
+    systems = getattr(ship, "systems", None)
+    if not systems:
+        _fire_suppression_powered = True
+        return
+    efficiencies = [sys.efficiency for sys in systems.values()]
+    if not efficiencies:
+        _fire_suppression_powered = True
+        return
+    avg_eff = sum(efficiencies) / len(efficiencies)
+    _fire_suppression_powered = avg_eff >= FIRE_SUPPRESSION_MIN_EFFICIENCY
+
+
+# ---------------------------------------------------------------------------
+# Public API — vent conflict detection (C.3.4)
+# ---------------------------------------------------------------------------
+
+
+def check_vent_conflict(room_id: str, interior) -> list[str]:
+    """Return engineering repair team IDs on the same deck as *room_id*."""
+    import server.game_loop_engineering as _gle
+    room = interior.rooms.get(room_id) if interior else None
+    if room is None:
+        return []
+    return _gle.get_teams_on_deck(room.deck, interior)
+
+
+# ---------------------------------------------------------------------------
 # Public API — suppression commands
 # ---------------------------------------------------------------------------
 
@@ -1108,8 +1156,10 @@ def cancel_dct(room_id: str) -> bool:
 def suppress_local(room_id: str, resources: object | None = None) -> bool:
     """Start localised suppression on a fire.  Costs 1 suppressant, takes 5s.
 
-    Returns False if no fire, or no suppressant available.
+    Returns False if no fire, no suppressant available, or no power (C.3.1).
     """
+    if not _fire_suppression_powered:
+        return False
     if room_id not in _fires:
         return False
 
@@ -1132,8 +1182,10 @@ def suppress_deck(deck_name: str, interior: ShipInterior,
                   resources: object | None = None) -> bool:
     """Start deck-wide suppression.  Costs 3 suppressant, takes 15s.
 
-    Returns False if no fires on deck or no suppressant.
+    Returns False if no fires on deck, no suppressant, or no power (C.3.1).
     """
+    if not _fire_suppression_powered:
+        return False
     # Check if any fires on this deck.
     has_fire = False
     for fire in _fires.values():
@@ -1258,7 +1310,8 @@ def tick(interior: ShipInterior, dt: float, difficulty: object | None = None,
     return events
 
 
-def build_dc_state(interior: ShipInterior, difficulty: object | None = None) -> dict:
+def build_dc_state(interior: ShipInterior, difficulty: object | None = None,
+                   ship=None) -> dict:
     """Serialise current state for broadcasting to Hazard Control / Engineering."""
     repair_mult = getattr(difficulty, "repair_speed_multiplier", 1.0) if difficulty else 1.0
     effective_repair_dur = DCT_REPAIR_DURATION / max(0.1, repair_mult)
@@ -1322,7 +1375,41 @@ def build_dc_state(interior: ShipInterior, difficulty: object | None = None) -> 
         ],
         "abandon_ship": _abandon_ship,
         "evacuation_order": list(_evacuation_order),
+        # C.3.1: Fire suppression power gate.
+        "fire_suppression_powered": _fire_suppression_powered,
+        # C.3.3: Life support power display.
+        "life_support_efficiency": round(_get_ls_efficiency(ship), 3) if ship else None,
+        # C.3.4: Engineering teams at risk from venting.
+        "engineering_teams_at_risk": _get_engineering_teams_at_risk(interior),
     }
+
+
+def _get_ls_efficiency(ship) -> float:
+    """Life support efficiency = average system efficiency."""
+    systems = getattr(ship, "systems", None)
+    if not systems:
+        return 1.0
+    efficiencies = [sys.efficiency for sys in systems.values()]
+    return sum(efficiencies) / len(efficiencies) if efficiencies else 1.0
+
+
+def _get_engineering_teams_at_risk(interior) -> dict[str, list[str]]:
+    """Return {deck_name: [team_ids]} for repair teams on decks with active vents."""
+    import server.game_loop_engineering as _gle
+    result: dict[str, list[str]] = {}
+    # Only care about decks that have active venting or space venting.
+    vent_decks: set[str] = set()
+    for rid in _vent_rooms:
+        room = interior.rooms.get(rid)
+        if room:
+            vent_decks.add(room.deck)
+    if not vent_decks:
+        return result
+    for deck_name in vent_decks:
+        team_ids = _gle.get_teams_on_deck(deck_name, interior)
+        if team_ids:
+            result[deck_name] = team_ids
+    return result
 
 
 # ---------------------------------------------------------------------------
