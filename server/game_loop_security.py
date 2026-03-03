@@ -73,6 +73,7 @@ from server.models.security import (
     is_intruder_visible,
 )
 from server.models.ship import Ship
+import server.game_loop_hazard_control as glhc
 import server.game_loop_rationing as glrat
 
 # ---------------------------------------------------------------------------
@@ -649,6 +650,7 @@ def build_interior_state(interior: ShipInterior, ship: Ship) -> dict:
     their room OR sensor efficiency is >= SENSOR_FOW_THRESHOLD.
     """
     sensor_eff = ship.systems["sensors"].efficiency
+    smoke = frozenset(glhc.get_smoke_rooms())
 
     squads = [
         {
@@ -669,7 +671,7 @@ def build_interior_state(interior: ShipInterior, ship: Ship) -> dict:
             "objective_id": i.objective_id,
         }
         for i in interior.intruders
-        if is_intruder_visible(i, interior.marine_squads, sensor_eff)
+        if is_intruder_visible(i, interior.marine_squads, sensor_eff, smoke)
     ]
 
     rooms = {
@@ -685,6 +687,7 @@ def build_interior_state(interior: ShipInterior, ship: Ship) -> dict:
         "squads": squads,
         "intruders": intruders,
         "rooms": rooms,
+        "smoke_rooms": sorted(smoke),
         "marine_teams": [t.to_dict() for t in _marine_teams],
         "boarding_parties": [
             {

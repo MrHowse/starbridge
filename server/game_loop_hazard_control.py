@@ -256,6 +256,10 @@ _resource_consumption: dict[str, float] = {}  # resource_type → total consumed
 # C.7: Medical injury prediction + evacuation warnings.
 _pending_evac_warnings: list[dict] = []
 
+# B.2.3.3: Per-room crew presence for fire evacuation.
+_room_crew_counts: dict[str, int] = {}   # room_id → crew present
+_evacuated_rooms: set[str] = set()       # rooms evacuated due to intensity 3+ fire
+
 _rng: random.Random = random.Random()
 
 
@@ -292,6 +296,9 @@ def reset() -> None:
     _resource_consumption.clear()
     # C.7: Medical evacuation warnings.
     _pending_evac_warnings.clear()
+    # B.2.3.3: Room crew counts.
+    _room_crew_counts.clear()
+    _evacuated_rooms.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -1087,6 +1094,100 @@ def get_smoke_rooms() -> set[str]:
 
 
 # ---------------------------------------------------------------------------
+# Public API — B.2.3.3 crew fire evacuation
+# ---------------------------------------------------------------------------
+
+
+def init_room_crew_counts(interior: ShipInterior) -> None:
+    """Initialize per-room crew counts from interior layout.
+
+    System rooms (housing ship systems) get 3 crew; other rooms get 1.
+    """
+    _room_crew_counts.clear()
+    _evacuated_rooms.clear()
+    system_room_ids = set(interior.system_rooms.values()) if interior.system_rooms else set()
+    for room_id in interior.rooms:
+        _room_crew_counts[room_id] = 3 if room_id in system_room_ids else 1
+
+
+def get_room_crew_counts() -> dict[str, int]:
+    """Return the current per-room crew counts (read-only intent)."""
+    return _room_crew_counts
+
+
+def get_evacuated_rooms() -> set[str]:
+    """Return the set of rooms currently marked as evacuated."""
+    return _evacuated_rooms
+
+
+def tick_crew_fire_evacuation(interior: ShipInterior) -> list[dict]:
+    """Auto-move crew from rooms with fire intensity 3+.
+
+    Crew relocate to the adjacent safe room with the lowest crew count.
+    If no safe adjacent room exists, crew shelter in place.
+    Returns evacuation event dicts for broadcasting.
+    """
+    events: list[dict] = []
+
+    for room_id, fire in list(_fires.items()):
+        if fire.intensity < 3:
+            continue
+        if room_id in _evacuated_rooms:
+            continue
+
+        crew_count = _room_crew_counts.get(room_id, 0)
+        if crew_count <= 0:
+            _evacuated_rooms.add(room_id)
+            continue
+
+        room = interior.rooms.get(room_id)
+        if room is None:
+            continue
+
+        # Find adjacent safe room with lowest crew count.
+        best_target: str | None = None
+        best_count = float("inf")
+        for adj_id in room.connections:
+            adj = interior.rooms.get(adj_id)
+            if adj is None:
+                continue
+            if adj.state == "decompressed":
+                continue
+            if adj_id in _fires and _fires[adj_id].intensity >= 3:
+                continue
+            adj_count = _room_crew_counts.get(adj_id, 0)
+            if adj_count < best_count:
+                best_count = adj_count
+                best_target = adj_id
+
+        if best_target is not None:
+            _room_crew_counts[best_target] = _room_crew_counts.get(best_target, 0) + crew_count
+            _room_crew_counts[room_id] = 0
+            _evacuated_rooms.add(room_id)
+            events.append({
+                "type": "crew_evacuated",
+                "room_id": room_id,
+                "target_room": best_target,
+                "crew_count": crew_count,
+            })
+        else:
+            # No safe adjacent rooms — shelter in place.
+            _evacuated_rooms.add(room_id)
+            events.append({
+                "type": "crew_sheltering",
+                "room_id": room_id,
+                "crew_count": crew_count,
+            })
+
+    # Clear evacuated flag for rooms where fire dropped below 3.
+    for room_id in list(_evacuated_rooms):
+        if room_id not in _fires or _fires[room_id].intensity < 3:
+            _evacuated_rooms.discard(room_id)
+
+    return events
+
+
+# ---------------------------------------------------------------------------
 # Public API — DCT dispatch (unchanged interface)
 # ---------------------------------------------------------------------------
 
@@ -1382,6 +1483,9 @@ def tick(interior: ShipInterior, dt: float, difficulty: object | None = None,
     """
     events: list[dict] = []
 
+    # 0. B.2.3.3: Crew auto-evacuation from intensity 3+ rooms.
+    events.extend(tick_crew_fire_evacuation(interior))
+
     # 1. Fire escalation.
     _tick_fire_escalation(dt)
 
@@ -1498,6 +1602,9 @@ def build_dc_state(interior: ShipInterior, difficulty: object | None = None,
         "life_support_efficiency": round(_get_ls_efficiency(ship), 3) if ship else None,
         # C.3.4: Engineering teams at risk from venting.
         "engineering_teams_at_risk": _get_engineering_teams_at_risk(interior),
+        # B.2.3.3: Room crew counts and evacuated rooms.
+        "room_crew_counts": dict(_room_crew_counts),
+        "evacuated_rooms": sorted(_evacuated_rooms),
     }
 
 

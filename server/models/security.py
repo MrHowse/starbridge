@@ -172,18 +172,23 @@ def is_intruder_visible(
     intruder: Intruder,
     marine_squads: list[MarineSquad],
     sensor_efficiency: float,
+    smoke_rooms: frozenset[str] = frozenset(),
 ) -> bool:
     """Return True if the intruder should be visible to the Security station.
 
     Visibility rules:
       1. Always visible if a marine squad occupies the same room.
-      2. Always visible if sensor efficiency >= SENSOR_FOW_THRESHOLD.
+      2. Sensor efficiency >= SENSOR_FOW_THRESHOLD makes intruder visible,
+         but smoke (B.2.3.4) halves effective sensor efficiency in affected rooms.
       3. Otherwise invisible (fog of war active).
     """
-    # Rule 1: line-of-sight via squad presence.
+    # Rule 1: line-of-sight via squad presence (unaffected by smoke).
     if any(sq.room_id == intruder.room_id for sq in marine_squads):
         return True
-    # Rule 2: sensors are healthy enough to detect throughout the ship.
-    if sensor_efficiency >= SENSOR_FOW_THRESHOLD:
+    # Rule 2: sensors — halved in smoke rooms (B.2.3.4).
+    eff = sensor_efficiency
+    if intruder.room_id in smoke_rooms:
+        eff *= 0.5
+    if eff >= SENSOR_FOW_THRESHOLD:
         return True
     return False

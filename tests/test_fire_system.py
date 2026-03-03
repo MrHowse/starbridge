@@ -3,14 +3,14 @@ Tests for fire intensity model — v0.08 B.2.
 
 Covers: Fire dataclass, escalation, spread, four suppression methods,
 suppressant resource, cross-station effects, DCT+fire coexistence,
-serialise/deserialise round-trips.
+serialise/deserialise round-trips, crew fire evacuation (B.2.3.3).
 """
 from __future__ import annotations
 
 import pytest
 
 import server.game_loop_hazard_control as glhc
-from server.models.interior import make_default_interior
+from server.models.interior import Room, ShipInterior, make_default_interior
 from server.models.resources import ResourceStore
 
 
@@ -584,3 +584,93 @@ def test_suppression_resets_escalation_timer():
     # Fire should be at intensity 2, and escalation timer reset.
     assert glhc._fires[rid].intensity == 2
     assert glhc._fires[rid].escalation_timer == pytest.approx(glhc.ESCALATION_INTERVAL)
+
+
+# ---------------------------------------------------------------------------
+# B.2.3.3: Crew fire evacuation
+# ---------------------------------------------------------------------------
+
+
+def _evac_interior() -> ShipInterior:
+    """3-room linear interior: A—B—C with system room at A."""
+    rooms = {
+        "room_a": Room(id="room_a", name="Room A", deck="main",
+                       position=(0, 0), connections=["room_b"]),
+        "room_b": Room(id="room_b", name="Room B", deck="main",
+                       position=(1, 0), connections=["room_a", "room_c"]),
+        "room_c": Room(id="room_c", name="Room C", deck="main",
+                       position=(2, 0), connections=["room_b"]),
+    }
+    return ShipInterior(rooms=rooms, system_rooms={"engines": "room_a"})
+
+
+class TestCrewFireEvacuation:
+    """B.2.3.3: Crew auto-move from intensity 3+ fire rooms."""
+
+    def test_crew_evacuate_at_intensity_3(self):
+        """Fire at intensity 3 triggers crew evacuation to adjacent room."""
+        interior = _evac_interior()
+        glhc.init_room_crew_counts(interior)
+        glhc.start_fire("room_a", 3, interior)
+        events = glhc.tick_crew_fire_evacuation(interior)
+        assert any(e["type"] == "crew_evacuated" and e["room_id"] == "room_a" for e in events)
+        assert glhc.get_room_crew_counts()["room_a"] == 0
+        assert glhc.get_room_crew_counts()["room_b"] > 0
+
+    def test_crew_no_evacuate_below_3(self):
+        """Fire at intensity 2 does NOT trigger evacuation."""
+        interior = _evac_interior()
+        glhc.init_room_crew_counts(interior)
+        glhc.start_fire("room_b", 2, interior)
+        events = glhc.tick_crew_fire_evacuation(interior)
+        assert not any(e["type"] == "crew_evacuated" for e in events)
+        # Crew count unchanged.
+        assert glhc.get_room_crew_counts()["room_b"] == 1
+
+    def test_crew_move_to_lowest_count_adjacent(self):
+        """Crew choose adjacent room with lowest crew count."""
+        interior = _evac_interior()
+        glhc.init_room_crew_counts(interior)
+        # room_b has 2 adjacent rooms: room_a (system, 3 crew) and room_c (1 crew).
+        glhc.start_fire("room_b", 4, interior)
+        events = glhc.tick_crew_fire_evacuation(interior)
+        evac = [e for e in events if e["type"] == "crew_evacuated"]
+        assert len(evac) == 1
+        # Should go to room_c (1 crew) not room_a (3 crew).
+        assert evac[0]["target_room"] == "room_c"
+
+    def test_crew_shelter_when_no_safe_adjacent(self):
+        """All adjacent rooms also on fire 3+ → crew shelter in place."""
+        interior = _evac_interior()
+        glhc.init_room_crew_counts(interior)
+        glhc.start_fire("room_a", 3, interior)
+        glhc.start_fire("room_b", 3, interior)
+        # Evacuate room_a first — only adjacent is room_b which is also fire 3+.
+        # Need to make sure room_b is already evacuated or on fire 3+.
+        # room_a's only connection is room_b (fire 3+) → shelter.
+        events = glhc.tick_crew_fire_evacuation(interior)
+        shelter = [e for e in events if e["type"] == "crew_sheltering" and e["room_id"] == "room_a"]
+        assert len(shelter) == 1
+
+    def test_crew_evacuate_once_only(self):
+        """Same room doesn't re-evacuate on repeated ticks."""
+        interior = _evac_interior()
+        glhc.init_room_crew_counts(interior)
+        glhc.start_fire("room_a", 3, interior)
+        events1 = glhc.tick_crew_fire_evacuation(interior)
+        assert len([e for e in events1 if e["room_id"] == "room_a"]) == 1
+        # Second tick — no new events for room_a.
+        events2 = glhc.tick_crew_fire_evacuation(interior)
+        assert not any(e["room_id"] == "room_a" for e in events2)
+
+    def test_evacuated_flag_clears_on_suppression(self):
+        """Fire suppressed below 3 → evacuated flag clears, allowing re-evacuation."""
+        interior = _evac_interior()
+        glhc.init_room_crew_counts(interior)
+        glhc.start_fire("room_a", 3, interior)
+        glhc.tick_crew_fire_evacuation(interior)
+        assert "room_a" in glhc.get_evacuated_rooms()
+        # Manually reduce fire intensity below 3.
+        glhc._fires["room_a"].intensity = 2
+        glhc.tick_crew_fire_evacuation(interior)
+        assert "room_a" not in glhc.get_evacuated_rooms()

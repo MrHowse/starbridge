@@ -390,6 +390,44 @@ def test_multiple_squads_any_same_room_triggers_visibility():
 
 
 # ---------------------------------------------------------------------------
+# B.2.3.4: Smoke reduces sensor detection
+# ---------------------------------------------------------------------------
+
+
+def test_smoke_halves_sensor_detection():
+    """Intruder in smoke room: sensor eff 0.8 → effective 0.4 < 0.5 → invisible."""
+    intruder = make_intruder(room_id="cargo_hold")
+    smoke = frozenset({"cargo_hold"})
+    # 0.8 * 0.5 = 0.4, below threshold of 0.5.
+    assert is_intruder_visible(intruder, [], sensor_efficiency=0.8, smoke_rooms=smoke) is False
+
+
+def test_smoke_no_effect_on_high_sensors():
+    """Intruder in smoke room: sensor eff 1.0 → effective 0.5 = threshold → visible."""
+    intruder = make_intruder(room_id="cargo_hold")
+    smoke = frozenset({"cargo_hold"})
+    # 1.0 * 0.5 = 0.5, exactly at threshold → visible.
+    assert is_intruder_visible(intruder, [], sensor_efficiency=1.0, smoke_rooms=smoke) is True
+
+
+def test_marine_overrides_smoke():
+    """Marine in same room as intruder in smoke → always visible."""
+    intruder = make_intruder(room_id="cargo_hold")
+    squad = make_squad(room_id="cargo_hold")
+    smoke = frozenset({"cargo_hold"})
+    # Even with sensors at 0 and smoke, marine presence overrides.
+    assert is_intruder_visible(intruder, [squad], sensor_efficiency=0.0, smoke_rooms=smoke) is True
+
+
+def test_no_smoke_normal_detection():
+    """Intruder not in smoke room → normal sensor threshold applies."""
+    intruder = make_intruder(room_id="cargo_hold")
+    smoke = frozenset({"bridge"})  # Smoke in a different room.
+    # 0.6 >= 0.5 → visible (no halving since intruder not in smoke).
+    assert is_intruder_visible(intruder, [], sensor_efficiency=0.6, smoke_rooms=smoke) is True
+
+
+# ---------------------------------------------------------------------------
 # ShipInterior — marine_squads and intruders fields
 # ---------------------------------------------------------------------------
 
