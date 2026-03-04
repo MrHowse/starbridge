@@ -279,8 +279,8 @@ class TestTimeline:
         timeline = glfb.compute_timeline(world, ship)
         beam_entries = [e for e in timeline if e["type"] == "beam_range"]
         assert len(beam_entries) == 1
-        # Distance 20_000, beam range 8_000 → gap 12_000 at 100 u/s → ~120s.
-        assert beam_entries[0]["eta_s"] == pytest.approx(120.0, abs=1.0)
+        # Distance 20_000, beam range 10_000 → gap 10_000 at 100 u/s → ~100s.
+        assert beam_entries[0]["eta_s"] == pytest.approx(100.0, abs=1.0)
 
     def test_enemy_already_in_range(self):
         glfb.reset(active=True)

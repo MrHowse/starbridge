@@ -11,7 +11,6 @@ from unittest.mock import patch
 import server.game_loop_weapons as glw
 from server.models.ship import Ship
 from server.models.world import World, spawn_enemy
-from server.systems.combat import BEAM_PLAYER_RANGE
 
 
 # ---------------------------------------------------------------------------
@@ -161,8 +160,8 @@ def test_ignores_out_of_range():
     ship = _fresh_ship()
     world = _fresh_world(ship)
 
-    # Place enemy beyond BEAM_PLAYER_RANGE.
-    enemy = _scanned_enemy("e1", 0.0, -(BEAM_PLAYER_RANGE + 1000))
+    # Place enemy beyond ship's beam range.
+    enemy = _scanned_enemy("e1", 0.0, -(ship.beam_range + 1000))
     world.enemies.append(enemy)
 
     glw.set_weapons_crewed(False)

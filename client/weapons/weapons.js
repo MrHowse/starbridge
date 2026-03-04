@@ -1385,10 +1385,10 @@ function _onRangeChange(key, worldUnits) {
 /** Update range rings showing beam range, torpedo range. */
 function _updateWeaponRangeRings() {
   if (!radarRenderer) return;
-  const beamRange = (shipState && shipState.beam_range) ? shipState.beam_range : 8_000;
+  const beamRange = (shipState && shipState.beam_range) ? shipState.beam_range : 10_000;
   radarRenderer.setRangeRings([
     { range: beamRange, label: 'BEAM', style: 'dotted' },
-    { range: 40_000,    label: 'TORP', style: 'dashed' },
+    { range: 20_000,    label: 'TORP', style: 'dashed' },
   ]);
 }
 

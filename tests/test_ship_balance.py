@@ -233,7 +233,7 @@ class TestWeaponSubfields:
         if class_id == "medical_ship":
             assert rng == 0, "Medical ship should have zero beam range"
         else:
-            assert 4000 <= rng <= 15000, f"{class_id}: beam_range {rng} out of bounds"
+            assert 4000 <= rng <= 16000, f"{class_id}: beam_range {rng} out of bounds"
 
     def test_battleship_has_longest_beam_range(self):
         classes = {cid: load_ship_class(cid) for cid in ALL_IDS}

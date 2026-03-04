@@ -245,6 +245,8 @@ function handleGameStarted(payload) {
     });
   }
 
+  _updateRangeRings();
+
   // Sector map for strategic grid + sector boundary overlays.
   _sectorMap = new SectorMap({
     allowedLevels: ['tactical', 'sector', 'strategic'],
@@ -285,11 +287,21 @@ function handleShipState(payload) {
   if (_dockedAt) _approachInfo = null;
   SoundBank.setAmbient('engine_hum', { throttle: payload.throttle ?? 0, enginePower: payload.systems?.engines?.efficiency ?? 1 });
   if (_mapRenderer) _mapRenderer.updateShipState(payload);
+  _updateRangeRings();
   if (_sectorMap && payload.position) {
     _sectorMap.updateShipPosition(payload.position.x, payload.position.y, payload.heading ?? 0);
   }
   // C.1.2: ALL STOP overlay
   _updateAllStopOverlay(payload.all_stop_active ?? false);
+}
+
+function _updateRangeRings() {
+  if (!_mapRenderer) return;
+  const beamRange = (currState && currState.beam_range) ? currState.beam_range : 10_000;
+  _mapRenderer.setRangeRings([
+    { range: beamRange, label: 'BEAM', style: 'dotted' },
+    { range: 20_000,    label: 'TORP', style: 'dashed' },
+  ]);
 }
 
 function _updateAllStopOverlay(active) {
