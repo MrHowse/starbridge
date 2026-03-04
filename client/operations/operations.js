@@ -111,6 +111,8 @@ let _mapRenderer  = null;
 let _rangeControl = null;
 let _rafId = null;
 let _flagBridgeState = null;
+let _knownContactIds = new Set();
+let _scanBannerTimer = null;
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -128,11 +130,21 @@ function init() {
   on('game.started',       handleGameStarted);
   on('game.over',          handleGameOver);
   on('ship.state',         handleShipState);
-  on('ship.alert_changed', ({ level }) => setAlertLevel(level));
+  on('ship.alert_changed', ({ level }) => {
+    setAlertLevel(level);
+    if (_gameActive) addFeedEvent('CAPTAIN', `Alert level: ${level.toUpperCase()}`, level === 'red' ? 'critical' : 'info');
+  });
   on('operations.state',   handleOpsState);
   on('operations.event',   handleOpsEvent);
   on('sensor.contacts',    handleSensorContacts);
   on('flag_bridge.state',  (p) => { _flagBridgeState = p; });
+  on('science.scan_complete', handleScanComplete);
+  on('ship.hull_hit', (p) => {
+    if (!_gameActive) return;
+    const cause = p.cause || 'unknown';
+    const dmg = p.damage ? ` (${Math.round(p.damage)} dmg)` : '';
+    addFeedEvent('COMBAT', `Hull hit: ${cause}${dmg}`, 'warning');
+  });
 
   setupAdvisory();
   SoundBank.init();
@@ -185,6 +197,8 @@ function handleGameStarted(payload) {
     _mapRenderer.onContactClick(handleContactClick);
     renderLoop();
   });
+
+  showOnboardingTooltip();
 }
 
 function handleGameOver(payload) {
@@ -254,6 +268,15 @@ function handleSensorContacts(payload) {
   if (!_gameActive) return;
   _contacts = payload.contacts || [];
   _torpedoes = payload.torpedoes || [];
+
+  // Detect new hostile/unknown contacts for feed.
+  const newIds = _contacts.filter(c => !_knownContactIds.has(c.id)
+    && (c.classification === 'hostile' || c.classification === 'unknown'));
+  for (const c of newIds) {
+    addFeedEvent('SENSORS', `Contact detected: ${c.id} (${c.type || c.kind})`, 'info');
+  }
+  for (const c of _contacts) _knownContactIds.add(c.id);
+
   if (_mapRenderer) {
     _mapRenderer.updateContacts(_contacts, _torpedoes);
   }
@@ -510,7 +533,18 @@ function updateAnalysisPanel() {
   if (!analysisEl || !_opsState) return;
 
   if (!_selectedId || !_opsState.assessments[_selectedId]) {
-    analysisEl.innerHTML = '<p class="text-dim">Select a contact to begin assessment.</p>';
+    const hasAny = Object.keys(_opsState.assessments || {}).length > 0;
+    if (!hasAny && !_opsState.active_assessment_id) {
+      analysisEl.innerHTML = `
+        <div class="ops-empty-state">
+          <p class="ops-empty-state__title">NO CONTACTS ASSESSED</p>
+          <p class="ops-empty-state__body">Science must scan an enemy contact before
+             Operations can analyse it.</p>
+          <p class="ops-empty-state__hint">Ask Science to scan a target.</p>
+        </div>`;
+    } else {
+      analysisEl.innerHTML = '<p class="text-dim">Select a contact to begin assessment.</p>';
+    }
     return;
   }
 
@@ -782,6 +816,90 @@ function updateBottomBar() {
     const complete = ids.filter(id => asmt[id].complete).length;
     assessQueueEl.textContent = `ASSESS: ${complete}/${ids.length}`;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Scan-Ready Banner (§2)
+// ---------------------------------------------------------------------------
+
+function handleScanComplete(payload) {
+  if (!_gameActive) return;
+  const cid = payload.entity_id || 'unknown';
+  showScanBanner(cid);
+  SoundBank.play('ops_assessment_complete');
+}
+
+function showScanBanner(contactId) {
+  // Remove existing banner.
+  dismissScanBanner();
+
+  const banner = document.createElement('div');
+  banner.className = 'ops-scan-banner';
+  banner.id = 'ops-scan-banner';
+
+  const text = document.createElement('span');
+  text.className = 'ops-scan-banner__text';
+  text.textContent = `NEW SCAN DATA: ${contactId} — Ready for Battle Assessment`;
+  banner.appendChild(text);
+
+  const assessBtn = document.createElement('button');
+  assessBtn.className = 'ops-scan-banner__btn';
+  assessBtn.textContent = 'ASSESS';
+  assessBtn.addEventListener('click', () => {
+    _selectedId = contactId;
+    send('operations.start_assessment', { contact_id: contactId });
+    dismissScanBanner();
+  });
+  banner.appendChild(assessBtn);
+
+  const dismissBtn = document.createElement('button');
+  dismissBtn.className = 'ops-scan-banner__dismiss';
+  dismissBtn.textContent = '\u2715';
+  dismissBtn.addEventListener('click', () => dismissScanBanner());
+  banner.appendChild(dismissBtn);
+
+  // Insert before analysis content.
+  const parent = analysisEl?.parentElement;
+  if (parent) {
+    parent.insertBefore(banner, analysisEl);
+  }
+
+  // Auto-dismiss after 15s.
+  _scanBannerTimer = setTimeout(() => dismissScanBanner(), 15000);
+}
+
+function dismissScanBanner() {
+  if (_scanBannerTimer) {
+    clearTimeout(_scanBannerTimer);
+    _scanBannerTimer = null;
+  }
+  const existing = document.getElementById('ops-scan-banner');
+  if (existing) existing.remove();
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding Tooltip (§4)
+// ---------------------------------------------------------------------------
+
+function showOnboardingTooltip() {
+  if (sessionStorage.getItem('ops_onboarded')) return;
+  sessionStorage.setItem('ops_onboarded', '1');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'ops-onboarding';
+  overlay.innerHTML = `
+    <div class="ops-onboarding__card">
+      <div class="ops-onboarding__title">OPERATIONS OFFICER</div>
+      <div class="ops-onboarding__body">
+        Coordinate the crew using intel from Science scans.<br>
+        Start by asking Science to scan an enemy.
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', () => overlay.remove());
+  document.body.appendChild(overlay);
+
+  setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 5000);
 }
 
 // ---------------------------------------------------------------------------

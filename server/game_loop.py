@@ -1286,6 +1286,12 @@ async def _loop() -> None:
         # B.5: Structural damage from beam hits (only when hull actually took damage).
         if _world.ship.hull < _hull_before_combat:
             glhc.apply_combat_structural_damage(_world.ship.interior, "beam")
+            _hull_dmg_amt = _hull_before_combat - _world.ship.hull
+            glops.add_feed_event(
+                "COMBAT",
+                f"Hull damage: {_hull_dmg_amt:.0f} ({_world.ship.hull:.0f}% remaining)",
+                "critical" if _world.ship.hull < 25.0 else "warning",
+            )
         # v0.07 §2.1: Break stealth on damage; suppress shield regen during active stealth.
         if _world.ship.hull < _hull_before_combat and glew.is_stealth_engaged():
             glew.break_stealth("damage")
@@ -1817,6 +1823,9 @@ async def _loop() -> None:
                 Message.build(f"mission.{_dme['event']}", _dme),
             )
             gl.log_event("dynamic_mission", _dme["event"], _dme)
+            if _dme["event"] == "offered":
+                _dm_title = _dme.get("title", _dme.get("template", "Unknown"))
+                glops.add_feed_event("MISSION", f"Mission available: {_dm_title}", "info")
         # Broadcast active/offered mission list to captain every tick.
         _dm_list = gldm.get_missions_for_broadcast()
         if _dm_list:
@@ -1920,7 +1929,7 @@ async def _loop() -> None:
                     "results": sensors.build_scan_result(ce),
                 }))
                 gl.log_event("science", "scan_completed", {"entity_id": cid})
-                glops.add_feed_event("SCI", f"Scan complete: {cid}", "info")
+                glops.add_feed_event("SCI", f"SCAN COMPLETE: {cid} — Ready for assessment", "warning")
             # Notify dynamic missions of scan completion.
             gldm.notify_scan_completed(cid)
 

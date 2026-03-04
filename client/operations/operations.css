@@ -294,3 +294,41 @@
   font-size: 0.7rem;
   margin-left: 0.3em;
 }
+
+/* ── Empty state guidance ── */
+.ops-empty-state { padding: 0.8rem 0.5rem; text-align: center; }
+.ops-empty-state__title { font-size: 0.9rem; color: #ffaa00; letter-spacing: 0.1em; margin-bottom: 0.4rem; }
+.ops-empty-state__body { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-bottom: 0.3rem; }
+.ops-empty-state__hint { font-size: 0.8rem; color: #00ff41; }
+
+/* ── Scan-ready banner ── */
+.ops-scan-banner {
+  display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.5rem;
+  background: rgba(255,170,0,0.12); border: 1px solid rgba(255,170,0,0.4); margin-bottom: 0.3rem;
+  animation: scan-banner-pulse 2s ease-in-out infinite;
+}
+@keyframes scan-banner-pulse {
+  0%,100% { border-color: rgba(255,170,0,0.4); }
+  50% { border-color: rgba(255,170,0,0.8); }
+}
+.ops-scan-banner__text { flex: 1; font-size: 0.75rem; color: #ffaa00; }
+.ops-scan-banner__btn {
+  padding: 0.2rem 0.5rem; background: rgba(255,170,0,0.2); border: 1px solid #ffaa00;
+  color: #ffaa00; font-family: inherit; font-size: 0.75rem; cursor: pointer;
+}
+.ops-scan-banner__dismiss {
+  background: none; border: none; color: rgba(255,255,255,0.4);
+  cursor: pointer; font-size: 0.8rem; padding: 0 0.2rem;
+}
+
+/* ── Onboarding tooltip ── */
+.ops-onboarding {
+  position: fixed; inset: 0; z-index: 8000; display: flex; align-items: center;
+  justify-content: center; background: rgba(0,0,0,0.7); cursor: pointer;
+}
+.ops-onboarding__card {
+  max-width: 400px; padding: 1.2rem 1.5rem; background: rgba(10,10,10,0.95);
+  border: 1px solid rgba(0,255,65,0.3); text-align: center;
+}
+.ops-onboarding__title { font-size: 1rem; color: #00ff41; letter-spacing: 0.15em; margin-bottom: 0.6rem; }
+.ops-onboarding__body { font-size: 0.85rem; color: rgba(255,255,255,0.7); line-height: 1.5; }
