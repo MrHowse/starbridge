@@ -118,6 +118,10 @@ _interception_timer: float = 0.0
 # Tick counter (set from game_loop)
 _tick: int = 0
 
+# Whether the comms station is crewed (set from game_loop)
+_comms_crewed: bool = True
+AUTO_DECODE_DELAY: float = 30.0  # seconds before auto-decode fires when uncrewed
+
 
 # ---------------------------------------------------------------------------
 # Reset / Init
@@ -126,7 +130,7 @@ _tick: int = 0
 def reset() -> None:
     """Clear all comms state. Called at game start."""
     global _active_frequency, _signal_counter, _active_decode_id
-    global _interception_timer, _tick, _contact_counter
+    global _interception_timer, _tick, _contact_counter, _comms_crewed
     _active_frequency = 0.15
     _signal_counter = 0
     _active_decode_id = None
@@ -144,6 +148,7 @@ def reset() -> None:
     _pending_npc_responses.clear()
     _pending_decode_completions.clear()
     _active_probes.clear()
+    _comms_crewed = True
     _transmissions.clear()
     _comms_contacts.clear()
     _pending_contact_updates.clear()
@@ -324,6 +329,13 @@ def _tick_decode(dt: float, crew_factor: float, bandwidth_quality: float) -> lis
     for sig in _signals:
         if sig.dismissed or not sig.requires_decode or sig.decode_progress >= 1.0:
             continue
+
+        # Auto-decode when comms is unclaimed: force complete after delay.
+        if not _comms_crewed and sig.decode_progress < 1.0:
+            signal_age = (_tick - sig.arrived_tick) * 0.1  # tick → seconds (10Hz)
+            if signal_age >= AUTO_DECODE_DELAY:
+                sig.decode_progress = 1.0
+                # Fall through to existing completion handling below
 
         old_progress = sig.decode_progress
 
@@ -1351,6 +1363,12 @@ def set_tick(tick: int) -> None:
     """Update the current tick counter."""
     global _tick
     _tick = tick
+
+
+def set_comms_crewed(crewed: bool) -> None:
+    """Set whether the comms station is currently crewed."""
+    global _comms_crewed
+    _comms_crewed = crewed
 
 
 def tick_comms(dt: float, crew_factor: float = 1.0) -> list[dict]:

@@ -45,6 +45,9 @@ _failed_mission_ids: list[str] = []
 # Current tick (set externally)
 _tick: int = 0
 
+# Whether the captain station is crewed (set from game_loop)
+_captain_crewed: bool = True
+
 
 # ---------------------------------------------------------------------------
 # Reset
@@ -52,9 +55,10 @@ _tick: int = 0
 
 def reset() -> None:
     """Clear all dynamic mission state. Called at game start."""
-    global _mission_counter, _tick
+    global _mission_counter, _tick, _captain_crewed
     _mission_counter = 0
     _tick = 0
+    _captain_crewed = True
     _missions.clear()
     _pending_mission_events.clear()
     _completed_mission_ids.clear()
@@ -68,6 +72,12 @@ def reset() -> None:
 def set_tick(tick: int) -> None:
     global _tick
     _tick = tick
+
+
+def set_captain_crewed(crewed: bool) -> None:
+    """Set whether the captain station is currently crewed."""
+    global _captain_crewed
+    _captain_crewed = crewed
 
 
 # ---------------------------------------------------------------------------
@@ -314,6 +324,19 @@ def tick_missions(
 
         # --- Accept deadline (offered missions) ---
         if mission.status == "offered":
+            # Auto-decline when captain is unclaimed (would expire anyway).
+            if not _captain_crewed:
+                mission.status = "declined"
+                _pending_mission_events.append({
+                    "event": "mission_declined",
+                    "mission_id": mission.id,
+                    "title": mission.title,
+                    "consequences": mission.decline_consequences,
+                    "auto_declined": True,
+                    "reason": "No captain — auto-declined",
+                })
+                logger.info("Mission auto-declined (no captain): %s", mission.title)
+                continue
             if mission.accept_deadline is not None:
                 mission.accept_deadline -= dt
                 if mission.accept_deadline <= 0:

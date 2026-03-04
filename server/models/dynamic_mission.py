@@ -170,6 +170,9 @@ class DynamicMission:
     estimated_difficulty: str = "unknown"
     comms_assessment: str = ""        # Comms officer's analysis
 
+    # Station warnings (e.g. "No Comms officer")
+    station_warnings: list[str] = field(default_factory=list)
+
     # Trap flag (server-side — never sent to client)
     _is_trap: bool = field(default=False, repr=False)
 
@@ -214,6 +217,7 @@ class DynamicMission:
             "status": self.status,
             "estimated_difficulty": self.estimated_difficulty,
             "comms_assessment": self.comms_assessment,
+            "station_warnings": list(self.station_warnings),
         }
 
     @staticmethod
@@ -243,6 +247,7 @@ class DynamicMission:
             status=d.get("status", "offered"),
             estimated_difficulty=d.get("estimated_difficulty", "unknown"),
             comms_assessment=d.get("comms_assessment", ""),
+            station_warnings=d.get("station_warnings", []),
             _is_trap=d.get("_is_trap", False),
         )
 

@@ -1196,6 +1196,7 @@ async def _loop() -> None:
         glw.tick_tube_loading(TICK_DT)
         # Auto-fire targeting computer.
         glw.set_weapons_crewed(len(_manager.get_by_role("weapons")) > 0)
+        glco.set_comms_crewed(len(_manager.get_by_role("comms")) > 0)
         auto_fire_events = glw.tick_auto_fire(_world.ship, _world, TICK_DT)
         _af_status = glw.pop_auto_fire_status_changed()
         if _af_status is not None:
@@ -1310,6 +1311,7 @@ async def _loop() -> None:
         _route = gln.get_route()
         _route_dist = _route.get("remaining_distance", -1.0) if _route else -1.0
         _is_captain_crewed = len(_manager.get_by_role("captain")) > 0
+        gldm.set_captain_crewed(_is_captain_crewed)
         glrat.tick(_world.ship, TICK_DT, _route_dist, _is_captain_crewed, _tick_count * TICK_DT)
         glw.tick_cooldowns(TICK_DT)
         # v0.07 §2.5.1: Spinal mount tick (charge timer, cooldown).
@@ -1829,6 +1831,15 @@ async def _loop() -> None:
         # Broadcast active/offered mission list to captain every tick.
         _dm_list = gldm.get_missions_for_broadcast()
         if _dm_list:
+            _comms_claimed = len(_manager.get_by_role("comms")) > 0
+            _ops_claimed = len(_manager.get_by_role("operations")) > 0
+            for _dm_entry in _dm_list:
+                _warnings = []
+                if not _comms_claimed:
+                    _warnings.append("\u26a0 No Comms officer \u2014 signal auto-decoded")
+                if not _ops_claimed:
+                    _warnings.append("\u26a0 No Operations officer \u2014 assessment unavailable")
+                _dm_entry["station_warnings"] = _warnings
             await _manager.broadcast_to_roles(
                 ["captain"],
                 Message.build("mission.dynamic_list", {"missions": _dm_list}),
