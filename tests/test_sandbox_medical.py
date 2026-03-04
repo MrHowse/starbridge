@@ -60,7 +60,7 @@ class TestSystemDamageInjury:
     def test_system_damage_no_injury_when_roll_fails(self) -> None:
         """Roll above threshold → no injury generated from system damage."""
         # The constant is 0.10 — if random always returns 0.99, no injury.
-        assert glsb.CREW_INJURY_FROM_SYSTEM_DAMAGE_CHANCE == 0.10
+        assert glsb.CREW_INJURY_FROM_SYSTEM_DAMAGE_CHANCE == 0.20
         # Verify the constant is reasonable (not 0 or 1).
         assert 0.0 < glsb.CREW_INJURY_FROM_SYSTEM_DAMAGE_CHANCE < 1.0
 
@@ -73,7 +73,7 @@ class TestSystemDamageInjury:
 class TestOverclockInjury:
     def test_overclock_injury_chance(self) -> None:
         """Overclock injury constant is 20%."""
-        assert glsb.CREW_INJURY_FROM_OVERCLOCK_CHANCE == 0.20
+        assert glsb.CREW_INJURY_FROM_OVERCLOCK_CHANCE == 0.35
 
     def test_overclock_injury_sandbox_only(self) -> None:
         """Overclock injury only fires when sandbox is active."""
@@ -90,7 +90,7 @@ class TestOverclockInjury:
 class TestAltercationInjury:
     def test_altercation_injury_chance(self) -> None:
         """Altercation injury constant is 30%."""
-        assert glsb.ALTERCATION_INJURY_CHANCE == 0.30
+        assert glsb.ALTERCATION_INJURY_CHANCE == 0.40
 
     def test_altercation_event_generated(self) -> None:
         """Sandbox generates security incidents including crew_altercation."""

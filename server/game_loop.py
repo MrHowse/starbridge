@@ -1813,6 +1813,180 @@ async def _loop() -> None:
                         if _es_injuries:
                             _world.ship.crew.apply_casualties(_es_bad_deck, 1)
                             gl.log_event("sandbox", "env_sickness_injury", {"deck": _es_bad_deck})
+            # -- v0.08 Hazard Control events --------------------------------
+            elif _sb_type == "sandbox_fire":
+                _sf_room = sb_evt["room_id"]
+                _sf_intensity = sb_evt["intensity"]
+                if glhc.start_fire(_sf_room, _sf_intensity, _world.ship.interior, _tick_count):
+                    await _manager.broadcast_to_roles(
+                        ["hazard_control"],
+                        Message.build("hazcon.sandbox_fire", {
+                            "room_id": _sf_room, "intensity": _sf_intensity,
+                        }),
+                    )
+                    glops.add_feed_event("HAZCON", f"Fire reported in {_sf_room}", "warning")
+                    gl.log_event("sandbox", "fire_started", {
+                        "room_id": _sf_room, "intensity": _sf_intensity,
+                    })
+            elif _sb_type == "sandbox_breach":
+                _sbr_room = sb_evt["room_id"]
+                _sbr_severity = sb_evt["severity"]
+                glatm.create_breach(_sbr_room, _sbr_severity, _world.ship.interior)
+                await _manager.broadcast_to_roles(
+                    ["hazard_control"],
+                    Message.build("hazcon.sandbox_breach", {
+                        "room_id": _sbr_room, "severity": _sbr_severity,
+                    }),
+                )
+                glops.add_feed_event("HAZCON", f"Hull breach in {_sbr_room} ({_sbr_severity})", "critical")
+                gl.log_event("sandbox", "breach_created", {
+                    "room_id": _sbr_room, "severity": _sbr_severity,
+                })
+            elif _sb_type == "sandbox_radiation":
+                _srad_room = sb_evt["room_id"]
+                _srad_amount = sb_evt["amount"]
+                _srad_atm = glatm.get_atmosphere(_srad_room)
+                if _srad_atm is not None:
+                    _srad_atm.radiation = min(100.0, _srad_atm.radiation + _srad_amount)
+                await _manager.broadcast_to_roles(
+                    ["hazard_control"],
+                    Message.build("hazcon.sandbox_radiation", {
+                        "room_id": _srad_room, "amount": _srad_amount,
+                        "source": sb_evt["source"],
+                    }),
+                )
+                glops.add_feed_event("HAZCON", f"Radiation detected in {_srad_room}", "warning")
+                gl.log_event("sandbox", "radiation_event", {
+                    "room_id": _srad_room, "amount": _srad_amount,
+                })
+            elif _sb_type == "sandbox_structural":
+                _sst_section_id = sb_evt.get("section_id", "")
+                _sst_amount = sb_evt["amount"]
+                _sst_sections = glhc.get_sections()
+                _sst_sec = _sst_sections.get(_sst_section_id)
+                if _sst_sec is not None and not _sst_sec.collapsed:
+                    _sst_sec.integrity = max(0.0, _sst_sec.integrity - _sst_amount)
+                    await _manager.broadcast_to_roles(
+                        ["hazard_control"],
+                        Message.build("hazcon.sandbox_structural", {
+                            "section_id": _sst_section_id,
+                            "integrity": round(_sst_sec.integrity, 1),
+                            "amount": _sst_amount,
+                        }),
+                    )
+                    glops.add_feed_event("HAZCON", f"Structural stress on {_sst_sec.deck_name}", "warning")
+                    gl.log_event("sandbox", "structural_stress", {
+                        "section_id": _sst_section_id, "amount": _sst_amount,
+                        "integrity": round(_sst_sec.integrity, 1),
+                    })
+            # -- Operations events ------------------------------------------
+            elif _sb_type == "sandbox_intel_update":
+                _siu_assessment = sb_evt["assessment"]
+                glops.add_feed_event("INTEL", _siu_assessment.get(
+                    "sector_status",
+                    f"Contact {sb_evt.get('enemy_id', '?')}: threat {_siu_assessment.get('threat_level', '?')}",
+                ), "info")
+                await _manager.broadcast_to_roles(
+                    ["operations"],
+                    Message.build("operations.intel_update", _siu_assessment),
+                )
+                gl.log_event("sandbox", "intel_update", {
+                    "enemy_id": sb_evt.get("enemy_id"),
+                })
+            elif _sb_type == "sandbox_ops_alert":
+                glops.add_feed_event(
+                    sb_evt["source"], sb_evt["alert"], sb_evt["severity"],
+                )
+                await _manager.broadcast_to_roles(
+                    ["operations"],
+                    Message.build("operations.advisory", {
+                        "alert": sb_evt["alert"],
+                        "severity": sb_evt["severity"],
+                        "source": sb_evt["source"],
+                    }),
+                )
+                gl.log_event("sandbox", "ops_alert", {"alert": sb_evt["alert"]})
+            # -- Quartermaster events ---------------------------------------
+            elif _sb_type == "sandbox_resource_pressure":
+                await _manager.broadcast_to_roles(
+                    ["quartermaster"],
+                    Message.build("quartermaster.resource_alert", {
+                        "resource": sb_evt["resource"],
+                        "level": sb_evt["level"],
+                        "message": sb_evt["message"],
+                    }),
+                )
+                gl.log_event("sandbox", "resource_pressure", {
+                    "resource": sb_evt["resource"], "level": sb_evt["level"],
+                })
+            elif _sb_type == "sandbox_trade_opportunity":
+                await _manager.broadcast_to_roles(
+                    ["quartermaster"],
+                    Message.build("quartermaster.trade_offer", sb_evt["offer"]),
+                )
+                gl.log_event("sandbox", "trade_opportunity", {
+                    "offer_id": sb_evt["offer"]["id"],
+                })
+            # -- Boosted station events -------------------------------------
+            elif _sb_type == "sandbox_ew_intercept":
+                await _manager.broadcast_to_roles(
+                    ["electronic_warfare", "comms"],
+                    Message.build("ew.intercept", {
+                        "faction": sb_evt["faction"],
+                        "intel": sb_evt["intel"],
+                    }),
+                )
+                glops.add_feed_event("EW", f"Intercepted {sb_evt['faction']} comms", "info")
+                gl.log_event("sandbox", "ew_intercept", {"faction": sb_evt["faction"]})
+            elif _sb_type == "sandbox_flight_contact":
+                await _manager.broadcast_to_roles(
+                    ["flight_ops"],
+                    Message.build("flight_ops.contact_detected", {
+                        "x":     sb_evt["x"],
+                        "y":     sb_evt["y"],
+                        "id":    sb_evt["id"],
+                        "label": sb_evt["label"],
+                    }),
+                )
+                gl.log_event("sandbox", "flight_contact", {
+                    "id": sb_evt["id"], "label": sb_evt["label"],
+                })
+            elif _sb_type == "sandbox_captain_decision":
+                await _manager.broadcast_to_roles(
+                    ["captain"],
+                    Message.build("captain.decision_prompt", {
+                        "decision_id": sb_evt["decision_id"],
+                        "prompt": sb_evt["prompt"],
+                        "options": sb_evt["options"],
+                    }),
+                )
+                gl.log_event("sandbox", "captain_decision", {
+                    "decision_id": sb_evt["decision_id"],
+                })
+            # -- Medical standalone event -----------------------------------
+            elif _sb_type == "sandbox_medical_event":
+                _sme_roster = glmed.get_roster()
+                if _sme_roster is not None:
+                    _sme_deck = sb_evt["deck"]
+                    _sme_phys_deck = _DECK_NAME_TO_NUM.get(_sme_deck, 1)
+                    _sme_injuries = generate_injuries(
+                        sb_evt["cause"], _sme_phys_deck, _sme_roster,
+                        severity_scale=sb_evt["severity_scale"],
+                        tick=_tick_count,
+                        difficulty=_world.ship.difficulty,
+                    )
+                    for _sme_cid, _sme_inj in _sme_injuries:
+                        _sme_member = _sme_roster.members.get(_sme_cid)
+                        if _sme_member is not None:
+                            _sme_member.injuries.append(_sme_inj)
+                            _sme_member.update_status()
+                    if _sme_injuries:
+                        _world.ship.crew.apply_casualties(_sme_deck, 1)
+                        gl.log_event("sandbox", "medical_event", {
+                            "deck": _sme_deck,
+                            "cause": sb_evt["cause"],
+                            "label": sb_evt.get("label", ""),
+                        })
 
         # 9. Hull check (safety net when no mission engine).
         if glm.get_mission_engine() is None and _world.ship.hull <= 0.0:
