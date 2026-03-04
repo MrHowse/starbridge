@@ -35,6 +35,7 @@ import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { markPending, applyPending } from '../shared/action_feedback.js';
 import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
@@ -906,8 +907,10 @@ function renderTeamCards(teams) {
         dispBtn.className = 'team-card__btn';
         dispBtn.textContent = 'DISPATCH';
         dispBtn.addEventListener('click', () => {
+          markPending(`eng:dispatch:${team.id}`, 'DISPATCHING...', 3000);
           send('engineering.dispatch_team', { team_id: team.id, system: selectedSystem });
         });
+        applyPending(dispBtn, `eng:dispatch:${team.id}`);
         actions.appendChild(dispBtn);
       }
     } else {
@@ -916,8 +919,10 @@ function renderTeamCards(teams) {
       recallBtn.className = 'team-card__btn team-card__btn--recall';
       recallBtn.textContent = 'RECALL';
       recallBtn.addEventListener('click', () => {
+        markPending(`eng:recall:${team.id}`, 'RECALLING...', 3000);
         send('engineering.recall_team', { team_id: team.id });
       });
+      applyPending(recallBtn, `eng:recall:${team.id}`);
       actions.appendChild(recallBtn);
 
       // Escort request button (if no escort already)
@@ -926,8 +931,10 @@ function renderTeamCards(teams) {
         escortBtn.className = 'team-card__btn';
         escortBtn.textContent = 'ESCORT';
         escortBtn.addEventListener('click', () => {
+          markPending(`eng:escort:${team.id}`, 'REQUESTING...', 3000);
           send('engineering.request_escort', { team_id: team.id });
         });
+        applyPending(escortBtn, `eng:escort:${team.id}`);
         actions.appendChild(escortBtn);
       }
     }

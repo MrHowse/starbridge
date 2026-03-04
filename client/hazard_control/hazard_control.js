@@ -27,6 +27,7 @@ import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
 import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
+import { markPending, applyPending } from '../shared/action_feedback.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -682,12 +683,13 @@ function renderDeckCards() {
 // Right panel: contextual action buttons
 // ---------------------------------------------------------------------------
 
-function addBtn(parent, label, cls, handler, disabled) {
+function addBtn(parent, label, cls, handler, disabled, actionKey) {
   const btn = document.createElement('button');
   btn.className = `hc-action-btn${cls ? ' hc-action-btn--' + cls : ''}`;
   btn.textContent = label;
   btn.disabled = !!disabled;
-  if (!disabled) btn.addEventListener('click', handler);
+  if (actionKey && applyPending(btn, actionKey)) { /* pending — already disabled */ }
+  else if (!disabled) btn.addEventListener('click', handler);
   parent.appendChild(btn);
 }
 
@@ -744,29 +746,40 @@ function renderRoomActions() {
   const hasDCT = dctProgress != null;
 
   // DCT
-  addBtn(actionsEl, hasDCT ? `CANCEL DCT (${(dctProgress * 100).toFixed(0)}%)` : 'DISPATCH DCT',
-    hasDCT ? 'danger' : 'primary',
-    () => _send(hasDCT ? 'hazard_control.cancel_dct' : 'hazard_control.dispatch_dct', { room_id: rid }),
-    !hasDCT && !hasDamage);
+  if (hasDCT) {
+    addBtn(actionsEl, `CANCEL DCT (${(dctProgress * 100).toFixed(0)}%)`, 'danger',
+      () => _send('hazard_control.cancel_dct', { room_id: rid }));
+  } else {
+    addBtn(actionsEl, 'DISPATCH DCT', 'primary', () => {
+      markPending(`hc:dct:${rid}`, 'DISPATCHING...', 3000);
+      _send('hazard_control.dispatch_dct', { room_id: rid });
+    }, !hasDamage, `hc:dct:${rid}`);
+  }
 
   // Fire actions
   if (fire) {
-    addBtn(actionsEl, 'SUPPRESS FIRE', 'danger',
-      () => _send('hazard_control.suppress_local', { room_id: rid }));
+    addBtn(actionsEl, 'SUPPRESS FIRE', 'danger', () => {
+      markPending(`hc:suppress:${rid}`, 'SUPPRESSING...', 3000);
+      _send('hazard_control.suppress_local', { room_id: rid });
+    }, false, `hc:suppress:${rid}`);
     if (fireTeam != null) {
       addBtn(actionsEl, 'CANCEL FIRE TEAM', 'danger',
         () => _send('hazard_control.cancel_fire_team', { room_id: rid }));
     } else {
-      addBtn(actionsEl, 'DISPATCH FIRE TEAM', '',
-        () => _send('hazard_control.dispatch_fire_team', { room_id: rid }));
+      addBtn(actionsEl, 'DISPATCH FIRE TEAM', '', () => {
+        markPending(`hc:fireteam:${rid}`, 'DISPATCHING...', 3000);
+        _send('hazard_control.dispatch_fire_team', { room_id: rid });
+      }, false, `hc:fireteam:${rid}`);
     }
   }
 
   // Breach actions
   if (breach) {
     if (!breach.force_field) {
-      addBtn(actionsEl, 'ACTIVATE FORCE FIELD', '',
-        () => _send('hazard_control.force_field', { room_id: rid }));
+      addBtn(actionsEl, 'ACTIVATE FORCE FIELD', '', () => {
+        markPending(`hc:ff:${rid}`, 'DEPLOYING...', 3000);
+        _send('hazard_control.force_field', { room_id: rid });
+      }, false, `hc:ff:${rid}`);
     }
     if (!breach.bulkhead_sealed) {
       addBtn(actionsEl, 'SEAL BULKHEAD', '',
@@ -783,8 +796,10 @@ function renderRoomActions() {
       addBtn(actionsEl, 'CANCEL DECON TEAM', 'danger',
         () => _send('hazard_control.cancel_decon_team', { room_id: rid }));
     } else {
-      addBtn(actionsEl, 'DEPLOY DECON TEAM', '',
-        () => _send('hazard_control.dispatch_decon_team', { room_id: rid }));
+      addBtn(actionsEl, 'DEPLOY DECON TEAM', '', () => {
+        markPending(`hc:decon:${rid}`, 'DEPLOYING...', 3000);
+        _send('hazard_control.dispatch_decon_team', { room_id: rid });
+      }, false, `hc:decon:${rid}`);
     }
   }
 
@@ -793,8 +808,10 @@ function renderRoomActions() {
     addBtn(actionsEl, 'CANCEL VENT', '',
       () => _send('hazard_control.cancel_vent', { room_id: rid }));
   } else {
-    addBtn(actionsEl, 'VENT ROOM', '',
-      () => _send('hazard_control.vent_room', { room_id: rid }));
+    addBtn(actionsEl, 'VENT ROOM', '', () => {
+      markPending(`hc:vent:${rid}`, 'VENTING...', 3000);
+      _send('hazard_control.vent_room', { room_id: rid });
+    }, false, `hc:vent:${rid}`);
   }
 
   // Space vent
@@ -802,8 +819,10 @@ function renderRoomActions() {
     addBtn(actionsEl, 'CANCEL SPACE VENT', 'danger',
       () => _send('hazard_control.cancel_space_vent', { room_id: rid }));
   } else {
-    addBtn(actionsEl, 'EMERGENCY VENT TO SPACE', 'danger',
-      () => _send('hazard_control.emergency_vent_space', { room_id: rid }));
+    addBtn(actionsEl, 'EMERGENCY VENT TO SPACE', 'danger', () => {
+      markPending(`hc:spacev:${rid}`, 'VENTING...', 3000);
+      _send('hazard_control.emergency_vent_space', { room_id: rid });
+    }, false, `hc:spacev:${rid}`);
   }
 
   // Section reinforcement
@@ -812,17 +831,23 @@ function renderRoomActions() {
       addBtn(actionsEl, 'CANCEL REINFORCEMENT', '',
         () => _send('hazard_control.cancel_reinforcement', { section_id: sec.id }));
     } else {
-      addBtn(actionsEl, 'REINFORCE SECTION', '',
-        () => _send('hazard_control.reinforce_section', { section_id: sec.id }));
+      addBtn(actionsEl, 'REINFORCE SECTION', '', () => {
+        markPending(`hc:reinforce:${sec.id}`, 'REINFORCING...', 3000);
+        _send('hazard_control.reinforce_section', { section_id: sec.id });
+      }, false, `hc:reinforce:${sec.id}`);
     }
   }
 
   // Deck-level
-  addBtn(actionsEl, `SUPPRESS DECK (${deckLabel(room.deck)})`, '',
-    () => _send('hazard_control.suppress_deck', { deck_name: room.deck }));
+  addBtn(actionsEl, `SUPPRESS DECK (${deckLabel(room.deck)})`, '', () => {
+    markPending(`hc:suppdeck:${room.deck}`, 'SUPPRESSING...', 3000);
+    _send('hazard_control.suppress_deck', { deck_name: room.deck });
+  }, false, `hc:suppdeck:${room.deck}`);
 
-  addBtn(actionsEl, 'EVACUATE ROOM', 'danger',
-    () => _send('hazard_control.order_evacuation', { room_id: rid }));
+  addBtn(actionsEl, 'EVACUATE ROOM', 'danger', () => {
+    markPending(`hc:evac:${rid}`, 'EVACUATING...', 10000);
+    _send('hazard_control.order_evacuation', { room_id: rid });
+  }, false, `hc:evac:${rid}`);
 }
 
 function renderConnectionActions() {
@@ -843,25 +868,32 @@ function renderConnectionActions() {
     addBtn(actionsEl, 'UNSEAL CONNECTION', '',
       () => _send('hazard_control.unseal_connection', { room_a: a, room_b: b }));
   } else {
-    addBtn(actionsEl, 'SEAL CONNECTION', 'danger',
-      () => _send('hazard_control.seal_connection', { room_a: a, room_b: b }));
+    addBtn(actionsEl, 'SEAL CONNECTION', 'danger', () => {
+      markPending(`hc:seal:${a}:${b}`, 'SEALING...', 3000);
+      _send('hazard_control.seal_connection', { room_a: a, room_b: b });
+    }, false, `hc:seal:${a}:${b}`);
   }
 
   // Vent cycling
-  addBtn(actionsEl, 'CYCLE VENT', '',
-    () => _send('hazard_control.cycle_vent', { room_a: a, room_b: b }));
+  addBtn(actionsEl, 'CYCLE VENT', '', () => {
+    markPending(`hc:cycle:${a}:${b}`, 'CYCLING...', 3000);
+    _send('hazard_control.cycle_vent', { room_a: a, room_b: b });
+  }, false, `hc:cycle:${a}:${b}`);
 
-  addBtn(actionsEl, 'SET VENT: OPEN', '',
-    () => _send('hazard_control.set_vent', { room_a: a, room_b: b, state: 'open' }),
-    vent === 'open');
+  addBtn(actionsEl, 'SET VENT: OPEN', '', () => {
+    markPending(`hc:vset:${a}:${b}`, 'SETTING...', 3000);
+    _send('hazard_control.set_vent', { room_a: a, room_b: b, state: 'open' });
+  }, vent === 'open', `hc:vset:${a}:${b}`);
 
-  addBtn(actionsEl, 'SET VENT: FILTERED', '',
-    () => _send('hazard_control.set_vent', { room_a: a, room_b: b, state: 'filtered' }),
-    vent === 'filtered');
+  addBtn(actionsEl, 'SET VENT: FILTERED', '', () => {
+    markPending(`hc:vset:${a}:${b}`, 'SETTING...', 3000);
+    _send('hazard_control.set_vent', { room_a: a, room_b: b, state: 'filtered' });
+  }, vent === 'filtered', `hc:vset:${a}:${b}`);
 
-  addBtn(actionsEl, 'SET VENT: SEALED', 'danger',
-    () => _send('hazard_control.set_vent', { room_a: a, room_b: b, state: 'sealed' }),
-    vent === 'sealed');
+  addBtn(actionsEl, 'SET VENT: SEALED', 'danger', () => {
+    markPending(`hc:vset:${a}:${b}`, 'SETTING...', 3000);
+    _send('hazard_control.set_vent', { room_a: a, room_b: b, state: 'sealed' });
+  }, vent === 'sealed', `hc:vset:${a}:${b}`);
 }
 
 // ---------------------------------------------------------------------------

@@ -225,6 +225,29 @@ body::after {
   box-shadow: none;
 }
 
+.btn--pending, .btn--pending:disabled {
+  border-color: rgba(255, 170, 0, 0.5);
+  color: #ffaa00;
+  cursor: wait;
+  opacity: 1;
+  position: relative;
+  overflow: hidden;
+}
+.btn--pending::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: 0; height: 2px;
+  width: 100%;
+  background: #ffaa00;
+  transform-origin: left;
+  animation: action-progress var(--action-duration, 3s) linear forwards;
+  animation-delay: var(--action-delay, 0ms);
+}
+@keyframes action-progress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
 /* =========================================================================
    Gauges
    ========================================================================= */

@@ -34,6 +34,7 @@ import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
 import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
+import { markPending, applyPending, getPending } from '../shared/action_feedback.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
@@ -620,12 +621,14 @@ function renderInjuryList(member) {
       const inBed = member.treatment_bed != null;
       const hasTreatment = treatment != null;
 
+      const treatPending = getPending(`med:treat:${member.id}:${inj.id}`);
+      const stabPending = getPending(`med:stab:${member.id}:${inj.id}`);
       actionsHtml = `
         <div class="inj-card__actions">
-          <button class="btn" data-action="treat" data-crew-id="${member.id}" data-injury-id="${inj.id}"
-                  ${(!inBed || hasTreatment) ? 'disabled' : ''}>${treatLabel} ${treatDur}s</button>
-          <button class="btn" data-action="stabilise" data-crew-id="${member.id}" data-injury-id="${inj.id}"
-                  >STABILISE</button>
+          <button class="btn${treatPending ? ' btn--pending' : ''}" data-action="treat" data-crew-id="${member.id}" data-injury-id="${inj.id}"
+                  ${(!inBed || hasTreatment || treatPending) ? 'disabled' : ''}>${treatPending ? treatPending.label : `${treatLabel} ${treatDur}s`}</button>
+          <button class="btn${stabPending ? ' btn--pending' : ''}" data-action="stabilise" data-crew-id="${member.id}" data-injury-id="${inj.id}"
+                  ${stabPending ? 'disabled' : ''}>${stabPending ? stabPending.label : 'STABILISE'}</button>
         </div>
       `;
     }
@@ -665,6 +668,12 @@ function updateActionButtons(member) {
   btnAdmit.disabled = isDead || inBay || inQuarantine;
   btnDischarge.disabled = isDead || (!inBay && !inQuarantine) || !allTreated;
   btnQuarantine.disabled = isDead || inQuarantine || !hasContagion;
+
+  if (selectedCrewId) {
+    applyPending(btnAdmit, `med:admit:${selectedCrewId}`);
+    applyPending(btnDischarge, `med:discharge:${selectedCrewId}`);
+    applyPending(btnQuarantine, `med:quarantine:${selectedCrewId}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -831,8 +840,12 @@ if (injuryListEl) {
     const crewId = btn.dataset.crewId;
     const injuryId = btn.dataset.injuryId;
     if (action === 'treat') {
+      markPending(`med:treat:${crewId}:${injuryId}`, 'TREATING...', 15000);
+      btn.disabled = true; btn.textContent = 'TREATING...'; btn.classList.add('btn--pending');
       send('medical.treat', { crew_id: crewId, injury_id: injuryId });
     } else if (action === 'stabilise') {
+      markPending(`med:stab:${crewId}:${injuryId}`, 'STABILISING...', 3000);
+      btn.disabled = true; btn.textContent = 'STABILISING...'; btn.classList.add('btn--pending');
       send('medical.stabilise', { crew_id: crewId, injury_id: injuryId });
       // Flash the timer element green and play confirmation sound
       const card = btn.closest('.inj-card');
@@ -889,19 +902,31 @@ document.querySelectorAll('[data-deck]').forEach(btn => {
 // Action buttons
 if (btnAdmit) {
   btnAdmit.addEventListener('click', () => {
-    if (selectedCrewId) send('medical.admit', { crew_id: selectedCrewId });
+    if (!selectedCrewId) return;
+    markPending(`med:admit:${selectedCrewId}`, 'ADMITTING...', 3000);
+    btnAdmit.disabled = true; btnAdmit.textContent = 'ADMITTING...';
+    btnAdmit.classList.add('btn--pending');
+    send('medical.admit', { crew_id: selectedCrewId });
   });
 }
 
 if (btnDischarge) {
   btnDischarge.addEventListener('click', () => {
-    if (selectedCrewId) send('medical.discharge', { crew_id: selectedCrewId });
+    if (!selectedCrewId) return;
+    markPending(`med:discharge:${selectedCrewId}`, 'DISCHARGING...', 3000);
+    btnDischarge.disabled = true; btnDischarge.textContent = 'DISCHARGING...';
+    btnDischarge.classList.add('btn--pending');
+    send('medical.discharge', { crew_id: selectedCrewId });
   });
 }
 
 if (btnQuarantine) {
   btnQuarantine.addEventListener('click', () => {
-    if (selectedCrewId) send('medical.quarantine', { crew_id: selectedCrewId });
+    if (!selectedCrewId) return;
+    markPending(`med:quarantine:${selectedCrewId}`, 'QUARANTINE...', 3000);
+    btnQuarantine.disabled = true; btnQuarantine.textContent = 'QUARANTINE...';
+    btnQuarantine.classList.add('btn--pending');
+    send('medical.quarantine', { crew_id: selectedCrewId });
   });
 }
 

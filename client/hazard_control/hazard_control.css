@@ -227,6 +227,16 @@
   color: var(--primary);
 }
 
+.hc-action-btn.btn--pending,
+.hc-action-btn.btn--pending:disabled {
+  border-color: rgba(255, 170, 0, 0.5);
+  color: #ffaa00;
+  opacity: 1;
+  cursor: wait;
+  position: relative;
+  overflow: hidden;
+}
+
 /* Hazard entries */
 .hc-hazards {
   display: flex;

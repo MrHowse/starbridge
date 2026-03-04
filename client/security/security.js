@@ -40,6 +40,7 @@ import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
 import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
+import { markPending, applyPending } from '../shared/action_feedback.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initRoleBar } from '../shared/role_bar.js';
 import { initCrewRoster } from '../shared/crew_roster.js';
@@ -569,7 +570,12 @@ function renderTeams(force = false) {
       if (team.status === 'engaging') {
         const btnDis = document.createElement('button');
         btnDis.className = 'team-btn'; btnDis.textContent = 'DISENGAGE';
-        btnDis.addEventListener('click', (e) => { e.stopPropagation(); send('security.disengage_team', { team_id: team.id }); });
+        btnDis.addEventListener('click', (e) => {
+          e.stopPropagation();
+          markPending(`sec:disengage:${team.id}`, 'DISENGAGING...', 3000);
+          send('security.disengage_team', { team_id: team.id });
+        });
+        applyPending(btnDis, `sec:disengage:${team.id}`);
         actions.appendChild(btnDis);
       } else {
         const btnResp = document.createElement('button');
@@ -583,7 +589,12 @@ function renderTeams(force = false) {
 
         const btnSta = document.createElement('button');
         btnSta.className = 'team-btn'; btnSta.textContent = 'STATION';
-        btnSta.addEventListener('click', (e) => { e.stopPropagation(); send('security.station_team', { team_id: team.id }); });
+        btnSta.addEventListener('click', (e) => {
+          e.stopPropagation();
+          markPending(`sec:station:${team.id}`, 'STATIONING...', 3000);
+          send('security.station_team', { team_id: team.id });
+        });
+        applyPending(btnSta, `sec:station:${team.id}`);
         actions.appendChild(btnSta);
       }
       card.appendChild(actions);
@@ -735,11 +746,19 @@ canvas.addEventListener('click', (e) => {
 // ---------------------------------------------------------------------------
 
 document.getElementById('btn-lock')?.addEventListener('click', () => {
-  if (selectedRoomId) send('security.lock_door', { room_id: selectedRoomId });
+  if (!selectedRoomId) return;
+  markPending(`sec:lock:${selectedRoomId}`, 'LOCKING...', 2000);
+  const btn = document.getElementById('btn-lock');
+  if (btn) { btn.disabled = true; btn.textContent = 'LOCKING...'; btn.classList.add('btn--pending'); }
+  send('security.lock_door', { room_id: selectedRoomId });
 });
 
 document.getElementById('btn-unlock')?.addEventListener('click', () => {
-  if (selectedRoomId) send('security.unlock_door', { room_id: selectedRoomId });
+  if (!selectedRoomId) return;
+  markPending(`sec:unlock:${selectedRoomId}`, 'UNLOCKING...', 2000);
+  const btn = document.getElementById('btn-unlock');
+  if (btn) { btn.disabled = true; btn.textContent = 'UNLOCKING...'; btn.classList.add('btn--pending'); }
+  send('security.unlock_door', { room_id: selectedRoomId });
 });
 
 document.getElementById('sel-lockdown')?.addEventListener('change', function () {
