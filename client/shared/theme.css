@@ -1134,3 +1134,42 @@ body::after {
   color: var(--friendly, #00aaff);
   background: rgba(0, 170, 255, 0.07);
 }
+
+/* =========================================================================
+   Small-screen scaling — 13" laptops (1366×768 and similar)
+   ========================================================================= */
+
+@media (max-height: 800px) {
+  html { font-size: 15px; }
+
+  /* Tighten spacing to reclaim vertical room */
+  .station-container { gap: 0.4rem; }
+  .panel__header     { padding: 0.35rem 0.75rem; }
+}
+
+@media (max-height: 650px) {
+  html { font-size: 16px; }
+}
+
+/* ── Minimum readable sizes (all viewports) ──────────────────────────────
+   0.7rem at 14px base = 9.8px — too small on dense station UIs.
+   Clamp small text to 11px, buttons to 13px, headers to 16px.
+   -------------------------------------------------------------------------- */
+
+.text-label,
+.text-muted {
+  font-size: max(0.875rem, 11px);
+}
+
+.btn,
+.btn--small {
+  font-size: max(0.875rem, 13px);
+}
+
+.text-title {
+  font-size: max(1.5rem, 16px);
+}
+
+.text-header {
+  font-size: max(1rem, 16px);
+}

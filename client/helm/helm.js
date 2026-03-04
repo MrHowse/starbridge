@@ -439,7 +439,7 @@ function _drawCaptainWaypoints(ctx, canvas, renderer, now) {
     ctx.lineTo(sp.x - s, sp.y);
     ctx.closePath();
     ctx.stroke();
-    ctx.font         = '9px "Share Tech Mono",monospace';
+    ctx.font         = '11px "Share Tech Mono",monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle    = `rgba(0,200,255,${alpha})`;

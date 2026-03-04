@@ -537,7 +537,7 @@ function _drawContacts(ctx, W, H, vp, inQuad = false) {
     const p0 = projected[0];
     if (p0) {
       ctx.fillStyle = color;
-      ctx.font = '9px "Courier New"';
+      ctx.font = '11px "Courier New"';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText(contact.entity_id || '?', p0.sx, p0.sy - 3);
@@ -643,7 +643,7 @@ function _drawContactLabel(ctx, sx, sy, dist, contact) {
   const line2 = `${distKm}km${contact.type ? ' · ' + contact.type.toUpperCase() : ''}`;
 
   ctx.save();
-  ctx.font = '8px "Share Tech Mono",monospace';
+  ctx.font = '11px "Share Tech Mono",monospace';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle = style.color;

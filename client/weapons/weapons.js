@@ -329,7 +329,7 @@ function handleGameStarted(payload) {
           // Label unscanned contacts.
           if (!contact.type) {
             ctx.fillStyle = color;
-            ctx.font = '9px "Share Tech Mono", monospace';
+            ctx.font = '11px "Share Tech Mono", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
             ctx.fillText('CONTACT', sx, sy + 12);

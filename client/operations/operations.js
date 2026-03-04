@@ -388,7 +388,7 @@ function drawOpsContact(ctx, sx, sy, contact, selected, now) {
   // Threat level label.
   if (threatLevel) {
     ctx.save();
-    ctx.font = '9px monospace';
+    ctx.font = '11px monospace';
     ctx.fillStyle = THREAT_COLORS[threatLevel] || '#fff';
     ctx.textAlign = 'center';
     ctx.fillText(threatLevel.toUpperCase()[0], sx, sy - 20);

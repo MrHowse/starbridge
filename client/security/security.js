@@ -393,7 +393,7 @@ function draw() {
     if (quarantinedRooms.includes(roomId)) {
       ctx.fillStyle = 'rgba(255,0,255,0.15)';
       ctx.fillRect(x, y, ROOM_W, ROOM_H);
-      ctx.fillStyle = '#ff00ff'; ctx.font = '8px "Share Tech Mono", monospace';
+      ctx.fillStyle = '#ff00ff'; ctx.font = '11px "Share Tech Mono", monospace';
       ctx.textAlign = 'right'; ctx.textBaseline = 'top';
       ctx.fillText('Q', x + ROOM_W - 3, y + 2);
     }
@@ -445,7 +445,7 @@ function draw() {
     ctx.fillStyle = isSel ? 'rgba(0,170,255,0.35)' : 'rgba(0,170,255,0.12)'; ctx.fill();
     ctx.strokeStyle = isSel ? '#66ccff' : C_FRIENDLY; ctx.lineWidth = isSel ? 2 : 1; ctx.stroke();
     // Label
-    ctx.fillStyle = C_FRIENDLY; ctx.font = 'bold 9px "Share Tech Mono", monospace';
+    ctx.fillStyle = C_FRIENDLY; ctx.font = 'bold 11px "Share Tech Mono", monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(String(team.size), cx, cy);
     ctx.restore();
@@ -460,7 +460,7 @@ function draw() {
     ctx.strokeStyle = C_HOSTILE; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(cx - 6, cy - 6); ctx.lineTo(cx + 6, cy + 6);
     ctx.moveTo(cx + 6, cy - 6); ctx.lineTo(cx - 6, cy + 6); ctx.stroke();
-    ctx.fillStyle = C_HOSTILE; ctx.font = 'bold 9px "Share Tech Mono", monospace';
+    ctx.fillStyle = C_HOSTILE; ctx.font = 'bold 11px "Share Tech Mono", monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(String(bp.members), cx, cy + 12);
     ctx.restore();

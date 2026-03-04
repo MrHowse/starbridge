@@ -345,7 +345,7 @@ export function drawMinimap(ctx, size, shipX, shipY, heading) {
 
   // Sector corner labels.
   ctx.fillStyle    = 'rgba(0, 255, 65, 0.25)';
-  ctx.font         = '8px "Share Tech Mono", monospace';
+  ctx.font         = '11px "Share Tech Mono", monospace';
   ctx.textAlign    = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText('0,0', PAD + 2, PAD + 2);

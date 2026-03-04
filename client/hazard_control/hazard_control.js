@@ -366,7 +366,7 @@ function drawCanvas(time) {
 
     // Vent state label at midpoint
     if (ventState && ventState !== 'open') {
-      ctx.font = '8px monospace';
+      ctx.font = '11px monospace';
       ctx.fillStyle = ventState === 'sealed' ? '#ff4444' : '#ffb000';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -429,7 +429,7 @@ function drawCanvas(time) {
     if (_atmState?.space_venting?.includes(id)) icons.push({ c: '#3399cc', t: 'V' });
 
     if (icons.length > 0) {
-      ctx.font = '8px monospace';
+      ctx.font = '11px monospace';
       const totalW = icons.length * 14;
       let ix = rect.cx - totalW / 2 + 7;
       for (const ic of icons) {

@@ -760,7 +760,7 @@ function drawScanner() {
     ctx.stroke();
 
     ctx.fillStyle = isTuned ? col : col + "88";
-    ctx.font = `${isTuned ? "700" : "400"} 8px monospace`;
+    ctx.font = `${isTuned ? "700" : "400"} 11px monospace`;
     ctx.textAlign = "center";
     ctx.fillText(faction.toUpperCase().slice(0, 5), bx, axisY + 12);
   }

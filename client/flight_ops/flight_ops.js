@@ -401,7 +401,7 @@ function drawContacts() {
 
     // Contact label.
     ctx.fillStyle = colour;
-    ctx.font = '9px monospace';
+    ctx.font = '11px monospace';
     const label = c.name || (c.scan_state === 'scanned' ? c.id : 'CONTACT');
     if (label) ctx.fillText(label, cx + 7, cy + 3);
   }
@@ -470,7 +470,7 @@ function drawDecoys() {
     ctx.restore();
     // Timer label.
     ctx.fillStyle = '#ff8800';
-    ctx.font = '9px monospace';
+    ctx.font = '11px monospace';
     ctx.fillText(`${Math.round(d.lifetime)}s`, cx + 5, cy + 3);
   }
 }
@@ -481,7 +481,7 @@ function drawBuoys() {
     const { cx, cy } = worldToCanvas(b.x, b.y);
     drawDiamond(cx, cy, 4, '#ffb000');
     ctx.fillStyle = '#ffb000';
-    ctx.font = '9px monospace';
+    ctx.font = '11px monospace';
     ctx.fillText('BUOY', cx + 6, cy + 3);
   }
 }
@@ -525,7 +525,7 @@ function drawDroneRoutes() {
       ctx.fill();
       if (!done) {
         ctx.fillStyle = colour;
-        ctx.font = '9px monospace';
+        ctx.font = '11px monospace';
         ctx.fillText(`${i + 1}`, cx + 5, cy - 2);
       }
     }
@@ -579,7 +579,7 @@ function drawDrones() {
     // Status indicator for RTB drones.
     if (d.ai_behaviour === 'rtb') {
       ctx.fillStyle = 'rgba(255,176,0,0.7)';
-      ctx.font = '9px monospace';
+      ctx.font = '11px monospace';
       ctx.fillText('RTB', cx + 8, cy + 8);
     }
   }
@@ -699,7 +699,7 @@ function drawPatrolPreview() {
     ctx.arc(cx, cy, 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = 'rgba(0,255,65,0.7)';
-    ctx.font = '9px monospace';
+    ctx.font = '11px monospace';
     ctx.fillText(`${i + 1}`, cx + 5, cy - 2);
   }
 }

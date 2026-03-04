@@ -523,7 +523,7 @@ function drawMap() {
 
     // Label
     ctx.fillStyle   = colour;
-    ctx.font        = '9px monospace';
+    ctx.font        = '11px monospace';
     ctx.textAlign   = 'center';
     ctx.fillText(c.creature_type.replace(/_/g, ' ').toUpperCase(), cx, cy + 17);
   }

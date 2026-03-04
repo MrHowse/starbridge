@@ -266,7 +266,7 @@ function _render() {
 
   // Target label.
   ctx.fillStyle   = C.target;
-  ctx.font        = '8px "Share Tech Mono", monospace';
+  ctx.font        = '11px "Share Tech Mono", monospace';
   ctx.textAlign   = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText('TARGET', tx, ty + 7);
@@ -314,7 +314,7 @@ function _render() {
 
   // Firing bearing label near arrowhead.
   ctx.fillStyle    = C.fireLine;
-  ctx.font         = '9px "Share Tech Mono", monospace';
+  ctx.font         = '11px "Share Tech Mono", monospace';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   const lblOffset = 14;

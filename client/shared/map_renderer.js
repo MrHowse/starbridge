@@ -370,7 +370,7 @@ export class MapRenderer {
     // Range readout + contact count.
     const km = Math.round((this._range * this._zoomLevel) / 1000);
     ctx.fillStyle    = 'rgba(0, 255, 65, 0.45)';
-    ctx.font         = '9px "Share Tech Mono", monospace';
+    ctx.font         = '11px "Share Tech Mono", monospace';
     ctx.textAlign    = 'right';
     ctx.textBaseline = 'bottom';
     ctx.fillText(`RANGE: ${km}km`, cw - 6, ch - 4);
@@ -450,7 +450,7 @@ export class MapRenderer {
         const labelY = cy - r - 3;
         if (labelY > 4) {
           ctx.fillStyle    = 'rgba(255, 176, 0, 0.4)';
-          ctx.font         = '8px "Share Tech Mono", monospace';
+          ctx.font         = '11px "Share Tech Mono", monospace';
           ctx.textAlign    = 'center';
           ctx.textBaseline = 'bottom';
           ctx.fillText(def.label, cx, labelY);
@@ -583,7 +583,7 @@ export class MapRenderer {
     ctx.stroke();
     // Label
     ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
-    ctx.font = 'bold 9px monospace';
+    ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('PRIORITY', sx, sy - size - 4);
     ctx.restore();
@@ -626,7 +626,7 @@ export class MapRenderer {
     const lx = sx + Math.cos(labelRad) * (radius + 10);
     const ly = sy + Math.sin(labelRad) * (radius + 10);
     ctx.fillStyle   = `rgba(0, 255, 65, ${0.6 + 0.2 * pulse})`;
-    ctx.font        = 'bold 7px monospace';
+    ctx.font        = 'bold 11px monospace';
     ctx.textAlign   = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('OPS: WEAK FACING', lx, ly);
@@ -838,7 +838,7 @@ function _drawDefaultContact(ctx, sx, sy, contact, selected) {
 
   // Entity ID label.
   ctx.fillStyle    = 'rgba(255, 64, 64, 0.6)';
-  ctx.font         = '9px "Share Tech Mono", monospace';
+  ctx.font         = '11px "Share Tech Mono", monospace';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(contact.id, sx, sy + s + 2);
@@ -895,7 +895,7 @@ function _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact, shipState) {
     ctx.save();
     ctx.fillStyle    = color;
     ctx.globalAlpha  = 0.7;
-    ctx.font         = '8px "Share Tech Mono", monospace';
+    ctx.font         = '11px "Share Tech Mono", monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${km}km`, lx, ly);
@@ -1004,7 +1004,7 @@ function _drawCommsContact(ctx, sx, sy, cc, zoom, now) {
 
   // "INTEL" label (unless merged)
   const labelY = sy + s + 3;
-  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.font = '11px "Share Tech Mono", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   if (merged) {
@@ -1019,7 +1019,7 @@ function _drawCommsContact(ctx, sx, sy, cc, zoom, now) {
   // Contact name below INTEL label
   if (cc.name && cc.name !== 'Unknown Contact') {
     ctx.globalAlpha = alpha * 0.5;
-    ctx.fillText(cc.name, sx, labelY + 9);
+    ctx.fillText(cc.name, sx, labelY + 13);
   }
 
   // "?" overlay for unverified/rumour
@@ -1094,7 +1094,7 @@ function _drawCommsOffScreenArrow(ctx, cw, ch, sx, sy, cc, shipState) {
     ctx.save();
     ctx.fillStyle = color;
     ctx.globalAlpha = 0.6;
-    ctx.font = '7px "Share Tech Mono", monospace';
+    ctx.font = '11px "Share Tech Mono", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, lx, ly - 6);

@@ -1455,7 +1455,7 @@ function _drawWaypoints(ctx, canvas, renderer, now) {
     ctx.closePath();
     ctx.stroke();
     // Label.
-    ctx.font         = '8px "Share Tech Mono",monospace';
+    ctx.font         = '11px "Share Tech Mono",monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle    = `rgba(0,200,255,${alpha})`;
