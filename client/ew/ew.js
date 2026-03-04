@@ -32,7 +32,7 @@ const PLAYER_COLOUR    = '#00c87a';
 const ENEMY_COLOUR     = '#ff5050';
 const JAM_COLOUR       = '#f0c040';
 const INTRUDED_COLOUR  = '#80a0ff';
-const CREATURE_COLOUR  = '#00ffaa';
+const CREATURE_COLOUR  = '#ff44ff';
 
 // Creature types that support EW interactions
 const SEDATABLE_TYPES = new Set(['rift_stalker']);
@@ -509,23 +509,30 @@ function drawMap() {
     const isHostile = ['attacking', 'aggressive', 'agitated'].includes(c.behaviour_state);
     const colour = isHostile ? '#ff8040' : CREATURE_COLOUR;
 
-    // Circle shape
+    // Organic trefoil shape
+    ctx.strokeStyle = colour;
+    ctx.lineWidth   = 1.5;
+    const cr = 6;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = (i * Math.PI * 2) / 3 - Math.PI / 2;
+      const lx = cx + Math.cos(a) * cr * 0.45;
+      const ly = cy + Math.sin(a) * cr * 0.45;
+      ctx.moveTo(lx + cr * 0.55, ly);
+      ctx.arc(lx, ly, cr * 0.55, 0, Math.PI * 2);
+    }
+    ctx.stroke();
     ctx.fillStyle = colour;
     ctx.beginPath();
-    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Centre dot
-    ctx.fillStyle = '#0a0f0a';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
     ctx.fill();
 
     // Label
     ctx.fillStyle   = colour;
     ctx.font        = '11px monospace';
     ctx.textAlign   = 'center';
-    ctx.fillText(c.creature_type.replace(/_/g, ' ').toUpperCase(), cx, cy + 17);
+    const cLabel = c.creature_type.replace(/_/g, ' ').toUpperCase();
+    ctx.fillText(`CREATURE: ${cLabel}`, cx, cy + 17);
   }
 
   // Player ship

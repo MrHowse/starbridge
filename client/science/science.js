@@ -296,10 +296,14 @@ function handleGameStarted(payload) {
       showRangeRings: true,
       interactive:   true,
       zoom:          { enabled: true },
-      drawContact:   (ctx, sx, sy, contact, selected, _now) => {
-        // Callback references module-level scanMode, so mode colour updates live.
+      drawContact:   (ctx, sx, sy, contact, selected, now) => {
+        const kind = contact.kind || 'enemy';
         const modeColor = SCAN_MODES[scanMode].color;
-        if (contact.scan_state === 'scanned') {
+        if (kind === 'creature') {
+          _drawScienceCreature(ctx, sx, sy, contact, selected, now);
+        } else if (kind === 'wreck') {
+          _drawScienceAnomaly(ctx, sx, sy, contact, selected, now);
+        } else if (contact.scan_state === 'scanned') {
           drawScannedContact(ctx, sx, sy, contact.type, selected, modeColor);
         } else {
           drawUnknownContact(ctx, sx, sy, selected, modeColor);
@@ -929,6 +933,82 @@ function drawScannedContact(ctx, sx, sy, type, selected, modeColor = C_SCANNED) 
   }
 
   ctx.restore();
+}
+
+/** Creature on science map — organic trefoil in magenta with type label. */
+function _drawScienceCreature(ctx, sx, sy, contact, selected, now) {
+  const pulse = now ? 0.7 + 0.3 * Math.sin(now * 0.003) : 1;
+  const r = 8;
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.strokeStyle = '#ff44ff';
+  ctx.lineWidth   = selected ? 2.5 : 1.5;
+  ctx.globalAlpha = pulse;
+  ctx.beginPath();
+  for (let i = 0; i < 3; i++) {
+    const a = (i * Math.PI * 2) / 3 - Math.PI / 2;
+    const lx = Math.cos(a) * r * 0.45;
+    const ly = Math.sin(a) * r * 0.45;
+    ctx.moveTo(lx + r * 0.55, ly);
+    ctx.arc(lx, ly, r * 0.55, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#ff44ff';
+  ctx.beginPath();
+  ctx.arc(0, 0, 2, 0, Math.PI * 2);
+  ctx.fill();
+  if (selected) {
+    ctx.strokeStyle = C_SELECTED;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 7, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+  const ctype = (contact.creature_type || '').replace(/_/g, ' ').toUpperCase();
+  ctx.fillStyle = '#ff44ff';
+  ctx.globalAlpha = 0.8;
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText(ctype ? `CREATURE: ${ctype}` : contact.id, sx, sy + r + 3);
+  ctx.globalAlpha = 1;
+}
+
+/** Wreck / anomaly on science map — pulsing cyan diamond with type label. */
+function _drawScienceAnomaly(ctx, sx, sy, contact, selected, now) {
+  const pulse = now ? 0.6 + 0.4 * Math.sin(now * 0.004) : 1;
+  const s = 9;
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.strokeStyle = '#00ddff';
+  ctx.lineWidth   = selected ? 2.5 : 1.5;
+  ctx.globalAlpha = pulse;
+  ctx.beginPath();
+  ctx.moveTo(0, -s); ctx.lineTo(s, 0);
+  ctx.lineTo(0, s);  ctx.lineTo(-s, 0);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle = '#00ddff';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('?', 0, 0);
+  if (selected) {
+    ctx.strokeStyle = C_SELECTED;
+    ctx.lineWidth   = 1;
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, s + 7, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+  const wtype = (contact.enemy_type || '').replace(/_/g, ' ').toUpperCase();
+  ctx.fillStyle = '#00ddff';
+  ctx.globalAlpha = 0.8;
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText(wtype ? `WRECK: ${wtype}` : contact.id, sx, sy + s + 3);
+  ctx.globalAlpha = 1;
 }
 
 // ---------------------------------------------------------------------------

@@ -26,6 +26,8 @@ const C_GRID        = 'rgba(255, 255, 255, 0.05)';
 const C_ENEMY       = '#ff4040';
 const C_FRIENDLY    = '#00aaff';
 const C_RING        = 'rgba(255, 176, 0, 0.18)';
+const C_CREATURE    = '#ff44ff';  // magenta — organic entities
+const C_ANOMALY     = '#00ddff';  // cyan — anomalies, wrecks, unknown objects
 
 const TRAIL_LENGTH  = 5;
 
@@ -121,6 +123,11 @@ export class MapRenderer {
 
     // Ship silhouette (loaded SVG image).
     this._shipSilhouetteImg = null;
+
+    // Hover tooltip state.
+    this._hoveredContact = null;
+    this._hoverScreenPos = { x: 0, y: 0 };
+    if (this._interactive) this._setupHover();
   }
 
   // ── Public data API ────────────────────────────────────────────────────────
@@ -382,6 +389,9 @@ export class MapRenderer {
       ctx.fillStyle    = 'rgba(255, 64, 64, 0.6)';
       ctx.fillText(`CONTACTS: ${nContacts}  TORP: ${nTorpedoes}`, 6, ch - 4);
     }
+
+    // Hover tooltip (drawn last so it's on top).
+    this._drawTooltip(ctx, cw, ch);
   }
 
   // ── Private draw helpers ───────────────────────────────────────────────────
@@ -541,7 +551,7 @@ export class MapRenderer {
         if (this._drawContactFn) {
           this._drawContactFn(ctx, sx, sy, contact, selected, now);
         } else {
-          _drawDefaultContact(ctx, sx, sy, contact, selected);
+          _drawDefaultContact(ctx, sx, sy, contact, selected, now);
         }
         // C.1.1: Priority target diamond overlay.
         if (contact.id === priorityId) {
@@ -779,19 +789,139 @@ export class MapRenderer {
       this._onContactClickFn(hit ? hit.id : null);
     });
   }
+
+  // ── Hover tooltip ─────────────────────────────────────────────────────────
+
+  _setupHover() {
+    this._canvas.addEventListener('mousemove', (e) => {
+      if (!this._shipState) { this._hoveredContact = null; return; }
+
+      const rect  = this._canvas.getBoundingClientRect();
+      const scaleX = this._canvas.width  / rect.width;
+      const scaleY = this._canvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top)  * scaleY;
+
+      const cw   = this._canvas.width;
+      const ch   = this._canvas.height;
+      const cam  = this._getCamPos();
+      const zoom = this._effectiveZoom(cw, ch);
+
+      const HIT_R = 20;
+      let hit = null;
+      for (const contact of this._contacts) {
+        const sx = cw / 2 + (contact.x - cam.x) / zoom;
+        const sy = ch / 2 + (contact.y - cam.y) / zoom;
+        const dx = mx - sx;
+        const dy = my - sy;
+        if (dx * dx + dy * dy <= HIT_R * HIT_R) { hit = contact; break; }
+      }
+      this._hoveredContact = hit;
+      this._hoverScreenPos = { x: mx, y: my };
+    });
+
+    this._canvas.addEventListener('mouseleave', () => {
+      this._hoveredContact = null;
+    });
+  }
+
+  _drawTooltip(ctx, cw, ch) {
+    const c = this._hoveredContact;
+    if (!c) return;
+
+    const kind = c.kind || 'enemy';
+    const lines = [];
+
+    // Title line.
+    if (kind === 'creature') {
+      const t = (c.creature_type || 'Unknown').replace(/_/g, ' ');
+      lines.push(`CREATURE: ${t}`);
+    } else if (kind === 'wreck') {
+      const t = (c.enemy_type || 'Unknown').replace(/_/g, ' ');
+      lines.push(`WRECK: ${t}`);
+    } else if (kind === 'station') {
+      lines.push(c.name || c.station_type || c.id);
+    } else {
+      lines.push(c.name || c.type || c.id);
+    }
+
+    // Detail lines from scan data.
+    if (c.hull !== undefined) lines.push(`Hull: ${Math.round(c.hull)}/${c.hull_max || '?'}`);
+    if (c.classification) lines.push(`Class: ${c.classification}`);
+    if (c.behaviour_state) lines.push(`State: ${c.behaviour_state}`);
+    if (c.study_progress != null) lines.push(`Study: ${Math.round(c.study_progress * 100)}%`);
+    if (c.salvage_state) lines.push(`Salvage: ${c.salvage_state}`);
+    if (c.faction) lines.push(`Faction: ${c.faction}`);
+    if (c.scan_state === 'unscanned') lines.push('(Unscanned)');
+
+    // Measure text.
+    ctx.font = '11px "Share Tech Mono", monospace';
+    const PAD = 6;
+    const LINE_H = 15;
+    let maxW = 0;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width;
+      if (w > maxW) maxW = w;
+    }
+    const boxW = maxW + PAD * 2;
+    const boxH = lines.length * LINE_H + PAD * 2;
+
+    // Position: offset from cursor, keep within canvas.
+    let tx = this._hoverScreenPos.x + 14;
+    let ty = this._hoverScreenPos.y - boxH - 4;
+    if (tx + boxW > cw) tx = cw - boxW - 4;
+    if (ty < 4) ty = this._hoverScreenPos.y + 18;
+
+    // Draw box.
+    ctx.save();
+    ctx.fillStyle   = 'rgba(10, 10, 10, 0.9)';
+    ctx.strokeStyle = kind === 'creature' ? C_CREATURE
+                    : kind === 'wreck'    ? C_ANOMALY
+                    : kind === 'station'  ? '#ffaa00'
+                    : C_ENEMY;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(tx, ty, boxW, boxH, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw text.
+    ctx.fillStyle    = '#cccccc';
+    ctx.textAlign    = 'left';
+    ctx.textBaseline = 'top';
+    for (let i = 0; i < lines.length; i++) {
+      if (i === 0) ctx.fillStyle = ctx.strokeStyle; // title in accent colour
+      else ctx.fillStyle = '#cccccc';
+      ctx.fillText(lines[i], tx + PAD, ty + PAD + i * LINE_H);
+    }
+    ctx.restore();
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Private draw utilities
 // ---------------------------------------------------------------------------
 
-/** Default enemy wireframe (diamond/triangle/hexagon by type). */
-function _drawDefaultContact(ctx, sx, sy, contact, selected) {
+/** Default contact renderer — dispatches by contact.kind. */
+function _drawDefaultContact(ctx, sx, sy, contact, selected, now) {
+  const kind = contact.kind || 'enemy';
+  if (kind === 'creature') {
+    _drawCreatureContact(ctx, sx, sy, contact, selected, now);
+  } else if (kind === 'wreck') {
+    _drawAnomalyContact(ctx, sx, sy, contact, selected, now);
+  } else if (kind === 'station') {
+    _drawStationContact(ctx, sx, sy, contact, selected);
+  } else {
+    _drawEnemyContact(ctx, sx, sy, contact, selected);
+  }
+}
+
+/** Enemy wireframe (diamond/triangle/hexagon by type). */
+function _drawEnemyContact(ctx, sx, sy, contact, selected) {
   const shape = ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser;
   const s     = shape.size;
   const headRad = (contact.heading || 0) * Math.PI / 180;
 
-  // Bright centre dot — always visible regardless of zoom.
   ctx.fillStyle = C_ENEMY;
   ctx.beginPath();
   ctx.arc(sx, sy, 3, 0, Math.PI * 2);
@@ -815,7 +945,6 @@ function _drawDefaultContact(ctx, sx, sy, contact, selected) {
     ctx.lineTo(-s * 0.866, s * 0.5);
     ctx.closePath(); ctx.stroke();
   } else {
-    // Hexagon (destroyer + unknown).
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
       const a = (i * Math.PI) / 3 - Math.PI / 6;
@@ -825,7 +954,6 @@ function _drawDefaultContact(ctx, sx, sy, contact, selected) {
     ctx.closePath(); ctx.stroke();
   }
 
-  // Selected: outer glow ring.
   if (selected) {
     ctx.strokeStyle = C_PRIMARY;
     ctx.lineWidth   = 1;
@@ -836,12 +964,149 @@ function _drawDefaultContact(ctx, sx, sy, contact, selected) {
 
   ctx.restore();
 
-  // Entity ID label.
   ctx.fillStyle    = 'rgba(255, 64, 64, 0.6)';
   ctx.font         = '11px "Share Tech Mono", monospace';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(contact.id, sx, sy + s + 2);
+}
+
+/** Creature — irregular organic shape (3-lobed) in magenta with type label. */
+function _drawCreatureContact(ctx, sx, sy, contact, selected, now) {
+  const pulse = now ? 0.7 + 0.3 * Math.sin(now * 0.003) : 1;
+  const r = 9;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // Organic 3-lobed shape (trefoil).
+  ctx.strokeStyle = C_CREATURE;
+  ctx.lineWidth   = selected ? 2.5 : 1.5;
+  ctx.globalAlpha = pulse;
+  ctx.beginPath();
+  for (let i = 0; i < 3; i++) {
+    const angle = (i * Math.PI * 2) / 3 - Math.PI / 2;
+    const cx = Math.cos(angle) * r * 0.45;
+    const cy = Math.sin(angle) * r * 0.45;
+    ctx.moveTo(cx + r * 0.55, cy);
+    ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+
+  // Centre dot.
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = C_CREATURE;
+  ctx.beginPath();
+  ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (selected) {
+    ctx.strokeStyle = C_PRIMARY;
+    ctx.lineWidth   = 1;
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 6, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // Type label: "CREATURE: Swarm".
+  const typeName = (contact.creature_type || contact.type || '').replace(/_/g, ' ').toUpperCase();
+  ctx.fillStyle    = C_CREATURE;
+  ctx.globalAlpha  = 0.8;
+  ctx.font         = '11px "Share Tech Mono", monospace';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(typeName ? `CREATURE: ${typeName}` : contact.id, sx, sy + r + 3);
+  ctx.globalAlpha  = 1;
+}
+
+/** Anomaly / wreck — pulsing diamond in cyan with type label. */
+function _drawAnomalyContact(ctx, sx, sy, contact, selected, now) {
+  const pulse = now ? 0.6 + 0.4 * Math.sin(now * 0.004) : 1;
+  const s = 10;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // Pulsing diamond.
+  ctx.strokeStyle = C_ANOMALY;
+  ctx.lineWidth   = selected ? 2.5 : 1.5;
+  ctx.globalAlpha = pulse;
+  ctx.beginPath();
+  ctx.moveTo(0, -s); ctx.lineTo(s, 0);
+  ctx.lineTo(0, s);  ctx.lineTo(-s, 0);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Inner question mark.
+  ctx.globalAlpha = pulse * 0.9;
+  ctx.fillStyle   = C_ANOMALY;
+  ctx.font        = 'bold 11px monospace';
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('?', 0, 0);
+
+  if (selected) {
+    ctx.strokeStyle = C_PRIMARY;
+    ctx.lineWidth   = 1;
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, s + 6, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // Type label.
+  const typeName = (contact.enemy_type || contact.type || '').replace(/_/g, ' ').toUpperCase();
+  ctx.fillStyle    = C_ANOMALY;
+  ctx.globalAlpha  = 0.8;
+  ctx.font         = '11px "Share Tech Mono", monospace';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(typeName ? `WRECK: ${typeName}` : contact.id, sx, sy + s + 3);
+  ctx.globalAlpha  = 1;
+}
+
+/** Station — square with crosshair in classification colour. */
+function _drawStationContact(ctx, sx, sy, contact, selected) {
+  const cls = contact.classification || 'neutral';
+  const CLS_COLORS = { hostile: C_ENEMY, friendly: C_PRIMARY, neutral: '#ffaa00', unknown: '#ffffff' };
+  const color = CLS_COLORS[cls] || CLS_COLORS.neutral;
+  const s = 8;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = selected ? 2 : 1.5;
+  ctx.beginPath();
+  ctx.rect(-s, -s, s * 2, s * 2);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-s - 4, 0); ctx.lineTo(s + 4, 0);
+  ctx.moveTo(0, -s - 4); ctx.lineTo(0, s + 4);
+  ctx.stroke();
+
+  if (selected) {
+    ctx.strokeStyle = C_PRIMARY;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, s + 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // Label.
+  ctx.fillStyle    = color;
+  ctx.font         = '11px "Share Tech Mono", monospace';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+  const name = contact.name || contact.station_type || contact.id;
+  ctx.fillText(name, sx, sy + s + 3);
 }
 
 /** Arrow indicator at canvas edge for off-screen contacts, with distance label. */
@@ -853,10 +1118,16 @@ function _drawOffScreenArrow(ctx, cw, ch, sx, sy, contact, shipState) {
   const dist = Math.hypot(dx, dy);
   if (dist < 1) return;
 
-  // Colour by classification.
-  const cls = contact.classification || 'hostile';
-  const CLS_COLORS = { hostile: '#ff4040', unknown: '#ffffff', friendly: '#00ff41', neutral: '#ffaa00' };
-  const color = CLS_COLORS[cls] || C_ENEMY;
+  // Colour by kind, then classification.
+  const kind = contact.kind || 'enemy';
+  let color;
+  if (kind === 'creature') { color = C_CREATURE; }
+  else if (kind === 'wreck') { color = C_ANOMALY; }
+  else {
+    const cls = contact.classification || 'hostile';
+    const CLS_COLORS = { hostile: '#ff4040', unknown: '#ffffff', friendly: '#00ff41', neutral: '#ffaa00' };
+    color = CLS_COLORS[cls] || C_ENEMY;
+  }
 
   // Clamp to canvas edge with margin.
   const M = 20;

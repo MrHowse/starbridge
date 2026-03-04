@@ -322,11 +322,51 @@ function handleGameStarted(payload) {
           drawStationShape(ctx, sx, sy, color, selected);
         } else if (kind === 'creature') {
           drawCreatureShape(ctx, sx, sy, color, selected);
+          const ctype = (contact.creature_type || '').replace(/_/g, ' ').toUpperCase();
+          ctx.fillStyle = '#ff44ff';
+          ctx.font = '11px "Share Tech Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(ctype ? `CREATURE: ${ctype}` : contact.id, sx, sy + 14);
+        } else if (kind === 'wreck') {
+          // Pulsing cyan diamond with "?".
+          const pulse = 0.6 + 0.4 * Math.sin(now * 0.004);
+          const ws = 8;
+          ctx.save();
+          ctx.translate(sx, sy);
+          ctx.strokeStyle = '#00ddff';
+          ctx.lineWidth = selected ? 2.5 : 1.5;
+          ctx.globalAlpha = pulse;
+          ctx.beginPath();
+          ctx.moveTo(0, -ws); ctx.lineTo(ws, 0);
+          ctx.lineTo(0, ws);  ctx.lineTo(-ws, 0);
+          ctx.closePath();
+          ctx.stroke();
+          ctx.fillStyle = '#00ddff';
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText('?', 0, 0);
+          if (selected) {
+            ctx.strokeStyle = C_FRIENDLY;
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.arc(0, 0, ws + 6, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+          const wtype = (contact.enemy_type || '').replace(/_/g, ' ').toUpperCase();
+          ctx.fillStyle = '#00ddff';
+          ctx.globalAlpha = 0.8;
+          ctx.font = '11px "Share Tech Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(wtype ? `WRECK: ${wtype}` : contact.id, sx, sy + ws + 3);
+          ctx.globalAlpha = 1;
         } else {
           drawEnemyShape(ctx, sx, sy, contact.type,
             (ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser).size,
             color, selected);
-          // Label unscanned contacts.
           if (!contact.type) {
             ctx.fillStyle = color;
             ctx.font = '11px "Share Tech Mono", monospace';
@@ -1302,17 +1342,23 @@ function drawStationShape(ctx, sx, sy, color, selected) {
   ctx.restore();
 }
 
-// Creature — circle with central dot.
+// Creature — organic trefoil shape in magenta.
 function drawCreatureShape(ctx, sx, sy, color, selected) {
   ctx.save();
   ctx.translate(sx, sy);
-  ctx.strokeStyle = color;
-  ctx.lineWidth   = selected ? 2 : 1.5;
-  const r = 7;
+  const cr = 7;
+  ctx.strokeStyle = '#ff44ff';
+  ctx.lineWidth   = selected ? 2.5 : 1.5;
   ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  for (let i = 0; i < 3; i++) {
+    const a = (i * Math.PI * 2) / 3 - Math.PI / 2;
+    const lx = Math.cos(a) * cr * 0.45;
+    const ly = Math.sin(a) * cr * 0.45;
+    ctx.moveTo(lx + cr * 0.55, ly);
+    ctx.arc(lx, ly, cr * 0.55, 0, Math.PI * 2);
+  }
   ctx.stroke();
-  ctx.fillStyle = color;
+  ctx.fillStyle = '#ff44ff';
   ctx.beginPath();
   ctx.arc(0, 0, 2, 0, Math.PI * 2);
   ctx.fill();
@@ -1320,7 +1366,7 @@ function drawCreatureShape(ctx, sx, sy, color, selected) {
     ctx.strokeStyle = C_FRIENDLY;
     ctx.lineWidth   = 1;
     ctx.beginPath();
-    ctx.arc(0, 0, r + 6, 0, Math.PI * 2);
+    ctx.arc(0, 0, cr + 6, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.restore();

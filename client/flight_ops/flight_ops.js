@@ -351,6 +351,8 @@ const CONTACT_COLOURS = {
   friendly: '#00ff41',
   neutral: '#ffaa00',
 };
+const C_FO_CREATURE = '#ff44ff';
+const C_FO_ANOMALY  = '#00ddff';
 
 function drawContacts() {
   if (!_sensorContacts || _sensorContacts.length === 0) return;
@@ -375,13 +377,36 @@ function drawContacts() {
       ctx.moveTo(0, -3); ctx.lineTo(0, 3);
       ctx.stroke();
     } else if (kind === 'creature') {
-      // Circle with dot.
+      // Organic 3-lobed trefoil in magenta.
+      ctx.strokeStyle = C_FO_CREATURE;
+      ctx.fillStyle   = C_FO_CREATURE;
+      const cr = 6;
       ctx.beginPath();
-      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      for (let i = 0; i < 3; i++) {
+        const a = (i * Math.PI * 2) / 3 - Math.PI / 2;
+        const lx = Math.cos(a) * cr * 0.45;
+        const ly = Math.sin(a) * cr * 0.45;
+        ctx.moveTo(lx + cr * 0.55, ly);
+        ctx.arc(lx, ly, cr * 0.55, 0, Math.PI * 2);
+      }
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
       ctx.fill();
+    } else if (kind === 'wreck') {
+      // Pulsing diamond with ? in cyan.
+      ctx.strokeStyle = C_FO_ANOMALY;
+      ctx.fillStyle   = C_FO_ANOMALY;
+      const ws = 6;
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(Date.now() * 0.004);
+      ctx.beginPath();
+      ctx.moveTo(0, -ws); ctx.lineTo(ws, 0);
+      ctx.lineTo(0, ws);  ctx.lineTo(-ws, 0);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('?', 0, 0);
     } else if (c.scan_state === 'scanned') {
       // Scanned enemy — solid triangle.
       ctx.beginPath();
@@ -399,10 +424,22 @@ function drawContacts() {
     }
     ctx.restore();
 
-    // Contact label.
-    ctx.fillStyle = colour;
+    // Contact label — type-aware.
+    let labelColor = colour;
+    let label;
+    if (kind === 'creature') {
+      labelColor = C_FO_CREATURE;
+      const ctype = (c.creature_type || '').replace(/_/g, ' ').toUpperCase();
+      label = ctype ? `CREATURE: ${ctype}` : c.id;
+    } else if (kind === 'wreck') {
+      labelColor = C_FO_ANOMALY;
+      const wtype = (c.enemy_type || '').replace(/_/g, ' ').toUpperCase();
+      label = wtype ? `WRECK: ${wtype}` : c.id;
+    } else {
+      label = c.name || (c.scan_state === 'scanned' ? c.id : 'CONTACT');
+    }
+    ctx.fillStyle = labelColor;
     ctx.font = '11px monospace';
-    const label = c.name || (c.scan_state === 'scanned' ? c.id : 'CONTACT');
     if (label) ctx.fillText(label, cx + 7, cy + 3);
   }
 }

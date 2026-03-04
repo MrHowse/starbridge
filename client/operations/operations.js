@@ -322,7 +322,7 @@ function drawOpsContact(ctx, sx, sy, contact, selected, now) {
     ctx.restore();
   }
 
-  // Base shape — diamond for enemies, circle for stations, triangle for creatures.
+  // Base shape by kind.
   ctx.save();
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
@@ -333,12 +333,35 @@ function drawOpsContact(ctx, sx, sy, contact, selected, now) {
     ctx.rect(sx - 5, sy - 5, 10, 10);
     ctx.stroke();
   } else if (kind === 'creature') {
+    // Organic trefoil in magenta.
+    ctx.strokeStyle = '#ff44ff';
+    const cr = 6;
     ctx.beginPath();
-    ctx.moveTo(sx, sy - 7);
-    ctx.lineTo(sx + 6, sy + 5);
-    ctx.lineTo(sx - 6, sy + 5);
+    for (let i = 0; i < 3; i++) {
+      const a = (i * Math.PI * 2) / 3 - Math.PI / 2;
+      const lx = sx + Math.cos(a) * cr * 0.45;
+      const ly = sy + Math.sin(a) * cr * 0.45;
+      ctx.moveTo(lx + cr * 0.55, ly);
+      ctx.arc(lx, ly, cr * 0.55, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#ff44ff';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'wreck') {
+    // Pulsing cyan diamond with "?".
+    ctx.strokeStyle = '#00ddff';
+    ctx.fillStyle   = '#00ddff';
+    const ws = 6;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - ws); ctx.lineTo(sx + ws, sy);
+    ctx.lineTo(sx, sy + ws); ctx.lineTo(sx - ws, sy);
     ctx.closePath();
     ctx.stroke();
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', sx, sy);
   } else {
     // Enemy — diamond.
     ctx.beginPath();
