@@ -79,12 +79,12 @@ class BroadcastCapture:
     def collect_hazcon_events(self, events: list[dict]) -> None:
         """Record HazCon tick events."""
         for ev in events:
-            self._record(["damage_control", "engineering"], ev)
+            self._record(["hazard_control", "engineering"], ev)
 
     def collect_atm_events(self, events: list[dict]) -> None:
         """Record Atmosphere tick events."""
         for ev in events:
-            self._record(["damage_control"], ev)
+            self._record(["hazard_control"], ev)
 
     def collect_security_events(self, events: list[tuple[str, dict]]) -> None:
         """Record Security events (type, payload) tuples."""
@@ -103,7 +103,7 @@ class BroadcastCapture:
     def collect_evacuation_warnings(self) -> None:
         """Drain HC evacuation warnings."""
         for w in glhc.pop_evacuation_warnings():
-            self._record(["medical", "damage_control"], w)
+            self._record(["medical", "hazard_control"], w)
 
     # ── Query helpers ─────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ class BroadcastCapture:
         if "all" in roles:
             for r in ("captain", "helm", "weapons", "engineering", "science",
                        "medical", "security", "comms", "operations",
-                       "ew", "flight_ops", "damage_control", "quartermaster"):
+                       "ew", "flight_ops", "hazard_control", "quartermaster"):
                 if r not in roles:
                     self.messages[r].append(payload)
 

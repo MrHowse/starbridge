@@ -154,7 +154,7 @@ class TestMigrationMission:
         m = load_mission("migration")
         node = next(n for n in m["nodes"] if n["id"] == "protect_and_study")
         assert node["type"] == "parallel"
-        assert node["complete_when"].get("all") is True
+        assert node["complete_when"] == "all"
 
     def test_survey_whales_is_parallel_count_2(self):
         m = load_mission("migration")

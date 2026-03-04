@@ -20,7 +20,7 @@
       "id": "protect_and_study",
       "type": "parallel",
       "text": "Protect the whales and complete scientific survey",
-      "complete_when": {"all": true},
+      "complete_when": "all",
       "children": [
         {
           "id": "neutralise_poachers",
