@@ -35,6 +35,7 @@ import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
@@ -124,6 +125,16 @@ const sbTeamsVal     = document.getElementById('sb-teams-val');
 const sbBusVal       = document.getElementById('sb-bus-val');
 const sbEmergencyVal = document.getElementById('sb-emergency-val');
 const sbEmergencyEl  = document.getElementById('sb-emergency');
+
+// ---------------------------------------------------------------------------
+// Render throttle + interaction guard
+// ---------------------------------------------------------------------------
+
+let _latestTeams = [];
+let _latestOrders = [];
+
+const guardedRenderTeamCards  = guardInteraction(() => renderTeamCards(_latestTeams), teamCardsEl);
+const guardedRenderRepairQueue = guardInteraction(() => renderRepairQueue(_latestOrders), repairQueueListEl);
 
 // ---------------------------------------------------------------------------
 // Game state
@@ -259,10 +270,12 @@ function handleShipState(payload) {
   }
 }
 
+const scheduleEngRender = createRenderScheduler(() => { if (currEngState) applyEngState(currEngState); }, 333);
+
 function handleEngState(payload) {
   if (!gameActive) return;
   currEngState = payload;
-  applyEngState(payload);
+  scheduleEngRender();
 }
 
 function handleDCState(payload) {
@@ -436,11 +449,13 @@ function applyEngState(state) {
 
   // --- Repair teams ---
   const teams = state.repair_teams || [];
-  renderTeamCards(teams);
+  _latestTeams = teams;
+  guardedRenderTeamCards();
 
   // --- Repair orders queue ---
   const orders = state.repair_orders || [];
-  renderRepairQueue(orders);
+  _latestOrders = orders;
+  guardedRenderRepairQueue();
 
   // --- Component detail (if system selected) ---
   if (selectedSystem && state.systems?.[selectedSystem]) {

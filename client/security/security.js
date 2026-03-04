@@ -39,6 +39,7 @@ import {
 import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initRoleBar } from '../shared/role_bar.js';
 import { initCrewRoster } from '../shared/crew_roster.js';
@@ -99,6 +100,13 @@ const teamListEl       = document.getElementById('team-list');
 const boardingListEl   = document.getElementById('boarding-list');
 const alertListEl      = document.getElementById('alert-list');
 const escortListEl     = document.getElementById('escort-list');
+
+// ---------------------------------------------------------------------------
+// Render throttle + interaction guard
+// ---------------------------------------------------------------------------
+
+const guardedRenderTeams  = guardInteraction(() => renderTeams(), teamListEl);
+const guardedRenderAlerts = guardInteraction(() => renderAlerts(), alertListEl);
 
 // ---------------------------------------------------------------------------
 // State
@@ -674,11 +682,18 @@ function renderStatusBar(force = false) {
 
 function renderAll(force = false) {
   draw();
-  renderAlerts(force);
-  renderTeams(force);
+  if (force) {
+    renderAlerts(true);
+    renderTeams(true);
+  } else {
+    guardedRenderAlerts();
+    guardedRenderTeams();
+  }
   renderBoardingIntel(force);
   renderStatusBar(force);
 }
+
+const scheduleRenderAll = createRenderScheduler(() => renderAll(), 333);
 
 // ---------------------------------------------------------------------------
 // Canvas click
@@ -849,7 +864,7 @@ function handleInteriorState(payload) {
   armedDecks       = payload.armed_decks || [];
   quarantinedRooms = payload.quarantined_rooms || [];
   sensorStatus     = payload.sensor_status || {};
-  renderAll();
+  scheduleRenderAll();
 }
 
 function handleHullHit() {

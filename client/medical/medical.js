@@ -33,6 +33,7 @@ import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
 import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
 import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
 import { initNotifications } from '../shared/notifications.js';
 import { initRoleBar } from '../shared/role_bar.js';
@@ -111,6 +112,15 @@ const morgueItemEl    = document.getElementById('morgue-item');
 const morgueOverlayEl = document.getElementById('morgue-overlay');
 const morgueListEl    = document.getElementById('morgue-list');
 const btnCloseMorgue  = document.getElementById('btn-close-morgue');
+
+// ---------------------------------------------------------------------------
+// Render throttle + interaction guard
+// ---------------------------------------------------------------------------
+
+let _latestDetailMember = null;
+const guardedRenderInjuryList = guardInteraction(() => {
+  if (_latestDetailMember) renderInjuryList(_latestDetailMember);
+}, injuryListEl);
 
 // ---------------------------------------------------------------------------
 // State
@@ -404,7 +414,8 @@ function renderPatientDetail() {
 
   // Body diagram is rendered by the dedicated animation loop (_startDiagramLoop)
   // at 60fps for smooth pulse animation — do NOT call renderBodyDiagram here.
-  renderInjuryList(member);
+  _latestDetailMember = member;
+  guardedRenderInjuryList();
   updateActionButtons(member);
 }
 
@@ -559,7 +570,7 @@ function renderInjuryList(member) {
   const treatment = _findTreatment(member.id);
   const tElapsed = treatment ? Math.round(treatment.elapsed) : -1;
   const hash = filtered.map(i =>
-    `${i.id}:${i.severity}:${i.treated}:${i.treating}:${Math.ceil(i.death_timer ?? -1)}:${Math.ceil(i.degrade_timer ?? -1)}`
+    `${i.id}:${i.severity}:${i.treated}:${i.treating}:${Math.ceil((i.death_timer ?? -1) / 5) * 5}:${Math.ceil((i.degrade_timer ?? -1) / 5) * 5}`
   ).join('|') + `|bed=${member.treatment_bed}|te=${tElapsed}|rf=${bodyRegionFilter}`;
   if (hash === _injuryListHash) return;
   _injuryListHash = hash;
@@ -752,6 +763,8 @@ function render() {
   renderPatientDetail();
   renderStatusBar();
 }
+
+const scheduleRender = createRenderScheduler(render, 333);
 
 // Body diagram animation loop (separate from data render)
 let _animFrame = null;
@@ -1013,12 +1026,12 @@ function handleShipState(payload) {
     medicalState.supplies = payload.medical_supplies;
     medicalState.supplies_max = 20; // old system max
   }
-  render();
+  scheduleRender();
 }
 
 function handleMedicalState(payload) {
   medicalState = payload;
-  render();
+  scheduleRender();
 }
 
 function handleCrewRoster(payload) {
@@ -1027,7 +1040,7 @@ function handleCrewRoster(payload) {
   for (const [id, data] of Object.entries(members)) {
     crewRoster[id] = data;
   }
-  render();
+  scheduleRender();
 }
 
 function handleMedicalEvent(payload) {

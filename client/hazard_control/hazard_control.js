@@ -26,6 +26,7 @@ import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -112,6 +113,13 @@ const elTeams  = $('hc-teams');
 const elFF     = $('hc-forcefields');
 const elLS     = $('hc-lifesupport');
 const elWorst  = $('hc-worstdeck');
+
+// ---------------------------------------------------------------------------
+// Render throttle + interaction guard
+// ---------------------------------------------------------------------------
+
+const guardedRenderDeckCards = guardInteraction(() => renderDeckCards(), deckListEl);
+const guardedRenderActions  = guardInteraction(() => renderActions(), actionsEl);
 
 // ---------------------------------------------------------------------------
 // Utility helpers
@@ -1212,14 +1220,14 @@ function handleDcState(payload) {
   _prevDcState = _dcState;
   _dcState = payload;
   diffAndTriggerAudio();
-  render();
+  scheduleRender();
 }
 
 function handleAtmosphere(payload) {
   _prevAtmState = _atmState;
   _atmState = payload;
   diffAndTriggerAudio();
-  render();
+  scheduleRender();
 }
 
 function handleShipState(payload) {
@@ -1272,11 +1280,13 @@ function handleMessage(msg) {
 // ---------------------------------------------------------------------------
 
 function render() {
-  renderDeckCards();
-  renderActions();
+  guardedRenderDeckCards();
+  guardedRenderActions();
   renderHazardList();
   renderBottomBar();
 }
+
+const scheduleRender = createRenderScheduler(render, 333);
 
 // ---------------------------------------------------------------------------
 // Initialisation
