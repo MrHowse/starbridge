@@ -13,7 +13,7 @@ from server.game_loop_science_scan import (
     PHASE_THRESHOLDS,
     SECTOR_SWEEP_DURATION,
 )
-from server.models.sector import Rect, Sector, SectorGrid, SectorProperties, SectorVisibility
+from server.models.sector import Rect, Sector, SectorFeature, SectorGrid, SectorProperties, SectorVisibility
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +29,8 @@ def _make_world(enemies=None, sector_grid=None, ship_x=50_000.0, ship_y=50_000.0
     world = MagicMock()
     world.ship = ship
     world.enemies = enemies or []
+    world.creatures = []
+    world.stations = []
     world.sector_grid = sector_grid
     return world
 
@@ -475,3 +477,56 @@ class TestDuration:
         world = _make_world()
         events = glss.tick(LONG_RANGE_DURATION + 1.0, world)
         assert any(e["type"] == "complete" for e in events)
+
+
+# ---------------------------------------------------------------------------
+# Scan results summary
+# ---------------------------------------------------------------------------
+
+
+class TestScanResults:
+    def test_sector_scan_complete_includes_results(self) -> None:
+        """Completion event should contain a results dict."""
+        grid = _make_grid_2x1()
+        enemy = _enemy_at(50_000, 50_000)
+        world = _make_world(enemies=[enemy], sector_grid=grid)
+        glss.start_scan("sector", "em", "A1")
+        events = glss.tick(SECTOR_SWEEP_DURATION + 1.0, world)
+        complete = next(e for e in events if e["type"] == "complete")
+        assert "results" in complete
+        assert complete["results"]["contacts"] == 1
+        assert "1 contact detected" in complete["results"]["details"]
+
+    def test_sector_scan_results_counts_features(self) -> None:
+        """Features in the sector should be counted."""
+        grid = _make_grid_2x1()
+        feat = SectorFeature(id="f1", type="anomaly", position=(50_000, 50_000))
+        grid.sectors["A1"].features.append(feat)
+        world = _make_world(sector_grid=grid)
+        glss.start_scan("sector", "em", "A1")
+        events = glss.tick(SECTOR_SWEEP_DURATION + 1.0, world)
+        complete = next(e for e in events if e["type"] == "complete")
+        assert complete["results"]["features"] == 1
+        assert "1 feature found" in complete["results"]["details"]
+
+    def test_sector_scan_results_empty_sector(self) -> None:
+        """Empty sector reports no contacts or features."""
+        grid = _make_grid_2x1()
+        world = _make_world(sector_grid=grid)
+        glss.start_scan("sector", "em", "A1")
+        events = glss.tick(SECTOR_SWEEP_DURATION + 1.0, world)
+        complete = next(e for e in events if e["type"] == "complete")
+        assert complete["results"]["contacts"] == 0
+        assert complete["results"]["features"] == 0
+        assert "no contacts or features detected" in complete["results"]["details"]
+
+    def test_sector_scan_results_ignores_out_of_bounds(self) -> None:
+        """Enemy outside the scanned sector is not counted."""
+        grid = _make_grid_2x1()
+        # Place enemy in B1, scan A1.
+        enemy = _enemy_at(150_000, 50_000)
+        world = _make_world(enemies=[enemy], sector_grid=grid)
+        glss.start_scan("sector", "em", "A1")
+        events = glss.tick(SECTOR_SWEEP_DURATION + 1.0, world)
+        complete = next(e for e in events if e["type"] == "complete")
+        assert complete["results"]["contacts"] == 0

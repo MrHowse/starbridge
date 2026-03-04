@@ -33,12 +33,17 @@ DETAILED_SCAN_THRESHOLD: float = 0.75  # C.4.2: sensor eff ≥ 75% → detailed 
 # ---------------------------------------------------------------------------
 
 
+_STALL_THRESHOLD: float = 95.0        # progress % above which stall timer ticks
+_STALL_FORCE_COMPLETE: float = 2.0    # seconds at ≥95% before forced completion
+
+
 @dataclass
 class ActiveScan:
     """Tracks an in-progress scan of a single contact."""
 
     entity_id: str
     progress: float = 0.0   # 0.0 – 100.0
+    stall_elapsed: float = 0.0  # time spent at ≥95% progress
 
 
 _active_scan: ActiveScan | None = None
@@ -128,7 +133,16 @@ def tick(world: World, ship: Ship, dt: float) -> list[str]:
 
     _active_scan.progress = min(100.0, _active_scan.progress + progress_per_sec * dt)
 
-    if _active_scan.progress >= 100.0:
+    # Track time spent at high progress — force-complete if stalled.
+    if _active_scan.progress >= _STALL_THRESHOLD:
+        _active_scan.stall_elapsed += dt
+
+    # Complete when progress reaches 99.9% (float safety) or stall timer expires.
+    complete = (
+        _active_scan.progress >= 99.9
+        or _active_scan.stall_elapsed >= _STALL_FORCE_COMPLETE
+    )
+    if complete:
         completed_id = _active_scan.entity_id
         efficiency = max(_MIN_EFFICIENCY, ship.systems["sensors"].efficiency)
         for enemy in world.enemies:

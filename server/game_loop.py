@@ -1888,6 +1888,7 @@ async def _loop() -> None:
                         "scale": _glss_evt["scale"],
                         "sector_id": _glss_evt["sector_id"],
                         "mode": _glss_evt["mode"],
+                        "results": _glss_evt.get("results"),
                     }),
                 )
                 gl.log_event("science", "sector_scan_completed", {

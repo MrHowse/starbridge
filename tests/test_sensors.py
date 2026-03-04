@@ -191,6 +191,51 @@ def test_tick_caps_progress_at_100():
     assert enemy.scan_state == "scanned"
 
 
+def test_scan_completes_at_99_9_percent():
+    """Scan completes when progress reaches 99.9% (float safety threshold)."""
+    _fresh_sensors()
+    world, enemy, ship = _make_world_with_enemy()
+    sensors.start_scan(enemy.id)
+
+    # Tick in small increments to just under 99.9%.
+    # At efficiency=1.0: progress_per_sec=20.0, so 0.1s tick adds 2.0%.
+    for _ in range(49):  # 49 × 0.1s = 4.9s → 98.0%
+        sensors.tick(world, ship, 0.1)
+    assert sensors.get_scan_progress() is not None  # still scanning
+
+    # One more 0.1s tick → 100.0% (clamped), which is >= 99.9%.
+    completed = sensors.tick(world, ship, 0.1)
+    assert enemy.id in completed
+    assert enemy.scan_state == "scanned"
+
+
+def test_scan_stall_force_completes_after_2s():
+    """If scan is at >=95% for >2 seconds, force-complete even if < 99.9%."""
+    _fresh_sensors()
+    world, enemy, ship = _make_world_with_enemy()
+    sensors.start_scan(enemy.id)
+
+    # Advance to ~96% using small ticks (0.1s each).
+    # At efficiency=1.0: progress_per_sec=20.0, so 48 ticks = 96%.
+    for _ in range(48):
+        sensors.tick(world, ship, 0.1)
+    prog = sensors.get_scan_progress()
+    assert prog is not None
+    assert prog[1] >= 95.0
+
+    # Simulate very low efficiency so progress barely moves.
+    ship.systems["sensors"].health = 1.0  # ~1% efficiency → very slow
+
+    # Tick 0.1s at a time for 2.1 seconds — stall timer should force completion.
+    completed = []
+    for _ in range(21):
+        completed = sensors.tick(world, ship, 0.1)
+        if completed:
+            break
+    assert enemy.id in completed
+    assert enemy.scan_state == "scanned"
+
+
 # ---------------------------------------------------------------------------
 # build_sensor_contacts — range filtering
 # ---------------------------------------------------------------------------

@@ -447,7 +447,15 @@ function handleSectorScanComplete(payload) {
   scanProgressFill.style.width = '100%';
   scanProgressPct.textContent  = '100%';
   const scaleLabel = payload.scale === 'sector' ? 'SECTOR SWEEP' : 'LONG-RANGE SCAN';
-  scanTargetLabel.textContent = `${scaleLabel}: COMPLETE`;
+  const sectorId = payload.sector_id || '';
+
+  // Build results summary from server payload.
+  const r = payload.results;
+  let summary = 'COMPLETE';
+  if (r && r.details && r.details.length > 0) {
+    summary = `COMPLETE — ${r.details.join(', ')}`;
+  }
+  scanTargetLabel.textContent = `${sectorId} ${scaleLabel}: ${summary}`;
 
   if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
 
@@ -457,9 +465,9 @@ function handleSectorScanComplete(payload) {
     scanScale          = 'targeted';
     updateScaleSelectorUI();
     resetScanProgress();
-  }, 1500);
+  }, 3000);
 
-  console.log(`[science] Sector scan complete: ${payload.scale} mode=${payload.mode}`);
+  console.log(`[science] Sector scan complete: ${payload.scale} mode=${payload.mode} results=${JSON.stringify(r)}`);
 }
 
 function handleScanInterrupted(_payload) {

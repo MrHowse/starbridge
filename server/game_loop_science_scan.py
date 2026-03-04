@@ -279,6 +279,7 @@ def tick(dt: float, world: "World") -> list[dict]:
     # --- Completion -------------------------------------------------------
     if _state.progress >= 100.0:
         _state.complete = True
+        results = _collect_scan_results(world)
         changed = _finalize_scan(world)
         if changed:
             events.append({"type": "sector_visibility_changed"})
@@ -287,6 +288,7 @@ def tick(dt: float, world: "World") -> list[dict]:
             "scale": _state.scale,
             "sector_id": _state.sector_id,
             "mode": _state.mode,
+            "results": results,
         })
 
     return events
@@ -353,6 +355,55 @@ def _reveal_features_for_phase(phase: int, world: "World") -> bool:
                     changed = True
 
     return changed
+
+
+def _collect_scan_results(world: "World") -> dict:
+    """Gather a summary of what was found in the scanned sector(s).
+
+    Returns a dict with counts of entities and features discovered:
+    ``{"contacts": N, "features": N, "details": [str, ...]}``
+    """
+    if world.sector_grid is None or _state is None:
+        return {"contacts": 0, "features": 0, "details": []}
+
+    grid = world.sector_grid
+    # Determine which sector(s) to inspect.
+    if _state.scale == "sector":
+        sector_ids = [_state.sector_id]
+    else:
+        sector_ids = list(_state.adjacent_ids)
+
+    contacts = 0
+    features = 0
+    details: list[str] = []
+
+    for sid in sector_ids:
+        if sid not in grid.sectors:
+            continue
+        sector = grid.sectors[sid]
+
+        # Count entities whose position falls inside this sector.
+        for enemy in world.enemies:
+            if sector.world_bounds.contains(enemy.x, enemy.y):
+                contacts += 1
+        for creature in world.creatures:
+            if sector.world_bounds.contains(creature.x, creature.y):
+                contacts += 1
+        for station in world.stations:
+            if sector.world_bounds.contains(station.x, station.y):
+                contacts += 1
+
+        # Count sector features.
+        features += len(sector.features)
+
+    if contacts:
+        details.append(f"{contacts} contact{'s' if contacts != 1 else ''} detected")
+    if features:
+        details.append(f"{features} feature{'s' if features != 1 else ''} found")
+    if not details:
+        details.append("no contacts or features detected")
+
+    return {"contacts": contacts, "features": features, "details": details}
 
 
 def _finalize_scan(world: "World") -> bool:
