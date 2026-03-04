@@ -11,6 +11,7 @@ Events returned from tick():
   {"type": "start_boarding","intruders": list[dict]}
   {"type": "mission_signal","mission_type": str, "signal_params": dict}
   {"type": "security_incident","incident": str, "message": str, "deck": str}
+  {"type": "env_sickness"}
 """
 from __future__ import annotations
 
@@ -40,6 +41,14 @@ DISTRESS_SIGNAL_INTERVAL:       tuple[float, float] = (180.0, 300.0)
 
 # Minor security events to keep the Security station busy between boardings.
 SECURITY_EVENT_INTERVAL:        tuple[float, float] = (30.0,  60.0)
+
+# Chance of crew injury as side-effect of other sandbox events (Medical work).
+CREW_INJURY_FROM_OVERCLOCK_CHANCE: float = 0.20   # 20% per overclock damage event
+CREW_INJURY_FROM_SYSTEM_DAMAGE_CHANCE: float = 0.10  # 10% per system damage event
+ALTERCATION_INJURY_CHANCE: float = 0.30            # 30% per crew_altercation incident
+
+# Environmental sickness from prolonged bad atmosphere (low O2 / high temp).
+ENV_SICKNESS_CHECK_INTERVAL: tuple[float, float] = (90.0, 120.0)
 
 # Minor security incident types — give Security work between boardings.
 SECURITY_INCIDENT_TYPES: list[dict] = [
@@ -210,6 +219,7 @@ def reset(active: bool = False) -> None:
         _timers["creature_spawn"]       = random.uniform(120.0, 180.0)  # first one sooner
         _timers["mission_signal"]       = random.uniform(60.0,  90.0)   # first mission sooner
         _timers["security_event"]       = random.uniform(20.0,  40.0)   # minor events early
+        _timers["env_sickness"]         = random.uniform(60.0,  90.0)   # env sickness check
 
 
 def is_active() -> bool:
@@ -553,6 +563,11 @@ def tick(
             "deck": _deck,
         })
         _timers["security_event"] = random.uniform(*SECURITY_EVENT_INTERVAL) * _evt_mult
+
+    # --- Environmental sickness (Medical) — prolonged atmo hazards ----------
+    if _timers.get("env_sickness", 1.0) <= 0.0:
+        events.append({"type": "env_sickness"})
+        _timers["env_sickness"] = random.uniform(*ENV_SICKNESS_CHECK_INTERVAL) * _evt_mult
 
     # --- Incoming transmission — NPC contact on a faction band (Comms) ----
     if _timers.get("incoming_transmission", 1.0) <= 0.0:

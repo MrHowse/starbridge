@@ -284,6 +284,12 @@ OVERCLOCK_DAMAGE_CHANCE: float = 0.10
 OVERCLOCK_DAMAGE_HP: float = 3.0
 REPAIR_HP_PER_TICK: float = 1.0
 
+# Deck name → physical deck number mapping (for injury generation).
+_DECK_NAME_TO_NUM: dict[str, int] = {
+    "bridge": 1, "sensors": 2, "weapons": 3,
+    "shields": 3, "engineering": 5, "medical": 4,
+}
+
 
 class _ManagerProtocol(Protocol):
     async def broadcast(self, message: Message) -> None: ...
@@ -1567,12 +1573,32 @@ async def _loop() -> None:
                         "component_health": round(_sb_comp_hit.get("health", 0.0), 1),
                         "effect": _sb_comp_hit.get("effect", ""),
                     })
+                    # Medical side-effect: 10% chance of crew injury from system damage.
+                    if random.random() < glsb.CREW_INJURY_FROM_SYSTEM_DAMAGE_CHANCE:
+                        _sd_roster = glmed.get_roster()
+                        if _sd_roster is not None:
+                            _sd_deck = random.choice(glsb.CREW_DECKS)
+                            _sd_phys_deck = _DECK_NAME_TO_NUM.get(_sd_deck, 1)
+                            _sd_injuries = generate_injuries(
+                                "system_malfunction", _sd_phys_deck, _sd_roster,
+                                severity_scale=0.6, tick=_tick_count,
+                                difficulty=_world.ship.difficulty,
+                            )
+                            for _sd_cid, _sd_inj in _sd_injuries:
+                                _sd_member = _sd_roster.members.get(_sd_cid)
+                                if _sd_member is not None:
+                                    _sd_member.injuries.append(_sd_inj)
+                                    _sd_member.update_status()
+                            if _sd_injuries:
+                                _world.ship.crew.apply_casualties(_sd_deck, 1)
+                                gl.log_event("sandbox", "system_damage_injury", {
+                                    "deck": _sd_deck, "source": sb_evt["system"],
+                                })
             elif _sb_type == "crew_casualty":
                 _world.ship.crew.apply_casualties(sb_evt["deck"], sb_evt["count"])
                 # v0.06.1: generate individual injuries via the injury system.
                 _sb_roster = glmed.get_roster()
                 if _sb_roster is not None:
-                    _DECK_NAME_TO_NUM = {"bridge": 1, "sensors": 2, "weapons": 3, "shields": 3, "engineering": 5, "medical": 4}
                     _sb_phys_deck = _DECK_NAME_TO_NUM.get(sb_evt["deck"], 1)
                     _sb_cause = sb_evt.get("cause", "system_malfunction")
                     _sb_injuries = generate_injuries(
@@ -1618,6 +1644,25 @@ async def _loop() -> None:
                     "incident": sb_evt["incident"],
                     "deck": sb_evt["deck"],
                 })
+                # Medical side-effect: 30% chance of minor injury from crew altercation.
+                if sb_evt["incident"] == "crew_altercation" and random.random() < glsb.ALTERCATION_INJURY_CHANCE:
+                    _alt_roster = glmed.get_roster()
+                    if _alt_roster is not None:
+                        _alt_deck = sb_evt["deck"]
+                        _alt_phys_deck = _DECK_NAME_TO_NUM.get(_alt_deck, 1)
+                        _alt_injuries = generate_injuries(
+                            "boarding", _alt_phys_deck, _alt_roster,
+                            severity_scale=0.3, tick=_tick_count,
+                            difficulty=_world.ship.difficulty,
+                        )
+                        for _alt_cid, _alt_inj in _alt_injuries:
+                            _alt_member = _alt_roster.members.get(_alt_cid)
+                            if _alt_member is not None:
+                                _alt_member.injuries.append(_alt_inj)
+                                _alt_member.update_status()
+                        if _alt_injuries:
+                            _world.ship.crew.apply_casualties(_alt_deck, 1)
+                            gl.log_event("sandbox", "altercation_injury", {"deck": _alt_deck})
             elif _sb_type == "incoming_transmission":
                 # Create a Signal object in the comms system
                 _sb_faction = sb_evt["faction"]
@@ -1741,6 +1786,33 @@ async def _loop() -> None:
                 gl.log_event("sandbox", "mission_signal", {
                     "mission_type": sb_evt["mission_type"],
                 })
+            elif _sb_type == "env_sickness":
+                # Environmental sickness — only generates injuries if atmosphere is bad.
+                _es_penalties = glatm.get_atmosphere_penalties(_world.ship.interior)
+                _es_bad_deck: str | None = None
+                for _es_rid, _es_pen in _es_penalties.items():
+                    if _es_pen.get("crew_hp_rate", 0) > 0 or _es_pen.get("crew_eff_penalty", 0) >= 0.20:
+                        _es_room = _world.ship.interior.rooms.get(_es_rid)
+                        if _es_room is not None:
+                            _es_bad_deck = _es_room.deck
+                            break
+                if _es_bad_deck is not None:
+                    _es_roster = glmed.get_roster()
+                    if _es_roster is not None:
+                        _es_phys_deck = _DECK_NAME_TO_NUM.get(_es_bad_deck, 1)
+                        _es_injuries = generate_injuries(
+                            "system_malfunction", _es_phys_deck, _es_roster,
+                            severity_scale=0.4, tick=_tick_count,
+                            difficulty=_world.ship.difficulty,
+                        )
+                        for _es_cid, _es_inj in _es_injuries:
+                            _es_member = _es_roster.members.get(_es_cid)
+                            if _es_member is not None:
+                                _es_member.injuries.append(_es_inj)
+                                _es_member.update_status()
+                        if _es_injuries:
+                            _world.ship.crew.apply_casualties(_es_bad_deck, 1)
+                            gl.log_event("sandbox", "env_sickness_injury", {"deck": _es_bad_deck})
 
         # 9. Hull check (safety net when no mission engine).
         if glm.get_mission_engine() is None and _world.ship.hull <= 0.0:
@@ -2305,6 +2377,23 @@ async def _loop() -> None:
                         Message.build("hazcon.overclock_fire", {"system": _oc_sys, "room_id": _oc_room_id}),
                     )
                     glops.add_feed_event("HAZCON", f"Overclock fire: {_oc_sys} in {_oc_room_id}", "warning")
+            # Medical side-effect: 20% chance of crew injury from overclock (sandbox only).
+            if glsb.is_active() and random.random() < glsb.CREW_INJURY_FROM_OVERCLOCK_CHANCE:
+                _oc_roster = glmed.get_roster()
+                if _oc_roster is not None:
+                    _oc_injuries = generate_injuries(
+                        "system_malfunction", _DECK_NAME_TO_NUM["engineering"], _oc_roster,
+                        severity_scale=0.5, tick=_tick_count,
+                        difficulty=_world.ship.difficulty,
+                    )
+                    for _oc_cid, _oc_inj in _oc_injuries:
+                        _oc_member = _oc_roster.members.get(_oc_cid)
+                        if _oc_member is not None:
+                            _oc_member.injuries.append(_oc_inj)
+                            _oc_member.update_status()
+                    if _oc_injuries:
+                        _world.ship.crew.apply_casualties("engineering", 1)
+                        gl.log_event("sandbox", "overclock_injury", {"system": _oc_sys})
         # 12a-b. Overheat warnings (from gle.tick).
         for _ow_evt in _eng_result.overclock_warnings:
             await _manager.broadcast_to_roles(
