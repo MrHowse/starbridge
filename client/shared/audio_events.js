@@ -412,3 +412,206 @@ registerSound('defeat', (ctx, gains) => {
     osc.connect(g); g.connect(evGain);
     osc.start(); osc.stop(ctx.currentTime + 4.5);
 });
+
+// ---------------------------------------------------------------------------
+// Flight Ops
+// ---------------------------------------------------------------------------
+
+registerSound('drone_launch', (ctx, gains) => {
+    // Rising noise through highpass filter 400→3000 Hz, 400ms (catapult whoosh)
+    const shot = _noiseShot(ctx, gains, 'events', 0.4, 400, 1.5, 'highpass');
+    if (!shot) return;
+    shot.filter.frequency.linearRampToValueAtTime(3000, ctx.currentTime + 0.4);
+    _envelope(shot.g, ctx, 0.35, 0.02, 0.1, 0.28);
+    shot.src.start(); shot.src.stop(ctx.currentTime + 0.45);
+});
+
+registerSound('drone_recovery', (ctx, gains) => {
+    // Descending sine 800→300 Hz, 500ms — landing confirmed
+    const evGain = gains.events;
+    if (!evGain) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.5);
+    _envelope(g, ctx, 0.25, 0.02, 0.15, 0.33);
+    osc.connect(g); g.connect(evGain);
+    osc.start(); osc.stop(ctx.currentTime + 0.55);
+});
+
+registerSound('drone_destroyed', (ctx, gains) => {
+    // Explosion + static burst
+    const evGain = gains.events;
+    if (!evGain) return;
+    // Low-freq explosion
+    const shot = _noiseShot(ctx, gains, 'events', 0.5, 300, 0.8, 'lowpass');
+    if (shot) {
+        _envelope(shot.g, ctx, 0.4, 0.01, 0.05, 0.4);
+        shot.src.start(); shot.src.stop(ctx.currentTime + 0.55);
+    }
+    // High-freq static crackle
+    const crackle = _noiseShot(ctx, gains, 'events', 0.3, 4000, 2, 'highpass');
+    if (crackle) {
+        _envelope(crackle.g, ctx, 0.2, 0.05, 0.05, 0.2);
+        crackle.src.start(); crackle.src.stop(ctx.currentTime + 0.35);
+    }
+});
+
+registerSound('drone_lost', (ctx, gains) => {
+    // Slow descending two-tone sine 440→330 Hz, 600ms — solemn
+    const evGain = gains.events;
+    if (!evGain) return;
+    [[440, 0], [330, 0.3]].forEach(([freq, delay]) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine'; osc.frequency.value = freq;
+        g.gain.setValueAtTime(0, ctx.currentTime + delay);
+        g.gain.linearRampToValueAtTime(0.2, ctx.currentTime + delay + 0.03);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.28);
+        osc.connect(g); g.connect(evGain);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.3);
+    });
+});
+
+registerSound('bingo_fuel', (ctx, gains) => {
+    // 4-pulse square 600 Hz alarm, 120ms spacing
+    const evGain = gains.events;
+    if (!evGain) return;
+    for (let i = 0; i < 4; i++) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'square'; osc.frequency.value = 600;
+        const delay = i * 0.12;
+        g.gain.setValueAtTime(0, ctx.currentTime + delay);
+        g.gain.linearRampToValueAtTime(0.2, ctx.currentTime + delay + 0.01);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.08);
+        osc.connect(g); g.connect(evGain);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.1);
+    }
+});
+
+registerSound('warning', (ctx, gains) => {
+    // 3-pulse alternating square 500/400 Hz
+    const evGain = gains.events;
+    if (!evGain) return;
+    for (let i = 0; i < 3; i++) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'square'; osc.frequency.value = i % 2 === 0 ? 500 : 400;
+        const delay = i * 0.15;
+        g.gain.setValueAtTime(0, ctx.currentTime + delay);
+        g.gain.linearRampToValueAtTime(0.2, ctx.currentTime + delay + 0.01);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.12);
+        osc.connect(g); g.connect(evGain);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.14);
+    }
+});
+
+registerSound('bolter', (ctx, gains) => {
+    // Harsh sawtooth 150 Hz through bandpass, 300ms — missed landing buzzer
+    const evGain = gains.events;
+    if (!evGain) return;
+    const osc = ctx.createOscillator();
+    const filter = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.value = 150;
+    filter.type = 'bandpass'; filter.frequency.value = 400; filter.Q.value = 2;
+    _envelope(g, ctx, 0.3, 0.01, 0.1, 0.19);
+    osc.connect(filter); filter.connect(g); g.connect(evGain);
+    osc.start(); osc.stop(ctx.currentTime + 0.35);
+});
+
+registerSound('contact_ping', (ctx, gains) => {
+    // Sine 1500 Hz, 150ms with quick decay — sonar-like proximity ping
+    const evGain = gains.events;
+    if (!evGain) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.value = 1500;
+    _envelope(g, ctx, 0.2, 0.005, 0.02, 0.12);
+    osc.connect(g); g.connect(evGain);
+    osc.start(); osc.stop(ctx.currentTime + 0.2);
+});
+
+registerSound('torpedo_hit', (ctx, gains) => {
+    // Confirmed kill — deep bass hit + noise (torpedo_impact pattern)
+    const evGain = gains.events;
+    if (!evGain) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.value = 55;
+    _envelope(g, ctx, 0.5, 0.01, 0.05, 0.4);
+    osc.connect(g); g.connect(evGain);
+    osc.start(); osc.stop(ctx.currentTime + 0.6);
+    const shot = _noiseShot(ctx, gains, 'events', 0.5, 180, 1.5, 'bandpass');
+    if (shot) {
+        _envelope(shot.g, ctx, 0.3, 0.01, 0.05, 0.35);
+        shot.src.start(); shot.src.stop(ctx.currentTime + 0.55);
+    }
+});
+
+registerSound('survivor_pickup', (ctx, gains) => {
+    // Ascending 3-tone chime 659/784/988 Hz — rescue complete
+    const evGain = gains.events;
+    if (!evGain) return;
+    [659, 784, 988].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine'; osc.frequency.value = freq;
+        const delay = i * 0.12;
+        g.gain.setValueAtTime(0, ctx.currentTime + delay);
+        g.gain.linearRampToValueAtTime(0.25, ctx.currentTime + delay + 0.02);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.25);
+        osc.connect(g); g.connect(evGain);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.3);
+    });
+});
+
+registerSound('decoy_deploy', (ctx, gains) => {
+    // Bandpass noise burst 1200 Hz, 200ms — electronic ejection
+    const shot = _noiseShot(ctx, gains, 'events', 0.2, 1200, 3, 'bandpass');
+    if (!shot) return;
+    _envelope(shot.g, ctx, 0.3, 0.01, 0.05, 0.14);
+    shot.src.start(); shot.src.stop(ctx.currentTime + 0.25);
+});
+
+registerSound('buoy_deploy', (ctx, gains) => {
+    // Descending sine 2000→800 Hz, 300ms — sonar deployment ping
+    const evGain = gains.events;
+    if (!evGain) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(2000, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.3);
+    _envelope(g, ctx, 0.2, 0.01, 0.08, 0.21);
+    osc.connect(g); g.connect(evGain);
+    osc.start(); osc.stop(ctx.currentTime + 0.35);
+});
+
+// ---------------------------------------------------------------------------
+// Security
+// ---------------------------------------------------------------------------
+
+registerSound('alert', (ctx, gains) => {
+    // 3-pulse square 800/600 Hz alternating — security incident alarm
+    const evGain = gains.events;
+    if (!evGain) return;
+    for (let i = 0; i < 3; i++) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'square'; osc.frequency.value = i % 2 === 0 ? 800 : 600;
+        const delay = i * 0.12;
+        g.gain.setValueAtTime(0, ctx.currentTime + delay);
+        g.gain.linearRampToValueAtTime(0.22, ctx.currentTime + delay + 0.01);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.09);
+        osc.connect(g); g.connect(evGain);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.11);
+    }
+});

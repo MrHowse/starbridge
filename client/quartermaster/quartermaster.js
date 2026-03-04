@@ -27,6 +27,9 @@ import { initRoleBar } from '../shared/role_bar.js';
 import {
   setStatusDot, setAlertLevel, showBriefing, showGameOver,
 } from '../shared/ui_components.js';
+import { SoundBank } from '../shared/audio.js';
+import '../shared/audio_events.js';
+import { wireButtonSounds } from '../shared/audio_ui.js';
 
 // ---------------------------------------------------------------------------
 // DOM references
@@ -139,6 +142,7 @@ function handleMessage(msg) {
 
     case 'ship.alert_changed':
       setAlertLevel(msg.payload.level);
+      SoundBank.setAmbient('alert_level', { level: msg.payload.level });
       break;
 
     case 'ship.hull_hit':
@@ -146,10 +150,12 @@ function handleMessage(msg) {
         stationEl.classList.add('hit');
         setTimeout(() => stationEl.classList.remove('hit'), 400);
       }
+      SoundBank.play('hull_hit');
       break;
 
     case 'game.over':
       showGameOver(msg.payload);
+      SoundBank.play(msg.payload.result === 'victory' ? 'victory' : 'defeat');
       break;
 
     default:
@@ -179,5 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   _send = send;
   initRoleBar(send, 'quartermaster');
+  SoundBank.init();
+  wireButtonSounds(SoundBank);
   renderRationButtons();
 });

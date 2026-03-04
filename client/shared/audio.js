@@ -159,7 +159,7 @@ export const SoundBank = {
         const ctx = getCtx();
         if (ctx.state !== 'running') return;
         const def = _SOUNDS[name];
-        if (!def) { return; }
+        if (!def) { console.warn(`[audio] unknown sound: ${name}`); return; }
         try { def(ctx, _categoryGains, opts); } catch (e) {
             console.warn(`[audio] ${name} error:`, e);
         }
@@ -175,7 +175,7 @@ export const SoundBank = {
         const ctx = getCtx();
         if (ctx.state !== 'running') return;
         const def = _AMBIENT[name];
-        if (!def) { return; }
+        if (!def) { console.warn(`[audio] unknown ambient: ${name}`); return; }
         try { def(ctx, _categoryGains, params); } catch (e) {
             console.warn(`[audio] ambient ${name} error:`, e);
         }
