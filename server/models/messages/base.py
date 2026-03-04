@@ -167,6 +167,7 @@ from server.models.messages.lobby import LobbyClaimRolePayload, LobbyReleaseRole
 from server.models.messages.science import (
     ScienceCancelScanPayload,
     ScienceCancelSectorScanPayload,
+    ScienceScanAutoContPayload,
     ScienceScanInterruptResponsePayload,
     ScienceStartScanPayload,
     ScienceStartSectorScanPayload,
@@ -285,6 +286,7 @@ _PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     "science.start_sector_scan": ScienceStartSectorScanPayload,
     "science.cancel_sector_scan": ScienceCancelSectorScanPayload,
     "science.scan_interrupt_response": ScienceScanInterruptResponsePayload,
+    "science.scan_auto_continue": ScienceScanAutoContPayload,
     # Captain
     "captain.set_alert": CaptainSetAlertPayload,
     "captain.authorize": CaptainAuthorizePayload,

@@ -59,6 +59,7 @@ from server.models.messages.science import (
     ScienceStartSectorScanPayload,
     ScienceCancelSectorScanPayload,
     ScienceScanInterruptResponsePayload,
+    ScienceScanAutoContPayload,
 )
 
 # Captain
@@ -343,6 +344,7 @@ __all__ = [
     "ScienceStartSectorScanPayload",
     "ScienceCancelSectorScanPayload",
     "ScienceScanInterruptResponsePayload",
+    "ScienceScanAutoContPayload",
     # captain
     "CaptainSetAlertPayload",
     "CaptainAuthorizePayload",

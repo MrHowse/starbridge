@@ -34,3 +34,8 @@ class ScienceCancelSectorScanPayload(BaseModel):
 class ScienceScanInterruptResponsePayload(BaseModel):
     """Player response to a combat-interrupt warning during a sector scan."""
     continue_scan: bool
+
+
+class ScienceScanAutoContPayload(BaseModel):
+    """Toggle auto-continue during sector scans."""
+    enabled: bool

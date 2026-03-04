@@ -165,6 +165,8 @@ const scaleBtns = {
 const interruptOverlayEl = document.getElementById('scan-interrupt-overlay');
 const scanContinueBtn    = document.getElementById('scan-continue-btn');
 const scanAbortBtn       = document.getElementById('scan-abort-btn');
+const autoContRow        = document.getElementById('auto-continue-row');
+const autoContCb         = document.getElementById('scan-auto-continue-cb');
 
 const rangeBarEl = document.getElementById('range-bar');
 
@@ -198,6 +200,7 @@ let sectorScanActive   = false;
 let sectorScanProgress = 0;          // 0–100
 let sectorScanPhase    = 0;          // 0–3
 let sectorScanDuration = 45;         // seconds (from server)
+let scanContinueCount  = 0;          // consecutive "continue" clicks (for auto-continue)
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -224,6 +227,7 @@ function init() {
   on('science.sector_scan_progress',   handleSectorScanProgress);
   on('science.sector_scan_complete',   handleSectorScanComplete);
   on('science.scan_interrupted',       handleScanInterrupted);
+  on('science.scan_auto_continued',   (p) => console.log('[science] Auto-continued:', p.reason));
   on('mission.signal_bearing',         handleSignalBearing);
   on('ship.hull_hit',                  handleHullHit);
   on('science.sensor_anomaly',         handleSensorAnomaly);
@@ -479,6 +483,8 @@ function handleScanInterrupted(_payload) {
   sectorScanActive = false;
   cancelBtn.disabled = true;
   if (interruptOverlayEl) interruptOverlayEl.style.display = '';
+  // Show auto-continue option after 2+ consecutive continues
+  if (autoContRow) autoContRow.style.display = scanContinueCount >= 2 ? '' : 'none';
   console.log('[science] Scan interrupted — awaiting response');
 }
 
@@ -558,6 +564,8 @@ function setupControls() {
       sectorScanActive   = true;
       sectorScanProgress = 0;
       sectorScanPhase    = 0;
+      scanContinueCount  = 0;
+      if (autoContCb) autoContCb.checked = false;
       const scaleLabel = scanScale === 'sector' ? 'SECTOR SWEEP' : 'LONG-RANGE SCAN';
       scanTargetLabel.textContent = `${scaleLabel}: 0%`;
       scanBtn.disabled   = true;
@@ -604,7 +612,11 @@ function setupControls() {
   if (scanContinueBtn) {
     scanContinueBtn.addEventListener('click', () => {
       if (!gameActive) return;
+      scanContinueCount++;
       send('science.scan_interrupt_response', { continue_scan: true });
+      if (autoContCb && autoContCb.checked) {
+        send('science.scan_auto_continue', { enabled: true });
+      }
       sectorScanActive   = true;
       cancelBtn.disabled = false;
       if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
@@ -619,7 +631,9 @@ function setupControls() {
       sectorScanActive   = false;
       sectorScanProgress = 0;
       sectorScanPhase    = 0;
+      scanContinueCount  = 0;
       scanScale          = 'targeted';
+      if (autoContCb) autoContCb.checked = false;
       if (interruptOverlayEl) interruptOverlayEl.style.display = 'none';
       updateScaleSelectorUI();
       resetScanProgress();

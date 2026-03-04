@@ -9,6 +9,7 @@ import pytest
 import server.game_loop_science_scan as glss
 from server.game_loop_science_scan import (
     COMBAT_INTERRUPT_RANGE,
+    INTERRUPT_COOLDOWN,
     LONG_RANGE_DURATION,
     PHASE_THRESHOLDS,
     SECTOR_SWEEP_DURATION,
@@ -20,19 +21,29 @@ from server.models.sector import Rect, Sector, SectorFeature, SectorGrid, Sector
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_world(enemies=None, sector_grid=None, ship_x=50_000.0, ship_y=50_000.0):
+def _make_world(enemies=None, sector_grid=None, ship_x=50_000.0, ship_y=50_000.0,
+                torpedoes=None, hull=120.0):
     """Build a minimal mock World for scan tests."""
     ship = MagicMock()
     ship.x = ship_x
     ship.y = ship_y
+    ship.hull = hull
 
     world = MagicMock()
     world.ship = ship
     world.enemies = enemies or []
     world.creatures = []
     world.stations = []
+    world.torpedoes = torpedoes or []
     world.sector_grid = sector_grid
     return world
+
+
+def _torpedo(owner="enemy1"):
+    """Build a minimal mock torpedo."""
+    t = MagicMock()
+    t.owner = owner
+    return t
 
 
 def _make_grid_2x1() -> SectorGrid:
@@ -158,9 +169,9 @@ class TestCancelScan:
 class TestInterruptResponse:
     def test_continue_resumes_scan(self) -> None:
         glss.start_scan("sector", "em", "A1")
-        # Advance past 1s grace period before injecting enemy
+        # Advance past 1s grace period before injecting torpedo
         glss.tick(1.1, _make_world())
-        world = _make_world(enemies=[_enemy_at(50_000, 50_000)])
+        world = _make_world(torpedoes=[_torpedo()])
         glss.tick(0.1, world)
         assert glss.build_progress().get("interrupted") is True
         glss.set_interrupt_response(True)
@@ -170,7 +181,7 @@ class TestInterruptResponse:
     def test_abort_cancels_scan(self) -> None:
         glss.start_scan("sector", "em", "A1")
         glss.tick(1.1, _make_world())
-        world = _make_world(enemies=[_enemy_at(50_000, 50_000)])
+        world = _make_world(torpedoes=[_torpedo()])
         glss.tick(0.1, world)
         glss.set_interrupt_response(False)
         assert glss.is_active() is False
@@ -178,7 +189,7 @@ class TestInterruptResponse:
     def test_no_interrupt_during_grace_period(self) -> None:
         """Combat detected within the 1s grace period should not interrupt."""
         glss.start_scan("sector", "em", "A1")
-        world = _make_world(enemies=[_enemy_at(50_000, 50_000)])
+        world = _make_world(torpedoes=[_torpedo()])
         glss.tick(0.5, world)
         assert glss.build_progress().get("interrupted") is False
         assert glss.is_active() is True
@@ -313,32 +324,32 @@ class TestTick:
     def test_no_tick_when_interrupted(self) -> None:
         glss.start_scan("sector", "em", "A1")
         glss.tick(1.1, _make_world())  # past grace period
-        enemy = _enemy_at(50_000, 50_000)
-        world = _make_world(enemies=[enemy])
+        world = _make_world(torpedoes=[_torpedo()])
         glss.tick(0.1, world)  # triggers interrupt
         events = glss.tick(1.0, world)
         assert events == []
 
-    def test_interrupted_event_when_enemy_close(self) -> None:
+    def test_interrupted_event_when_torpedo_incoming(self) -> None:
         glss.start_scan("sector", "em", "A1")
         glss.tick(1.1, _make_world())  # past grace period
-        enemy = _enemy_at(50_000, 50_000)  # within range
-        world = _make_world(enemies=[enemy])
+        world = _make_world(torpedoes=[_torpedo()])
         events = glss.tick(0.1, world)
         types = [e["type"] for e in events]
         assert "interrupted" in types
 
-    def test_no_interrupt_when_enemy_far(self) -> None:
+    def test_no_interrupt_when_enemy_nearby_but_no_threat(self) -> None:
+        """Proximity alone no longer triggers interrupt."""
         glss.start_scan("sector", "em", "A1")
-        far_enemy = _enemy_at(50_000 + COMBAT_INTERRUPT_RANGE + 1000, 50_000)
-        world = _make_world(enemies=[far_enemy])
+        glss.tick(1.1, _make_world())
+        enemy = _enemy_at(50_000, 50_000)  # close but no torpedoes/damage/boarding
+        world = _make_world(enemies=[enemy])
         events = glss.tick(0.1, world)
         types = [e["type"] for e in events]
         assert "interrupted" not in types
 
-    def test_no_interrupt_when_no_enemies(self) -> None:
+    def test_no_interrupt_when_no_threats(self) -> None:
         glss.start_scan("sector", "em", "A1")
-        world = _make_world(enemies=[])
+        world = _make_world()
         events = glss.tick(0.1, world)
         types = [e["type"] for e in events]
         assert "interrupted" not in types
@@ -530,3 +541,184 @@ class TestScanResults:
         events = glss.tick(SECTOR_SWEEP_DURATION + 1.0, world)
         complete = next(e for e in events if e["type"] == "complete")
         assert complete["results"]["contacts"] == 0
+
+
+# ---------------------------------------------------------------------------
+# TestInterruptCooldown
+# ---------------------------------------------------------------------------
+
+
+class TestInterruptCooldown:
+    def test_no_reinterrupt_during_cooldown(self) -> None:
+        """After clicking continue, no interrupt fires for 10s."""
+        glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())
+        # Trigger first interrupt
+        world = _make_world(torpedoes=[_torpedo()])
+        glss.tick(0.1, world)
+        assert glss.build_progress().get("interrupted") is True
+        # Continue — starts cooldown
+        glss.set_interrupt_response(True)
+        # Tick during cooldown — should NOT interrupt even with torpedo
+        events = glss.tick(0.1, world)
+        types = [e["type"] for e in events]
+        assert "interrupted" not in types
+
+    def test_interrupt_fires_after_cooldown_expires(self) -> None:
+        """After cooldown expires, torpedo triggers interrupt again."""
+        glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())
+        world = _make_world(torpedoes=[_torpedo()])
+        glss.tick(0.1, world)
+        glss.set_interrupt_response(True)
+        # Advance past cooldown
+        events = glss.tick(INTERRUPT_COOLDOWN + 0.1, world)
+        types = [e["type"] for e in events]
+        assert "interrupted" in types
+
+    def test_cooldown_resets_on_each_continue(self) -> None:
+        """Each continue click resets the cooldown timer."""
+        glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())
+        world = _make_world(torpedoes=[_torpedo()])
+        # First interrupt + continue
+        glss.tick(0.1, world)
+        glss.set_interrupt_response(True)
+        # Wait 5s (half cooldown), no interrupt
+        events = glss.tick(5.0, world)
+        assert "interrupted" not in [e["type"] for e in events]
+        # Wait 6s more (past original 10s) — triggers second interrupt
+        events = glss.tick(6.0, world)
+        assert "interrupted" in [e["type"] for e in events]
+        # Continue again — cooldown resets
+        glss.set_interrupt_response(True)
+        events = glss.tick(5.0, world)
+        assert "interrupted" not in [e["type"] for e in events]
+
+    def test_continue_count_increments(self) -> None:
+        glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())
+        world = _make_world(torpedoes=[_torpedo()])
+        glss.tick(0.1, world)
+        glss.set_interrupt_response(True)
+        assert glss.build_progress()["continue_count"] == 1
+        # Wait for cooldown, trigger again
+        glss.tick(INTERRUPT_COOLDOWN + 0.1, world)
+        glss.set_interrupt_response(True)
+        assert glss.build_progress()["continue_count"] == 2
+
+
+# ---------------------------------------------------------------------------
+# TestAutoContinue
+# ---------------------------------------------------------------------------
+
+
+class TestAutoContinue:
+    def test_auto_continue_emits_auto_continued(self) -> None:
+        """When auto_continue is on, torpedo yields auto_continued not interrupted."""
+        glss.start_scan("sector", "em", "A1")
+        glss.set_auto_continue(True)
+        glss.tick(1.1, _make_world())
+        world = _make_world(torpedoes=[_torpedo()])
+        events = glss.tick(0.1, world)
+        types = [e["type"] for e in events]
+        assert "auto_continued" in types
+        assert "interrupted" not in types
+
+    def test_auto_continue_sets_cooldown(self) -> None:
+        """Auto-continue should set cooldown to prevent rapid events."""
+        glss.start_scan("sector", "em", "A1")
+        glss.set_auto_continue(True)
+        glss.tick(1.1, _make_world())
+        world = _make_world(torpedoes=[_torpedo()])
+        # First auto_continued
+        events = glss.tick(0.1, world)
+        assert "auto_continued" in [e["type"] for e in events]
+        # Immediately tick again — cooldown active, no auto_continued
+        events = glss.tick(0.1, world)
+        assert "auto_continued" not in [e["type"] for e in events]
+
+    def test_auto_continue_does_not_pause_scan(self) -> None:
+        """Scan should keep running when auto_continue fires."""
+        glss.start_scan("sector", "em", "A1")
+        glss.set_auto_continue(True)
+        glss.tick(1.1, _make_world())
+        world = _make_world(torpedoes=[_torpedo()])
+        glss.tick(0.1, world)
+        assert glss.is_active() is True
+        assert glss.build_progress().get("interrupted") is False
+
+    def test_set_auto_continue_works(self) -> None:
+        glss.start_scan("sector", "em", "A1")
+        assert glss.build_progress()["auto_continue"] is False
+        glss.set_auto_continue(True)
+        assert glss.build_progress()["auto_continue"] is True
+        glss.set_auto_continue(False)
+        assert glss.build_progress()["auto_continue"] is False
+
+    def test_set_auto_continue_noop_when_no_scan(self) -> None:
+        """Should not raise when no scan is active."""
+        glss.set_auto_continue(True)  # no crash
+
+
+# ---------------------------------------------------------------------------
+# TestThreatFiltering
+# ---------------------------------------------------------------------------
+
+
+class TestThreatFiltering:
+    def test_no_interrupt_for_nearby_enemy_alone(self) -> None:
+        """Enemy proximity without torpedo/damage/boarding does not interrupt."""
+        glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())
+        enemy = _enemy_at(50_000, 50_000)
+        world = _make_world(enemies=[enemy])
+        events = glss.tick(0.1, world)
+        assert "interrupted" not in [e["type"] for e in events]
+
+    def test_interrupt_for_incoming_torpedo(self) -> None:
+        """Enemy torpedo in flight triggers interrupt."""
+        glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())
+        world = _make_world(torpedoes=[_torpedo("enemy1")])
+        events = glss.tick(0.1, world)
+        assert "interrupted" in [e["type"] for e in events]
+
+    def test_no_interrupt_for_player_torpedo(self) -> None:
+        """Player's own torpedo does not trigger interrupt."""
+        glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world())
+        world = _make_world(torpedoes=[_torpedo("player")])
+        events = glss.tick(0.1, world)
+        assert "interrupted" not in [e["type"] for e in events]
+
+    def test_interrupt_for_hull_damage(self) -> None:
+        """Hull damage between ticks triggers interrupt."""
+        glss.start_scan("sector", "em", "A1")
+        # First tick sets _last_hull
+        glss.tick(1.1, _make_world(hull=120.0))
+        # Next tick with lower hull
+        world = _make_world(hull=110.0)
+        events = glss.tick(0.1, world)
+        assert "interrupted" in [e["type"] for e in events]
+
+    def test_no_interrupt_when_hull_unchanged(self) -> None:
+        """No hull drop → no interrupt."""
+        glss.start_scan("sector", "em", "A1")
+        glss.tick(1.1, _make_world(hull=120.0))
+        world = _make_world(hull=120.0)
+        events = glss.tick(0.1, world)
+        assert "interrupted" not in [e["type"] for e in events]
+
+    def test_interrupt_for_boarding(self) -> None:
+        """Active boarding triggers interrupt."""
+        import server.game_loop_security as gls
+        old = gls._boarding_active
+        try:
+            gls._boarding_active = True
+            glss.start_scan("sector", "em", "A1")
+            glss.tick(1.1, _make_world())
+            events = glss.tick(0.1, _make_world())
+            assert "interrupted" in [e["type"] for e in events]
+        finally:
+            gls._boarding_active = old

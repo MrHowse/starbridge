@@ -99,6 +99,7 @@ from server.models.messages import (
     ScienceStartScanPayload,
     ScienceStartSectorScanPayload,
     ScienceCancelSectorScanPayload,
+    ScienceScanAutoContPayload,
     ScienceScanInterruptResponsePayload,
     SecurityMoveSquadPayload,
     SecurityToggleDoorPayload,
@@ -1904,6 +1905,11 @@ async def _loop() -> None:
                 gl.log_event("science", "sector_scan_interrupted", {
                     "reason": _glss_evt["reason"],
                 })
+            elif _glss_evt["type"] == "auto_continued":
+                await _manager.broadcast_to_roles(
+                    ["science"],
+                    Message.build("science.scan_auto_continued", {"reason": _glss_evt["reason"]}),
+                )
 
         # 11d. Scan complete.
         for cid in scan_completed:
@@ -2864,6 +2870,9 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "science.scan_interrupt_response" and isinstance(payload, ScienceScanInterruptResponsePayload):
             glss.set_interrupt_response(payload.continue_scan)
             gl.log_event("science", "scan_interrupt_response", {"continue": payload.continue_scan})
+        elif msg_type == "science.scan_auto_continue" and isinstance(payload, ScienceScanAutoContPayload):
+            glss.set_auto_continue(payload.enabled)
+            gl.log_event("science", "scan_auto_continue", {"enabled": payload.enabled})
         elif msg_type == "medical.treat_crew" and isinstance(payload, MedicalTreatCrewPayload):
             glmed.start_treatment(payload.deck, payload.injury_type, ship)
             gl.log_event("medical", "treatment_started", {"deck": payload.deck, "injury_type": payload.injury_type})

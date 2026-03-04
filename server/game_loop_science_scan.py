@@ -36,7 +36,6 @@ Public API
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -58,6 +57,9 @@ PHASE_THRESHOLDS: list[float] = [0.0, 25.0, 50.0, 75.0]
 
 #: Enemy distance (world units) that triggers a combat interrupt.
 COMBAT_INTERRUPT_RANGE: float = 15_000.0
+
+#: Cooldown (seconds) before another interrupt can fire after "continue".
+INTERRUPT_COOLDOWN: float = 10.0
 
 #: Feature types associated with each scan mode (for early-phase priority).
 MODE_FEATURE_AFFINITY: dict[str, frozenset[str]] = {
@@ -85,6 +87,10 @@ class _SectorScanState:
     complete: bool = False
     _revealed_phase: int = -1             # highest phase whose reveals were applied
     scan_time_multiplier: float = 1.0     # from difficulty preset (>1 = slower)
+    interrupt_cooldown: float = 0.0       # seconds before next interrupt allowed
+    continue_count: int = 0               # consecutive "continue" clicks
+    auto_continue: bool = False           # player opted to auto-continue
+    _last_hull: float = 0.0               # hull at last check (detect damage)
 
     @property
     def duration(self) -> float:
@@ -182,8 +188,16 @@ def set_interrupt_response(continue_scan: bool) -> None:
     if _state is not None and _state.interrupted:
         if continue_scan:
             _state.interrupted = False
+            _state.interrupt_cooldown = INTERRUPT_COOLDOWN
+            _state.continue_count += 1
         else:
             _state.cancelled = True
+
+
+def set_auto_continue(enabled: bool) -> None:
+    """Toggle auto-continue mode during a scan."""
+    if _state is not None:
+        _state.auto_continue = enabled
 
 
 def build_progress() -> dict:
@@ -201,6 +215,8 @@ def build_progress() -> dict:
         "phase": _state.phase,
         "sector_id": _state.sector_id,
         "interrupted": _state.interrupted,
+        "continue_count": _state.continue_count,
+        "auto_continue": _state.auto_continue,
     }
 
 
@@ -255,11 +271,24 @@ def tick(dt: float, world: "World") -> list[dict]:
 
     events: list[dict] = []
 
-    # --- Combat interrupt check (1s grace period after scan start) --------
-    if _state.elapsed >= 1.0 and _check_combat_interrupt(world):
-        _state.interrupted = True
-        events.append({"type": "interrupted", "reason": "combat"})
-        return events
+    # --- Decrement interrupt cooldown -------------------------------------
+    if _state.interrupt_cooldown > 0.0:
+        _state.interrupt_cooldown -= dt
+
+    # --- Combat interrupt check (1s grace + cooldown) ---------------------
+    if (_state.elapsed >= 1.0
+            and _state.interrupt_cooldown <= 0.0
+            and _check_combat_interrupt(world)):
+        if _state.auto_continue:
+            _state.interrupt_cooldown = INTERRUPT_COOLDOWN
+            events.append({"type": "auto_continued", "reason": "combat"})
+        else:
+            _state.interrupted = True
+            events.append({"type": "interrupted", "reason": "combat"})
+            return events
+
+    # --- Track hull for damage detection ----------------------------------
+    _state._last_hull = world.ship.hull
 
     # --- Advance elapsed time ---------------------------------------------
     _state.elapsed += dt
@@ -300,12 +329,22 @@ def tick(dt: float, world: "World") -> list[dict]:
 
 
 def _check_combat_interrupt(world: "World") -> bool:
-    """True when at least one enemy is within combat-interrupt range."""
-    if not world.enemies:
-        return False
-    ship = world.ship
-    for enemy in world.enemies:
-        if math.hypot(enemy.x - ship.x, enemy.y - ship.y) < COMBAT_INTERRUPT_RANGE:
+    """True when a direct threat requires interruption.
+
+    Direct threats: incoming torpedo, hull damage, boarding.
+    NOT: enemy proximity, distant combat, jamming.
+    """
+    # 1. Enemy torpedoes in flight.
+    for torp in world.torpedoes:
+        if torp.owner != "player":
+            return True
+    # 2. Active boarding.
+    import server.game_loop_security as gls
+    if gls.is_boarding_active():
+        return True
+    # 3. Hull damage since last check.
+    if _state is not None and _state._last_hull > 0.0:
+        if world.ship.hull < _state._last_hull:
             return True
     return False
 
