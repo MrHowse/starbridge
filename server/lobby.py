@@ -89,6 +89,11 @@ _game_active: bool = False
 _reserved_roles: dict[str, tuple[str, float]] = {}
 ROLE_RESERVE_SECS: float = 60.0
 
+# Debounce rapid duplicate claims (e.g. stuck click / UI bug).
+_last_claim_time: dict[str, float] = {}  # connection_id → monotonic timestamp
+_CLAIM_DEBOUNCE_SECS: float = 1.0
+_time_func = time.monotonic  # indirected for testability
+
 
 # ---------------------------------------------------------------------------
 # Initialisation
@@ -101,12 +106,13 @@ def init(manager: _ManagerProtocol) -> None:
     Called once from main.py on server startup with the real ConnectionManager.
     Calling again (e.g. in tests) resets the session to a clean state.
     """
-    global _manager, _session, _game_payload, _game_active, _reserved_roles
+    global _manager, _session, _game_payload, _game_active, _reserved_roles, _last_claim_time
     _manager = manager
     _session = LobbySession()
     _game_payload = None
     _game_active = False
     _reserved_roles = {}
+    _last_claim_time = {}
 
 
 def register_game_start_callback(callback: Callable[..., Awaitable[None]]) -> None:
@@ -317,6 +323,15 @@ async def _claim_role(connection_id: str, payload: LobbyClaimRolePayload) -> Non
         return
 
     occupant = _session.roles[role]
+
+    # Debounce: ignore if this connection already holds this role
+    # and claimed less than 1s ago (prevents spam-clicking).
+    if occupant is not None and occupant[0] == connection_id:
+        now = _time_func()
+        last = _last_claim_time.get(connection_id, 0.0)
+        if now - last < _CLAIM_DEBOUNCE_SECS:
+            return
+
     if occupant is not None and occupant[0] != connection_id:
         # Another connection holds the role.
         other_player = occupant[1]
@@ -361,6 +376,7 @@ async def _claim_role(connection_id: str, payload: LobbyClaimRolePayload) -> Non
                 _session.roles[held] = None
 
     _session.roles[role] = (connection_id, payload.player_name)
+    _last_claim_time[connection_id] = _time_func()
     _manager.tag(connection_id, role=role, player_name=payload.player_name)
     _log("lobby", "role_claimed", {
         "role": role,

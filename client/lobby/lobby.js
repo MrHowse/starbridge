@@ -206,7 +206,10 @@ function buildRoleCards() {
 // Actions
 // ---------------------------------------------------------------------------
 
+let _claimPending = false;
+
 function claimRole(role) {
+  if (_claimPending) return;
   const callsign = callsignInput.value.trim();
   if (!callsign || callsign.length > 20) {
     callsignInput.focus();
@@ -214,7 +217,9 @@ function claimRole(role) {
     setTimeout(() => callsignInput.classList.remove('lobby-input--error'), 1500);
     return;
   }
+  _claimPending = true;
   send('lobby.claim_role', { role, player_name: callsign });
+  setTimeout(() => { _claimPending = false; }, 500);
 }
 
 function releaseRole() {
@@ -325,9 +330,12 @@ function handleJanitorAvailable() {
   `;
 
   card.querySelector('[data-claim="janitor"]').addEventListener('click', () => {
+    if (_claimPending) return;
     const callsign = callsignInput.value.trim();
     if (!callsign) return;
+    _claimPending = true;
     send('lobby.claim_role', { role: 'janitor', player_name: callsign });
+    setTimeout(() => { _claimPending = false; }, 500);
     // Optimistically update card — janitor is excluded from lobby.state broadcasts.
     const occ = card.querySelector('[data-occupant="janitor"]');
     if (occ) occ.textContent = callsign;

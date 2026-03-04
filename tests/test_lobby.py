@@ -690,3 +690,63 @@ async def test_briefing_launch_still_works():
         assert any(msg.type == "game.all_ready" for msg in broadcast_msgs)
     finally:
         _main.manager.broadcast = orig_broadcast  # type: ignore[assignment]
+
+
+# ---------------------------------------------------------------------------
+# Claim debounce
+# ---------------------------------------------------------------------------
+
+
+async def test_claim_debounce_blocks_rapid_duplicate():
+    """Re-claiming the same role within 1s is silently ignored."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+
+    msg = Message.build("lobby.claim_role", {"role": "helm", "player_name": "Alice"})
+    await lobby.handle_lobby_message("a", msg)
+    assert lobby._session.roles["helm"] == ("a", "Alice")
+
+    # Clear broadcasts so we can detect whether a second claim triggers one.
+    m.broadcasts.clear()
+    await lobby.handle_lobby_message("a", msg)
+
+    # No new broadcast — the duplicate was suppressed.
+    assert len(m.broadcasts) == 0
+    assert lobby._session.roles["helm"] == ("a", "Alice")
+
+
+async def test_claim_debounce_allows_after_delay():
+    """Re-claiming the same role after >1s is allowed."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+
+    msg = Message.build("lobby.claim_role", {"role": "helm", "player_name": "Alice"})
+    await lobby.handle_lobby_message("a", msg)
+
+    # Simulate time passing beyond the debounce window.
+    _saved = lobby._time_func
+    lobby._time_func = lambda: _saved() + 2.0
+    try:
+        m.broadcasts.clear()
+        await lobby.handle_lobby_message("a", msg)
+        # Should have broadcast lobby.state for the (re-)claim.
+        assert any(b.type == "lobby.state" for b in m.broadcasts)
+    finally:
+        lobby._time_func = _saved
+
+
+async def test_claim_debounce_allows_different_role():
+    """Claiming a different role immediately after the first is allowed."""
+    m = fresh("a")
+    await lobby.on_connect("a")
+
+    msg1 = Message.build("lobby.claim_role", {"role": "helm", "player_name": "Alice"})
+    await lobby.handle_lobby_message("a", msg1)
+
+    m.broadcasts.clear()
+    msg2 = Message.build("lobby.claim_role", {"role": "captain", "player_name": "Alice"})
+    await lobby.handle_lobby_message("a", msg2)
+
+    # Different role — should go through despite rapid timing.
+    assert lobby._session.roles["captain"] == ("a", "Alice")
+    assert any(b.type == "lobby.state" for b in m.broadcasts)
