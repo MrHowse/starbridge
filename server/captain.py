@@ -20,7 +20,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel, ValidationError
 
 from server.game_logger import log_event as _log
-from server.models.messages import CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSystemOverridePayload, Message, VALID_SYSTEMS, validate_payload
+from server.models.messages import CaptainReassignCrewPayload, CaptainSaveGamePayload, CaptainSetAlertPayload, CaptainSetWaypointsPayload, CaptainSystemOverridePayload, Message, VALID_SYSTEMS, validate_payload
 from server.models.ship import Ship
 
 logger = logging.getLogger("starbridge.captain")
@@ -189,3 +189,10 @@ async def handle_captain_message(connection_id: str, message: Message) -> None:
                 connection_id,
                 Message.build("error.state", {"message": f"Save failed: {exc}", "original_type": message.type}),
             )
+
+    elif message.type == "captain.set_waypoints" and isinstance(payload, CaptainSetWaypointsPayload):
+        # Broadcast waypoints to all stations (Helm draws them as nav targets).
+        await _manager.broadcast(
+            Message.build("captain.waypoints", {"waypoints": payload.waypoints})
+        )
+        logger.debug("Captain set %d waypoints from %s", len(payload.waypoints), connection_id)

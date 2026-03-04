@@ -65,6 +65,8 @@
           <button class="vp-mode-btn" data-mode="port"      title="Port view (3)">PORT</button>
           <button class="vp-mode-btn" data-mode="starboard" title="Starboard view (4)">STAR</button>
           <div class="vp-toolbar-sep"></div>
+          <button class="vp-mode-btn" data-mode="map" title="Tactical map (6)">MAP</button>
+          <div class="vp-toolbar-sep"></div>
           <button class="vp-toggle-btn" id="highlights-btn" data-on="false" title="Toggle highlights (H)">HIGHLIGHTS: OFF</button>
           <button class="vp-toggle-btn" id="labels-btn"     data-on="false" title="Toggle labels (L)">LABELS: OFF</button>
         </div>
@@ -80,6 +82,16 @@
         <!-- Single full-screen view (hidden by default) -->
         <div class="viewport-single" id="viewport-single">
           <canvas id="vp-single" class="viewport-canvas"></canvas>
+        </div>
+
+        <!-- Full-screen tactical map (hidden by default) -->
+        <div class="viewport-map" id="viewport-map" style="display:none">
+          <canvas id="vp-map-canvas"></canvas>
+          <div class="vp-map-toolbar">
+            <span id="vp-map-waypoint-count" class="vp-map-label"></span>
+            <button id="vp-map-clear-btn" class="vp-map-btn" title="Clear all waypoints">CLEAR ROUTE</button>
+            <button id="vp-map-undo-btn" class="vp-map-btn" title="Remove last waypoint">UNDO</button>
+          </div>
         </div>
 
       </div>

@@ -58,3 +58,8 @@ class CaptainSetGeneralOrderPayload(BaseModel):
 class CaptainAcknowledgeAllStopPayload(BaseModel):
     """Helm acknowledges ALL STOP to resume control."""
     model_config = {"extra": "allow"}
+
+
+class CaptainSetWaypointsPayload(BaseModel):
+    """Captain places navigation waypoints for Helm."""
+    waypoints: list[dict] = Field(default_factory=list, max_length=20)

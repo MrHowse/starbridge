@@ -72,9 +72,17 @@ const captainMainEl  = document.querySelector('[data-captain-main]');
 const missionLabelEl = document.getElementById('mission-label');
 const alertBtns      = document.querySelectorAll('.alert-btn');
 
-// Tactical map
+// Tactical map (small, bottom-left)
 const mapCanvas = document.getElementById('captain-canvas');
 const mapCtx    = mapCanvas ? mapCanvas.getContext('2d') : null;
+
+// Full-screen tactical map (viewport area)
+const fullMapCanvas   = document.getElementById('vp-map-canvas');
+const fullMapCtx      = fullMapCanvas ? fullMapCanvas.getContext('2d') : null;
+const vpMapEl         = document.getElementById('viewport-map');
+const vpMapClearBtn   = document.getElementById('vp-map-clear-btn');
+const vpMapUndoBtn    = document.getElementById('vp-map-undo-btn');
+const vpMapWpCount    = document.getElementById('vp-map-waypoint-count');
 
 // Quick-status bars
 const hullFill       = document.getElementById('hull-fill');
@@ -188,6 +196,10 @@ let _scanIndicatorText = null;
 // Range control
 let _rangeControl = null;
 
+// Full-screen tactical map
+let _fullMapRenderer = null;   // MapRenderer for viewport map
+let _waypoints       = [];     // Captain-placed waypoints [{x, y, label}]
+
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
@@ -253,7 +265,7 @@ function init() {
   on('weapons.auto_fire_status',      handleAutoFireStatus);
   on('crew.roster',                   handleCrewRoster);
   on('comms.contacts',                handleCommsContacts);
-  on('operations.overlay',            (p) => { if (mapRenderer) mapRenderer.updateOpsOverlay(p); });
+  on('operations.overlay',            (p) => { if (mapRenderer) mapRenderer.updateOpsOverlay(p); if (_fullMapRenderer) _fullMapRenderer.updateOpsOverlay(p); });
   on('comms.contact_merged',          handleCommsContactMerged);
   on('mission.dynamic_list',          handleDynamicMissionList);
   on('mission.mission_offered',       handleMissionOffered);
@@ -295,7 +307,7 @@ function init() {
   // Viewport keys (1–5 for mode, H/L for highlights/labels)
   document.addEventListener('keydown', (e) => {
     if (!gameActive) return;
-    const VP_KEYS = { '1': 'fore', '2': 'aft', '3': 'port', '4': 'starboard', '5': 'quad' };
+    const VP_KEYS = { '1': 'fore', '2': 'aft', '3': 'port', '4': 'starboard', '5': 'quad', '6': 'map' };
     if (VP_KEYS[e.key]) {
       _setVpMode(VP_KEYS[e.key]);
       e.preventDefault();
@@ -408,6 +420,32 @@ function handleGameStarted(payload) {
     _buildDamageToggle();
   }
 
+  // Full-screen tactical map (viewport area)
+  if (fullMapCanvas) {
+    _fullMapRenderer = new MapRenderer(fullMapCanvas, {
+      range:          _rangeControl ? _rangeControl.currentRangeUnits() : MAP_WORLD_RADIUS,
+      orientation:    'north-up',
+      showGrid:       true,
+      showRangeRings: true,
+      zoom:           { enabled: true },
+      interactive:    true,
+      opsOverlayShields:    true,
+      opsOverlayPrediction: true,
+    });
+    _fullMapRenderer.loadShipSilhouette(_shipClass);
+
+    // Click on full-screen map → place waypoint at world coordinates.
+    fullMapCanvas.addEventListener('click', _onFullMapClick);
+    // Contact click → set priority target (same as small map).
+    _fullMapRenderer.onContactClick((contactId) => {
+      send('captain.set_priority_target', { entity_id: contactId });
+    });
+  }
+
+  // Waypoint toolbar buttons.
+  if (vpMapClearBtn) vpMapClearBtn.addEventListener('click', _clearWaypoints);
+  if (vpMapUndoBtn)  vpMapUndoBtn.addEventListener('click', _undoWaypoint);
+
   _resizeTactical();
   requestAnimationFrame(_tacticalLoop);
 
@@ -431,6 +469,7 @@ function handleShipState(payload) {
 
   // Update tactical map and sector map ship position
   if (mapRenderer) mapRenderer.updateShipState(payload);
+  if (_fullMapRenderer) _fullMapRenderer.updateShipState(payload);
   if (_sectorMap && payload.position) {
     _sectorMap.updateShipPosition(
       payload.position.x, payload.position.y, payload.heading ?? 0,
@@ -614,6 +653,10 @@ function handleWorldEntities(payload) {
     mapRenderer.updateContacts(payload.enemies || [], payload.torpedoes || []);
     mapRenderer.updateHazards(payload.hazards || []);
   }
+  if (_fullMapRenderer) {
+    _fullMapRenderer.updateContacts(payload.enemies || [], payload.torpedoes || []);
+    _fullMapRenderer.updateHazards(payload.hazards || []);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -621,9 +664,8 @@ function handleWorldEntities(payload) {
 // ---------------------------------------------------------------------------
 
 function handleCommsContacts(payload) {
-  if (mapRenderer) {
-    mapRenderer.updateCommsContacts(payload.contacts || []);
-  }
+  if (mapRenderer) mapRenderer.updateCommsContacts(payload.contacts || []);
+  if (_fullMapRenderer) _fullMapRenderer.updateCommsContacts(payload.contacts || []);
 }
 
 function handleCommsContactMerged(payload) {
@@ -923,6 +965,7 @@ function _onCaptainRangeChange(key, worldUnits) {
     mapRenderer.setRange(worldUnits);
     mapRenderer.clearCameraOverride();
   }
+  if (_fullMapRenderer) _fullMapRenderer.setRange(worldUnits);
 }
 
 // ---------------------------------------------------------------------------
@@ -1143,12 +1186,14 @@ function _initViewportToolbar() {
 
 function _setVpMode(mode) {
   _vpMode = mode;
-  setViewMode(mode);
+  if (mode !== 'map') setViewMode(mode);
   const grid   = document.getElementById('viewport-grid');
   const single = document.getElementById('viewport-single');
   if (grid)   grid.style.display   = mode === 'quad' ? '' : 'none';
-  if (single) single.style.display = mode === 'quad' ? 'none' : 'block';
-  resizeViewports();
+  if (single) single.style.display = (mode !== 'quad' && mode !== 'map') ? 'block' : 'none';
+  if (vpMapEl) vpMapEl.style.display = mode === 'map' ? 'flex' : 'none';
+  if (mode === 'map') _resizeFullMap();
+  else resizeViewports();
   _updateVpToolbarUI();
 }
 
@@ -1235,6 +1280,8 @@ function _tacticalLoop() {
       }
       mapCtx.restore();
     }
+    // Captain-placed waypoints on the small tactical map too.
+    if (mapCtx) _drawWaypoints(mapCtx, mapCanvas, mapRenderer, now);
   }
   // Science scan indicator overlay.
   if (mapCtx && _scanIndicatorText && mapCanvas) {
@@ -1264,6 +1311,23 @@ function _tacticalLoop() {
     );
     mapCtx.restore();
   }
+
+  // ── Full-screen tactical map (viewport MAP mode) ──────────────────────
+  if (_vpMode === 'map' && _fullMapRenderer && fullMapCanvas && fullMapCtx) {
+    _fullMapRenderer.render(now);
+    // Draw waypoints on full-screen map.
+    _drawWaypoints(fullMapCtx, fullMapCanvas, _fullMapRenderer, now);
+    // Heading label.
+    if (shipState) {
+      const hdg = Math.round(shipState.heading ?? 0).toString().padStart(3, '0');
+      fullMapCtx.fillStyle    = 'rgba(0,255,65,0.3)';
+      fullMapCtx.font         = '12px "Share Tech Mono",monospace';
+      fullMapCtx.textAlign    = 'center';
+      fullMapCtx.textBaseline = 'top';
+      fullMapCtx.fillText(`HDG ${hdg}°`, fullMapCanvas.width / 2, fullMapCanvas.height / 2 + 16);
+    }
+  }
+
   requestAnimationFrame(_tacticalLoop);
 }
 
@@ -1292,6 +1356,115 @@ function _buildDamageToggle() {
 }
 
 // ---------------------------------------------------------------------------
+// Full-screen map — waypoints
+// ---------------------------------------------------------------------------
+
+function _resizeFullMap() {
+  if (!fullMapCanvas) return;
+  const rect = fullMapCanvas.getBoundingClientRect();
+  fullMapCanvas.width  = Math.round(rect.width)  || fullMapCanvas.offsetWidth;
+  fullMapCanvas.height = Math.round(rect.height) || fullMapCanvas.offsetHeight;
+}
+
+function _onFullMapClick(e) {
+  if (!_fullMapRenderer || !fullMapCanvas) return;
+  // Ignore if MapRenderer handled a contact click (bubble already stopped).
+  // Convert canvas pixel → world coordinates (inverse of worldToCanvas).
+  const rect = fullMapCanvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const zoom = _fullMapRenderer.getZoom();
+  // Camera position: centre of the map in world coords.
+  const origin = _fullMapRenderer.worldToCanvas(0, 0);
+  const wx = (sx - origin.x) * zoom;
+  const wy = (sy - origin.y) * zoom;
+  const label = `WP${_waypoints.length + 1}`;
+  _waypoints.push({ x: wx, y: wy, label });
+  _updateWaypointToolbar();
+  _broadcastWaypoints();
+}
+
+function _clearWaypoints() {
+  _waypoints.length = 0;
+  _updateWaypointToolbar();
+  _broadcastWaypoints();
+}
+
+function _undoWaypoint() {
+  _waypoints.pop();
+  // Re-label remaining waypoints sequentially.
+  _waypoints.forEach((wp, i) => { wp.label = `WP${i + 1}`; });
+  _updateWaypointToolbar();
+  _broadcastWaypoints();
+}
+
+function _updateWaypointToolbar() {
+  if (vpMapWpCount) {
+    vpMapWpCount.textContent = _waypoints.length > 0
+      ? `${_waypoints.length} WAYPOINT${_waypoints.length > 1 ? 'S' : ''}`
+      : '';
+  }
+}
+
+function _broadcastWaypoints() {
+  send('captain.set_waypoints', {
+    waypoints: _waypoints.map(wp => ({ x: wp.x, y: wp.y, label: wp.label })),
+  });
+}
+
+/**
+ * Draw captain waypoints + route line on any map canvas.
+ * Called from _tacticalLoop for both the small tactical map and the full-screen map.
+ */
+function _drawWaypoints(ctx, canvas, renderer, now) {
+  if (_waypoints.length === 0) return;
+  const pulse = 0.5 + 0.5 * Math.sin(now / 500);
+  ctx.save();
+
+  // Route line connecting waypoints.
+  if (_waypoints.length > 1) {
+    ctx.strokeStyle = 'rgba(0,200,255,0.35)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    const first = renderer.worldToCanvas(_waypoints[0].x, _waypoints[0].y);
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < _waypoints.length; i++) {
+      const sp = renderer.worldToCanvas(_waypoints[i].x, _waypoints[i].y);
+      ctx.lineTo(sp.x, sp.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Waypoint markers.
+  for (const wp of _waypoints) {
+    const sp = renderer.worldToCanvas(wp.x, wp.y);
+    if (sp.x < -20 || sp.x > canvas.width + 20 ||
+        sp.y < -20 || sp.y > canvas.height + 20) continue;
+    const s = 6;
+    const alpha = 0.5 + 0.4 * pulse;
+    // Diamond marker.
+    ctx.strokeStyle = `rgba(0,200,255,${alpha})`;
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sp.x, sp.y - s);
+    ctx.lineTo(sp.x + s, sp.y);
+    ctx.lineTo(sp.x, sp.y + s);
+    ctx.lineTo(sp.x - s, sp.y);
+    ctx.closePath();
+    ctx.stroke();
+    // Label.
+    ctx.font         = '8px "Share Tech Mono",monospace';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle    = `rgba(0,200,255,${alpha})`;
+    ctx.fillText(wp.label, sp.x, sp.y - s - 3);
+  }
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
 // Resize handlers
 // ---------------------------------------------------------------------------
 
@@ -1299,6 +1472,20 @@ window.addEventListener('resize', () => {
   if (gameActive) {
     _resizeTactical();
     resizeViewports();
+    if (_vpMode === 'map') _resizeFullMap();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Listen for captain waypoints broadcast (round-trip sync)
+// ---------------------------------------------------------------------------
+
+on('captain.waypoints', (p) => {
+  if (p && Array.isArray(p.waypoints)) {
+    _waypoints = p.waypoints.map((wp, i) => ({
+      x: wp.x, y: wp.y, label: wp.label || `WP${i + 1}`,
+    }));
+    _updateWaypointToolbar();
   }
 });
 

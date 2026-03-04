@@ -139,6 +139,7 @@ let _scanIndicatorText = null;
 let _dockedAt      = null;   // station ID if docked, null otherwise
 let _approachInfo  = null;   // latest docking.approach_info payload
 let _flagBridgeDrawings = []; // flag bridge tactical drawings (cruiser)
+let _captainWaypoints  = []; // captain-placed nav waypoints
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -190,6 +191,7 @@ function init() {
   on('comms.contacts',        (p) => { if (_mapRenderer) _mapRenderer.updateCommsContacts(p.contacts || []); });
   on('operations.overlay',    (p) => { if (_mapRenderer) _mapRenderer.updateOpsOverlay(p); });
   on('flag_bridge.drawings',  (p) => { _flagBridgeDrawings = p.drawings || []; if (_mapRenderer && _mapRenderer.updateFlagBridgeDrawings) _mapRenderer.updateFlagBridgeDrawings(_flagBridgeDrawings); });
+  on('captain.waypoints',     (p) => { _captainWaypoints = (p.waypoints || []).map((wp, i) => ({ x: wp.x, y: wp.y, label: wp.label || `WP${i+1}` })); });
 
   initPuzzleRenderer(send);
   setupKeyboard();
@@ -396,7 +398,54 @@ function drawNavMap(now) {
       _sectorMap.setZoomLevel('sector');
       _sectorMap.renderSectorBoundaryOverlay(ctx, viewscreenCanvas, _mapRenderer);
     }
+    // Captain waypoints overlay.
+    if (_captainWaypoints.length > 0 && ctx) {
+      _drawCaptainWaypoints(ctx, viewscreenCanvas, _mapRenderer, now);
+    }
   }
+}
+
+function _drawCaptainWaypoints(ctx, canvas, renderer, now) {
+  const pulse = 0.5 + 0.5 * Math.sin(now / 500);
+  ctx.save();
+  // Route line.
+  if (_captainWaypoints.length > 1) {
+    ctx.strokeStyle = 'rgba(0,200,255,0.35)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    const first = renderer.worldToCanvas(_captainWaypoints[0].x, _captainWaypoints[0].y);
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < _captainWaypoints.length; i++) {
+      const sp = renderer.worldToCanvas(_captainWaypoints[i].x, _captainWaypoints[i].y);
+      ctx.lineTo(sp.x, sp.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // Diamond markers.
+  for (const wp of _captainWaypoints) {
+    const sp = renderer.worldToCanvas(wp.x, wp.y);
+    if (sp.x < -20 || sp.x > canvas.width + 20 ||
+        sp.y < -20 || sp.y > canvas.height + 20) continue;
+    const s = 7;
+    const alpha = 0.5 + 0.4 * pulse;
+    ctx.strokeStyle = `rgba(0,200,255,${alpha})`;
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sp.x, sp.y - s);
+    ctx.lineTo(sp.x + s, sp.y);
+    ctx.lineTo(sp.x, sp.y + s);
+    ctx.lineTo(sp.x - s, sp.y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.font         = '9px "Share Tech Mono",monospace';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle    = `rgba(0,200,255,${alpha})`;
+    ctx.fillText(wp.label, sp.x, sp.y - s - 3);
+  }
+  ctx.restore();
 }
 
 function drawCompassPanel(state) {
