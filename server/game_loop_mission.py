@@ -344,6 +344,7 @@ def build_sensor_contacts(
             "x": round(t.x, 1),
             "y": round(t.y, 1),
             "heading": round(t.heading, 2),
+            "torpedo_type": t.torpedo_type,
         }
         for t in world.torpedoes
     ]
@@ -419,6 +420,7 @@ def build_world_entities(world: World) -> Message:
             "x": round(t.x, 1),
             "y": round(t.y, 1),
             "heading": round(t.heading, 2),
+            "torpedo_type": t.torpedo_type,
         }
         for t in world.torpedoes
     ]

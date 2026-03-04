@@ -23,7 +23,7 @@
 
 import { on, onStatusChange, send, connect } from '../shared/connection.js';
 import { setStatusDot, setAlertLevel, showBriefing, showGameOver } from '../shared/ui_components.js';
-import { C_PRIMARY_DIM, C_FRIENDLY } from '../shared/renderer.js';
+import { C_PRIMARY, C_PRIMARY_DIM, C_FRIENDLY } from '../shared/renderer.js';
 import { MapRenderer } from '../shared/map_renderer.js';
 import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
 import { initPuzzleRenderer } from '../shared/puzzle_renderer.js';
@@ -70,6 +70,9 @@ const TYPE_DESCRIPTIONS   = {
   nuclear:      '200 DMG | 400 m/s | 10s reload\nDevastating — requires Captain authorisation',
   experimental: '60 DMG | 500 m/s | 6s reload\nUnpredictable secondary effects',
 };
+// Per-type torpedo speed (must mirror TORPEDO_VELOCITY_BY_TYPE on server).
+const TYPE_VELOCITY       = { standard: 500, homing: 500, ion: 500, piercing: 400,
+                               heavy: 300, proximity: 500, nuclear: 400, experimental: 500 };
 const TRAIL_LENGTH        = 5;       // torpedo trail positions to store
 const EXPLOSION_DURATION  = 500;     // explosion ring animation duration ms
 
@@ -188,6 +191,9 @@ let hitFlashTime = -Infinity;
 
 // Explosion rings: [{x, y, startTime}]
 const explosions = [];
+
+// Torpedo track lines: record first-seen position per torpedo id.
+const _torpedoLaunchPos = new Map();
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -439,6 +445,15 @@ function handleSensorContacts(payload) {
     suggestedId = nearest ? nearest.id : null;
   } else {
     suggestedId = null;
+  }
+
+  // Record launch position for new torpedoes; clean up dead ones.
+  for (const t of torpedoes) {
+    if (!_torpedoLaunchPos.has(t.id)) _torpedoLaunchPos.set(t.id, { x: t.x, y: t.y });
+  }
+  const _liveIds = new Set(torpedoes.map(t => t.id));
+  for (const id of _torpedoLaunchPos.keys()) {
+    if (!_liveIds.has(id)) _torpedoLaunchPos.delete(id);
   }
 
   if (radarRenderer) radarRenderer.updateContacts(contacts, torpedoes);
@@ -1207,11 +1222,11 @@ function drawRadar(now) {
 
   // Station-specific overlays drawn on top:
 
-  // Beam arc (±45° from ship heading).
-  const ARC_DEG = 45;
+  // Beam arc (dynamic range + arc from ship state).
+  const ARC_DEG = shipState.beam_arc_deg ?? 45;
   const headRad = shipState.heading * Math.PI / 180;
   const zoom    = radarRenderer.getZoom();
-  const arcR    = 8000 / zoom;   // beam range in canvas pixels
+  const arcR    = (shipState.beam_range ?? 10_000) / zoom;
   const upAngle = -Math.PI / 2;
   const leftArc  = upAngle - ARC_DEG * Math.PI / 180;
   const rightArc = upAngle + ARC_DEG * Math.PI / 180;
@@ -1232,6 +1247,12 @@ function drawRadar(now) {
   ctx.moveTo(0, 0); ctx.lineTo(Math.cos(rightArc) * arcR, Math.sin(rightArc) * arcR);
   ctx.stroke();
   ctx.restore();
+
+  // Torpedo track lines from launch position to current position.
+  _drawTorpedoTracks(ctx, now);
+
+  // Lead indicator — predicted intercept point for selected target.
+  _drawLeadIndicator(ctx, now);
 
   // Explosions — expanding wireframe circles.
   {
@@ -1256,6 +1277,99 @@ function drawRadar(now) {
     }
     for (const exp of done) explosions.splice(explosions.indexOf(exp), 1);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Torpedo track lines — dashed line from launch position to current position
+// ---------------------------------------------------------------------------
+
+function _drawTorpedoTracks(ctx) {
+  if (!radarRenderer) return;
+  ctx.save();
+  ctx.lineWidth = 1;
+  for (const t of torpedoes) {
+    const lp = _torpedoLaunchPos.get(t.id);
+    if (!lp) continue;
+    const from = radarRenderer.worldToCanvas(lp.x, lp.y);
+    const to   = radarRenderer.worldToCanvas(t.x, t.y);
+    const isHoming = t.torpedo_type === 'homing';
+    ctx.strokeStyle = isHoming ? C_FRIENDLY : 'rgba(0, 255, 65, 0.3)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Lead indicator — predicted intercept point for selected target
+// ---------------------------------------------------------------------------
+
+function _drawLeadIndicator(ctx, now) {
+  if (!selectedId || !radarRenderer || !shipState) return;
+  const target = contacts.find(c => c.id === selectedId);
+  if (!target || !target.velocity) return;
+
+  // Target velocity components from heading + speed.
+  const hRad = target.heading * Math.PI / 180;
+  const tvx  = target.velocity * Math.sin(hRad);
+  const tvy  = -target.velocity * Math.cos(hRad);
+
+  // Distance from ship to target.
+  const dx   = target.x - shipState.position.x;
+  const dy   = target.y - shipState.position.y;
+  const dist = Math.hypot(dx, dy);
+
+  // Torpedo speed from currently loaded tube type.
+  const torpSpeed = _getTorpedoSpeed();
+  if (torpSpeed <= 0) return;
+
+  // Time to intercept (simple linear estimate).
+  const toi = dist / torpSpeed;
+
+  // Intercept point.
+  const ix = target.x + tvx * toi;
+  const iy = target.y + tvy * toi;
+
+  // Draw crosshair at intercept point.
+  const sp = radarRenderer.worldToCanvas(ix, iy);
+  const r  = 6;
+  const pulse = 0.6 + 0.4 * Math.sin(now * 0.005);
+
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  ctx.strokeStyle = C_PRIMARY;
+  ctx.lineWidth   = 1.5;
+
+  // Open circle.
+  ctx.beginPath();
+  ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Cross lines.
+  const arm = r + 4;
+  ctx.beginPath();
+  ctx.moveTo(sp.x - arm, sp.y); ctx.lineTo(sp.x - r, sp.y);
+  ctx.moveTo(sp.x + r, sp.y);   ctx.lineTo(sp.x + arm, sp.y);
+  ctx.moveTo(sp.x, sp.y - arm); ctx.lineTo(sp.x, sp.y - r);
+  ctx.moveTo(sp.x, sp.y + r);   ctx.lineTo(sp.x, sp.y + arm);
+  ctx.stroke();
+
+  // Label.
+  ctx.font      = '9px monospace';
+  ctx.fillStyle = C_PRIMARY;
+  ctx.fillText('LEAD', sp.x + arm + 3, sp.y + 3);
+
+  ctx.restore();
+}
+
+function _getTorpedoSpeed() {
+  // Use first tube's loaded type to determine torpedo speed for lead calc.
+  const type = tubeTypes[0] || 'standard';
+  return TYPE_VELOCITY[type] || 500;
 }
 
 // ---------------------------------------------------------------------------

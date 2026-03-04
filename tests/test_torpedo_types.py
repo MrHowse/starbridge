@@ -763,3 +763,107 @@ class TestDeepStrikeMission:
         m = load_mission("deep_strike")
         spawn_from_mission(m, world, entity_counter=0)
         assert any(e.type == "destroyer" for e in world.enemies)
+
+
+# ---------------------------------------------------------------------------
+# TestStandardTorpedoWobble — ±2° sinusoidal wobble for standard torpedoes
+# ---------------------------------------------------------------------------
+
+
+class TestStandardTorpedoWobble:
+    def setup_method(self):
+        fresh_weapons()
+
+    def test_standard_torpedo_wobbles(self):
+        """Standard torpedo heading should oscillate over several ticks."""
+        world = fresh_world()
+        torp = Torpedo(
+            id="wobble_torp", owner="player",
+            x=50_000.0, y=50_000.0, heading=90.0,
+            torpedo_type="standard", velocity=500.0,
+        )
+        world.torpedoes.append(torp)
+        headings = [torp.heading]
+        for _ in range(50):
+            glw.tick_torpedoes(world)
+            headings.append(torp.heading)
+        # Heading should not remain constant — wobble causes variation.
+        unique = set(round(h, 4) for h in headings)
+        assert len(unique) > 1, "Standard torpedo heading should oscillate"
+
+    def test_homing_still_tracks_at_90_deg_s(self):
+        """Homing torpedo turn rate must remain unchanged (regression)."""
+        assert glw.HOMING_TURN_RATE == 90.0
+        world = fresh_world()
+        enemy = make_enemy(x=50_000.0, y=40_000.0)
+        world.enemies.append(enemy)
+        torp = Torpedo(
+            id="homing_reg", owner="player",
+            x=50_000.0, y=60_000.0, heading=180.0,
+            torpedo_type="homing", velocity=500.0, homing_target=enemy.id,
+        )
+        world.torpedoes.append(torp)
+        initial = torp.heading
+        glw.tick_torpedoes(world)
+        # Should have turned toward enemy (heading 0/360).
+        assert torp.heading != initial
+
+    def test_non_standard_types_no_wobble(self):
+        """Homing and ion torpedoes must not receive wobble."""
+        for ttype in ("homing", "ion"):
+            world = fresh_world()
+            torp = Torpedo(
+                id=f"no_wobble_{ttype}", owner="player",
+                x=50_000.0, y=50_000.0, heading=90.0,
+                torpedo_type=ttype, velocity=500.0,
+            )
+            world.torpedoes.append(torp)
+            # Record heading at first tick (before any distance_travelled).
+            glw.tick_torpedoes(world)
+            h1 = torp.heading
+            glw.tick_torpedoes(world)
+            h2 = torp.heading
+            # Non-homing types fly straight; homing without target also flies straight.
+            if ttype != "homing":
+                assert h1 == pytest.approx(h2, abs=0.01), \
+                    f"{ttype} torpedo should not wobble"
+
+
+# ---------------------------------------------------------------------------
+# TestTorpedoPayloadIncludesType — torpedo_type in sensor.contacts
+# ---------------------------------------------------------------------------
+
+
+class TestTorpedoPayloadIncludesType:
+    def setup_method(self):
+        fresh_weapons()
+
+    def test_torpedo_payload_includes_type(self):
+        """build_sensor_contacts torpedo entries must include torpedo_type."""
+        from server.game_loop_mission import build_sensor_contacts
+        world = fresh_world()
+        torp = Torpedo(
+            id="payload_torp", owner="player",
+            x=50_000.0, y=50_000.0, heading=0.0,
+            torpedo_type="homing", velocity=500.0,
+        )
+        world.torpedoes.append(torp)
+        msg = build_sensor_contacts(world, world.ship)
+        torp_list = msg.payload["torpedoes"]
+        assert len(torp_list) == 1
+        assert torp_list[0]["torpedo_type"] == "homing"
+
+    def test_world_entities_torpedo_includes_type(self):
+        """build_world_entities torpedo entries must include torpedo_type."""
+        from server.game_loop_mission import build_world_entities
+        world = fresh_world()
+        torp = Torpedo(
+            id="we_torp", owner="player",
+            x=50_000.0, y=50_000.0, heading=0.0,
+            torpedo_type="piercing", velocity=400.0,
+        )
+        world.torpedoes.append(torp)
+        msg = build_world_entities(world)
+        torp_list = msg.payload["torpedoes"]
+        assert len(torp_list) == 1
+        assert torp_list[0]["torpedo_type"] == "piercing"

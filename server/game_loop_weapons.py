@@ -103,6 +103,10 @@ HIGH_SPEED_TORPEDO_BONUS: float = 0.05   # +5% damage
 #: Homing torpedo turn rate (degrees / second).
 HOMING_TURN_RATE: float = 90.0
 
+#: Standard torpedo wobble — gentle sinusoidal oscillation for visual flavour.
+STANDARD_WOBBLE_DEG: float = 2.0     # ±2° amplitude
+STANDARD_WOBBLE_FREQ: float = 0.002  # cycles per world-unit travelled
+
 # Auto-fire targeting computer (activates when Weapons station is uncrewed).
 AUTO_FIRE_INTERVAL: float = 1.0    # seconds between shots (2× manual 0.5s)
 AUTO_FIRE_ACCURACY: float = 0.75   # 75% hit chance
@@ -1003,6 +1007,13 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
         # Homing guidance — steer before moving.
         if torp.torpedo_type == "homing" and torp.homing_target:
             _steer_homing(torp, world, TICK_DT)
+
+        # Standard torpedo wobble — ±2° sinusoidal oscillation for visual flavour.
+        if torp.torpedo_type == "standard":
+            wobble = STANDARD_WOBBLE_DEG * math.sin(
+                torp.distance_travelled * STANDARD_WOBBLE_FREQ * 2 * math.pi
+            )
+            torp.heading = wrap_angle(torp.heading + wobble * TICK_DT)
 
         h_rad = math.radians(torp.heading)
         torp.x += torp.velocity * math.sin(h_rad) * TICK_DT

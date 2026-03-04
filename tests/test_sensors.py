@@ -383,3 +383,29 @@ def test_scan_result_weakness_none_when_no_weakness():
 
     result = sensors.build_scan_result(enemy)
     assert result["weakness"] is None
+
+
+# ---------------------------------------------------------------------------
+# Velocity in sensor contacts
+# ---------------------------------------------------------------------------
+
+
+def test_scanned_enemy_includes_velocity():
+    """Scanned enemy contacts must include a velocity field."""
+    _fresh_sensors()
+    world, enemy, ship = _make_world_with_enemy()
+    enemy.scan_state = "scanned"
+    enemy.velocity = 120.5
+    contacts = sensors.build_sensor_contacts(world, ship)
+    ec = [c for c in contacts if c["id"] == enemy.id][0]
+    assert ec["velocity"] == 120.5
+
+
+def test_unscanned_enemy_no_velocity():
+    """Unscanned enemy contacts must NOT include a velocity field."""
+    _fresh_sensors()
+    world, enemy, ship = _make_world_with_enemy()
+    enemy.scan_state = "unscanned"
+    contacts = sensors.build_sensor_contacts(world, ship)
+    ec = [c for c in contacts if c["id"] == enemy.id][0]
+    assert "velocity" not in ec

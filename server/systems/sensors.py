@@ -201,6 +201,7 @@ def build_sensor_contacts(
 
         if enemy.scan_state == "scanned":
             contact["name"] = enemy.type.capitalize()
+            contact["velocity"] = round(enemy.velocity, 1)
             contact.update(build_scan_result(enemy))
 
         # Annotate if within a drone/buoy detection bubble.
