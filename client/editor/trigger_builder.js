@@ -6,23 +6,66 @@
  *   tb.getValue()  // → trigger dict or null
  */
 
-const TRIGGER_TYPES = [
-  { value: "",                    label: "— select trigger —" },
-  { value: "timer_elapsed",       label: "Timer elapsed" },
-  { value: "player_in_area",      label: "Player in area" },
-  { value: "entity_destroyed",    label: "Entity destroyed" },
-  { value: "wave_defeated",       label: "Wave defeated" },
-  { value: "all_enemies_destroyed", label: "All enemies destroyed" },
-  { value: "puzzle_completed",    label: "Puzzle completed" },
-  { value: "puzzle_resolved",     label: "Puzzle resolved (either)" },
-  { value: "puzzle_failed",       label: "Puzzle failed" },
-  { value: "scan_completed",      label: "Scan completed" },
-  { value: "ship_hull_below",     label: "Ship hull below %" },
-  { value: "ship_hull_above",     label: "Ship hull above %" },
-  { value: "boarding_active",     label: "Boarding active" },
-  { value: "no_intruders",        label: "No intruders" },
-  { value: "all_of",              label: "All of (compound)" },
-  { value: "any_of",              label: "Any of (compound)" },
+const TRIGGER_GROUPS = [
+  { label: null, items: [
+    { value: "",                    label: "— select trigger —" },
+  ]},
+  { label: "Timer", items: [
+    { value: "timer_elapsed",       label: "Timer elapsed" },
+  ]},
+  { label: "Spatial", items: [
+    { value: "player_in_area",      label: "Player in area" },
+  ]},
+  { label: "Entity", items: [
+    { value: "entity_destroyed",    label: "Entity destroyed" },
+    { value: "wave_defeated",       label: "Wave defeated" },
+    { value: "all_enemies_destroyed", label: "All enemies destroyed" },
+    { value: "scan_completed",      label: "Scan completed" },
+  ]},
+  { label: "Hull", items: [
+    { value: "ship_hull_below",     label: "Ship hull below %" },
+    { value: "ship_hull_above",     label: "Ship hull above %" },
+    { value: "ship_hull_zero",      label: "Ship hull zero" },
+    { value: "player_hull_zero",    label: "Player hull zero" },
+  ]},
+  { label: "Station", items: [
+    { value: "station_hull_below",       label: "Station hull below %" },
+    { value: "station_destroyed",        label: "Station destroyed" },
+    { value: "station_captured",         label: "Station captured" },
+    { value: "station_sensor_jammed",    label: "Station sensor jammed" },
+    { value: "station_reinforcements_called", label: "Station reinforcements called" },
+    { value: "component_destroyed",      label: "Component destroyed" },
+  ]},
+  { label: "Creature", items: [
+    { value: "creature_state",              label: "Creature state" },
+    { value: "creature_destroyed",          label: "Creature destroyed" },
+    { value: "creature_study_complete",     label: "Creature study complete" },
+    { value: "creature_communication_complete", label: "Creature comm complete" },
+    { value: "no_creatures_type",           label: "No creatures of type" },
+  ]},
+  { label: "Signal", items: [
+    { value: "signal_located",      label: "Signal located" },
+  ]},
+  { label: "Proximity", items: [
+    { value: "proximity_with_shields", label: "Proximity with shields" },
+  ]},
+  { label: "Puzzle", items: [
+    { value: "puzzle_completed",    label: "Puzzle completed" },
+    { value: "puzzle_resolved",     label: "Puzzle resolved (either)" },
+    { value: "puzzle_failed",       label: "Puzzle failed" },
+  ]},
+  { label: "Training", items: [
+    { value: "training_flag",       label: "Training flag" },
+  ]},
+  { label: "Boarding", items: [
+    { value: "boarding_active",     label: "Boarding active" },
+    { value: "no_intruders",        label: "No intruders" },
+  ]},
+  { label: "Compound", items: [
+    { value: "all_of",              label: "All of (compound)" },
+    { value: "any_of",              label: "Any of (compound)" },
+    { value: "none_of",             label: "None of (compound)" },
+  ]},
 ];
 
 // Fields required for each trigger type: [{name, type, label, default?}]
@@ -34,18 +77,54 @@ const TRIGGER_FIELDS = {
     { name: "r", type: "number", label: "Radius",  default: 5000  },
   ],
   entity_destroyed:     [{ name: "target", type: "text", label: "Entity ID" }],
-  wave_defeated:        [{ name: "enemy_prefix", type: "text", label: "Enemy prefix" }],
+  wave_defeated:        [{ name: "prefix", type: "text", label: "Enemy prefix" }],
   all_enemies_destroyed: [],
-  puzzle_completed:     [{ name: "puzzle_label", type: "text", label: "Puzzle label" }],
-  puzzle_resolved:      [{ name: "puzzle_label", type: "text", label: "Puzzle label" }],
-  puzzle_failed:        [{ name: "puzzle_label", type: "text", label: "Puzzle label" }],
+  puzzle_completed:     [{ name: "label", type: "text", label: "Puzzle label" }],
+  puzzle_resolved:      [{ name: "label", type: "text", label: "Puzzle label" }],
+  puzzle_failed:        [{ name: "label", type: "text", label: "Puzzle label" }],
   scan_completed:       [{ name: "target", type: "text", label: "Entity ID / target" }],
   ship_hull_below:      [{ name: "value", type: "number", label: "Hull % threshold", default: 50 }],
   ship_hull_above:      [{ name: "value", type: "number", label: "Hull % threshold", default: 50 }],
+  ship_hull_zero:       [],
+  player_hull_zero:     [],
   boarding_active:      [],
   no_intruders:         [],
-  all_of:               [],  // handled by compound UI
+  // Station triggers
+  station_hull_below:   [
+    { name: "station_id", type: "text", label: "Station ID" },
+    { name: "threshold", type: "number", label: "Hull % threshold", default: 50 },
+  ],
+  station_destroyed:    [{ name: "station_id", type: "text", label: "Station ID" }],
+  station_captured:     [{ name: "station_id", type: "text", label: "Station ID" }],
+  station_sensor_jammed:[{ name: "station_id", type: "text", label: "Station ID" }],
+  station_reinforcements_called: [{ name: "station_id", type: "text", label: "Station ID" }],
+  component_destroyed:  [{ name: "component_id", type: "text", label: "Component ID" }],
+  // Creature triggers
+  creature_state:       [
+    { name: "creature_id", type: "text", label: "Creature ID" },
+    { name: "state", type: "select", label: "State",
+      options: ["passive", "aggressive", "fleeing", "studying", "communicating"] },
+  ],
+  creature_destroyed:   [{ name: "creature_id", type: "text", label: "Creature ID" }],
+  creature_study_complete:        [{ name: "creature_id", type: "text", label: "Creature ID" }],
+  creature_communication_complete:[{ name: "creature_id", type: "text", label: "Creature ID" }],
+  no_creatures_type:    [{ name: "creature_type", type: "text", label: "Creature type" }],
+  // Signal
+  signal_located:       [],
+  // Proximity
+  proximity_with_shields: [
+    { name: "x", type: "number", label: "World X", default: 50000 },
+    { name: "y", type: "number", label: "World Y", default: 50000 },
+    { name: "radius", type: "number", label: "Radius", default: 5000 },
+    { name: "min_shield", type: "number", label: "Min shield %", default: 50 },
+    { name: "duration", type: "number", label: "Duration (s)", default: 5 },
+  ],
+  // Training
+  training_flag:        [{ name: "flag", type: "text", label: "Flag name" }],
+  // Compound
+  all_of:               [],
   any_of:               [],
+  none_of:              [],
 };
 
 export class TriggerBuilder {
@@ -67,7 +146,7 @@ export class TriggerBuilder {
 
     const result = { type };
 
-    if (type === "all_of" || type === "any_of") {
+    if (type === "all_of" || type === "any_of" || type === "none_of") {
       result.triggers = this._compounds.map(c => c.getValue()).filter(Boolean);
       return result;
     }
@@ -90,7 +169,7 @@ export class TriggerBuilder {
     this._container.innerHTML = "";
     this._container.classList.add("trigger-builder");
 
-    // Type selector
+    // Type selector with optgroups
     const sel = document.createElement("select");
     sel.className = "trigger-type-select";
     sel.style.width = "100%";
@@ -101,11 +180,26 @@ export class TriggerBuilder {
     sel.style.fontFamily = "inherit";
     sel.style.fontSize = "12px";
 
-    for (const { value, label } of TRIGGER_TYPES) {
-      const opt = document.createElement("option");
-      opt.value = value;
-      opt.textContent = label;
-      sel.appendChild(opt);
+    for (const group of TRIGGER_GROUPS) {
+      if (group.label === null) {
+        // Top-level options (the placeholder)
+        for (const { value, label } of group.items) {
+          const opt = document.createElement("option");
+          opt.value = value;
+          opt.textContent = label;
+          sel.appendChild(opt);
+        }
+      } else {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = group.label;
+        for (const { value, label } of group.items) {
+          const opt = document.createElement("option");
+          opt.value = value;
+          opt.textContent = label;
+          optgroup.appendChild(opt);
+        }
+        sel.appendChild(optgroup);
+      }
     }
     if (initial?.type) sel.value = initial.type;
     this._typeEl = sel;
@@ -127,23 +221,36 @@ export class TriggerBuilder {
 
     if (!type) { this._onChange(); return; }
 
-    if (type === "all_of" || type === "any_of") {
+    if (type === "all_of" || type === "any_of" || type === "none_of") {
       this._renderCompound(type, initial);
     } else {
       const fields = TRIGGER_FIELDS[type] || [];
       for (const field of fields) {
         const wrap = document.createElement("label");
         wrap.textContent = field.label + " ";
-        const inp = document.createElement("input");
-        inp.type = field.type === "number" ? "number" : "text";
-        inp.dataset.field = field.name;
-        inp.style.cssText = "width:100%;background:#0a0f1a;border:1px solid #1e3a5f;color:#e8f4f8;padding:3px;font-family:inherit;font-size:11px;";
-        if (initial && initial[field.name] !== undefined) {
-          inp.value = initial[field.name];
-        } else if (field.default !== undefined) {
-          inp.value = field.default;
+        let inp;
+        if (field.type === "select" && field.options) {
+          inp = document.createElement("select");
+          inp.style.cssText = "width:100%;background:#0a0f1a;border:1px solid #1e3a5f;color:#e8f4f8;padding:3px;font-family:inherit;font-size:11px;";
+          for (const optVal of field.options) {
+            const o = document.createElement("option");
+            o.value = optVal; o.textContent = optVal;
+            inp.appendChild(o);
+          }
+          if (initial && initial[field.name] !== undefined) inp.value = initial[field.name];
+        } else {
+          inp = document.createElement("input");
+          inp.type = field.type === "number" ? "number" : "text";
+          inp.style.cssText = "width:100%;background:#0a0f1a;border:1px solid #1e3a5f;color:#e8f4f8;padding:3px;font-family:inherit;font-size:11px;";
+          if (initial && initial[field.name] !== undefined) {
+            inp.value = initial[field.name];
+          } else if (field.default !== undefined) {
+            inp.value = field.default;
+          }
         }
+        inp.dataset.field = field.name;
         inp.addEventListener("input", () => this._onChange());
+        inp.addEventListener("change", () => this._onChange());
         wrap.appendChild(inp);
         this._argsEl.appendChild(wrap);
       }
@@ -154,9 +261,12 @@ export class TriggerBuilder {
   _renderCompound(type, initial) {
     const header = document.createElement("div");
     header.style.cssText = "font-size:11px;color:#4a7a9b;margin-bottom:4px;";
-    header.textContent = type === "all_of"
-      ? "All of the following must be true:"
-      : "Any of the following must be true:";
+    const labels = {
+      all_of: "All of the following must be true:",
+      any_of: "Any of the following must be true:",
+      none_of: "None of the following must be true:",
+    };
+    header.textContent = labels[type] || "";
     this._argsEl.appendChild(header);
 
     this._compoundList = document.createElement("div");

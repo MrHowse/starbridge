@@ -1,7 +1,7 @@
 {
   "id": "engineering_drill",
   "name": "Engineering Drill",
-  "briefing": "Systems diagnostic underway. Science \u2014 calibrate the sensor frequency signature. Engineering \u2014 repair the circuit routing damage. Engineering: boost SENSORS above 120% to assist Science's frequency calibration. Both tasks must be completed to clear the drill.",
+  "briefing": "Systems diagnostic underway. Science — calibrate the sensor frequency signature. Engineering — repair the circuit routing damage. Engineering: boost SENSORS above 120% to assist Science's frequency calibration. Both tasks must be completed to clear the drill.",
   "signal_location": null,
   "entities": [],
   "nodes": [
@@ -26,7 +26,7 @@
           "text": "Science: complete frequency calibration",
           "trigger": {
             "type": "puzzle_completed",
-            "puzzle_label": "freq_calibration"
+            "label": "freq_calibration"
           }
         },
         {
@@ -35,7 +35,7 @@
           "text": "Engineering: complete circuit routing repair",
           "trigger": {
             "type": "puzzle_completed",
-            "puzzle_label": "circuit_repair"
+            "label": "circuit_repair"
           }
         }
       ]

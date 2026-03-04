@@ -11,10 +11,22 @@ const ENTITY_COLORS = {
   scout:             "#ff2020",
   cruiser:           "#ffb000",
   destroyer:         "#ff6600",
+  frigate:           "#ff6644",
+  corvette:          "#ffdd00",
+  battleship:        "#cc0033",
+  enemy_station:     "#ff00ff",
+  creature:          "#ffaa00",
   hazard_nebula:     "#8844ff",
   hazard_minefield:  "#ff2020",
   hazard_radiation:  "#00ff41",
 };
+
+// Entity types that use triangle shapes (enemies)
+const _TRIANGLE_TYPES = new Set(["scout", "cruiser", "destroyer", "frigate", "corvette", "battleship"]);
+// Diamond shape
+const _DIAMOND_TYPES = new Set(["enemy_station"]);
+// Organic circle (creature)
+const _ORGANIC_TYPES = new Set(["creature"]);
 
 let _canvas, _ctx, _state, _pendingPos;
 
@@ -32,6 +44,13 @@ export function initEntityPlacer(state) {
   document.getElementById("entity-add-btn").addEventListener("click", _onAddEntity);
   document.getElementById("entity-placer-close").addEventListener("click", _close);
   document.getElementById("btn-entity-placer").addEventListener("click", _open);
+
+  // Toggle type-specific fields when entity type changes
+  const typeSelect = document.getElementById("entity-type-select");
+  if (typeSelect) {
+    typeSelect.addEventListener("change", () => _toggleTypeFields(typeSelect.value));
+    _toggleTypeFields(typeSelect.value);
+  }
 
   _drawEntities();
 }
@@ -95,8 +114,35 @@ function _drawEntities() {
     const color = ENTITY_COLORS[entity.type] || "#4a7a9b";
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.fill();
+    if (_TRIANGLE_TYPES.has(entity.type)) {
+      // Triangle (pointing up) for enemy ships
+      ctx.moveTo(cx, cy - 7);
+      ctx.lineTo(cx - 6, cy + 5);
+      ctx.lineTo(cx + 6, cy + 5);
+      ctx.closePath();
+      ctx.fill();
+    } else if (_DIAMOND_TYPES.has(entity.type)) {
+      // Diamond for enemy stations
+      ctx.moveTo(cx, cy - 8);
+      ctx.lineTo(cx + 6, cy);
+      ctx.lineTo(cx, cy + 8);
+      ctx.lineTo(cx - 6, cy);
+      ctx.closePath();
+      ctx.fill();
+    } else if (_ORGANIC_TYPES.has(entity.type)) {
+      // Organic wobbly circle for creatures
+      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx - 2, cy - 2, 3, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      // Default circle for stations, hazards, etc.
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = "#e8f4f8";
     ctx.font = "12px 'Courier New'";
     ctx.textAlign = "left";
@@ -146,7 +192,17 @@ function _onAddEntity() {
   if (!_pendingPos) { alert("Click on the map first to choose a position."); return; }
 
   if (!_state.spawn) _state.spawn = [];
-  _state.spawn.push({ type, id, x: _pendingPos.wx, y: _pendingPos.wy });
+  const entry = { type, id, x: _pendingPos.wx, y: _pendingPos.wy };
+  // Type-specific fields
+  const variantEl = document.getElementById("entity-variant-select");
+  if (variantEl && !variantEl.parentElement.classList.contains("hidden") && type === "enemy_station") {
+    entry.variant = variantEl.value;
+  }
+  const creatureTypeEl = document.getElementById("entity-creature-type-select");
+  if (creatureTypeEl && !creatureTypeEl.parentElement.classList.contains("hidden") && type === "creature") {
+    entry.creature_type = creatureTypeEl.value;
+  }
+  _state.spawn.push(entry);
 
   document.getElementById("entity-id-input").value = "";
   _pendingPos = null;
@@ -174,4 +230,11 @@ function _refreshEntityList() {
     row.appendChild(rm);
     list.appendChild(row);
   }
+}
+
+function _toggleTypeFields(type) {
+  const variantWrap = document.getElementById("entity-variant-wrap");
+  const creatureWrap = document.getElementById("entity-creature-type-wrap");
+  if (variantWrap) variantWrap.classList.toggle("hidden", type !== "enemy_station");
+  if (creatureWrap) creatureWrap.classList.toggle("hidden", type !== "creature");
 }

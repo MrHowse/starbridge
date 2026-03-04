@@ -443,6 +443,41 @@ async def save_mission_endpoint(payload: dict) -> dict:
     return {"saved": True, "file": dest.name, "warnings": errors}
 
 
+@app.delete("/editor/mission/{mission_id}")
+async def delete_mission_endpoint(mission_id: str) -> dict:
+    """Delete a mission JSON file. Returns 200 or 404."""
+    path = MISSIONS_DIR / f"{mission_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Mission '{mission_id}' not found.")
+    path.unlink()
+    return {"deleted": True, "id": mission_id}
+
+
+@app.post("/editor/duplicate/{mission_id}")
+async def duplicate_mission_endpoint(mission_id: str) -> dict:
+    """Duplicate a mission JSON file with a new ID."""
+    path = MISSIONS_DIR / f"{mission_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Mission '{mission_id}' not found.")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid JSON: {exc}") from exc
+
+    # Generate a unique copy ID
+    new_id = f"{mission_id}_copy"
+    counter = 2
+    while (MISSIONS_DIR / f"{new_id}.json").exists():
+        new_id = f"{mission_id}_copy{counter}"
+        counter += 1
+
+    data["id"] = new_id
+    data["name"] = data.get("name", new_id) + " (copy)"
+    dest = MISSIONS_DIR / f"{new_id}.json"
+    dest.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"duplicated": True, "id": new_id, "file": dest.name}
+
+
 # ---------------------------------------------------------------------------
 # Admin Dashboard endpoints (v0.04h)
 # ---------------------------------------------------------------------------

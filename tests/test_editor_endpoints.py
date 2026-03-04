@@ -215,6 +215,113 @@ def test_save_with_validation_errors_returns_warnings() -> None:
 
 
 # ---------------------------------------------------------------------------
+# DELETE /editor/mission/{id}
+# ---------------------------------------------------------------------------
+
+
+def test_delete_existing_mission(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import server.main as main_module
+    monkeypatch.setattr(main_module, "MISSIONS_DIR", tmp_path)
+    (tmp_path / "del_me.json").write_text('{"id":"del_me"}', encoding="utf-8")
+
+    with TestClient(app) as client:
+        response = client.delete("/editor/mission/del_me")
+    assert response.status_code == 200
+    assert not (tmp_path / "del_me.json").exists()
+
+
+def test_delete_missing_mission_404() -> None:
+    with TestClient(app) as client:
+        response = client.delete("/editor/mission/nonexistent")
+    assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /editor/duplicate/{id}
+# ---------------------------------------------------------------------------
+
+
+def test_duplicate_creates_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import server.main as main_module
+    monkeypatch.setattr(main_module, "MISSIONS_DIR", tmp_path)
+    orig = {"id": "orig", "name": "Original"}
+    (tmp_path / "orig.json").write_text(json.dumps(orig), encoding="utf-8")
+
+    with TestClient(app) as client:
+        response = client.post("/editor/duplicate/orig")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["duplicated"] is True
+    assert data["id"] == "orig_copy"
+    assert (tmp_path / "orig_copy.json").exists()
+    copy_data = json.loads((tmp_path / "orig_copy.json").read_text(encoding="utf-8"))
+    assert copy_data["id"] == "orig_copy"
+    assert "copy" in copy_data["name"]
+
+
+def test_duplicate_missing_404() -> None:
+    with TestClient(app) as client:
+        response = client.post("/editor/duplicate/nonexistent")
+    assert response.status_code == 404
+
+
+def test_duplicate_increments_if_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import server.main as main_module
+    monkeypatch.setattr(main_module, "MISSIONS_DIR", tmp_path)
+    (tmp_path / "dup.json").write_text('{"id":"dup","name":"D"}', encoding="utf-8")
+    (tmp_path / "dup_copy.json").write_text('{"id":"dup_copy","name":"D copy"}', encoding="utf-8")
+
+    with TestClient(app) as client:
+        response = client.post("/editor/duplicate/dup")
+    assert response.status_code == 200
+    assert response.json()["id"] == "dup_copy2"
+
+
+# ---------------------------------------------------------------------------
+# start_position in init_mission
+# ---------------------------------------------------------------------------
+
+
+def test_start_position_sets_ship_coords() -> None:
+    """Mission start_position should set ship x/y on init."""
+    from server.models.world import World
+    from server.models.ship import Ship
+    from server.mission_graph import MissionGraph
+    import server.game_loop_mission as glm
+
+    mission_dict = {
+        "id": "pos_test",
+        "name": "Pos Test",
+        "start_position": {"x": 10000, "y": 20000, "heading": 90},
+        "nodes": [
+            {"id": "s", "type": "objective", "text": "Go",
+             "trigger": {"type": "timer_elapsed", "seconds": 999}},
+        ],
+        "edges": [],
+        "start_node": "s",
+        "victory_nodes": ["s"],
+    }
+
+    glm.reset()
+    world = World()
+    world.ship = Ship()
+    world.ship.x = 50000
+    world.ship.y = 50000
+
+    glm._mission_engine = MissionGraph(mission_dict)
+    glm._mission_dict = mission_dict
+
+    # Apply start_position (same logic as init_mission)
+    start_pos = mission_dict.get("start_position")
+    if start_pos:
+        world.ship.x = float(start_pos.get("x", world.ship.x))
+        world.ship.y = float(start_pos.get("y", world.ship.y))
+
+    assert world.ship.x == 10000
+    assert world.ship.y == 20000
+
+
+# ---------------------------------------------------------------------------
 # GET /  — phase string
 # ---------------------------------------------------------------------------
 

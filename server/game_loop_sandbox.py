@@ -655,6 +655,7 @@ def tick(
 
     _evt_mult = getattr(difficulty, "event_interval_multiplier", 1.0) if difficulty else 1.0
     _brd_mult = getattr(difficulty, "boarding_frequency_multiplier", 1.0) if difficulty else 1.0
+    _overlap_max = getattr(difficulty, "event_overlap_max", 999) if difficulty else 999
 
     for key in list(_timers):
         _timers[key] -= dt
@@ -1172,6 +1173,10 @@ def tick(
     # --- Tick trade offer timers ------------------------------------------
     for _offer in _active_trade_offers:
         _offer["_remaining"] = _offer.get("_remaining", 0) - dt
+
+    # Cap concurrent events per tick based on difficulty.event_overlap_max
+    if len(events) > _overlap_max:
+        events = events[:_overlap_max]
 
     return events
 

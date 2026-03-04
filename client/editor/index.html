@@ -19,6 +19,8 @@
       <button id="btn-save" title="Save to server">SAVE</button>
       <button id="btn-validate" title="Validate structure">VALIDATE</button>
       <button id="btn-export" title="Download JSON">EXPORT</button>
+      <button id="btn-duplicate" title="Duplicate mission">DUPE</button>
+      <button id="btn-delete-mission" title="Delete mission from server">DEL</button>
       <button id="btn-test" title="Open in briefing room (test)">TEST</button>
     </div>
     <div id="toolbar-meta">
@@ -26,6 +28,21 @@
       <label>Name <input id="meta-name" type="text" placeholder="Mission name" /></label>
       <label>Start <input id="meta-start" type="text" placeholder="start_node_id" /></label>
       <label>Victory <input id="meta-victory" type="text" placeholder="node_id,node_id" /></label>
+      <label>Ship
+        <select id="meta-ship-class">
+          <option value="any">Any</option>
+          <option value="scout">Scout</option>
+          <option value="corvette">Corvette</option>
+          <option value="frigate">Frigate</option>
+          <option value="medical_ship">Medical Ship</option>
+          <option value="cruiser">Cruiser</option>
+          <option value="carrier">Carrier</option>
+          <option value="battleship">Battleship</option>
+        </select>
+      </label>
+      <label>Start X <input id="meta-start-x" type="number" placeholder="50000" style="width:60px" /></label>
+      <label>Start Y <input id="meta-start-y" type="number" placeholder="50000" style="width:60px" /></label>
+      <label>Heading <input id="meta-start-heading" type="number" placeholder="0" style="width:50px" /></label>
     </div>
   </div>
 
@@ -85,13 +102,34 @@
       <select id="entity-type-select">
         <option value="station">Station</option>
         <option value="scout">Scout</option>
+        <option value="corvette">Corvette</option>
+        <option value="frigate">Frigate</option>
         <option value="cruiser">Cruiser</option>
         <option value="destroyer">Destroyer</option>
+        <option value="battleship">Battleship</option>
+        <option value="enemy_station">Enemy Station</option>
+        <option value="creature">Creature</option>
         <option value="hazard_nebula">Hazard: Nebula</option>
         <option value="hazard_minefield">Hazard: Minefield</option>
         <option value="hazard_radiation">Hazard: Radiation</option>
       </select>
       <input id="entity-id-input" type="text" placeholder="entity_id" />
+      <span id="entity-variant-wrap" class="hidden">
+        <select id="entity-variant-select">
+          <option value="outpost">Outpost</option>
+          <option value="fortress">Fortress</option>
+          <option value="starbase">Starbase</option>
+        </select>
+      </span>
+      <span id="entity-creature-type-wrap" class="hidden">
+        <select id="entity-creature-type-select">
+          <option value="void_whale">Void Whale</option>
+          <option value="solar_jellyfish">Solar Jellyfish</option>
+          <option value="crystal_entity">Crystal Entity</option>
+          <option value="nebula_serpent">Nebula Serpent</option>
+          <option value="swarm">Swarm</option>
+        </select>
+      </span>
       <button id="entity-add-btn">Place</button>
       <span id="entity-coords">Click canvas to set position</span>
     </div>

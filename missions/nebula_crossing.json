@@ -1,7 +1,7 @@
 {
   "id": "nebula_crossing",
   "name": "Nebula Crossing",
-  "briefing": "LONG-RANGE SENSORS DETECT A DISTRESS BEACON DEEP IN THE VELORIAN NEBULA. THE NEBULA'S DENSE PARTICLE CLOUDS MAKE SAFE NAVIGATION TREACHEROUS \u2014 PLOT A COURSE BEFORE ENGAGING THRUSTERS. SCIENCE SENSORS CAN HELP REVEAL HIDDEN HAZARDS.",
+  "briefing": "LONG-RANGE SENSORS DETECT A DISTRESS BEACON DEEP IN THE VELORIAN NEBULA. THE NEBULA'S DENSE PARTICLE CLOUDS MAKE SAFE NAVIGATION TREACHEROUS — PLOT A COURSE BEFORE ENGAGING THRUSTERS. SCIENCE SENSORS CAN HELP REVEAL HIDDEN HAZARDS.",
   "signal_location": {
     "x": 70000,
     "y": 30000
@@ -41,7 +41,7 @@
       "text": "Successfully navigate through the nebula",
       "trigger": {
         "type": "puzzle_completed",
-        "puzzle_label": "nebula_route"
+        "label": "nebula_route"
       }
     },
     {

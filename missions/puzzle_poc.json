@@ -20,7 +20,7 @@
       "text": "Solve the sequence puzzle",
       "trigger": {
         "type": "puzzle_completed",
-        "puzzle_label": "sequence_1"
+        "label": "sequence_1"
       }
     }
   ],

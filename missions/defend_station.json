@@ -37,7 +37,7 @@
       "text": "Repel first attack wave",
       "trigger": {
         "type": "wave_defeated",
-        "enemy_prefix": "w1_"
+        "prefix": "w1_"
       }
     },
     {
@@ -46,7 +46,7 @@
       "text": "Repel second attack wave",
       "trigger": {
         "type": "wave_defeated",
-        "enemy_prefix": "w2_"
+        "prefix": "w2_"
       }
     },
     {
@@ -55,7 +55,7 @@
       "text": "Repel final assault",
       "trigger": {
         "type": "wave_defeated",
-        "enemy_prefix": "w3_"
+        "prefix": "w3_"
       }
     }
   ],

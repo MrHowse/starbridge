@@ -24,7 +24,7 @@
           "text": "Lock on to the alien frequency",
           "trigger": {
             "type": "puzzle_resolved",
-            "puzzle_label": "alien_freq"
+            "label": "alien_freq"
           }
         },
         {
@@ -33,7 +33,7 @@
           "text": "Decode the alien transmission",
           "trigger": {
             "type": "puzzle_resolved",
-            "puzzle_label": "alien_transmission"
+            "label": "alien_transmission"
           }
         }
       ]

@@ -1,7 +1,7 @@
 {
   "id": "deep_strike",
   "name": "Deep Strike",
-  "briefing": "ENEMY DESTROYER DETECTED ON INTERCEPT COURSE. STANDARD TORPEDO SOLUTIONS WON'T WORK \u2014 THE TARGET IS MANOEUVRING. WEAPONS MUST CALCULATE A PRECISE FIRING SOLUTION WHILE SCIENCE TRACKS TARGET VELOCITY. NUCLEAR OPTION IS AUTHORISED AT CAPTAIN'S DISCRETION.",
+  "briefing": "ENEMY DESTROYER DETECTED ON INTERCEPT COURSE. STANDARD TORPEDO SOLUTIONS WON'T WORK — THE TARGET IS MANOEUVRING. WEAPONS MUST CALCULATE A PRECISE FIRING SOLUTION WHILE SCIENCE TRACKS TARGET VELOCITY. NUCLEAR OPTION IS AUTHORISED AT CAPTAIN'S DISCRETION.",
   "signal_location": {
     "x": 65000,
     "y": 30000
@@ -30,7 +30,7 @@
       "text": "Calculate intercept firing solution for the destroyer",
       "trigger": {
         "type": "puzzle_completed",
-        "puzzle_label": "ds_firing_solution"
+        "label": "ds_firing_solution"
       }
     },
     {

@@ -24,6 +24,8 @@ const state = {
   briefing:        "",
   spawn:           [],
   defeat_condition: null,
+  ship_class:      "any",
+  start_position:  null,    // {x, y, heading} or null
 
   nodes:           [],    // flat list; parallel children have parentId property
   edges:           [],
@@ -88,6 +90,12 @@ function _bindToolbar() {
   document.getElementById("btn-test").addEventListener("click", testMission);
   document.getElementById("btn-delete").addEventListener("click", deleteSelected);
 
+  // QoL: Delete and Duplicate mission buttons
+  const delMissionBtn = document.getElementById("btn-delete-mission");
+  if (delMissionBtn) delMissionBtn.addEventListener("click", deleteMission);
+  const dupBtn = document.getElementById("btn-duplicate");
+  if (dupBtn) dupBtn.addEventListener("click", duplicateMission);
+
   // Palette node type buttons
   document.querySelectorAll(".palette-btn[data-type]").forEach(btn => {
     btn.addEventListener("click", () => addNode(btn.dataset.type));
@@ -112,6 +120,12 @@ function _bindMetaInputs() {
   document.getElementById("meta-briefing").addEventListener("input", e => {
     state.briefing = e.target.value;
   });
+  document.getElementById("meta-ship-class").addEventListener("change", e => {
+    state.ship_class = e.target.value;
+  });
+  document.getElementById("meta-start-x").addEventListener("input", () => _syncStartPosition());
+  document.getElementById("meta-start-y").addEventListener("input", () => _syncStartPosition());
+  document.getElementById("meta-start-heading").addEventListener("input", () => _syncStartPosition());
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +138,8 @@ export function newMission() {
   state.briefing = "";
   state.spawn = [];
   state.defeat_condition = null;
+  state.ship_class = "any";
+  state.start_position = null;
   state.nodes = [];
   state.edges = [];
   state.start_node = null;
@@ -199,6 +215,39 @@ export function testMission() {
   localStorage.setItem("starbridge_test_mission", JSON.stringify(mission));
   window.open("/client/briefing/?test=1", "_blank");
   _setStatus("Mission sent to test tab.");
+}
+
+export async function deleteMission() {
+  if (!state.id) { _setStatus("No mission loaded to delete."); return; }
+  if (!confirm(`Delete mission "${state.id}"? This cannot be undone.`)) return;
+  try {
+    const r = await fetch(`/editor/mission/${encodeURIComponent(state.id)}`, { method: "DELETE" });
+    if (r.ok) {
+      _setStatus(`Deleted: ${state.id}`);
+      newMission();
+    } else {
+      const data = await r.json();
+      _setStatus(`Delete failed: ${data.detail || r.statusText}`);
+    }
+  } catch (err) {
+    _setStatus(`Delete error: ${err}`);
+  }
+}
+
+export async function duplicateMission() {
+  if (!state.id) { _setStatus("Save mission first before duplicating."); return; }
+  try {
+    const r = await fetch(`/editor/duplicate/${encodeURIComponent(state.id)}`, { method: "POST" });
+    const data = await r.json();
+    if (r.ok && data.duplicated) {
+      _setStatus(`Duplicated as: ${data.id}`);
+      await openMission(data.id);
+    } else {
+      _setStatus(`Duplicate failed: ${data.detail || JSON.stringify(data)}`);
+    }
+  } catch (err) {
+    _setStatus(`Duplicate error: ${err}`);
+  }
 }
 
 export function addNode(type, x, y) {
@@ -364,6 +413,8 @@ function _loadMission(data) {
   state.briefing = data.briefing || "";
   state.spawn   = data.spawn   || [];
   state.defeat_condition = data.defeat_condition || null;
+  state.ship_class = data.ship_class || "any";
+  state.start_position = data.start_position || null;
   state.start_node   = data.start_node  || null;
   state.victory_nodes = data.victory_nodes || [];
 
@@ -452,6 +503,26 @@ function _syncMetaUI() {
   document.getElementById("meta-start").value   = state.start_node || "";
   document.getElementById("meta-victory").value = (state.victory_nodes || []).join(",");
   document.getElementById("meta-briefing").value = state.briefing || "";
+  document.getElementById("meta-ship-class").value = state.ship_class || "any";
+  const sp = state.start_position;
+  document.getElementById("meta-start-x").value = sp?.x ?? "";
+  document.getElementById("meta-start-y").value = sp?.y ?? "";
+  document.getElementById("meta-start-heading").value = sp?.heading ?? "";
+}
+
+function _syncStartPosition() {
+  const x = document.getElementById("meta-start-x").value;
+  const y = document.getElementById("meta-start-y").value;
+  const h = document.getElementById("meta-start-heading").value;
+  if (x || y) {
+    state.start_position = {
+      x: Number(x) || 50000,
+      y: Number(y) || 50000,
+    };
+    if (h) state.start_position.heading = Number(h);
+  } else {
+    state.start_position = null;
+  }
 }
 
 function _hidePanel(id) {

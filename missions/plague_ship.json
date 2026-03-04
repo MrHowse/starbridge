@@ -1,7 +1,7 @@
 {
   "id": "plague_ship",
   "name": "Plague Ship",
-  "briefing": "DISTRESS SIGNAL RECEIVED \u2014 derelict freighter MSV Korinthia, last known position Sector 7. Survivors aboard. Pathogen unknown. Board with extreme caution and prepare the medical bay. Science, run a pathogen sweep the moment we're in range. Medical, stand by for triage.",
+  "briefing": "DISTRESS SIGNAL RECEIVED — derelict freighter MSV Korinthia, last known position Sector 7. Survivors aboard. Pathogen unknown. Board with extreme caution and prepare the medical bay. Science, run a pathogen sweep the moment we're in range. Medical, stand by for triage.",
   "signal_location": {
     "x": 62000,
     "y": 44000
@@ -23,7 +23,7 @@
       "text": "Diagnose and treat the infected survivors",
       "trigger": {
         "type": "puzzle_resolved",
-        "puzzle_label": "plague_triage"
+        "label": "plague_triage"
       }
     },
     {

@@ -1,0 +1,155 @@
+{
+  "id": "v008_systems_test",
+  "name": "v0.08 Systems Test",
+  "briefing": "All-systems stress test. Environmental hazards will trigger at 30-second intervals across the ship. Survive to 240 seconds to pass.",
+  "ship_class": "cruiser",
+  "start_position": {"x": 50000, "y": 50000, "heading": 0},
+  "signal_location": null,
+  "entities": [],
+  "spawn": [
+    {"id": "e1", "type": "scout", "x": 52000, "y": 50000}
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "objective",
+      "text": "Systems test begins — stand by",
+      "trigger": {"type": "timer_elapsed", "seconds": 30}
+    },
+    {
+      "id": "fire_phase",
+      "type": "objective",
+      "text": "Fire reported in cargo hold",
+      "trigger": {"type": "timer_elapsed", "seconds": 30}
+    },
+    {
+      "id": "breach_phase",
+      "type": "objective",
+      "text": "Hull breach detected — seal the breach",
+      "trigger": {"type": "timer_elapsed", "seconds": 30}
+    },
+    {
+      "id": "radiation_phase",
+      "type": "objective",
+      "text": "Radiation spike in engineering",
+      "trigger": {"type": "timer_elapsed", "seconds": 30}
+    },
+    {
+      "id": "structural_phase",
+      "type": "objective",
+      "text": "Structural damage to forward section",
+      "trigger": {"type": "timer_elapsed", "seconds": 30}
+    },
+    {
+      "id": "contamination_phase",
+      "type": "objective",
+      "text": "Toxic gas leak in medbay",
+      "trigger": {"type": "timer_elapsed", "seconds": 30}
+    },
+    {
+      "id": "system_phase",
+      "type": "objective",
+      "text": "Engine damage sustained",
+      "trigger": {"type": "timer_elapsed", "seconds": 30}
+    },
+    {
+      "id": "transmission_phase",
+      "type": "objective",
+      "text": "Incoming distress signal",
+      "trigger": {"type": "timer_elapsed", "seconds": 30}
+    },
+    {
+      "id": "victory",
+      "type": "objective",
+      "text": "All systems test complete — well done",
+      "trigger": {"type": "timer_elapsed", "seconds": 10}
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "fire_phase",
+      "type": "sequence",
+      "on_complete": {
+        "action": "start_fire",
+        "room_id": "cargo_hold",
+        "intensity": 2
+      }
+    },
+    {
+      "from": "fire_phase",
+      "to": "breach_phase",
+      "type": "sequence",
+      "on_complete": {
+        "action": "create_breach",
+        "room_id": "corridor_fore",
+        "severity": "minor"
+      }
+    },
+    {
+      "from": "breach_phase",
+      "to": "radiation_phase",
+      "type": "sequence",
+      "on_complete": {
+        "action": "apply_radiation",
+        "room_id": "engineering",
+        "source": "reactor_leak",
+        "tier": 2
+      }
+    },
+    {
+      "from": "radiation_phase",
+      "to": "structural_phase",
+      "type": "sequence",
+      "on_complete": {
+        "action": "structural_damage",
+        "section": "forward",
+        "amount": 20
+      }
+    },
+    {
+      "from": "structural_phase",
+      "to": "contamination_phase",
+      "type": "sequence",
+      "on_complete": {
+        "action": "contaminate_atmosphere",
+        "room_id": "medbay",
+        "contaminant": "toxic_gas",
+        "concentration": 0.4
+      }
+    },
+    {
+      "from": "contamination_phase",
+      "to": "system_phase",
+      "type": "sequence",
+      "on_complete": {
+        "action": "system_damage",
+        "system": "engines",
+        "amount": 25
+      }
+    },
+    {
+      "from": "system_phase",
+      "to": "transmission_phase",
+      "type": "sequence",
+      "on_complete": {
+        "action": "send_transmission",
+        "faction": "civilian",
+        "message": "Mayday — freighter under attack, requesting assistance",
+        "channel": "distress"
+      }
+    },
+    {
+      "from": "transmission_phase",
+      "to": "victory",
+      "type": "sequence",
+      "on_complete": {
+        "action": "crew_casualty",
+        "room_id": "cargo_hold",
+        "count": 1
+      }
+    }
+  ],
+  "start_node": "start",
+  "victory_nodes": ["victory"]
+}

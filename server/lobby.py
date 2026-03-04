@@ -429,6 +429,7 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
     except FileNotFoundError:
         mission_data = {}
     sig = mission_data.get("signal_location")
+    _mission_ship_class = mission_data.get("ship_class")
 
     _default_interior = make_default_interior(payload.ship_class)
     interior_layout = {
@@ -496,6 +497,7 @@ async def _start_game(connection_id: str, payload: LobbyStartGamePayload) -> Non
         "players": players,
         "equipment_modules": payload.equipment_modules,
         "loadout": _loadout_dict,
+        "mission_ship_class": _mission_ship_class,
     }
     _game_active = True
     start_logging(payload.mission_id, players)

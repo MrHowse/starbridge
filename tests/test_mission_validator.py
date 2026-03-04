@@ -304,3 +304,121 @@ def test_on_activate_labels_counted_for_duplicates():
     })
     errors = validate_mission(m)
     assert any("delta" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# v0.08 action validation
+# ---------------------------------------------------------------------------
+
+
+def test_action_start_fire_valid():
+    m = _minimal()
+    m["edges"][0]["on_complete"] = {"action": "start_fire", "room_id": "bridge_1", "intensity": 3}
+    errors = validate_mission(m)
+    action_errors = [e for e in errors if "start_fire" in e]
+    assert action_errors == []
+
+
+def test_action_start_fire_missing_room():
+    m = _minimal()
+    m["edges"][0]["on_complete"] = {"action": "start_fire", "intensity": 3}
+    errors = validate_mission(m)
+    assert any("start_fire" in e and "room_id" in e for e in errors)
+
+
+def test_action_start_fire_invalid_intensity():
+    m = _minimal()
+    m["edges"][0]["on_complete"] = {"action": "start_fire", "room_id": "r1", "intensity": 10}
+    errors = validate_mission(m)
+    assert any("intensity" in e for e in errors)
+
+
+def test_action_system_damage_invalid_system():
+    m = _minimal()
+    m["edges"][0]["on_complete"] = {"action": "system_damage", "system": "warp_drive", "amount": 10}
+    errors = validate_mission(m)
+    assert any("system_damage" in e and "system" in e for e in errors)
+
+
+def test_action_system_damage_valid():
+    m = _minimal()
+    m["edges"][0]["on_complete"] = {"action": "system_damage", "system": "engines", "amount": 25}
+    errors = validate_mission(m)
+    action_errors = [e for e in errors if "system_damage" in e]
+    assert action_errors == []
+
+
+def test_action_send_transmission_missing_faction():
+    m = _minimal()
+    m["edges"][0]["on_complete"] = {"action": "send_transmission", "message": "hello"}
+    errors = validate_mission(m)
+    assert any("send_transmission" in e and "faction" in e for e in errors)
+
+
+def test_action_contaminate_invalid_contaminant():
+    m = _minimal()
+    m["edges"][0]["on_complete"] = {"action": "contaminate_atmosphere", "room_id": "r1", "contaminant": "magic_gas"}
+    errors = validate_mission(m)
+    assert any("contaminant" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# Entity/spawn validation
+# ---------------------------------------------------------------------------
+
+
+def test_entity_valid():
+    m = _minimal()
+    m["spawn"] = [{"id": "e1", "type": "scout", "x": 50000, "y": 50000}]
+    errors = validate_mission(m)
+    entity_errors = [e for e in errors if "spawn" in e]
+    assert entity_errors == []
+
+
+def test_entity_unknown_type():
+    m = _minimal()
+    m["spawn"] = [{"id": "e1", "type": "dragon", "x": 0, "y": 0}]
+    errors = validate_mission(m)
+    assert any("unknown type" in e for e in errors)
+
+
+def test_entity_missing_id():
+    m = _minimal()
+    m["spawn"] = [{"type": "scout", "x": 0, "y": 0}]
+    errors = validate_mission(m)
+    assert any("id" in e for e in errors)
+
+
+def test_entity_creature_requires_creature_type():
+    m = _minimal()
+    m["spawn"] = [{"id": "c1", "type": "creature", "x": 0, "y": 0}]
+    errors = validate_mission(m)
+    assert any("creature_type" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# Metadata validation
+# ---------------------------------------------------------------------------
+
+
+def test_metadata_valid_ship_class():
+    m = _minimal()
+    m["ship_class"] = "frigate"
+    errors = validate_mission(m)
+    meta_errors = [e for e in errors if "ship_class" in e]
+    assert meta_errors == []
+
+
+def test_metadata_invalid_ship_class():
+    m = _minimal()
+    m["ship_class"] = "dreadnought"
+    errors = validate_mission(m)
+    assert any("ship_class" in e for e in errors)
+
+
+def test_metadata_start_position_valid():
+    m = _minimal()
+    m["start_position"] = {"x": 10000, "y": 20000}
+    errors = validate_mission(m)
+    meta_errors = [e for e in errors if "start_position" in e]
+    assert meta_errors == []

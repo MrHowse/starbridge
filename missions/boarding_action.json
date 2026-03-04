@@ -18,7 +18,7 @@
       "text": "Repel all boarders",
       "trigger": {
         "type": "puzzle_resolved",
-        "puzzle_label": "position_squads"
+        "label": "position_squads"
       }
     },
     {

@@ -43,12 +43,16 @@ export function exportMission(state) {
     start_node:      state.start_node || null,
     victory_nodes:   state.victory_nodes || [],
     defeat_condition: state.defeat_condition || null,
+    ship_class:      state.ship_class || null,
+    start_position:  state.start_position || null,
   };
 
   // Remove null/empty optional fields
   if (!mission.briefing) delete mission.briefing;
   if (!mission.spawn.length) delete mission.spawn;
   if (!mission.defeat_condition) delete mission.defeat_condition;
+  if (!mission.ship_class || mission.ship_class === "any") delete mission.ship_class;
+  if (!mission.start_position) delete mission.start_position;
 
   return mission;
 }

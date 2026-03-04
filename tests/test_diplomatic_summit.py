@@ -188,27 +188,27 @@ class TestDiplomaticSummitObjectives:
     def test_science_objective_trigger(self):
         obj = next(o for o in self.all_nodes if o["id"] == "obj_science")
         assert obj["trigger"]["type"] == "puzzle_resolved"
-        assert obj["trigger"]["puzzle_label"] == "faction_signatures"
+        assert obj["trigger"]["label"] == "faction_signatures"
 
     def test_comms_objective_trigger(self):
         obj = next(o for o in self.all_nodes if o["id"] == "obj_comms")
         assert obj["trigger"]["type"] == "puzzle_resolved"
-        assert obj["trigger"]["puzzle_label"] == "summit_channel"
+        assert obj["trigger"]["label"] == "summit_channel"
 
     def test_engineering_objective_trigger(self):
         obj = next(o for o in self.all_nodes if o["id"] == "obj_engineering")
         assert obj["trigger"]["type"] == "puzzle_resolved"
-        assert obj["trigger"]["puzzle_label"] == "summit_power"
+        assert obj["trigger"]["label"] == "summit_power"
 
     def test_medical_objective_trigger(self):
         obj = next(o for o in self.all_nodes if o["id"] == "obj_medical")
         assert obj["trigger"]["type"] == "puzzle_resolved"
-        assert obj["trigger"]["puzzle_label"] == "crew_prep"
+        assert obj["trigger"]["label"] == "crew_prep"
 
     def test_security_objective_trigger(self):
         obj = next(o for o in self.all_nodes if o["id"] == "obj_security")
         assert obj["trigger"]["type"] == "puzzle_resolved"
-        assert obj["trigger"]["puzzle_label"] == "security_sweep"
+        assert obj["trigger"]["label"] == "security_sweep"
 
     def test_security_edge_starts_helm_and_weapons_puzzles(self):
         security_edge = next(e for e in self.m["edges"] if e["from"] == "obj_security")
@@ -223,12 +223,12 @@ class TestDiplomaticSummitObjectives:
     def test_helm_objective_trigger(self):
         obj = next(o for o in self.all_nodes if o["id"] == "obj_helm")
         assert obj["trigger"]["type"] == "puzzle_resolved"
-        assert obj["trigger"]["puzzle_label"] == "exit_route"
+        assert obj["trigger"]["label"] == "exit_route"
 
     def test_weapons_objective_trigger(self):
         obj = next(o for o in self.all_nodes if o["id"] == "obj_weapons")
         assert obj["trigger"]["type"] == "puzzle_resolved"
-        assert obj["trigger"]["puzzle_label"] == "summit_defense"
+        assert obj["trigger"]["label"] == "summit_defense"
 
     def test_final_objective_timer_at_least_200s(self):
         final = next(o for o in self.all_nodes if o["id"] == "obj_summit")

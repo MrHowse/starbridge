@@ -112,6 +112,18 @@ def validate_mission(mission: dict) -> list[str]:
     label_errors = _check_puzzle_labels(mission, node_registry, edges)
     errors.extend(label_errors)
 
+    # 9. Action field validation (v0.08)
+    action_errors = _check_actions(edges, node_registry)
+    errors.extend(action_errors)
+
+    # 10. Entity/spawn validation
+    entity_errors = _check_entities(mission)
+    errors.extend(entity_errors)
+
+    # 11. Metadata validation
+    meta_errors = _check_metadata(mission)
+    errors.extend(meta_errors)
+
     return errors
 
 
@@ -227,3 +239,180 @@ def _collect_from_action(action: Any, source: str, out: list[str]) -> None:
     nested = action.get("on_complete")
     if nested:
         _collect_from_action(nested, source, out)
+
+
+# ---------------------------------------------------------------------------
+# v0.08 action field validation
+# ---------------------------------------------------------------------------
+
+_VALID_SYSTEMS = frozenset(
+    {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring",
+     "flight_deck", "ecm_suite", "point_defence"}
+)
+
+_VALID_CONTAMINANTS = frozenset({"toxic_gas", "smoke", "biological", "chemical"})
+
+_VALID_SEVERITIES = frozenset({"minor", "moderate", "major"})
+
+_VALID_ENTITY_TYPES = frozenset(
+    {"station", "scout", "corvette", "frigate", "cruiser", "destroyer",
+     "battleship", "enemy_station", "creature",
+     "hazard_nebula", "hazard_minefield", "hazard_radiation"}
+)
+
+_VALID_SHIP_CLASSES = frozenset(
+    {"any", "scout", "corvette", "frigate", "medical_ship",
+     "cruiser", "carrier", "battleship"}
+)
+
+
+def _collect_all_actions(edges: list[dict], node_registry: dict[str, dict]) -> list[tuple[str, dict]]:
+    """Collect all action dicts from edges and nodes. Returns (source_desc, action) tuples."""
+    results: list[tuple[str, dict]] = []
+
+    def _walk(action: Any, source: str) -> None:
+        if isinstance(action, list):
+            for item in action:
+                _walk(item, source)
+            return
+        if not isinstance(action, dict):
+            return
+        if "action" in action:
+            results.append((source, action))
+        nested = action.get("on_complete")
+        if nested:
+            _walk(nested, source)
+
+    for i, edge in enumerate(edges):
+        oc = edge.get("on_complete")
+        if oc:
+            _walk(oc, f"edge #{i} ({edge.get('from')}→{edge.get('to')})")
+
+    for node_id, node in node_registry.items():
+        oa = node.get("on_activate")
+        if oa:
+            _walk(oa, f"node '{node_id}' on_activate")
+        od = node.get("on_deactivate")
+        if od:
+            _walk(od, f"node '{node_id}' on_deactivate")
+
+    return results
+
+
+def _check_actions(edges: list[dict], node_registry: dict[str, dict]) -> list[str]:
+    """Validate required fields and value ranges for all action types."""
+    errors: list[str] = []
+
+    for source, action in _collect_all_actions(edges, node_registry):
+        atype = action.get("action", "")
+
+        if atype == "start_fire":
+            if not action.get("room_id"):
+                errors.append(f"{source}: start_fire requires 'room_id'.")
+            intensity = action.get("intensity")
+            if intensity is not None and (not isinstance(intensity, (int, float)) or intensity < 1 or intensity > 5):
+                errors.append(f"{source}: start_fire 'intensity' must be 1-5.")
+
+        elif atype == "create_breach":
+            if not action.get("room_id"):
+                errors.append(f"{source}: create_breach requires 'room_id'.")
+            sev = action.get("severity", "minor")
+            if sev not in _VALID_SEVERITIES:
+                errors.append(f"{source}: create_breach 'severity' must be one of {sorted(_VALID_SEVERITIES)}.")
+
+        elif atype == "apply_radiation":
+            if not action.get("room_id"):
+                errors.append(f"{source}: apply_radiation requires 'room_id'.")
+            if not action.get("source"):
+                errors.append(f"{source}: apply_radiation requires 'source'.")
+            tier = action.get("tier")
+            if tier is not None and (not isinstance(tier, (int, float)) or tier < 1 or tier > 4):
+                errors.append(f"{source}: apply_radiation 'tier' must be 1-4.")
+
+        elif atype == "structural_damage":
+            if not action.get("section"):
+                errors.append(f"{source}: structural_damage requires 'section'.")
+            amount = action.get("amount")
+            if amount is not None and (not isinstance(amount, (int, float)) or amount < 1 or amount > 100):
+                errors.append(f"{source}: structural_damage 'amount' must be 1-100.")
+
+        elif atype == "contaminate_atmosphere":
+            if not action.get("room_id"):
+                errors.append(f"{source}: contaminate_atmosphere requires 'room_id'.")
+            cont = action.get("contaminant", "smoke")
+            if cont not in _VALID_CONTAMINANTS:
+                errors.append(f"{source}: contaminate_atmosphere 'contaminant' must be one of {sorted(_VALID_CONTAMINANTS)}.")
+            conc = action.get("concentration")
+            if conc is not None and (not isinstance(conc, (int, float)) or conc < 0 or conc > 1):
+                errors.append(f"{source}: contaminate_atmosphere 'concentration' must be 0-1.")
+
+        elif atype == "system_damage":
+            sys_name = action.get("system", "")
+            if sys_name not in _VALID_SYSTEMS:
+                errors.append(f"{source}: system_damage 'system' must be one of {sorted(_VALID_SYSTEMS)}.")
+            amount = action.get("amount")
+            if amount is not None and (not isinstance(amount, (int, float)) or amount < 1 or amount > 100):
+                errors.append(f"{source}: system_damage 'amount' must be 1-100.")
+
+        elif atype == "crew_casualty":
+            if not action.get("room_id"):
+                errors.append(f"{source}: crew_casualty requires 'room_id'.")
+            count = action.get("count")
+            if count is not None and (not isinstance(count, (int, float)) or count < 1 or count > 10):
+                errors.append(f"{source}: crew_casualty 'count' must be 1-10.")
+
+        elif atype == "send_transmission":
+            if not action.get("faction"):
+                errors.append(f"{source}: send_transmission requires 'faction'.")
+            if not action.get("message"):
+                errors.append(f"{source}: send_transmission requires 'message'.")
+
+    return errors
+
+
+def _check_entities(mission: dict) -> list[str]:
+    """Validate spawn array entries."""
+    errors: list[str] = []
+    spawn = mission.get("spawn") or []
+
+    for i, entity in enumerate(spawn):
+        if not isinstance(entity, dict):
+            errors.append(f"spawn[{i}]: must be a dict.")
+            continue
+        if not entity.get("id"):
+            errors.append(f"spawn[{i}]: requires 'id'.")
+        if not entity.get("type"):
+            errors.append(f"spawn[{i}]: requires 'type'.")
+        elif entity["type"] not in _VALID_ENTITY_TYPES:
+            errors.append(f"spawn[{i}]: unknown type '{entity['type']}'.")
+
+        for coord in ("x", "y"):
+            val = entity.get(coord)
+            if val is not None and not isinstance(val, (int, float)):
+                errors.append(f"spawn[{i}]: '{coord}' must be numeric.")
+
+        if entity.get("type") == "creature" and not entity.get("creature_type"):
+            errors.append(f"spawn[{i}]: creature requires 'creature_type'.")
+
+    return errors
+
+
+def _check_metadata(mission: dict) -> list[str]:
+    """Validate optional metadata fields: ship_class, start_position."""
+    errors: list[str] = []
+
+    sc = mission.get("ship_class")
+    if sc is not None and sc not in _VALID_SHIP_CLASSES:
+        errors.append(f"'ship_class' must be one of {sorted(_VALID_SHIP_CLASSES)}, got '{sc}'.")
+
+    sp = mission.get("start_position")
+    if sp is not None:
+        if not isinstance(sp, dict):
+            errors.append("'start_position' must be a dict with x/y keys.")
+        else:
+            for key in ("x", "y"):
+                val = sp.get(key)
+                if val is not None and not isinstance(val, (int, float)):
+                    errors.append(f"'start_position.{key}' must be numeric.")
+
+    return errors

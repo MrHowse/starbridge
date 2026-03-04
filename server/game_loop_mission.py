@@ -18,6 +18,9 @@ from server.missions.loader import load_mission, spawn_from_mission, spawn_wave
 from server.systems import sensors
 from server.utils.math_helpers import distance
 import server.game_loop_flight_ops as glfo
+import server.game_loop_hazard_control as glhc
+import server.game_loop_atmosphere as glatm
+import server.game_loop_comms as glcomms
 
 # ---------------------------------------------------------------------------
 # Docking / resupply constants
@@ -40,6 +43,7 @@ _pending_puzzle_starts: list[dict] = []
 _pending_boardings: list[dict] = []
 _pending_deployments: list[dict] = []
 _pending_outbreaks: list[dict] = []
+_pending_casualties: list[dict] = []
 _mission_dict: dict = {}
 
 
@@ -54,6 +58,14 @@ def reset() -> None:
     _pending_boardings.clear()
     _pending_deployments.clear()
     _pending_outbreaks.clear()
+    _pending_casualties.clear()
+
+
+def pop_pending_casualties() -> list[dict]:
+    """Return and clear crew_casualty actions queued since the last tick_mission call."""
+    actions = list(_pending_casualties)
+    _pending_casualties.clear()
+    return actions
 
 
 def pop_pending_puzzle_starts() -> list[dict]:
@@ -115,6 +127,7 @@ def deserialise_mission(data: dict, mission_id: str) -> None:
     _pending_boardings.clear()
     _pending_deployments.clear()
     _pending_outbreaks.clear()
+    _pending_casualties.clear()
 
     _dock_timer = float(data.get("dock_timer", 0.0))
 
@@ -156,6 +169,14 @@ def init_mission(mission_id: str, world: World) -> None:
 
     sig = mission.get("signal_location")
     _signal_location = (float(sig["x"]), float(sig["y"])) if sig else None
+
+    # Place ship at mission-defined start position if specified.
+    start_pos = mission.get("start_position")
+    if start_pos:
+        world.ship.x = float(start_pos.get("x", world.ship.x))
+        world.ship.y = float(start_pos.get("y", world.ship.y))
+        if "heading" in start_pos:
+            world.ship.heading = float(start_pos["heading"])
 
 
 def _spawn_sandbox_enemies(world: World) -> None:
@@ -301,6 +322,22 @@ async def tick_mission(
             _pending_boardings.append(action)
         elif action.get("action") == "start_outbreak":
             _pending_outbreaks.append(action)
+        elif action.get("action") == "start_fire":
+            _exec_start_fire(action, ship)
+        elif action.get("action") == "create_breach":
+            _exec_create_breach(action, ship)
+        elif action.get("action") == "apply_radiation":
+            _exec_apply_radiation(action, ship)
+        elif action.get("action") == "structural_damage":
+            _exec_structural_damage(action, ship)
+        elif action.get("action") == "contaminate_atmosphere":
+            _exec_contaminate_atmosphere(action, ship)
+        elif action.get("action") == "system_damage":
+            _exec_system_damage(action, ship)
+        elif action.get("action") == "crew_casualty":
+            _pending_casualties.append(action)
+        elif action.get("action") == "send_transmission":
+            _exec_send_transmission(action)
 
     if newly_completed:
         await manager.broadcast(  # type: ignore[union-attr]
@@ -317,6 +354,152 @@ async def tick_mission(
 
     over, result = _mission_engine.is_over()
     return over, result
+
+
+# ---------------------------------------------------------------------------
+# v0.08 environmental action executors
+# ---------------------------------------------------------------------------
+
+_VALID_SYSTEMS = frozenset(
+    {"engines", "beams", "torpedoes", "shields", "sensors", "manoeuvring",
+     "flight_deck", "ecm_suite", "point_defence"}
+)
+
+_VALID_CONTAMINANTS = frozenset({"toxic_gas", "smoke", "biological", "chemical"})
+
+# Map contaminant name → AtmosphereState attribute
+_CONTAMINANT_ATTR = {
+    "toxic_gas": "coolant",
+    "smoke": "smoke",
+    "biological": "chemical",
+    "chemical": "chemical",
+}
+
+
+def _exec_start_fire(action: dict, ship: object) -> None:
+    """Start a fire in a ship room via HazCon module."""
+    room_id = action.get("room_id", "")
+    intensity = max(1, min(5, int(action.get("intensity", 2))))
+    interior = getattr(ship, "interior", None)
+    if interior is None:
+        gl.log_event("mission", "action_error", {"action": "start_fire", "error": "no interior"})
+        return
+    try:
+        glhc.start_fire(room_id, intensity, interior)
+    except Exception as exc:
+        gl.log_event("mission", "action_error", {"action": "start_fire", "room_id": room_id, "error": str(exc)})
+
+
+def _exec_create_breach(action: dict, ship: object) -> None:
+    """Create a hull breach in a ship room via atmosphere module."""
+    room_id = action.get("room_id", "")
+    severity = action.get("severity", "minor")
+    # Normalise "moderate" → "major" (atmosphere API only has minor/major)
+    if severity == "moderate":
+        severity = "major"
+    if severity not in ("minor", "major"):
+        severity = "minor"
+    interior = getattr(ship, "interior", None)
+    if interior is None:
+        gl.log_event("mission", "action_error", {"action": "create_breach", "error": "no interior"})
+        return
+    try:
+        glatm.create_breach(room_id, severity, interior)
+    except Exception as exc:
+        gl.log_event("mission", "action_error", {"action": "create_breach", "room_id": room_id, "error": str(exc)})
+
+
+def _exec_apply_radiation(action: dict, ship: object) -> None:
+    """Apply radiation to a room's atmosphere."""
+    room_id = action.get("room_id", "")
+    tier = max(1, min(4, int(action.get("tier", 1))))
+    amount = tier * 25  # tier 1→25, 2→50, 3→75, 4→100
+    try:
+        atm = glatm.get_atmosphere(room_id)
+        if atm is None:
+            gl.log_event("mission", "action_error", {"action": "apply_radiation", "room_id": room_id, "error": "unknown room"})
+            return
+        atm.radiation = min(100.0, atm.radiation + amount)
+    except Exception as exc:
+        gl.log_event("mission", "action_error", {"action": "apply_radiation", "error": str(exc)})
+
+
+def _exec_structural_damage(action: dict, ship: object) -> None:
+    """Apply structural damage to a ship section via a room_id lookup."""
+    room_id = action.get("section", action.get("room_id", ""))
+    amount = max(1.0, min(100.0, float(action.get("amount", 10))))
+    try:
+        sec = glhc.get_section_for_room(room_id)
+        if sec is None:
+            gl.log_event("mission", "action_error", {"action": "structural_damage", "section": room_id, "error": "unknown room/section"})
+            return
+        sec.integrity = max(0.0, sec.integrity - amount)
+    except Exception as exc:
+        gl.log_event("mission", "action_error", {"action": "structural_damage", "error": str(exc)})
+
+
+def _exec_contaminate_atmosphere(action: dict, ship: object) -> None:
+    """Add contaminant to a room's atmosphere."""
+    room_id = action.get("room_id", "")
+    contaminant = action.get("contaminant", "smoke")
+    concentration = max(0.0, min(1.0, float(action.get("concentration", 0.5))))
+    attr = _CONTAMINANT_ATTR.get(contaminant, "smoke")
+    try:
+        atm = glatm.get_atmosphere(room_id)
+        if atm is None:
+            gl.log_event("mission", "action_error", {"action": "contaminate_atmosphere", "room_id": room_id, "error": "unknown room"})
+            return
+        current = getattr(atm, attr, 0.0)
+        setattr(atm, attr, min(100.0, current + concentration * 100))
+    except Exception as exc:
+        gl.log_event("mission", "action_error", {"action": "contaminate_atmosphere", "error": str(exc)})
+
+
+def _exec_system_damage(action: dict, ship: object) -> None:
+    """Apply damage to a named ship system."""
+    system_name = action.get("system", "")
+    amount = max(1.0, min(100.0, float(action.get("amount", 10))))
+    if system_name not in _VALID_SYSTEMS:
+        gl.log_event("mission", "action_error", {"action": "system_damage", "system": system_name, "error": "invalid system"})
+        return
+    systems = getattr(ship, "systems", {})
+    sys_obj = systems.get(system_name) if isinstance(systems, dict) else None
+    if sys_obj is None:
+        gl.log_event("mission", "action_error", {"action": "system_damage", "system": system_name, "error": "system not found"})
+        return
+    try:
+        sys_obj.health = max(0.0, sys_obj.health - amount)
+    except Exception as exc:
+        gl.log_event("mission", "action_error", {"action": "system_damage", "error": str(exc)})
+
+
+def _exec_send_transmission(action: dict) -> None:
+    """Inject a signal into the comms queue."""
+    faction = action.get("faction", "unknown")
+    message = action.get("message", "")
+    channel = action.get("channel", "open")
+    try:
+        kwargs: dict = {
+            "source": faction,
+            "source_name": faction.capitalize(),
+            "raw_content": message,
+            "decoded_content": message,
+            "faction": faction,
+        }
+        if channel == "open":
+            kwargs["auto_decoded"] = True
+            kwargs["requires_decode"] = False
+        elif channel == "encrypted":
+            kwargs["requires_decode"] = True
+            kwargs["auto_decoded"] = False
+        elif channel == "distress":
+            kwargs["signal_type"] = "distress"
+            kwargs["auto_decoded"] = True
+            kwargs["requires_decode"] = False
+            kwargs["priority"] = "high"
+        glcomms.add_signal(**kwargs)
+    except Exception as exc:
+        gl.log_event("mission", "action_error", {"action": "send_transmission", "error": str(exc)})
 
 
 # ---------------------------------------------------------------------------
