@@ -108,6 +108,9 @@ AUTO_FIRE_INTERVAL: float = 1.0    # seconds between shots (2× manual 0.5s)
 AUTO_FIRE_ACCURACY: float = 0.75   # 75% hit chance
 AUTO_FIRE_DELAY: float = 3.0       # seconds after player leaves before engaging
 
+# Accuracy penalty for firing at unscanned targets (30% reduction).
+UNSCANNED_ACCURACY_PENALTY: float = 0.7
+
 # ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
@@ -713,6 +716,9 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
         # v0.07: target profile affects hit chance (spec 1.2.5).
         hit_chance = min(1.0, getattr(target, "target_profile", 1.0) + sync_acc + _prio_acc + _evasive_acc)
         hit_chance *= glcord.get_target_profile_modifier()
+        # Unscanned targets are harder to hit accurately.
+        if getattr(target, "scan_state", None) != "scanned":
+            hit_chance *= UNSCANNED_ACCURACY_PENALTY
         hit_chance = max(0.0, min(1.0, hit_chance))
         if hit_chance < 1.0 and _rng.random() > hit_chance:
             _beam_cooldown = ship.beam_fire_rate

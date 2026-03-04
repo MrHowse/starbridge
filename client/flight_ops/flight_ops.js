@@ -382,13 +382,19 @@ function drawContacts() {
       ctx.beginPath();
       ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
       ctx.fill();
-    } else {
-      // Enemy — triangle.
+    } else if (c.scan_state === 'scanned') {
+      // Scanned enemy — solid triangle.
       ctx.beginPath();
       ctx.moveTo(0, -5);
       ctx.lineTo(5, 4);
       ctx.lineTo(-5, 4);
       ctx.closePath();
+      ctx.stroke();
+    } else {
+      // Unscanned enemy — pulsing circle.
+      ctx.globalAlpha = 0.5 + 0.2 * Math.sin(Date.now() * 0.004);
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
@@ -396,7 +402,7 @@ function drawContacts() {
     // Contact label.
     ctx.fillStyle = colour;
     ctx.font = '9px monospace';
-    const label = c.name || c.id || '';
+    const label = c.name || (c.scan_state === 'scanned' ? c.id : 'CONTACT');
     if (label) ctx.fillText(label, cx + 7, cy + 3);
   }
 }
@@ -1518,7 +1524,15 @@ function renderStatusBar() {
   parts.push(`DECOYS: ${foState.decoy_stock}`);
   if (_sensorContacts.length > 0) {
     const hostiles = _sensorContacts.filter(c => c.classification === 'hostile').length;
-    parts.push(`CONTACTS: ${_sensorContacts.length}${hostiles ? ` (${hostiles} hostile)` : ''}`);
+    const unknowns = _sensorContacts.filter(c => c.classification === 'unknown').length;
+    let detail = '';
+    if (hostiles || unknowns) {
+      const parts2 = [];
+      if (hostiles) parts2.push(`${hostiles} hostile`);
+      if (unknowns) parts2.push(`${unknowns} unknown`);
+      detail = ` (${parts2.join(', ')})`;
+    }
+    parts.push(`CONTACTS: ${_sensorContacts.length}${detail}`);
   }
 
   // Warnings.

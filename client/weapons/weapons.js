@@ -292,7 +292,7 @@ function handleGameStarted(payload) {
         // Determine colour; unknown contacts pulse white.
         let color;
         if (cls === 'unknown') {
-          const alpha = 0.5 + 0.5 * Math.sin(now * 0.004);
+          const alpha = 0.5 + 0.2 * Math.sin(now * 0.004);
           color = `rgba(255,255,255,${alpha})`;
         } else {
           color = CONTACT_COLORS[cls] || CONTACT_COLORS.hostile;
@@ -326,6 +326,14 @@ function handleGameStarted(payload) {
           drawEnemyShape(ctx, sx, sy, contact.type,
             (ENEMY_SHAPES[contact.type] || ENEMY_SHAPES.cruiser).size,
             color, selected);
+          // Label unscanned contacts.
+          if (!contact.type) {
+            ctx.fillStyle = color;
+            ctx.font = '9px "Share Tech Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('CONTACT', sx, sy + 12);
+          }
         }
       },
     });
@@ -1249,6 +1257,11 @@ function drawEnemyShape(ctx, sx, sy, type, halfSize, color, selected) {
       else         ctx.lineTo(Math.cos(a) * s, Math.sin(a) * s);
     }
     ctx.closePath();
+    ctx.stroke();
+  } else {
+    // Unknown / unscanned — generic circle blip.
+    ctx.beginPath();
+    ctx.arc(0, 0, halfSize * 0.7, 0, Math.PI * 2);
     ctx.stroke();
   }
 

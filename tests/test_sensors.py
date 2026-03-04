@@ -269,6 +269,25 @@ def test_scanned_contact_type_matches_enemy():
     assert contacts[0]["type"] == "cruiser"
 
 
+def test_scanned_contact_has_name_field():
+    _fresh_sensors()
+    world, enemy, ship = _make_world_with_enemy()
+    enemy.type = "destroyer"  # type: ignore[assignment]
+    enemy.scan_state = "scanned"
+
+    contacts = sensors.build_sensor_contacts(world, ship)
+    assert contacts[0]["name"] == "Destroyer"
+
+
+def test_unknown_contact_has_no_name_field():
+    _fresh_sensors()
+    world, enemy, ship = _make_world_with_enemy()
+    assert enemy.scan_state == "unknown"
+
+    contacts = sensors.build_sensor_contacts(world, ship)
+    assert "name" not in contacts[0]
+
+
 # ---------------------------------------------------------------------------
 # build_scan_result / _compute_weakness
 # ---------------------------------------------------------------------------

@@ -427,3 +427,51 @@ def test_ship_state_broadcast_weapon_fields():
     assert ship.beam_count == 2
     assert ship.torpedo_tube_count == 3
     assert ship.pd_turret_count == 4
+
+
+# ---------------------------------------------------------------------------
+# Unscanned target accuracy penalty
+# ---------------------------------------------------------------------------
+
+def test_fire_beams_unscanned_penalty():
+    """Firing at an unscanned target applies UNSCANNED_ACCURACY_PENALTY."""
+    ship = _make_ship(beam_damage_base=10.0, beam_arc_deg=180.0, beam_fire_rate=0.0)
+    enemy = _enemy_ahead(ship)
+    enemy.scan_state = "unknown"
+    enemy.hull = 10000.0  # don't die
+    world = _make_world(enemies=[enemy])
+    glw.reset()
+    glw.set_target(enemy.id)
+
+    # Run many shots and count misses — with penalty, miss rate should be
+    # significantly higher than zero (perfect hit_chance=1.0 × 0.7 = 0.7).
+    random.seed(42)
+    misses = 0
+    trials = 200
+    for _ in range(trials):
+        glw.tick_cooldowns(10.0)  # clear any cooldown
+        result = glw.fire_player_beams(ship, world)
+        if result is not None and result[0] == "weapons.beam_miss":
+            misses += 1
+    # With 0.7 hit chance, expect ~30% misses.  Accept > 10% to avoid flakiness.
+    assert misses > trials * 0.10, f"Expected misses with unscanned penalty, got {misses}/{trials}"
+
+
+def test_fire_beams_scanned_no_penalty():
+    """Firing at a scanned target does NOT apply accuracy penalty (hit chance ~1.0)."""
+    ship = _make_ship(beam_damage_base=10.0, beam_arc_deg=180.0, beam_fire_rate=0.0)
+    enemy = _enemy_ahead(ship)
+    enemy.scan_state = "scanned"
+    enemy.hull = 10000.0
+    world = _make_world(enemies=[enemy])
+    glw.reset()
+    glw.set_target(enemy.id)
+
+    # target_profile defaults to 1.0, so hit_chance = 1.0 — should never miss.
+    misses = 0
+    for _ in range(50):
+        glw.tick_cooldowns(10.0)
+        result = glw.fire_player_beams(ship, world)
+        if result is not None and result[0] == "weapons.beam_miss":
+            misses += 1
+    assert misses == 0, f"Scanned target should not cause misses, got {misses}/50"
