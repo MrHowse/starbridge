@@ -1,0 +1,5525 @@
+{
+  "save_id": "20260305_205105_sandbox",
+  "saved_at": "2026-03-05T20:51:05",
+  "mission_id": "sandbox",
+  "difficulty_preset": "officer",
+  "ship_class": "frigate",
+  "equipment_module_ids": [],
+  "tick_count": 13007,
+  "sector_layout": "standard_grid",
+  "sector_grid_visibility": {
+    "A1": "active",
+    "B1": "unknown",
+    "C1": "scanned",
+    "D1": "scanned",
+    "E1": "unknown",
+    "A2": "unknown",
+    "B2": "transponder",
+    "C2": "unknown",
+    "D2": "unknown",
+    "E2": "unknown",
+    "A3": "transponder",
+    "B3": "unknown",
+    "C3": "unknown",
+    "D3": "unknown",
+    "E3": "unknown",
+    "A4": "unknown",
+    "B4": "unknown",
+    "C4": "unknown",
+    "D4": "unknown",
+    "E4": "unknown",
+    "A5": "unknown",
+    "B5": "scanned",
+    "C5": "unknown",
+    "D5": "unknown",
+    "E5": "scanned"
+  },
+  "ship": {
+    "name": "TSS Endeavour",
+    "x": 42892.53076563192,
+    "y": 79024.93596798545,
+    "heading": 149.16300665067865,
+    "target_heading": 152.0351920811422,
+    "velocity": 20.02649006622517,
+    "throttle": 30.0,
+    "hull": 80.6,
+    "hull_max": 120.0,
+    "max_speed_base": 160.0,
+    "acceleration_base": 30.0,
+    "turn_rate_base": 90.0,
+    "target_profile": 0.75,
+    "armour": 10.0,
+    "armour_max": 10.0,
+    "armour_zones": null,
+    "armour_zones_max": null,
+    "beam_damage_base": 6.0,
+    "beam_fire_rate": 1.0,
+    "beam_arc_deg": 180,
+    "beam_count": 2,
+    "beam_range": 10000.0,
+    "torpedo_tube_count": 2,
+    "pd_turret_count": 2,
+    "fuel_multiplier": 1.0,
+    "sensor_range_base": 30000.0,
+    "shield_capacity": 80.0,
+    "shield_recharge_rate": 5.0,
+    "docked_at": null,
+    "shields": {
+      "fore": 20.0,
+      "aft": 20.0,
+      "port": 20.0,
+      "starboard": 20.0
+    },
+    "shield_focus": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "shield_distribution": {
+      "fore": 0.25,
+      "aft": 0.25,
+      "port": 0.25,
+      "starboard": 0.25
+    },
+    "systems": {
+      "engines": {
+        "power": 41.72185430463576,
+        "health": 100.0,
+        "_captain_offline": false
+      },
+      "beams": {
+        "power": 92.71523178807946,
+        "health": 91.11,
+        "_captain_offline": false
+      },
+      "torpedoes": {
+        "power": 92.71523178807946,
+        "health": 95.36,
+        "_captain_offline": false
+      },
+      "shields": {
+        "power": 92.71523178807946,
+        "health": 87.05253738441479,
+        "_captain_offline": false
+      },
+      "sensors": {
+        "power": 78.80794701986754,
+        "health": 100.0,
+        "_captain_offline": false
+      },
+      "manoeuvring": {
+        "power": 78.80794701986754,
+        "health": 100.0,
+        "_captain_offline": false
+      },
+      "flight_deck": {
+        "power": 41.72185430463576,
+        "health": 96.39999999999999,
+        "_captain_offline": false
+      },
+      "ecm_suite": {
+        "power": 92.71523178807946,
+        "health": 100.0,
+        "_captain_offline": false
+      },
+      "point_defence": {
+        "power": 88.0794701986755,
+        "health": 100.0,
+        "_captain_offline": false
+      }
+    },
+    "repair_focus": "shields",
+    "alert_level": "green",
+    "medical_supplies": 20,
+    "cargo_capacity": 60.0,
+    "cargo": {},
+    "countermeasure_charges": 10,
+    "ew_countermeasure_active": false,
+    "resources": {
+      "fuel": 6.192499999866735,
+      "fuel_max": 1200.0,
+      "engine_burn_rate": 1.0,
+      "reactor_idle_rate": 0.5,
+      "medical_supplies": 28.0,
+      "medical_supplies_max": 80.0,
+      "repair_materials": 50.0,
+      "repair_materials_max": 60.0,
+      "drone_fuel": 200.0,
+      "drone_fuel_max": 200.0,
+      "drone_parts": 12.0,
+      "drone_parts_max": 20.0,
+      "ammunition": 50.0,
+      "ammunition_max": 80.0,
+      "provisions": 489.1608333333432,
+      "provisions_max": 500.0,
+      "provisions_depleted_time": 0.0,
+      "provisions_crew_penalty": 0.0
+    },
+    "credits": 800.0,
+    "trade_reputation": 0.0,
+    "crew": {
+      "decks": {
+        "bridge": {
+          "deck_name": "bridge",
+          "total": 5,
+          "active": 0,
+          "injured": 4,
+          "critical": 1,
+          "dead": 0
+        },
+        "sensors": {
+          "deck_name": "sensors",
+          "total": 3,
+          "active": 1,
+          "injured": 2,
+          "critical": 0,
+          "dead": 0
+        },
+        "weapons": {
+          "deck_name": "weapons",
+          "total": 4,
+          "active": 2,
+          "injured": 2,
+          "critical": 0,
+          "dead": 0
+        },
+        "shields": {
+          "deck_name": "shields",
+          "total": 3,
+          "active": 0,
+          "injured": 3,
+          "critical": 0,
+          "dead": 0
+        },
+        "engineering": {
+          "deck_name": "engineering",
+          "total": 6,
+          "active": 4,
+          "injured": 2,
+          "critical": 0,
+          "dead": 0
+        },
+        "medical": {
+          "deck_name": "medical",
+          "total": 4,
+          "active": 2,
+          "injured": 2,
+          "critical": 0,
+          "dead": 0
+        }
+      }
+    },
+    "interior": {
+      "room_states": {
+        "bridge": {
+          "state": "decompressed",
+          "door_sealed": false
+        },
+        "conn": {
+          "state": "decompressed",
+          "door_sealed": false
+        },
+        "ready_room": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "observation": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "sensor_array": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "science_lab": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "comms_center": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "astrometrics": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "weapons_bay": {
+          "state": "decompressed",
+          "door_sealed": false
+        },
+        "torpedo_room": {
+          "state": "decompressed",
+          "door_sealed": false
+        },
+        "shields_control": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "combat_info": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "medbay": {
+          "state": "decompressed",
+          "door_sealed": false
+        },
+        "surgery": {
+          "state": "decompressed",
+          "door_sealed": false
+        },
+        "quarantine": {
+          "state": "decompressed",
+          "door_sealed": false
+        },
+        "pharmacy": {
+          "state": "decompressed",
+          "door_sealed": false
+        },
+        "main_engineering": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "engine_room": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "auxiliary_power": {
+          "state": "damaged",
+          "door_sealed": false
+        },
+        "cargo_hold": {
+          "state": "damaged",
+          "door_sealed": false
+        }
+      },
+      "marine_squads": [
+        {
+          "id": "squad_1",
+          "room_id": "bridge",
+          "health": 100.0,
+          "action_points": 10.0,
+          "count": 4
+        },
+        {
+          "id": "squad_2",
+          "room_id": "combat_info",
+          "health": 100.0,
+          "action_points": 10.0,
+          "count": 4
+        }
+      ],
+      "intruders": [
+        {
+          "id": "sb_i1006",
+          "room_id": "weapons_bay",
+          "objective_id": "weapons_bay",
+          "health": 100.0,
+          "move_timer": 1
+        },
+        {
+          "id": "sb_i1007",
+          "room_id": "engine_room",
+          "objective_id": "engine_room",
+          "health": 100.0,
+          "move_timer": 1
+        }
+      ]
+    },
+    "difficulty": {
+      "enemy_damage_multiplier": 1.0,
+      "enemy_accuracy": 1.0,
+      "enemy_health_multiplier": 1.0,
+      "enemy_count_multiplier": 1.0,
+      "enemy_ai_aggression": 0.75,
+      "component_damage_chance": 0.5,
+      "component_severity_multiplier": 1.0,
+      "cook_off_chance_multiplier": 1.0,
+      "repair_speed_multiplier": 1.0,
+      "injury_chance": 0.4,
+      "injury_severity_bias": 0.5,
+      "degradation_timer_multiplier": 1.0,
+      "death_timer_multiplier": 1.0,
+      "contagion_spread_chance": 0.3,
+      "starting_torpedo_multiplier": 1.0,
+      "medical_supply_multiplier": 1.0,
+      "battery_capacity_multiplier": 1.0,
+      "fuel_consumption_multiplier": 1.0,
+      "starting_credits_multiplier": 1.0,
+      "sensor_range_multiplier": 1.0,
+      "scan_time_multiplier": 1.0,
+      "fog_of_war_reveal": 0.2,
+      "hazard_damage_multiplier": 1.0,
+      "event_interval_multiplier": 1.0,
+      "event_overlap_max": 2,
+      "docking_service_multiplier": 1.0,
+      "boarding_frequency_multiplier": 1.0,
+      "puzzle_time_mult": 1.0,
+      "hints_enabled": false
+    }
+  },
+  "entities": {
+    "enemies": [
+      {
+        "id": "sb_e1005",
+        "type": "scout",
+        "x": 55185.17462712973,
+        "y": 68571.10899237513,
+        "heading": 0.0,
+        "velocity": 0.0,
+        "hull": 40.0,
+        "shield_front": 30.0,
+        "shield_rear": 30.0,
+        "ai_state": "idle",
+        "beam_cooldown": 0.0,
+        "scan_state": "scanned",
+        "stun_ticks": 0,
+        "jam_factor": 0.0,
+        "intrusion_stun_ticks": 0,
+        "shield_frequency": "beta",
+        "scan_detail": "basic"
+      },
+      {
+        "id": "sb_e1011",
+        "type": "scout",
+        "x": 78477.50237155822,
+        "y": 70061.22879197272,
+        "heading": 284.6395630776936,
+        "velocity": 280.0,
+        "hull": 40.0,
+        "shield_front": 30.0,
+        "shield_rear": 30.0,
+        "ai_state": "attack",
+        "beam_cooldown": 0.0,
+        "scan_state": "scanned",
+        "stun_ticks": 0,
+        "jam_factor": 0.0,
+        "intrusion_stun_ticks": 0,
+        "shield_frequency": "beta",
+        "scan_detail": "basic"
+      },
+      {
+        "id": "sb_e1017",
+        "type": "scout",
+        "x": 29272.421802755576,
+        "y": 49627.760777140655,
+        "heading": 0.0,
+        "velocity": 0.0,
+        "hull": 40.0,
+        "shield_front": 30.0,
+        "shield_rear": 30.0,
+        "ai_state": "idle",
+        "beam_cooldown": 0.0,
+        "scan_state": "scanned",
+        "stun_ticks": 0,
+        "jam_factor": 0.0,
+        "intrusion_stun_ticks": 0,
+        "shield_frequency": "alpha",
+        "scan_detail": "detailed"
+      },
+      {
+        "id": "sb_e1030",
+        "type": "scout",
+        "x": 85312.74667284833,
+        "y": 15716.315547728242,
+        "heading": 0.0,
+        "velocity": 0.0,
+        "hull": 40.0,
+        "shield_front": 30.0,
+        "shield_rear": 30.0,
+        "ai_state": "idle",
+        "beam_cooldown": 0.0,
+        "scan_state": "unknown",
+        "stun_ticks": 0,
+        "jam_factor": 0.0,
+        "intrusion_stun_ticks": 0,
+        "shield_frequency": "delta",
+        "scan_detail": "basic"
+      },
+      {
+        "id": "sb_e1048",
+        "type": "cruiser",
+        "x": 44658.22997405815,
+        "y": 82310.41200183675,
+        "heading": 0.0,
+        "velocity": 0.0,
+        "hull": 70.0,
+        "shield_front": 21.98721854304636,
+        "shield_rear": 60.0,
+        "ai_state": "idle",
+        "beam_cooldown": 0.0,
+        "scan_state": "scanned",
+        "stun_ticks": 0,
+        "jam_factor": 0.0,
+        "intrusion_stun_ticks": 0,
+        "shield_frequency": "gamma",
+        "scan_detail": "basic"
+      },
+      {
+        "id": "sb_e1072",
+        "type": "scout",
+        "x": 7409.642778268804,
+        "y": 59419.76577295936,
+        "heading": 0.0,
+        "velocity": 0.0,
+        "hull": 40.0,
+        "shield_front": 30.0,
+        "shield_rear": 30.0,
+        "ai_state": "idle",
+        "beam_cooldown": 0.0,
+        "scan_state": "unknown",
+        "stun_ticks": 0,
+        "jam_factor": 0.0,
+        "intrusion_stun_ticks": 0,
+        "shield_frequency": "beta",
+        "scan_detail": "basic"
+      }
+    ],
+    "torpedoes": [],
+    "stations": [
+      {
+        "id": "homeward_station",
+        "x": 25000.0,
+        "y": 30000.0,
+        "name": "Homeward Station",
+        "station_type": "military",
+        "faction": "friendly",
+        "services": [
+          "weapons_resupply",
+          "hull_repair",
+          "intel",
+          "torpedo_resupply"
+        ],
+        "docking_range": 2000.0,
+        "docking_ports": 2,
+        "transponder_active": true,
+        "shields": 100.0,
+        "shields_max": 100.0,
+        "hull": 600.0,
+        "hull_max": 600.0,
+        "inventory": {},
+        "requires_scan": false
+      },
+      {
+        "id": "kepler_research",
+        "x": 150000.0,
+        "y": 150000.0,
+        "name": "Kepler Research Station",
+        "station_type": "military",
+        "faction": "friendly",
+        "services": [
+          "weapons_resupply",
+          "hull_repair",
+          "intel",
+          "torpedo_resupply"
+        ],
+        "docking_range": 2000.0,
+        "docking_ports": 2,
+        "transponder_active": true,
+        "shields": 100.0,
+        "shields_max": 100.0,
+        "hull": 600.0,
+        "hull_max": 600.0,
+        "inventory": {},
+        "requires_scan": false
+      },
+      {
+        "id": "sentinel_station",
+        "x": 50000.0,
+        "y": 250000.0,
+        "name": "Sentinel Station",
+        "station_type": "military",
+        "faction": "friendly",
+        "services": [
+          "weapons_resupply",
+          "hull_repair",
+          "intel",
+          "torpedo_resupply"
+        ],
+        "docking_range": 2000.0,
+        "docking_ports": 2,
+        "transponder_active": true,
+        "shields": 100.0,
+        "shields_max": 100.0,
+        "hull": 600.0,
+        "hull_max": 600.0,
+        "inventory": {},
+        "requires_scan": false
+      },
+      {
+        "id": "enemy_fortress_main",
+        "x": 450000.0,
+        "y": 350000.0,
+        "name": "Rebel Fortress Alpha",
+        "station_type": "enemy",
+        "faction": "hostile",
+        "services": [],
+        "docking_range": 2000.0,
+        "docking_ports": 2,
+        "transponder_active": false,
+        "shields": 150.0,
+        "shields_max": 150.0,
+        "hull": 800.0,
+        "hull_max": 800.0,
+        "inventory": {},
+        "requires_scan": true
+      },
+      {
+        "id": "sb_port",
+        "x": 50000.0,
+        "y": 20000.0,
+        "name": "Way Station Alpha",
+        "station_type": "repair_dock",
+        "faction": "friendly",
+        "services": [
+          "hull_repair",
+          "system_repair",
+          "atmospheric_resupply"
+        ],
+        "docking_range": 4000.0,
+        "docking_ports": 2,
+        "transponder_active": true,
+        "shields": 50.0,
+        "shields_max": 50.0,
+        "hull": 500.0,
+        "hull_max": 500.0,
+        "inventory": {},
+        "requires_scan": false
+      },
+      {
+        "id": "sb_derelict",
+        "x": 78000.0,
+        "y": 72000.0,
+        "name": "Derelict: Wrecked Freighter",
+        "station_type": "derelict",
+        "faction": "none",
+        "services": [],
+        "docking_range": 3000.0,
+        "docking_ports": 1,
+        "transponder_active": false,
+        "shields": 0.0,
+        "shields_max": 0.0,
+        "hull": 75.0,
+        "hull_max": 100.0,
+        "inventory": {},
+        "requires_scan": true
+      }
+    ],
+    "asteroids": [],
+    "hazards": [
+      {
+        "id": "sb_nebula_1",
+        "x": 22000.0,
+        "y": 68000.0,
+        "radius": 14000.0,
+        "hazard_type": "nebula",
+        "label": "Sensor Nebula"
+      },
+      {
+        "id": "sb_asteroids_1",
+        "x": 72000.0,
+        "y": 32000.0,
+        "radius": 10000.0,
+        "hazard_type": "asteroid_field",
+        "label": "Rock Field"
+      }
+    ]
+  },
+  "modules": {
+    "weapons": {
+      "weapons_target": "sb_e1048",
+      "torpedo_ammo": {
+        "standard": 2,
+        "homing": 0,
+        "ion": 1,
+        "piercing": 4,
+        "heavy": 2,
+        "proximity": 4,
+        "nuclear": 1,
+        "experimental": 0
+      },
+      "torpedo_ammo_max": {
+        "standard": 8,
+        "homing": 4,
+        "ion": 4,
+        "piercing": 4,
+        "heavy": 2,
+        "proximity": 4,
+        "nuclear": 1,
+        "experimental": 0
+      },
+      "tube_cooldowns": [
+        0.0,
+        0.0
+      ],
+      "tube_reload_times": [
+        33.931567593480345,
+        55.42905081495685
+      ],
+      "tube_types": [
+        "standard",
+        "ion"
+      ],
+      "tube_loading": [
+        0.0,
+        0.0
+      ],
+      "tube_type_loading": [
+        "standard",
+        "ion"
+      ],
+      "entity_counter": 15,
+      "auto_fire_active": false,
+      "auto_fire_delay": 0.0,
+      "beam_cooldown": 0.0
+    },
+    "medical": {
+      "active_treatments": {},
+      "heal_timers": {},
+      "active_outbreak": {},
+      "spread_timer": 40.70000000000031,
+      "v2": {
+        "treatment_beds": 4,
+        "occupied_beds": {
+          "2": "crew_002"
+        },
+        "treatment_queue": [],
+        "active_crew_treatments": {},
+        "medical_supplies": 28.0,
+        "quarantine_slots": 2,
+        "quarantine_occupied": {},
+        "morgue": [
+          "crew_001",
+          "crew_005",
+          "crew_003"
+        ]
+      }
+    },
+    "security": {
+      "boarding_active": true,
+      "eliminated_reported": [],
+      "station_boarding_active": false,
+      "station_eliminated_reported": [],
+      "marine_teams": [
+        {
+          "id": "mt_alpha",
+          "name": "Alpha Squad",
+          "callsign": "ALPHA",
+          "members": [],
+          "leader": "bridge_0",
+          "size": 0,
+          "max_size": 4,
+          "location": "conn",
+          "destination": null,
+          "travel_progress": 0.0,
+          "patrol_route": [],
+          "patrol_index": 0,
+          "status": "stationed",
+          "engagement": null,
+          "escort_target": null,
+          "combat_effectiveness": 1.0,
+          "suppression_level": 0.0,
+          "ammo": 100.0
+        },
+        {
+          "id": "mt_bravo",
+          "name": "Bravo Squad",
+          "callsign": "BRAVO",
+          "members": [],
+          "leader": "bridge_4",
+          "size": 0,
+          "max_size": 4,
+          "location": "engine_room",
+          "destination": null,
+          "travel_progress": 0.0,
+          "patrol_route": [],
+          "patrol_index": 0,
+          "status": "stationed",
+          "engagement": null,
+          "escort_target": null,
+          "combat_effectiveness": 1.0,
+          "suppression_level": 0.0,
+          "ammo": 100.0
+        }
+      ],
+      "boarding_parties": [],
+      "next_party_id": 0,
+      "locked_doors": [],
+      "breached_doors": [],
+      "lockdown_decks": [],
+      "ship_lockdown": false,
+      "sensor_status": {},
+      "sealed_bulkheads": [],
+      "deck_alerts": {},
+      "armed_decks": [],
+      "quarantined_rooms": [],
+      "door_lock_origins": {}
+    },
+    "flight_ops": {
+      "drones": [
+        {
+          "id": "drone_s1",
+          "callsign": "Hawk",
+          "drone_type": "scout",
+          "position": [
+            0.0,
+            0.0
+          ],
+          "heading": 0.0,
+          "speed": 0.0,
+          "max_speed": 375.0,
+          "hull": 30.0,
+          "max_hull": 30.0,
+          "fuel": 100.0,
+          "fuel_consumption": 0.8,
+          "ammo": 0.0,
+          "status": "hangar",
+          "mission_type": null,
+          "waypoints": [],
+          "waypoint_index": 0,
+          "loiter_point": null,
+          "loiter_radius": 3000.0,
+          "hangar_slot": 0,
+          "turnaround_remaining": 0.0,
+          "needs_refuel": false,
+          "needs_rearm": false,
+          "needs_repair": false,
+          "refuel_progress": 0.0,
+          "rearm_progress": 0.0,
+          "repair_progress": 0.0,
+          "sensor_range": 25000.0,
+          "sensor_resolution": 0.7,
+          "weapon_damage": 0.0,
+          "weapon_range": 0.0,
+          "cargo_capacity": 0,
+          "cargo_current": 0,
+          "ecm_strength": 0.0,
+          "buoy_capacity": 0,
+          "buoys_remaining": 0,
+          "ai_mode": "semi_auto",
+          "ai_behaviour": "loiter",
+          "engagement_rules": "weapons_tight",
+          "contact_of_interest": null,
+          "escort_target": null,
+          "bingo_acknowledged": false,
+          "damage_dealt": 0.0,
+          "contacts_found": 0,
+          "survivors_rescued": 0,
+          "attack_cooldown_remaining": 0.0
+        },
+        {
+          "id": "drone_c1",
+          "callsign": "Fang",
+          "drone_type": "combat",
+          "position": [
+            0.0,
+            0.0
+          ],
+          "heading": 0.0,
+          "speed": 0.0,
+          "max_speed": 300.0,
+          "hull": 60.0,
+          "max_hull": 60.0,
+          "fuel": 100.0,
+          "fuel_consumption": 1.2,
+          "ammo": 100.0,
+          "status": "hangar",
+          "mission_type": null,
+          "waypoints": [],
+          "waypoint_index": 0,
+          "loiter_point": null,
+          "loiter_radius": 2000.0,
+          "hangar_slot": 1,
+          "turnaround_remaining": 0.0,
+          "needs_refuel": false,
+          "needs_rearm": false,
+          "needs_repair": false,
+          "refuel_progress": 0.0,
+          "rearm_progress": 0.0,
+          "repair_progress": 0.0,
+          "sensor_range": 10000.0,
+          "sensor_resolution": 0.3,
+          "weapon_damage": 4.0,
+          "weapon_range": 10000.0,
+          "cargo_capacity": 0,
+          "cargo_current": 0,
+          "ecm_strength": 0.0,
+          "buoy_capacity": 0,
+          "buoys_remaining": 0,
+          "ai_mode": "semi_auto",
+          "ai_behaviour": "loiter",
+          "engagement_rules": "weapons_tight",
+          "contact_of_interest": null,
+          "escort_target": null,
+          "bingo_acknowledged": false,
+          "damage_dealt": 0.0,
+          "contacts_found": 0,
+          "survivors_rescued": 0,
+          "attack_cooldown_remaining": 0.0
+        },
+        {
+          "id": "drone_c2",
+          "callsign": "Sabre",
+          "drone_type": "combat",
+          "position": [
+            0.0,
+            0.0
+          ],
+          "heading": 0.0,
+          "speed": 0.0,
+          "max_speed": 300.0,
+          "hull": 60.0,
+          "max_hull": 60.0,
+          "fuel": 100.0,
+          "fuel_consumption": 1.2,
+          "ammo": 100.0,
+          "status": "hangar",
+          "mission_type": null,
+          "waypoints": [],
+          "waypoint_index": 0,
+          "loiter_point": null,
+          "loiter_radius": 2000.0,
+          "hangar_slot": 2,
+          "turnaround_remaining": 0.0,
+          "needs_refuel": false,
+          "needs_rearm": false,
+          "needs_repair": false,
+          "refuel_progress": 0.0,
+          "rearm_progress": 0.0,
+          "repair_progress": 0.0,
+          "sensor_range": 10000.0,
+          "sensor_resolution": 0.3,
+          "weapon_damage": 4.0,
+          "weapon_range": 10000.0,
+          "cargo_capacity": 0,
+          "cargo_current": 0,
+          "ecm_strength": 0.0,
+          "buoy_capacity": 0,
+          "buoys_remaining": 0,
+          "ai_mode": "semi_auto",
+          "ai_behaviour": "loiter",
+          "engagement_rules": "weapons_tight",
+          "contact_of_interest": null,
+          "escort_target": null,
+          "bingo_acknowledged": false,
+          "damage_dealt": 0.0,
+          "contacts_found": 0,
+          "survivors_rescued": 0,
+          "attack_cooldown_remaining": 0.0
+        },
+        {
+          "id": "drone_r1",
+          "callsign": "Angel",
+          "drone_type": "rescue",
+          "position": [
+            0.0,
+            0.0
+          ],
+          "heading": 0.0,
+          "speed": 0.0,
+          "max_speed": 200.0,
+          "hull": 80.0,
+          "max_hull": 80.0,
+          "fuel": 100.0,
+          "fuel_consumption": 1.0,
+          "ammo": 0.0,
+          "status": "hangar",
+          "mission_type": null,
+          "waypoints": [],
+          "waypoint_index": 0,
+          "loiter_point": null,
+          "loiter_radius": 2000.0,
+          "hangar_slot": 3,
+          "turnaround_remaining": 0.0,
+          "needs_refuel": false,
+          "needs_rearm": false,
+          "needs_repair": false,
+          "refuel_progress": 0.0,
+          "rearm_progress": 0.0,
+          "repair_progress": 0.0,
+          "sensor_range": 8000.0,
+          "sensor_resolution": 0.3,
+          "weapon_damage": 0.0,
+          "weapon_range": 0.0,
+          "cargo_capacity": 6,
+          "cargo_current": 0,
+          "ecm_strength": 0.0,
+          "buoy_capacity": 0,
+          "buoys_remaining": 0,
+          "ai_mode": "semi_auto",
+          "ai_behaviour": "loiter",
+          "engagement_rules": "weapons_tight",
+          "contact_of_interest": null,
+          "escort_target": null,
+          "bingo_acknowledged": false,
+          "damage_dealt": 0.0,
+          "contacts_found": 0,
+          "survivors_rescued": 0,
+          "attack_cooldown_remaining": 0.0
+        }
+      ],
+      "flight_deck": {
+        "launch_tubes": 1,
+        "launch_time": 8.0,
+        "tubes_in_use": [],
+        "launch_queue": [],
+        "recovery_slots": 1,
+        "recovery_time": 5.0,
+        "recovery_in_progress": [],
+        "recovery_queue": [],
+        "hangar_slots": 4,
+        "turnarounds": {},
+        "drone_fuel_reserve": 100.0,
+        "drone_ammo_reserve": 100.0,
+        "deck_status": "operational",
+        "catapult_health": 100.0,
+        "recovery_health": 100.0,
+        "fuel_lines_health": 100.0,
+        "control_tower_health": 100.0,
+        "fire_active": false,
+        "depressurised": false,
+        "power_available": true,
+        "crash_block_remaining": 0.0,
+        "turnaround_multiplier": 1.0
+      },
+      "missions": {},
+      "buoys": [],
+      "decoys": [],
+      "decoy_stock": 3,
+      "decoy_counter": 0,
+      "bingo_timers": {},
+      "launch_timers": {},
+      "launch_phases": {},
+      "retry_delays": {},
+      "recovery_timers": {}
+    },
+    "hazard_control": {
+      "active_dcts": {},
+      "pending_hull_damage": 0.0,
+      "fires": {},
+      "fire_teams": {},
+      "vent_rooms": [],
+      "deck_suppression": {},
+      "sections": {
+        "deck1_a": {
+          "deck_number": 1,
+          "deck_name": "bridge",
+          "room_ids": [
+            "bridge",
+            "conn"
+          ],
+          "integrity": 0.0,
+          "collapsed": true
+        },
+        "deck1_b": {
+          "deck_number": 1,
+          "deck_name": "bridge",
+          "room_ids": [
+            "observation",
+            "ready_room"
+          ],
+          "integrity": 54.6,
+          "collapsed": false
+        },
+        "deck2_a": {
+          "deck_number": 2,
+          "deck_name": "sensors",
+          "room_ids": [
+            "astrometrics",
+            "comms_center"
+          ],
+          "integrity": 70.2,
+          "collapsed": false
+        },
+        "deck2_b": {
+          "deck_number": 2,
+          "deck_name": "sensors",
+          "room_ids": [
+            "science_lab",
+            "sensor_array"
+          ],
+          "integrity": 36.0,
+          "collapsed": false
+        },
+        "deck3_a": {
+          "deck_number": 3,
+          "deck_name": "shields",
+          "room_ids": [
+            "combat_info",
+            "shields_control"
+          ],
+          "integrity": 45.2,
+          "collapsed": false
+        },
+        "deck3_b": {
+          "deck_number": 3,
+          "deck_name": "weapons",
+          "room_ids": [
+            "torpedo_room",
+            "weapons_bay"
+          ],
+          "integrity": 0.0,
+          "collapsed": true
+        },
+        "deck4_a": {
+          "deck_number": 4,
+          "deck_name": "medical",
+          "room_ids": [
+            "medbay",
+            "pharmacy"
+          ],
+          "integrity": 0.0,
+          "collapsed": true
+        },
+        "deck4_b": {
+          "deck_number": 4,
+          "deck_name": "medical",
+          "room_ids": [
+            "quarantine",
+            "surgery"
+          ],
+          "integrity": 0.0,
+          "collapsed": true
+        },
+        "deck5_a": {
+          "deck_number": 5,
+          "deck_name": "engineering",
+          "room_ids": [
+            "auxiliary_power",
+            "cargo_hold"
+          ],
+          "integrity": 80.0,
+          "collapsed": false
+        },
+        "deck5_b": {
+          "deck_number": 5,
+          "deck_name": "engineering",
+          "room_ids": [
+            "engine_room",
+            "main_engineering"
+          ],
+          "integrity": 42.4,
+          "collapsed": false
+        }
+      },
+      "reinforcement_teams": {},
+      "fire_structural_timers": {
+        "deck4_a": 3.353761712787673e-12,
+        "deck4_b": 29.900000000003352,
+        "deck3_b": 17.500000000003176,
+        "deck3_a": 9.400000000002699,
+        "deck2_b": 6.600000000002708,
+        "deck5_b": 10.600000000002055,
+        "deck1_a": 3.0340174816956278e-12,
+        "deck2_a": 26.600000000002026,
+        "deck5_a": 7.900000000001584,
+        "deck1_b": 5.400000000001913
+      },
+      "sealed_connections": [],
+      "deck_batteries": {
+        "1": 0.0,
+        "2": 180.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 180.0
+      },
+      "deck_power": {
+        "1": "none",
+        "2": "main",
+        "3": "none",
+        "4": "none",
+        "5": "main"
+      },
+      "power_cut_overrides": [],
+      "life_pods": [
+        {
+          "id": "pod_d1_a",
+          "deck_number": 1,
+          "capacity": 4,
+          "loaded_crew": 0,
+          "launched": false,
+          "launch_timer": 0.0,
+          "load_accum": 0.0
+        },
+        {
+          "id": "pod_d2_a",
+          "deck_number": 2,
+          "capacity": 4,
+          "loaded_crew": 0,
+          "launched": false,
+          "launch_timer": 0.0,
+          "load_accum": 0.0
+        },
+        {
+          "id": "pod_d3_a",
+          "deck_number": 3,
+          "capacity": 4,
+          "loaded_crew": 0,
+          "launched": false,
+          "launch_timer": 0.0,
+          "load_accum": 0.0
+        },
+        {
+          "id": "pod_d4_a",
+          "deck_number": 4,
+          "capacity": 4,
+          "loaded_crew": 0,
+          "launched": false,
+          "launch_timer": 0.0,
+          "load_accum": 0.0
+        },
+        {
+          "id": "pod_d5_a",
+          "deck_number": 5,
+          "capacity": 4,
+          "loaded_crew": 0,
+          "launched": false,
+          "launch_timer": 0.0,
+          "load_accum": 0.0
+        }
+      ],
+      "abandon_ship": false,
+      "evacuation_order": [],
+      "fire_suppression_powered": true
+    },
+    "atmosphere": {
+      "atmosphere": {
+        "bridge": {
+          "oxygen_percent": 0.0,
+          "pressure_kpa": 0.0,
+          "temperature_c": -270.0,
+          "smoke": 85.05443979451324,
+          "coolant": 0.0,
+          "radiation": 1.0164466331108102,
+          "chemical": 0.0
+        },
+        "conn": {
+          "oxygen_percent": 0.015917337272745094,
+          "pressure_kpa": 0.039795458927579734,
+          "temperature_c": -270.0,
+          "smoke": 87.76615364462445,
+          "coolant": 0.0,
+          "radiation": 1.0488490297407638,
+          "chemical": 0.0
+        },
+        "ready_room": {
+          "oxygen_percent": 0.00035506471112030927,
+          "pressure_kpa": 0.0008922788884608456,
+          "temperature_c": -267.944413901892,
+          "smoke": 87.02720906123797,
+          "coolant": 0.0,
+          "radiation": 1.0400294924839382,
+          "chemical": 0.0
+        },
+        "observation": {
+          "oxygen_percent": 0.0005703464057732456,
+          "pressure_kpa": 0.0014332825567916058,
+          "temperature_c": -266.5780938704441,
+          "smoke": 86.96701468959368,
+          "coolant": 0.0,
+          "radiation": 1.0393159675750971,
+          "chemical": 0.0
+        },
+        "sensor_array": {
+          "oxygen_percent": 2.3728937456015,
+          "pressure_kpa": 5.9325078299212874,
+          "temperature_c": -266.16844401340956,
+          "smoke": 92.4717035162397,
+          "coolant": 0.0,
+          "radiation": 1.10506696493755,
+          "chemical": 0.0
+        },
+        "science_lab": {
+          "oxygen_percent": 1.5913769163504572,
+          "pressure_kpa": 3.978648754137439,
+          "temperature_c": -267.32221546326645,
+          "smoke": 92.48877441018362,
+          "coolant": 0.0,
+          "radiation": 1.1052677097859496,
+          "chemical": 0.0
+        },
+        "comms_center": {
+          "oxygen_percent": 3.1794736485360846,
+          "pressure_kpa": 7.949182438891059,
+          "temperature_c": -263.71252752138025,
+          "smoke": 93.53996770585975,
+          "coolant": 0.0,
+          "radiation": 1.1178377176788383,
+          "chemical": 0.0
+        },
+        "astrometrics": {
+          "oxygen_percent": 3.9616883093550492,
+          "pressure_kpa": 9.904883537025453,
+          "temperature_c": -261.7475859492747,
+          "smoke": 94.24265097739942,
+          "coolant": 0.0,
+          "radiation": 1.126239020749649,
+          "chemical": 0.0
+        },
+        "weapons_bay": {
+          "oxygen_percent": 0.0001599401822696062,
+          "pressure_kpa": 0.0003998713105488939,
+          "temperature_c": -270.0,
+          "smoke": 96.6116525342778,
+          "coolant": 0.0,
+          "radiation": 1.154506503651384,
+          "chemical": 0.0
+        },
+        "torpedo_room": {
+          "oxygen_percent": 0.015675921901551468,
+          "pressure_kpa": 0.03919187796338909,
+          "temperature_c": -270.0,
+          "smoke": 96.23584294477313,
+          "coolant": 0.0,
+          "radiation": 1.1500149005763582,
+          "chemical": 0.0
+        },
+        "shields_control": {
+          "oxygen_percent": 0.015852646594032606,
+          "pressure_kpa": 0.039636620289524825,
+          "temperature_c": -269.87706384512444,
+          "smoke": 97.21095498384945,
+          "coolant": 0.0,
+          "radiation": 1.1616687064029991,
+          "chemical": 0.0
+        },
+        "combat_info": {
+          "oxygen_percent": 0.015862918817293473,
+          "pressure_kpa": 0.03966395209589622,
+          "temperature_c": -269.70006784480154,
+          "smoke": 97.75086818631044,
+          "coolant": 0.0,
+          "radiation": 1.1681211540972931,
+          "chemical": 0.0
+        },
+        "medbay": {
+          "oxygen_percent": 1.5834264547021691e-06,
+          "pressure_kpa": 3.958775551857485e-06,
+          "temperature_c": -270.0,
+          "smoke": 98.61456101013556,
+          "coolant": 0.0,
+          "radiation": 1.178406410596071,
+          "chemical": 0.0
+        },
+        "surgery": {
+          "oxygen_percent": 0.03211684954759361,
+          "pressure_kpa": 0.08029677434980745,
+          "temperature_c": -270.0,
+          "smoke": 98.29901055537374,
+          "coolant": 0.0,
+          "radiation": 1.1746380112973125,
+          "chemical": 0.0
+        },
+        "quarantine": {
+          "oxygen_percent": 1.551916268253596e-06,
+          "pressure_kpa": 3.879995918375521e-06,
+          "temperature_c": -270.0,
+          "smoke": 98.88762081806797,
+          "coolant": 0.0,
+          "radiation": 1.1816656632183773,
+          "chemical": 0.0
+        },
+        "pharmacy": {
+          "oxygen_percent": 1.5675921901551477e-08,
+          "pressure_kpa": 3.919187796338911e-08,
+          "temperature_c": -270.0,
+          "smoke": 99.18228184895648,
+          "coolant": 0.0,
+          "radiation": 1.1851835082204816,
+          "chemical": 0.0
+        },
+        "main_engineering": {
+          "oxygen_percent": 3.963028906432131,
+          "pressure_kpa": 9.908126200973431,
+          "temperature_c": -266.2236438966105,
+          "smoke": 99.36062513060725,
+          "coolant": 0.0,
+          "radiation": 1.1872997784351462,
+          "chemical": 0.0
+        },
+        "engine_room": {
+          "oxygen_percent": 3.1963061630888503,
+          "pressure_kpa": 7.9912276185255395,
+          "temperature_c": -266.9376324571642,
+          "smoke": 99.13369311265059,
+          "coolant": 0.0,
+          "radiation": 1.1845924748113559,
+          "chemical": 0.0
+        },
+        "auxiliary_power": {
+          "oxygen_percent": 4.771407542151714,
+          "pressure_kpa": 11.929262859517646,
+          "temperature_c": -265.1360887716296,
+          "smoke": 99.4945953698821,
+          "coolant": 0.0,
+          "radiation": 1.1888942609232733,
+          "chemical": 0.0
+        },
+        "cargo_hold": {
+          "oxygen_percent": 5.555200056243266,
+          "pressure_kpa": 13.888897338258804,
+          "temperature_c": -264.19302335770703,
+          "smoke": 99.6603797054637,
+          "coolant": 0.0,
+          "radiation": 1.1908696628380129,
+          "chemical": 0.0
+        }
+      },
+      "breaches": {
+        "torpedo_room": {
+          "severity": "major",
+          "force_field_active": false,
+          "force_field_timer": 0.0,
+          "bulkhead_sealed": false,
+          "bulkhead_timer": 0.0,
+          "evacuating": false,
+          "evacuation_timer": 0.0
+        },
+        "medbay": {
+          "severity": "major",
+          "force_field_active": false,
+          "force_field_timer": 0.0,
+          "bulkhead_sealed": false,
+          "bulkhead_timer": 0.0,
+          "evacuating": false,
+          "evacuation_timer": 0.0
+        },
+        "pharmacy": {
+          "severity": "major",
+          "force_field_active": false,
+          "force_field_timer": 0.0,
+          "bulkhead_sealed": false,
+          "bulkhead_timer": 0.0,
+          "evacuating": false,
+          "evacuation_timer": 0.0
+        },
+        "quarantine": {
+          "severity": "major",
+          "force_field_active": false,
+          "force_field_timer": 0.0,
+          "bulkhead_sealed": false,
+          "bulkhead_timer": 0.0,
+          "evacuating": false,
+          "evacuation_timer": 0.0
+        },
+        "surgery": {
+          "severity": "major",
+          "force_field_active": false,
+          "force_field_timer": 0.0,
+          "bulkhead_sealed": false,
+          "bulkhead_timer": 0.0,
+          "evacuating": false,
+          "evacuation_timer": 0.0
+        },
+        "weapons_bay": {
+          "severity": "major",
+          "force_field_active": false,
+          "force_field_timer": 0.0,
+          "bulkhead_sealed": false,
+          "bulkhead_timer": 0.0,
+          "evacuating": false,
+          "evacuation_timer": 0.0
+        },
+        "bridge": {
+          "severity": "major",
+          "force_field_active": false,
+          "force_field_timer": 0.0,
+          "bulkhead_sealed": false,
+          "bulkhead_timer": 0.0,
+          "evacuating": false,
+          "evacuation_timer": 0.0
+        },
+        "conn": {
+          "severity": "major",
+          "force_field_active": false,
+          "force_field_timer": 0.0,
+          "bulkhead_sealed": false,
+          "bulkhead_timer": 0.0,
+          "evacuating": false,
+          "evacuation_timer": 0.0
+        }
+      },
+      "vent_states": {
+        "bridge|conn": "open",
+        "conn|ready_room": "open",
+        "conn|science_lab": "open",
+        "observation|ready_room": "open",
+        "science_lab|sensor_array": "open",
+        "comms_center|science_lab": "open",
+        "science_lab|torpedo_room": "open",
+        "astrometrics|comms_center": "open",
+        "torpedo_room|weapons_bay": "open",
+        "shields_control|torpedo_room": "open",
+        "surgery|torpedo_room": "open",
+        "combat_info|shields_control": "open",
+        "medbay|surgery": "open",
+        "quarantine|surgery": "open",
+        "engine_room|surgery": "open",
+        "pharmacy|quarantine": "open",
+        "engine_room|main_engineering": "open",
+        "auxiliary_power|engine_room": "open",
+        "auxiliary_power|cargo_hold": "open"
+      },
+      "space_vent_rooms": [
+        "bridge"
+      ],
+      "coolant_leaks": [],
+      "decon_teams": {},
+      "radiation_exposure": {}
+    },
+    "comms": {
+      "active_frequency": 0.075,
+      "signal_counter": 28,
+      "signals": [
+        {
+          "id": "sig_1",
+          "source": "unknown_vessel",
+          "source_name": "Unknown Vessel",
+          "frequency": 0.143,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "This is the transport vessel Meridian. Cargo run to sector 7.",
+          "decoded_content": "This is the transport vessel Meridian. Cargo run to sector 7.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 142,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_2",
+          "source": "unknown_vessel",
+          "source_name": "Unknown Vessel",
+          "frequency": 0.069,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "Patrol vessel Resolute, Federation Navy. Identify yourselves.",
+          "decoded_content": "Patrol vessel Resolute, Federation Navy. Identify yourselves.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 470,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": 0.0,
+          "faction": "pirate",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_3",
+          "source": "unknown_vessel",
+          "source_name": "Unknown Vessel",
+          "frequency": 0.069,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "Patrol vessel Resolute, Federation Navy. Identify yourselves.",
+          "decoded_content": "Patrol vessel Resolute, Federation Navy. Identify yourselves.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 472,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": 0.0,
+          "faction": "pirate",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_5",
+          "source": "unknown_vessel",
+          "source_name": "Unknown Vessel",
+          "frequency": 0.417,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "This is the transport vessel Meridian. Cargo run to sector 7.",
+          "decoded_content": "This is the transport vessel Meridian. Cargo run to sector 7.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 856,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": 0.0,
+          "faction": "rebel",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_6",
+          "source": "unknown_vessel",
+          "source_name": "Unknown Vessel",
+          "frequency": 0.417,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "Independent trader. Our registry is on file.",
+          "decoded_content": "Independent trader. Our registry is on file.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 857,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": 0.0,
+          "faction": "rebel",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_7",
+          "source": "distress_beacon",
+          "source_name": "Distress Beacon",
+          "frequency": 0.9,
+          "signal_type": "distress",
+          "priority": "critical",
+          "raw_content": "EMERGENCY — vessel in distress at (17026, 38886). Requesting immediate assistance.",
+          "decoded_content": "EMERGENCY — vessel in distress at (17026, 38886). Requesting immediate assistance.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 1104,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "unknown",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "acknowledge",
+              "label": "ACKNOWLEDGE",
+              "description": "Confirm receipt and offer assistance.",
+              "likely_outcome": "Positive — may be genuine.",
+              "standing_effect": "help_distress"
+            },
+            {
+              "id": "request_coords",
+              "label": "REQUEST COORDS",
+              "description": "Ask for precise coordinates before committing.",
+              "likely_outcome": "Cautious — delays response.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "unable",
+              "label": "UNABLE",
+              "description": "Acknowledge but cannot assist.",
+              "likely_outcome": "Negative — standing loss.",
+              "standing_effect": "ignore_distress"
+            }
+          ],
+          "dismissed": true,
+          "location_data": {
+            "type": "exact",
+            "position": [
+              17026.9,
+              38886.7
+            ],
+            "radius": 0.0,
+            "entity_type": "ship"
+          }
+        },
+        {
+          "id": "sig_10",
+          "source": "distress_beacon",
+          "source_name": "Distress Beacon",
+          "frequency": 0.9,
+          "signal_type": "distress",
+          "priority": "critical",
+          "raw_content": "EMERGENCY — vessel in distress at (34473, 91724). Requesting immediate assistance.",
+          "decoded_content": "EMERGENCY — vessel in distress at (34473, 91724). Requesting immediate assistance.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 2948,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "unknown",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "acknowledge",
+              "label": "ACKNOWLEDGE",
+              "description": "Confirm receipt and offer assistance.",
+              "likely_outcome": "Positive — may be genuine.",
+              "standing_effect": "help_distress"
+            },
+            {
+              "id": "request_coords",
+              "label": "REQUEST COORDS",
+              "description": "Ask for precise coordinates before committing.",
+              "likely_outcome": "Cautious — delays response.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "unable",
+              "label": "UNABLE",
+              "description": "Acknowledge but cannot assist.",
+              "likely_outcome": "Negative — standing loss.",
+              "standing_effect": "ignore_distress"
+            }
+          ],
+          "dismissed": true,
+          "location_data": {
+            "type": "exact",
+            "position": [
+              34473.4,
+              91724.3
+            ],
+            "radius": 0.0,
+            "entity_type": "ship"
+          }
+        },
+        {
+          "id": "sig_12",
+          "source": "unknown_vessel",
+          "source_name": "Unknown Vessel",
+          "frequency": 0.078,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "Independent trader. Our registry is on file.",
+          "decoded_content": "Independent trader. Our registry is on file.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 4647,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "pirate",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_14",
+          "source": "distress_beacon",
+          "source_name": "Distress Beacon",
+          "frequency": 0.9,
+          "signal_type": "distress",
+          "priority": "critical",
+          "raw_content": "EMERGENCY — vessel in distress at (45144, 76906). Requesting immediate assistance.",
+          "decoded_content": "EMERGENCY — vessel in distress at (45144, 76906). Requesting immediate assistance.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 4868,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "unknown",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "acknowledge",
+              "label": "ACKNOWLEDGE",
+              "description": "Confirm receipt and offer assistance.",
+              "likely_outcome": "Positive — may be genuine.",
+              "standing_effect": "help_distress"
+            },
+            {
+              "id": "request_coords",
+              "label": "REQUEST COORDS",
+              "description": "Ask for precise coordinates before committing.",
+              "likely_outcome": "Cautious — delays response.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "unable",
+              "label": "UNABLE",
+              "description": "Acknowledge but cannot assist.",
+              "likely_outcome": "Negative — standing loss.",
+              "standing_effect": "ignore_distress"
+            }
+          ],
+          "dismissed": true,
+          "location_data": {
+            "type": "exact",
+            "position": [
+              45144.4,
+              76906.9
+            ],
+            "radius": 0.0,
+            "entity_type": "ship"
+          }
+        },
+        {
+          "id": "sig_17",
+          "source": "unknown_vessel",
+          "source_name": "Unknown Vessel",
+          "frequency": 0.148,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "This is the transport vessel Meridian. Cargo run to sector 7.",
+          "decoded_content": "This is the transport vessel Meridian. Cargo run to sector 7.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 7035,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_18",
+          "source": "Meridian?",
+          "source_name": "Meridian?",
+          "frequency": 0.148,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "Independent trader. Our registry is on file.",
+          "decoded_content": "Independent trader. Our registry is on file.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 7769,
+          "expires_tick": null,
+          "responded": false,
+          "response_deadline": 54.3,
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_19",
+          "source": "Meridian?",
+          "source_name": "Meridian?",
+          "frequency": 0.148,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "Patrol vessel Resolute, Federation Navy. Identify yourselves.",
+          "decoded_content": "Patrol vessel Resolute, Federation Navy. Identify yourselves.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 7773,
+          "expires_tick": null,
+          "responded": false,
+          "response_deadline": 54.4,
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_20",
+          "source": "distress_beacon",
+          "source_name": "Distress Beacon",
+          "frequency": 0.9,
+          "signal_type": "distress",
+          "priority": "critical",
+          "raw_content": "EMERGENCY — vessel in distress at (87974, 95000). Requesting immediate assistance.",
+          "decoded_content": "EMERGENCY — vessel in distress at (87974, 95000). Requesting immediate assistance.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 7831,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "unknown",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "acknowledge",
+              "label": "ACKNOWLEDGE",
+              "description": "Confirm receipt and offer assistance.",
+              "likely_outcome": "Positive — may be genuine.",
+              "standing_effect": "help_distress"
+            },
+            {
+              "id": "request_coords",
+              "label": "REQUEST COORDS",
+              "description": "Ask for precise coordinates before committing.",
+              "likely_outcome": "Cautious — delays response.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "unable",
+              "label": "UNABLE",
+              "description": "Acknowledge but cannot assist.",
+              "likely_outcome": "Negative — standing loss.",
+              "standing_effect": "ignore_distress"
+            }
+          ],
+          "dismissed": true,
+          "location_data": {
+            "type": "exact",
+            "position": [
+              87974.2,
+              95000.0
+            ],
+            "radius": 0.0,
+            "entity_type": "ship"
+          }
+        },
+        {
+          "id": "sig_23",
+          "source": "pirate",
+          "source_name": "Pirate",
+          "frequency": 0.075,
+          "signal_type": "hail",
+          "priority": "medium",
+          "raw_content": "This is the transport vessel Meridian. Cargo run to sector 7.",
+          "decoded_content": "This is the transport vessel Meridian. Cargo run to sector 7.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 9857,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "pirate",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "comply",
+              "label": "COMPLY",
+              "description": "Identify ship and state intentions.",
+              "likely_outcome": "Positive — most vessels respond well to openness.",
+              "standing_effect": "honest_identify"
+            },
+            {
+              "id": "formal",
+              "label": "FORMAL",
+              "description": "Demand reciprocal identification first.",
+              "likely_outcome": "Neutral — professional but cautious.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "evasive",
+              "label": "EVASIVE",
+              "description": "Claim to be a civilian transport.",
+              "likely_outcome": "Risky — works if they don't scan you.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "assertive",
+              "label": "ASSERTIVE",
+              "description": "Identify as a warship and demand they stand down.",
+              "likely_outcome": "Intimidating — weaker ships comply.",
+              "standing_effect": "refuse_aggressive"
+            }
+          ],
+          "dismissed": true,
+          "location_data": null
+        },
+        {
+          "id": "sig_25",
+          "source": "distress_beacon",
+          "source_name": "Distress Beacon",
+          "frequency": 0.9,
+          "signal_type": "distress",
+          "priority": "critical",
+          "raw_content": "EMERGENCY — vessel in distress at (65039, 95000). Requesting immediate assistance.",
+          "decoded_content": "EMERGENCY — vessel in distress at (65039, 95000). Requesting immediate assistance.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 10258,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": 0.0,
+          "faction": "unknown",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "acknowledge",
+              "label": "ACKNOWLEDGE",
+              "description": "Confirm receipt and offer assistance.",
+              "likely_outcome": "Positive — may be genuine.",
+              "standing_effect": "help_distress"
+            },
+            {
+              "id": "request_coords",
+              "label": "REQUEST COORDS",
+              "description": "Ask for precise coordinates before committing.",
+              "likely_outcome": "Cautious — delays response.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "unable",
+              "label": "UNABLE",
+              "description": "Acknowledge but cannot assist.",
+              "likely_outcome": "Negative — standing loss.",
+              "standing_effect": "ignore_distress"
+            }
+          ],
+          "dismissed": true,
+          "location_data": {
+            "type": "exact",
+            "position": [
+              65039.1,
+              95000.0
+            ],
+            "radius": 0.0,
+            "entity_type": "ship"
+          }
+        },
+        {
+          "id": "sig_26",
+          "source": "sb_rebel_vessel",
+          "source_name": "Rebel Vessel",
+          "frequency": 0.42,
+          "signal_type": "broadcast",
+          "priority": "medium",
+          "raw_content": "patrol coordinates",
+          "decoded_content": "patrol coordinates",
+          "decode_progress": 1.0,
+          "auto_decoded": false,
+          "requires_decode": true,
+          "language": "standard",
+          "arrived_tick": 11122,
+          "expires_tick": 14122,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "rebel",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "fleet",
+          "decoding_active": true,
+          "response_options": [
+            {
+              "id": "acknowledge",
+              "label": "ACKNOWLEDGE",
+              "description": "Note the broadcast.",
+              "likely_outcome": "Informational.",
+              "standing_effect": "respond_promptly"
+            }
+          ],
+          "dismissed": true,
+          "location_data": {
+            "type": "approximate",
+            "position": [
+              2948.1,
+              72149.6
+            ],
+            "radius": 11686.578137158946
+          }
+        },
+        {
+          "id": "sig_27",
+          "source": "sb_imperial_vessel",
+          "source_name": "Imperial Vessel",
+          "frequency": 0.15,
+          "signal_type": "broadcast",
+          "priority": "medium",
+          "raw_content": "encrypted orders",
+          "decoded_content": "encrypted orders",
+          "decode_progress": 1.0,
+          "auto_decoded": false,
+          "requires_decode": true,
+          "language": "standard",
+          "arrived_tick": 12154,
+          "expires_tick": 15154,
+          "responded": false,
+          "response_deadline": null,
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "fleet",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "acknowledge",
+              "label": "ACKNOWLEDGE",
+              "description": "Note the broadcast.",
+              "likely_outcome": "Informational.",
+              "standing_effect": "respond_promptly"
+            }
+          ],
+          "dismissed": false,
+          "location_data": {
+            "type": "approximate",
+            "position": [
+              38611.6,
+              102918.2
+            ],
+            "radius": 14102.626599821395
+          }
+        },
+        {
+          "id": "sig_28",
+          "source": "distress_beacon",
+          "source_name": "Distress Beacon",
+          "frequency": 0.9,
+          "signal_type": "distress",
+          "priority": "critical",
+          "raw_content": "EMERGENCY — vessel in distress at (9547, 76815). Requesting immediate assistance.",
+          "decoded_content": "EMERGENCY — vessel in distress at (9547, 76815). Requesting immediate assistance.",
+          "decode_progress": 1.0,
+          "auto_decoded": true,
+          "requires_decode": false,
+          "language": "standard",
+          "arrived_tick": 12349,
+          "expires_tick": null,
+          "responded": true,
+          "response_deadline": null,
+          "faction": "unknown",
+          "threat_level": "unknown",
+          "intel_value": "",
+          "intel_category": "",
+          "decoding_active": false,
+          "response_options": [
+            {
+              "id": "acknowledge",
+              "label": "ACKNOWLEDGE",
+              "description": "Confirm receipt and offer assistance.",
+              "likely_outcome": "Positive — may be genuine.",
+              "standing_effect": "help_distress"
+            },
+            {
+              "id": "request_coords",
+              "label": "REQUEST COORDS",
+              "description": "Ask for precise coordinates before committing.",
+              "likely_outcome": "Cautious — delays response.",
+              "standing_effect": "respond_promptly"
+            },
+            {
+              "id": "unable",
+              "label": "UNABLE",
+              "description": "Acknowledge but cannot assist.",
+              "likely_outcome": "Negative — standing loss.",
+              "standing_effect": "ignore_distress"
+            }
+          ],
+          "dismissed": false,
+          "location_data": {
+            "type": "exact",
+            "position": [
+              9547.5,
+              76815.9
+            ],
+            "radius": 0.0,
+            "entity_type": "ship"
+          }
+        }
+      ],
+      "factions": {
+        "imperial": {
+          "faction_id": "imperial",
+          "name": "Terran Empire",
+          "standing": 23.0,
+          "disposition": "neutral",
+          "recent_actions": [
+            "honest_identify",
+            "respond_promptly",
+            "respond_promptly",
+            "respond_promptly",
+            "respond_promptly",
+            "respond_promptly"
+          ]
+        },
+        "federation": {
+          "faction_id": "federation",
+          "name": "Federation",
+          "standing": 20.0,
+          "disposition": "neutral",
+          "recent_actions": []
+        },
+        "pirate": {
+          "faction_id": "pirate",
+          "name": "Pirate Clans",
+          "standing": -40.0,
+          "disposition": "hostile",
+          "recent_actions": [
+            "ignored_hail",
+            "ignored_hail",
+            "refuse_aggressive",
+            "refuse_aggressive"
+          ]
+        },
+        "alien": {
+          "faction_id": "alien",
+          "name": "Unknown Alien",
+          "standing": 6.0,
+          "disposition": "neutral",
+          "recent_actions": [
+            "respond_promptly",
+            "respond_promptly",
+            "respond_promptly"
+          ]
+        },
+        "civilian": {
+          "faction_id": "civilian",
+          "name": "Civilian",
+          "standing": 30.0,
+          "disposition": "friendly",
+          "recent_actions": []
+        },
+        "rebel": {
+          "faction_id": "rebel",
+          "name": "Rebel Alliance",
+          "standing": -4.0,
+          "disposition": "suspicious",
+          "recent_actions": [
+            "respond_promptly",
+            "ignored_hail",
+            "ignored_hail",
+            "respond_promptly",
+            "respond_promptly"
+          ]
+        },
+        "unknown": {
+          "faction_id": "unknown",
+          "name": "Unknown",
+          "standing": 15.0,
+          "disposition": "neutral",
+          "recent_actions": [
+            "respond_promptly",
+            "respond_promptly",
+            "respond_promptly",
+            "respond_promptly",
+            "ignored_distress",
+            "help_distress"
+          ]
+        }
+      },
+      "channels": [
+        {
+          "name": "emergency",
+          "status": "open",
+          "bandwidth_cost": 5.0
+        },
+        {
+          "name": "standard",
+          "status": "open",
+          "bandwidth_cost": 15.0
+        },
+        {
+          "name": "fleet",
+          "status": "closed",
+          "bandwidth_cost": 20.0
+        },
+        {
+          "name": "intelligence",
+          "status": "open",
+          "bandwidth_cost": 25.0
+        },
+        {
+          "name": "broadcast",
+          "status": "monitored",
+          "bandwidth_cost": 10.0
+        },
+        {
+          "name": "science",
+          "status": "closed",
+          "bandwidth_cost": 15.0
+        },
+        {
+          "name": "internal",
+          "status": "open",
+          "bandwidth_cost": 10.0
+        }
+      ],
+      "translations": {},
+      "decoded_factions": [
+        "rebel",
+        "alien",
+        "imperial"
+      ],
+      "active_decode_id": "sig_26",
+      "dialogues": {
+        "sig_1": [
+          {
+            "speaker": "them",
+            "text": "This is the transport vessel Meridian. Cargo run to sector 7."
+          },
+          {
+            "speaker": "you",
+            "text": "COMPLY"
+          },
+          {
+            "speaker": "them",
+            "text": "Identification confirmed. You're clear."
+          }
+        ],
+        "sig_4": [
+          {
+            "speaker": "them",
+            "text": "scrambled signal"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_7": [
+          {
+            "speaker": "them",
+            "text": "EMERGENCY — vessel in distress at (17026, 38886). Requesting immediate assistance."
+          },
+          {
+            "speaker": "you",
+            "text": "REQUEST COORDS"
+          },
+          {
+            "speaker": "them",
+            "text": "Sending coordinates now. We don't have much time."
+          }
+        ],
+        "sig_10": [
+          {
+            "speaker": "them",
+            "text": "EMERGENCY — vessel in distress at (34473, 91724). Requesting immediate assistance."
+          },
+          {
+            "speaker": "you",
+            "text": "REQUEST COORDS"
+          },
+          {
+            "speaker": "them",
+            "text": "Coordinates: sector 4B, bearing 127. Hurry!"
+          }
+        ],
+        "sig_11": [
+          {
+            "speaker": "them",
+            "text": "encrypted orders"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_9": [
+          {
+            "speaker": "them",
+            "text": "scrambled signal"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_12": [
+          {
+            "speaker": "them",
+            "text": "Independent trader. Our registry is on file."
+          },
+          {
+            "speaker": "you",
+            "text": "ASSERTIVE"
+          },
+          {
+            "speaker": "them",
+            "text": "We comply. Altering course now."
+          }
+        ],
+        "sig_13": [
+          {
+            "speaker": "them",
+            "text": "alliance request"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_14": [
+          {
+            "speaker": "them",
+            "text": "EMERGENCY — vessel in distress at (45144, 76906). Requesting immediate assistance."
+          },
+          {
+            "speaker": "you",
+            "text": "REQUEST COORDS"
+          },
+          {
+            "speaker": "them",
+            "text": "Coordinates: sector 4B, bearing 127. Hurry!"
+          }
+        ],
+        "sig_15": [
+          {
+            "speaker": "them",
+            "text": "encrypted orders"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_16": [
+          {
+            "speaker": "them",
+            "text": "supply manifest"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_17": [
+          {
+            "speaker": "them",
+            "text": "This is the transport vessel Meridian. Cargo run to sector 7."
+          },
+          {
+            "speaker": "you",
+            "text": "FORMAL"
+          },
+          {
+            "speaker": "them",
+            "text": "Acknowledged. State your business."
+          }
+        ],
+        "sig_20": [
+          {
+            "speaker": "them",
+            "text": "EMERGENCY — vessel in distress at (87974, 95000). Requesting immediate assistance."
+          },
+          {
+            "speaker": "you",
+            "text": "REQUEST COORDS"
+          },
+          {
+            "speaker": "them",
+            "text": "Coordinates: sector 4B, bearing 127. Hurry!"
+          }
+        ],
+        "sig_21": [
+          {
+            "speaker": "them",
+            "text": "scrambled signal"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_22": [
+          {
+            "speaker": "them",
+            "text": "alliance request"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_23": [
+          {
+            "speaker": "them",
+            "text": "This is the transport vessel Meridian. Cargo run to sector 7."
+          },
+          {
+            "speaker": "you",
+            "text": "ASSERTIVE"
+          },
+          {
+            "speaker": "them",
+            "text": "Big words. Let's see if your guns match."
+          }
+        ],
+        "sig_24": [
+          {
+            "speaker": "them",
+            "text": "supply manifest"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_26": [
+          {
+            "speaker": "them",
+            "text": "patrol coordinates"
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "...acknowledged..."
+          }
+        ],
+        "sig_28": [
+          {
+            "speaker": "them",
+            "text": "EMERGENCY — vessel in distress at (9547, 76815). Requesting immediate assistance."
+          },
+          {
+            "speaker": "you",
+            "text": "ACKNOWLEDGE"
+          },
+          {
+            "speaker": "them",
+            "text": "Copy — help is on the way? We're venting atmosphere!"
+          }
+        ]
+      },
+      "transmissions": [
+        {
+          "text": "HAILING unknown_vessel [IDENTIFY]",
+          "type": "outgoing"
+        },
+        {
+          "text": "ENC: 7A-3F-12... patrol route updated",
+          "type": "intercepted"
+        },
+        {
+          "text": "HAILING unknown_vessel [IDENTIFY]",
+          "type": "outgoing"
+        },
+        {
+          "text": "ENC: 3B-9C... reinforcements inbound",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 3B-9C... reinforcements inbound",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: ALPHA-DELTA-7... asset confirmed",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 3B-9C... reinforcements inbound",
+          "type": "intercepted"
+        },
+        {
+          "text": "HAILING Meridian? [IDENTIFY]",
+          "type": "outgoing"
+        },
+        {
+          "text": "HAILING Meridian? [IDENTIFY]",
+          "type": "outgoing"
+        },
+        {
+          "text": "ENC: 7A-3F-12... patrol route updated",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 7A-3F-12... patrol route updated",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 7A-3F-12... patrol route updated",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 7A-3F-12... patrol route updated",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 3B-9C... reinforcements inbound",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 3B-9C... reinforcements inbound",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 7A-3F-12... patrol route updated",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 3B-9C... reinforcements inbound",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 7A-3F-12... patrol route updated",
+          "type": "intercepted"
+        },
+        {
+          "text": "ENC: 7A-3F-12... patrol route updated",
+          "type": "intercepted"
+        },
+        {
+          "text": "HAILING pirate [IDENTIFY]",
+          "type": "outgoing"
+        }
+      ],
+      "interception_timer": 8.499999999999986,
+      "active_probes": {},
+      "comms_contacts": [
+        {
+          "id": "cc_1",
+          "source_signal_id": "sig_4",
+          "source_type": "fleet_movement",
+          "position": [
+            74182.1,
+            71981.0
+          ],
+          "position_accuracy": "exact",
+          "position_radius": 0.0,
+          "name": "Rebel Vessel",
+          "entity_type": "fleet",
+          "faction": "rebel",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 1885,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 3506,
+          "mission_id": "dm_1",
+          "merged_sensor_id": "sb_e1011",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_3",
+          "source_signal_id": "sig_8",
+          "source_type": "fleet_movement",
+          "position": [
+            24735.0,
+            38703.8
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 5000.0,
+          "name": "Alien Vessel",
+          "entity_type": "fleet",
+          "faction": "alien",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 2086,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 4485,
+          "mission_id": null,
+          "merged_sensor_id": "homeward_station",
+          "decode_progress": 0.751,
+          "assessment": null
+        },
+        {
+          "id": "cc_4",
+          "source_signal_id": "sig_9",
+          "source_type": "fleet_movement",
+          "position": [
+            76773.3,
+            54827.6
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 12221.1,
+          "name": "Imperial Vessel",
+          "entity_type": "fleet",
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 2935,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 5680,
+          "mission_id": "dm_3",
+          "merged_sensor_id": "sb_e1001",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_6",
+          "source_signal_id": "sig_11",
+          "source_type": "fleet_movement",
+          "position": [
+            42920.1,
+            41199.7
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 11940.3,
+          "name": "Imperial Vessel",
+          "entity_type": "fleet",
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 3947,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 6677,
+          "mission_id": "dm_5",
+          "merged_sensor_id": "sb_e1017",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_8",
+          "source_signal_id": "sig_13",
+          "source_type": "fleet_movement",
+          "position": [
+            53223.2,
+            18009.4
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 14577.6,
+          "name": "Alien Vessel",
+          "entity_type": "fleet",
+          "faction": "alien",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 5060,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 7709,
+          "mission_id": "dm_7",
+          "merged_sensor_id": "sb_port",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_9",
+          "source_signal_id": "sig_15",
+          "source_type": "fleet_movement",
+          "position": [
+            57966.8,
+            65393.8
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 9750.7,
+          "name": "Alien Vessel",
+          "entity_type": "fleet",
+          "faction": "alien",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 6135,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 8849,
+          "mission_id": "dm_8",
+          "merged_sensor_id": "sb_e1001",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_10",
+          "source_signal_id": "sig_16",
+          "source_type": "fleet_movement",
+          "position": [
+            87607.5,
+            53079.2
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 10502.4,
+          "name": "Imperial Vessel",
+          "entity_type": "fleet",
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 7036,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 9823,
+          "mission_id": "dm_9",
+          "merged_sensor_id": "sb_c1035",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_12",
+          "source_signal_id": "sig_21",
+          "source_type": "fleet_movement",
+          "position": [
+            33061.9,
+            29164.2
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 12482.5,
+          "name": "Imperial Vessel",
+          "entity_type": "fleet",
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 8479,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 10878,
+          "mission_id": "dm_11",
+          "merged_sensor_id": "homeward_station",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_13",
+          "source_signal_id": "sig_22",
+          "source_type": "fleet_movement",
+          "position": [
+            61671.7,
+            63231.0
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 9612.3,
+          "name": "Alien Vessel",
+          "entity_type": "fleet",
+          "faction": "alien",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 9258,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 12061,
+          "mission_id": "dm_12",
+          "merged_sensor_id": "sb_e1005",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_14",
+          "source_signal_id": "sig_24",
+          "source_type": "fleet_movement",
+          "position": [
+            78650.2,
+            48307.8
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 11305.0,
+          "name": "Rebel Vessel",
+          "entity_type": "fleet",
+          "faction": "rebel",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 10680,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 13001,
+          "mission_id": "dm_14",
+          "merged_sensor_id": "sb_c1035",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_15",
+          "source_signal_id": "sig_25",
+          "source_type": "distress_decode",
+          "position": [
+            65039.1,
+            95000.0
+          ],
+          "position_accuracy": "exact",
+          "position_radius": 0.0,
+          "name": "Distress Beacon",
+          "entity_type": "ship",
+          "faction": "unknown",
+          "threat_level": "distress",
+          "confidence": "confirmed",
+          "staleness": 274.9,
+          "last_updated_tick": 10258,
+          "icon": "distress",
+          "visible_to": [
+            "captain",
+            "helm",
+            "science",
+            "weapons"
+          ],
+          "expires_tick": 13258,
+          "mission_id": "dm_13",
+          "merged_sensor_id": null,
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_16",
+          "source_signal_id": "sig_26",
+          "source_type": "fleet_movement",
+          "position": [
+            2948.1,
+            72149.6
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 11686.6,
+          "name": "Rebel Vessel",
+          "entity_type": "fleet",
+          "faction": "rebel",
+          "threat_level": "unknown",
+          "confidence": "confirmed",
+          "staleness": 0.0,
+          "last_updated_tick": 11506,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 14122,
+          "mission_id": "dm_15",
+          "merged_sensor_id": "sb_e1072",
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_17",
+          "source_signal_id": "sig_27",
+          "source_type": "fleet_movement",
+          "position": [
+            38611.6,
+            102918.2
+          ],
+          "position_accuracy": "approximate",
+          "position_radius": 14102.6,
+          "name": "Imperial Vessel",
+          "entity_type": "fleet",
+          "faction": "imperial",
+          "threat_level": "unknown",
+          "confidence": "probable",
+          "staleness": 15.8,
+          "last_updated_tick": 12850,
+          "icon": "fleet",
+          "visible_to": [
+            "captain",
+            "weapons"
+          ],
+          "expires_tick": 15154,
+          "mission_id": "dm_17",
+          "merged_sensor_id": null,
+          "decode_progress": 1.0,
+          "assessment": null
+        },
+        {
+          "id": "cc_18",
+          "source_signal_id": "sig_28",
+          "source_type": "distress_decode",
+          "position": [
+            9547.5,
+            76815.9
+          ],
+          "position_accuracy": "exact",
+          "position_radius": 0.0,
+          "name": "Distress Beacon",
+          "entity_type": "ship",
+          "faction": "unknown",
+          "threat_level": "distress",
+          "confidence": "confirmed",
+          "staleness": 65.8,
+          "last_updated_tick": 12349,
+          "icon": "distress",
+          "visible_to": [
+            "captain",
+            "helm",
+            "science",
+            "weapons"
+          ],
+          "expires_tick": 15349,
+          "mission_id": "dm_16",
+          "merged_sensor_id": null,
+          "decode_progress": 1.0,
+          "assessment": null
+        }
+      ],
+      "contact_counter": 18,
+      "signal_contact_map": {
+        "sig_4": "cc_1",
+        "sig_8": "cc_3",
+        "sig_9": "cc_4",
+        "sig_11": "cc_6",
+        "sig_13": "cc_8",
+        "sig_15": "cc_9",
+        "sig_16": "cc_10",
+        "sig_21": "cc_12",
+        "sig_22": "cc_13",
+        "sig_24": "cc_14",
+        "sig_25": "cc_15",
+        "sig_26": "cc_16",
+        "sig_27": "cc_17",
+        "sig_28": "cc_18"
+      }
+    },
+    "captain_log": {
+      "captain_log": []
+    },
+    "training": {
+      "training_active": false,
+      "target_role": "",
+      "obj_hints": {},
+      "last_hint_idx": -1,
+      "auto_helm_enabled": false,
+      "auto_engineering_enabled": false
+    },
+    "ew": {
+      "jam_target_id": null,
+      "intrusion_target_id": null,
+      "intrusion_target_system": null,
+      "stealth_state": "inactive",
+      "stealth_timer": 0.0,
+      "stealth_capable": false,
+      "cloak_module": false,
+      "cloak_active_timer": 0.0,
+      "cloak_cooldown": 0.0,
+      "corvette_ecm": false,
+      "ghosts": [],
+      "ghost_counter": 0,
+      "intercept_timer": 15.0,
+      "ghost_class": null,
+      "freq_lock_target_id": null,
+      "freq_lock_progress": 0.0,
+      "freq_lock_active": false
+    },
+    "operations": {
+      "assessments": {
+        "sb_e1048": {
+          "enemy_id": "sb_e1048",
+          "progress": 15.0,
+          "complete": true,
+          "shield_harmonics": {
+            "fore": 21.99,
+            "aft": 60.0,
+            "port": 40.99,
+            "starboard": 40.99
+          },
+          "harmonics_timer": 2.800000000000001,
+          "vulnerable_facing": null,
+          "priority_subsystem": null,
+          "priority_cooldown": 0.0,
+          "prediction_active": false,
+          "predicted_x": 0.0,
+          "predicted_y": 0.0,
+          "prediction_confidence": "low",
+          "prediction_timer": 0.0,
+          "threat_level": "low",
+          "out_of_range_timer": 0.0
+        }
+      },
+      "active_id": null,
+      "elapsed": 1300.6999999999125,
+      "coordination": {
+        "sync_cooldown": 0.0,
+        "evasion_cooldown": 0.0
+      },
+      "objectives_marked": [],
+      "station_advisories": {}
+    },
+    "mission": {
+      "signal_location": null,
+      "dock_timer": 0.0,
+      "graph_state": {
+        "graph_nodes": {},
+        "proximity_timers": {},
+        "parallel_complete_count": {},
+        "parallel_start_elapsed": {},
+        "elapsed": 1300.6999999999125,
+        "last_dt": 0.1,
+        "completed_puzzle_labels": [],
+        "failed_puzzle_labels": [],
+        "training_flags": [],
+        "triangulation_count": 0,
+        "triangulation_positions": [],
+        "over": false,
+        "result": null,
+        "captured_station_ids": [],
+        "conditional_activation_count": {},
+        "destroyed_creature_ids": []
+      }
+    },
+    "docking": {
+      "state": "none",
+      "target_station_id": null,
+      "sequence_timer": 0.0,
+      "clearance_timer": 0.0,
+      "active_services": {}
+    },
+    "engineering": {
+      "requested_power": {
+        "engines": 45.0,
+        "beams": 100.0,
+        "torpedoes": 100.0,
+        "shields": 100.0,
+        "sensors": 85.0,
+        "manoeuvring": 85.0,
+        "flight_deck": 45.0,
+        "ecm_suite": 100.0,
+        "point_defence": 95.0
+      },
+      "tick_count": 13007,
+      "ship_class": "frigate",
+      "overclock_next_check": {
+        "shields": 4566
+      },
+      "overclock_grace_until": {
+        "beams": 3896,
+        "torpedoes": 9158,
+        "flight_deck": 10682,
+        "manoeuvring": 9269,
+        "sensors": 13307,
+        "ecm_suite": 13307
+      },
+      "power_grid": {
+        "reactor_max": 700,
+        "reactor_health": 100.0,
+        "battery_capacity": 500,
+        "battery_charge": 0.0,
+        "battery_charge_rate": 50,
+        "battery_discharge_rate": 100,
+        "battery_mode": "auto",
+        "emergency_reserve": 100,
+        "emergency_active": false,
+        "primary_bus_online": true,
+        "secondary_bus_online": true,
+        "reroute_active": false,
+        "reroute_timer": 0.0,
+        "reroute_target_bus": null,
+        "external_drain": 0.0
+      },
+      "repair_teams": {
+        "teams": {
+          "team_alpha": {
+            "id": "team_alpha",
+            "name": "Alpha Team",
+            "member_ids": [
+              "bridge_0",
+              "bridge_1",
+              "bridge_2",
+              "shields_0",
+              "engineering_1",
+              "engineering_5",
+              "medical_3"
+            ],
+            "size": 7,
+            "room_id": "comms_center",
+            "base_room": "main_engineering",
+            "status": "repairing",
+            "target_system": "ecm_suite",
+            "target_room_id": "comms_center",
+            "path": [],
+            "travel_progress": 0.0,
+            "repair_progress": 3375.75,
+            "escort_squad_id": "squad_1"
+          },
+          "team_beta": {
+            "id": "team_beta",
+            "name": "Beta Team",
+            "member_ids": [
+              "bridge_3",
+              "bridge_4",
+              "sensors_0",
+              "shields_1"
+            ],
+            "size": 4,
+            "room_id": "sensor_array",
+            "base_room": "main_engineering",
+            "status": "repairing",
+            "target_system": "sensors",
+            "target_room_id": "sensor_array",
+            "path": [],
+            "travel_progress": 0.0,
+            "repair_progress": 1567.2,
+            "escort_squad_id": null
+          },
+          "team_gamma": {
+            "id": "team_gamma",
+            "name": "Gamma Team",
+            "member_ids": [
+              "sensors_1",
+              "sensors_2",
+              "weapons_0",
+              "shields_2",
+              "engineering_3"
+            ],
+            "size": 5,
+            "room_id": "main_engineering",
+            "base_room": "main_engineering",
+            "status": "idle",
+            "target_system": null,
+            "target_room_id": null,
+            "path": [],
+            "travel_progress": 0.0,
+            "repair_progress": 0.0,
+            "escort_squad_id": null
+          },
+          "team_delta": {
+            "id": "team_delta",
+            "name": "Delta Team",
+            "member_ids": [
+              "weapons_1",
+              "weapons_2",
+              "weapons_3",
+              "engineering_0",
+              "engineering_4",
+              "medical_2"
+            ],
+            "size": 6,
+            "room_id": "main_engineering",
+            "base_room": "main_engineering",
+            "status": "idle",
+            "target_system": null,
+            "target_room_id": null,
+            "path": [],
+            "travel_progress": 0.0,
+            "repair_progress": 0.0,
+            "escort_squad_id": null
+          }
+        },
+        "order_queue": [
+          {
+            "id": "order_6",
+            "system": "shields",
+            "priority": 1
+          },
+          {
+            "id": "order_10",
+            "system": "shields",
+            "priority": 1
+          },
+          {
+            "id": "order_12",
+            "system": "sensors",
+            "priority": 1
+          },
+          {
+            "id": "order_13",
+            "system": "ecm_suite",
+            "priority": 1
+          },
+          {
+            "id": "order_14",
+            "system": "ecm_suite",
+            "priority": 1
+          },
+          {
+            "id": "order_15",
+            "system": "sensors",
+            "priority": 1
+          },
+          {
+            "id": "order_16",
+            "system": "ecm_suite",
+            "priority": 1
+          },
+          {
+            "id": "order_17",
+            "system": "beams",
+            "priority": 1
+          },
+          {
+            "id": "order_18",
+            "system": "shields",
+            "priority": 1
+          },
+          {
+            "id": "order_19",
+            "system": "beams",
+            "priority": 1
+          },
+          {
+            "id": "order_20",
+            "system": "shields",
+            "priority": 1
+          },
+          {
+            "id": "order_21",
+            "system": "shields",
+            "priority": 1
+          }
+        ],
+        "next_order_id": 21
+      },
+      "damage_model": {
+        "components": {
+          "engines": {
+            "fuel_injectors": {
+              "id": "fuel_injectors",
+              "name": "Fuel Injectors",
+              "system": "engines",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "max_speed"
+            },
+            "thrust_nozzles": {
+              "id": "thrust_nozzles",
+              "name": "Thrust Nozzles",
+              "system": "engines",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "acceleration"
+            },
+            "coolant_system": {
+              "id": "coolant_system",
+              "name": "Coolant System",
+              "system": "engines",
+              "health": 100.0,
+              "weight": 0.2,
+              "effect": "overclock_risk"
+            },
+            "power_coupling": {
+              "id": "power_coupling",
+              "name": "Power Coupling",
+              "system": "engines",
+              "health": 100.0,
+              "weight": 0.2,
+              "effect": "power_draw"
+            }
+          },
+          "beams": {
+            "emitter_array": {
+              "id": "emitter_array",
+              "name": "Emitter Array",
+              "system": "beams",
+              "health": 90.6,
+              "weight": 0.4,
+              "effect": "beam_damage"
+            },
+            "targeting_computer": {
+              "id": "targeting_computer",
+              "name": "Targeting Computer",
+              "system": "beams",
+              "health": 82.9,
+              "weight": 0.3,
+              "effect": "accuracy"
+            },
+            "power_conduit": {
+              "id": "power_conduit",
+              "name": "Power Conduit",
+              "system": "beams",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "power_draw"
+            }
+          },
+          "torpedoes": {
+            "loading_mechanism": {
+              "id": "loading_mechanism",
+              "name": "Loading Mechanism",
+              "system": "torpedoes",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "reload_time"
+            },
+            "guidance_system": {
+              "id": "guidance_system",
+              "name": "Guidance System",
+              "system": "torpedoes",
+              "health": 88.4,
+              "weight": 0.4,
+              "effect": "homing_accuracy"
+            },
+            "magazine_housing": {
+              "id": "magazine_housing",
+              "name": "Magazine Housing",
+              "system": "torpedoes",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "ammo_safety"
+            }
+          },
+          "shields": {
+            "generator_coils": {
+              "id": "generator_coils",
+              "name": "Generator Coils",
+              "system": "shields",
+              "health": 75.58,
+              "weight": 0.4,
+              "effect": "shield_capacity"
+            },
+            "field_emitter": {
+              "id": "field_emitter",
+              "name": "Field Emitter",
+              "system": "shields",
+              "health": 89.4,
+              "weight": 0.3,
+              "effect": "recharge_rate"
+            },
+            "harmonic_stabiliser": {
+              "id": "harmonic_stabiliser",
+              "name": "Harmonic Stabiliser",
+              "system": "shields",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "frequency_stability"
+            }
+          },
+          "sensors": {
+            "antenna_array": {
+              "id": "antenna_array",
+              "name": "Antenna Array",
+              "system": "sensors",
+              "health": 100.0,
+              "weight": 0.4,
+              "effect": "scan_range"
+            },
+            "signal_processor": {
+              "id": "signal_processor",
+              "name": "Signal Processor",
+              "system": "sensors",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "contact_resolution"
+            },
+            "calibration_unit": {
+              "id": "calibration_unit",
+              "name": "Calibration Unit",
+              "system": "sensors",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "scan_time"
+            }
+          },
+          "manoeuvring": {
+            "gyroscope": {
+              "id": "gyroscope",
+              "name": "Gyroscope",
+              "system": "manoeuvring",
+              "health": 100.0,
+              "weight": 0.4,
+              "effect": "turn_rate"
+            },
+            "thruster_array": {
+              "id": "thruster_array",
+              "name": "Thruster Array",
+              "system": "manoeuvring",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "lateral_thrust"
+            },
+            "nav_computer": {
+              "id": "nav_computer",
+              "name": "Navigation Computer",
+              "system": "manoeuvring",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "heading_stability"
+            }
+          },
+          "flight_deck": {
+            "launch_catapult": {
+              "id": "launch_catapult",
+              "name": "Launch Catapult",
+              "system": "flight_deck",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "launch_time"
+            },
+            "recovery_system": {
+              "id": "recovery_system",
+              "name": "Recovery System",
+              "system": "flight_deck",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "recovery_time"
+            },
+            "deck_plating": {
+              "id": "deck_plating",
+              "name": "Deck Plating",
+              "system": "flight_deck",
+              "health": 91.0,
+              "weight": 0.4,
+              "effect": "hangar_safety"
+            }
+          },
+          "ecm_suite": {
+            "jammer_array": {
+              "id": "jammer_array",
+              "name": "Jammer Array",
+              "system": "ecm_suite",
+              "health": 100.0,
+              "weight": 0.4,
+              "effect": "jamming_power"
+            },
+            "signal_analyzer": {
+              "id": "signal_analyzer",
+              "name": "Signal Analyzer",
+              "system": "ecm_suite",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "intercept_chance"
+            },
+            "countermeasure_pod": {
+              "id": "countermeasure_pod",
+              "name": "Countermeasure Pod",
+              "system": "ecm_suite",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "countermeasure_effectiveness"
+            }
+          },
+          "point_defence": {
+            "tracking_radar": {
+              "id": "tracking_radar",
+              "name": "Tracking Radar",
+              "system": "point_defence",
+              "health": 100.0,
+              "weight": 0.4,
+              "effect": "intercept_accuracy"
+            },
+            "turret_mechanism": {
+              "id": "turret_mechanism",
+              "name": "Turret Mechanism",
+              "system": "point_defence",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "tracking_speed"
+            },
+            "ammo_feed": {
+              "id": "ammo_feed",
+              "name": "Ammunition Feed",
+              "system": "point_defence",
+              "health": 100.0,
+              "weight": 0.3,
+              "effect": "feed_reliability"
+            }
+          }
+        },
+        "event_history": [
+          {
+            "tick": 309,
+            "system": "ecm_suite",
+            "component_id": "signal_analyzer",
+            "damage": 15.2,
+            "cause": "environment"
+          },
+          {
+            "tick": 1000,
+            "system": "manoeuvring",
+            "component_id": "gyroscope",
+            "damage": 8.7,
+            "cause": "environment"
+          },
+          {
+            "tick": 1501,
+            "system": "ecm_suite",
+            "component_id": "countermeasure_pod",
+            "damage": 9.8,
+            "cause": "environment"
+          },
+          {
+            "tick": 1997,
+            "system": "shields",
+            "component_id": "field_emitter",
+            "damage": 10.6,
+            "cause": "environment"
+          },
+          {
+            "tick": 2700,
+            "system": "flight_deck",
+            "component_id": "deck_plating",
+            "damage": 11.0,
+            "cause": "environment"
+          },
+          {
+            "tick": 3391,
+            "system": "shields",
+            "component_id": "generator_coils",
+            "damage": 16.4,
+            "cause": "environment"
+          },
+          {
+            "tick": 3896,
+            "system": "flight_deck",
+            "component_id": "deck_plating",
+            "damage": 16.3,
+            "cause": "environment"
+          },
+          {
+            "tick": 3926,
+            "system": "shields",
+            "component_id": "generator_coils",
+            "damage": 8.02,
+            "cause": "overclock"
+          },
+          {
+            "tick": 4640,
+            "system": "sensors",
+            "component_id": "calibration_unit",
+            "damage": 11.2,
+            "cause": "environment"
+          },
+          {
+            "tick": 5226,
+            "system": "sensors",
+            "component_id": "signal_processor",
+            "damage": 18.8,
+            "cause": "environment"
+          },
+          {
+            "tick": 5741,
+            "system": "sensors",
+            "component_id": "calibration_unit",
+            "damage": 17.3,
+            "cause": "environment"
+          },
+          {
+            "tick": 6490,
+            "system": "torpedoes",
+            "component_id": "magazine_housing",
+            "damage": 19.2,
+            "cause": "environment"
+          },
+          {
+            "tick": 7087,
+            "system": "flight_deck",
+            "component_id": "launch_catapult",
+            "damage": 14.6,
+            "cause": "environment"
+          },
+          {
+            "tick": 7599,
+            "system": "sensors",
+            "component_id": "antenna_array",
+            "damage": 13.1,
+            "cause": "environment"
+          },
+          {
+            "tick": 8313,
+            "system": "beams",
+            "component_id": "emitter_array",
+            "damage": 9.4,
+            "cause": "environment"
+          },
+          {
+            "tick": 8950,
+            "system": "ecm_suite",
+            "component_id": "jammer_array",
+            "damage": 9.4,
+            "cause": "environment"
+          },
+          {
+            "tick": 9661,
+            "system": "ecm_suite",
+            "component_id": "countermeasure_pod",
+            "damage": 17.6,
+            "cause": "environment"
+          },
+          {
+            "tick": 10257,
+            "system": "ecm_suite",
+            "component_id": "jammer_array",
+            "damage": 14.3,
+            "cause": "environment"
+          },
+          {
+            "tick": 10903,
+            "system": "torpedoes",
+            "component_id": "guidance_system",
+            "damage": 11.6,
+            "cause": "environment"
+          },
+          {
+            "tick": 11532,
+            "system": "beams",
+            "component_id": "targeting_computer",
+            "damage": 17.1,
+            "cause": "environment"
+          },
+          {
+            "tick": 12147,
+            "system": "flight_deck",
+            "component_id": "deck_plating",
+            "damage": 9.0,
+            "cause": "environment"
+          },
+          {
+            "tick": 12704,
+            "system": "sensors",
+            "component_id": "antenna_array",
+            "damage": 9.0,
+            "cause": "environment"
+          }
+        ]
+      }
+    },
+    "dynamic_missions": {
+      "missions": [
+        {
+          "id": "dm_1",
+          "source_signal_id": "sig_4",
+          "source_contact_id": "cc_1",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_1_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                76987.3,
+                81075.0
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_1_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_1_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_1_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_1_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            76987.3,
+            81075.0
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 752,
+          "deadline_tick": 2049,
+          "completion_deadline_tick": 6946,
+          "accept_deadline": 129.7,
+          "completion_deadline": 619.5,
+          "rewards": {
+            "faction_standing": {
+              "rebel": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Rebel standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "rebel": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_2",
+          "source_signal_id": "sig_7",
+          "source_contact_id": "cc_2",
+          "title": "Rescue Distress Beacon",
+          "briefing": "Distress Beacon is under attack at coordinates 17026, 38886. Requesting immediate assistance.",
+          "mission_type": "rescue",
+          "objectives": [
+            {
+              "id": "dm_2_nav",
+              "description": "Navigate to Distress Beacon's position",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                17026.9,
+                38886.7
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_2_clear",
+              "description": "Neutralise hostile vessels",
+              "objective_type": "destroy",
+              "target_id": "dm_2_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_2_dock",
+              "description": "Dock with Distress Beacon for medical transfer",
+              "objective_type": "dock",
+              "target_id": "cc_2",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            17026.9,
+            38886.7
+          ],
+          "waypoint_name": "Distress Beacon",
+          "offered_tick": 1104,
+          "deadline_tick": 1704,
+          "completion_deadline_tick": 4104,
+          "accept_deadline": 264.6,
+          "completion_deadline": 924.8,
+          "rewards": {
+            "faction_standing": {},
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 50.0,
+            "crew": 2,
+            "reputation": 10,
+            "description": "Faction standing +15, 50 credits, 2 replacement crew, sector chart data"
+          },
+          "decline_consequences": {
+            "faction_standing": {},
+            "description": "Distress Beacon destroyed.  Nearby factions note our non-response."
+          },
+          "failure_consequences": {
+            "faction_standing": {},
+            "description": "Arrived too late. Slight standing loss (they tried)."
+          },
+          "status": "declined",
+          "estimated_difficulty": "moderate",
+          "comms_assessment": "Risk assessment: medium. ",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_3",
+          "source_signal_id": "sig_9",
+          "source_contact_id": "cc_4",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_3_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                76773.3,
+                54827.6
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_3_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_3_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_3_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_3_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            76773.3,
+            54827.6
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 2935,
+          "deadline_tick": 5647,
+          "completion_deadline_tick": 11959,
+          "accept_deadline": 271.2,
+          "completion_deadline": 902.5,
+          "rewards": {
+            "faction_standing": {
+              "imperial": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Imperial standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "imperial": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_4",
+          "source_signal_id": "sig_10",
+          "source_contact_id": "cc_5",
+          "title": "Rescue Distress Beacon",
+          "briefing": "Distress Beacon is under attack at coordinates 34473, 91724. Requesting immediate assistance.",
+          "mission_type": "rescue",
+          "objectives": [
+            {
+              "id": "dm_4_nav",
+              "description": "Navigate to Distress Beacon's position",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                34473.4,
+                91724.3
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_4_clear",
+              "description": "Neutralise hostile vessels",
+              "objective_type": "destroy",
+              "target_id": "dm_4_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_4_dock",
+              "description": "Dock with Distress Beacon for medical transfer",
+              "objective_type": "dock",
+              "target_id": "cc_5",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            34473.4,
+            91724.3
+          ],
+          "waypoint_name": "Distress Beacon",
+          "offered_tick": 2948,
+          "deadline_tick": 3548,
+          "completion_deadline_tick": 5948,
+          "accept_deadline": 701.0,
+          "completion_deadline": 1761.9,
+          "rewards": {
+            "faction_standing": {},
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 50.0,
+            "crew": 2,
+            "reputation": 10,
+            "description": "Faction standing +15, 50 credits, 2 replacement crew, sector chart data"
+          },
+          "decline_consequences": {
+            "faction_standing": {},
+            "description": "Distress Beacon destroyed.  Nearby factions note our non-response."
+          },
+          "failure_consequences": {
+            "faction_standing": {},
+            "description": "Arrived too late. Slight standing loss (they tried)."
+          },
+          "status": "declined",
+          "estimated_difficulty": "moderate",
+          "comms_assessment": "Risk assessment: medium. ",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_5",
+          "source_signal_id": "sig_11",
+          "source_contact_id": "cc_6",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_5_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                42920.1,
+                41199.7
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_5_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_5_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_5_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_5_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            42920.1,
+            41199.7
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 3947,
+          "deadline_tick": 4847,
+          "completion_deadline_tick": 9118,
+          "accept_deadline": 67.2,
+          "completion_deadline": 517.1,
+          "rewards": {
+            "faction_standing": {
+              "imperial": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Imperial standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "imperial": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_6",
+          "source_signal_id": "sig_14",
+          "source_contact_id": "cc_7",
+          "title": "Rescue Distress Beacon",
+          "briefing": "Distress Beacon is under attack at coordinates 45144, 76906. Requesting immediate assistance.",
+          "mission_type": "rescue",
+          "objectives": [
+            {
+              "id": "dm_6_nav",
+              "description": "Navigate to Distress Beacon's position",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                45144.4,
+                76906.9
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_6_clear",
+              "description": "Neutralise hostile vessels",
+              "objective_type": "destroy",
+              "target_id": "dm_6_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_6_dock",
+              "description": "Dock with Distress Beacon for medical transfer",
+              "objective_type": "dock",
+              "target_id": "cc_7",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            45144.4,
+            76906.9
+          ],
+          "waypoint_name": "Distress Beacon",
+          "offered_tick": 4868,
+          "deadline_tick": 5468,
+          "completion_deadline_tick": 7868,
+          "accept_deadline": 191.9,
+          "completion_deadline": 803.3,
+          "rewards": {
+            "faction_standing": {},
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 50.0,
+            "crew": 2,
+            "reputation": 10,
+            "description": "Faction standing +15, 50 credits, 2 replacement crew, sector chart data"
+          },
+          "decline_consequences": {
+            "faction_standing": {},
+            "description": "Distress Beacon destroyed.  Nearby factions note our non-response."
+          },
+          "failure_consequences": {
+            "faction_standing": {},
+            "description": "Arrived too late. Slight standing loss (they tried)."
+          },
+          "status": "declined",
+          "estimated_difficulty": "moderate",
+          "comms_assessment": "Risk assessment: medium. ",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_7",
+          "source_signal_id": "sig_13",
+          "source_contact_id": "cc_8",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_7_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                53223.2,
+                18009.4
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_7_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_7_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_7_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_7_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            53223.2,
+            18009.4
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 5060,
+          "deadline_tick": 6287,
+          "completion_deadline_tick": 11115,
+          "accept_deadline": 118.7,
+          "completion_deadline": 605.5,
+          "rewards": {
+            "faction_standing": {
+              "alien": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Alien standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "alien": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_8",
+          "source_signal_id": "sig_15",
+          "source_contact_id": "cc_9",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_8_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                57966.8,
+                65393.8
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_8_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_8_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_8_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_8_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            57966.8,
+            65393.8
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 6135,
+          "deadline_tick": 7035,
+          "completion_deadline_tick": 11446,
+          "accept_deadline": 90.0,
+          "completion_deadline": 531.1,
+          "rewards": {
+            "faction_standing": {
+              "alien": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Alien standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "alien": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_9",
+          "source_signal_id": "sig_16",
+          "source_contact_id": "cc_10",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_9_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                87607.5,
+                53079.2
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_9_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_9_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_9_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_9_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            87607.5,
+            53079.2
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 7036,
+          "deadline_tick": 8690,
+          "completion_deadline_tick": 13945,
+          "accept_deadline": 76.5,
+          "completion_deadline": 690.9,
+          "rewards": {
+            "faction_standing": {
+              "imperial": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Imperial standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "imperial": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_10",
+          "source_signal_id": "sig_20",
+          "source_contact_id": "cc_11",
+          "title": "Rescue Distress Beacon",
+          "briefing": "Distress Beacon is under attack at coordinates 87974, 95000. Requesting immediate assistance.",
+          "mission_type": "rescue",
+          "objectives": [
+            {
+              "id": "dm_10_nav",
+              "description": "Navigate to Distress Beacon's position",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                87974.2,
+                95000.0
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_10_clear",
+              "description": "Neutralise hostile vessels",
+              "objective_type": "destroy",
+              "target_id": "dm_10_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_10_dock",
+              "description": "Dock with Distress Beacon for medical transfer",
+              "objective_type": "dock",
+              "target_id": "cc_11",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            87974.2,
+            95000.0
+          ],
+          "waypoint_name": "Distress Beacon",
+          "offered_tick": 7831,
+          "deadline_tick": 8431,
+          "completion_deadline_tick": 10831,
+          "accept_deadline": 374.9,
+          "completion_deadline": 1128.8,
+          "rewards": {
+            "faction_standing": {},
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 50.0,
+            "crew": 2,
+            "reputation": 10,
+            "description": "Faction standing +15, 50 credits, 2 replacement crew, sector chart data"
+          },
+          "decline_consequences": {
+            "faction_standing": {},
+            "description": "Distress Beacon destroyed.  Nearby factions note our non-response."
+          },
+          "failure_consequences": {
+            "faction_standing": {},
+            "description": "Arrived too late. Slight standing loss (they tried)."
+          },
+          "status": "declined",
+          "estimated_difficulty": "moderate",
+          "comms_assessment": "Risk assessment: medium. ",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_11",
+          "source_signal_id": "sig_21",
+          "source_contact_id": "cc_12",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_11_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                33061.9,
+                29164.2
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_11_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_11_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_11_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_11_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            33061.9,
+            29164.2
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 8479,
+          "deadline_tick": 10816,
+          "completion_deadline_tick": 16754,
+          "accept_deadline": 233.8,
+          "completion_deadline": 827.5,
+          "rewards": {
+            "faction_standing": {
+              "imperial": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Imperial standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "imperial": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_12",
+          "source_signal_id": "sig_22",
+          "source_contact_id": "cc_13",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_12_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                61671.7,
+                63231.0
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_12_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_12_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_12_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_12_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            61671.7,
+            63231.0
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 9258,
+          "deadline_tick": 10769,
+          "completion_deadline_tick": 15880,
+          "accept_deadline": 151.1,
+          "completion_deadline": 662.2,
+          "rewards": {
+            "faction_standing": {
+              "alien": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Alien standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "alien": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_13",
+          "source_signal_id": "sig_25",
+          "source_contact_id": "cc_15",
+          "title": "Rescue Distress Beacon",
+          "briefing": "Distress Beacon is under attack at coordinates 65039, 95000. Requesting immediate assistance.",
+          "mission_type": "rescue",
+          "objectives": [
+            {
+              "id": "dm_13_nav",
+              "description": "Navigate to Distress Beacon's position",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                65039.1,
+                95000.0
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_13_clear",
+              "description": "Neutralise hostile vessels",
+              "objective_type": "destroy",
+              "target_id": "dm_13_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_13_dock",
+              "description": "Dock with Distress Beacon for medical transfer",
+              "objective_type": "dock",
+              "target_id": "cc_15",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            65039.1,
+            95000.0
+          ],
+          "waypoint_name": "Distress Beacon",
+          "offered_tick": 10258,
+          "deadline_tick": 10858,
+          "completion_deadline_tick": 13258,
+          "accept_deadline": 306.9,
+          "completion_deadline": 978.7,
+          "rewards": {
+            "faction_standing": {},
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 50.0,
+            "crew": 2,
+            "reputation": 10,
+            "description": "Faction standing +15, 50 credits, 2 replacement crew, sector chart data"
+          },
+          "decline_consequences": {
+            "faction_standing": {},
+            "description": "Distress Beacon destroyed.  Nearby factions note our non-response."
+          },
+          "failure_consequences": {
+            "faction_standing": {},
+            "description": "Arrived too late. Slight standing loss (they tried)."
+          },
+          "status": "declined",
+          "estimated_difficulty": "moderate",
+          "comms_assessment": "Risk assessment: medium. ",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_14",
+          "source_signal_id": "sig_24",
+          "source_contact_id": "cc_14",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_14_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                78650.2,
+                48307.8
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_14_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_14_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_14_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_14_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            78650.2,
+            48307.8
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 10680,
+          "deadline_tick": 14231,
+          "completion_deadline_tick": 21382,
+          "accept_deadline": 355.1,
+          "completion_deadline": 1070.2,
+          "rewards": {
+            "faction_standing": {
+              "rebel": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Rebel standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "rebel": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_15",
+          "source_signal_id": "sig_26",
+          "source_contact_id": "cc_16",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_15_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                2948.1,
+                72149.6
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_15_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_15_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_15_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_15_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            2948.1,
+            72149.6
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 11506,
+          "deadline_tick": 14152,
+          "completion_deadline_tick": 20398,
+          "accept_deadline": 264.6,
+          "completion_deadline": 889.2,
+          "rewards": {
+            "faction_standing": {
+              "rebel": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Rebel standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "rebel": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "declined",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_16",
+          "source_signal_id": "sig_28",
+          "source_contact_id": "cc_18",
+          "title": "Rescue Distress Beacon",
+          "briefing": "Distress Beacon is under attack at coordinates 9547, 76815. Requesting immediate assistance.",
+          "mission_type": "rescue",
+          "objectives": [
+            {
+              "id": "dm_16_nav",
+              "description": "Navigate to Distress Beacon's position",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                9547.5,
+                76815.9
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_16_clear",
+              "description": "Neutralise hostile vessels",
+              "objective_type": "destroy",
+              "target_id": "dm_16_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_16_dock",
+              "description": "Dock with Distress Beacon for medical transfer",
+              "objective_type": "dock",
+              "target_id": "cc_18",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            9547.5,
+            76815.9
+          ],
+          "waypoint_name": "Distress Beacon",
+          "offered_tick": 12349,
+          "deadline_tick": 12949,
+          "completion_deadline_tick": 15349,
+          "accept_deadline": 241.1,
+          "completion_deadline": 845.2,
+          "rewards": {
+            "faction_standing": {},
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 50.0,
+            "crew": 2,
+            "reputation": 10,
+            "description": "Faction standing +15, 50 credits, 2 replacement crew, sector chart data"
+          },
+          "decline_consequences": {
+            "faction_standing": {},
+            "description": "Distress Beacon destroyed.  Nearby factions note our non-response."
+          },
+          "failure_consequences": {
+            "faction_standing": {},
+            "description": "Arrived too late. Slight standing loss (they tried)."
+          },
+          "status": "declined",
+          "estimated_difficulty": "moderate",
+          "comms_assessment": "Risk assessment: medium. ",
+          "station_warnings": []
+        },
+        {
+          "id": "dm_17",
+          "source_signal_id": "sig_27",
+          "source_contact_id": "cc_17",
+          "title": "Patrol Sector",
+          "briefing": "Command requests a patrol sweep of the area. Recent hostile activity reported.",
+          "mission_type": "patrol",
+          "objectives": [
+            {
+              "id": "dm_17_nav",
+              "description": "Navigate to patrol area",
+              "objective_type": "navigate_to",
+              "target_id": null,
+              "target_position": [
+                38611.6,
+                102918.2
+              ],
+              "completed": false,
+              "optional": false,
+              "order": 1,
+              "target_tick": null
+            },
+            {
+              "id": "dm_17_scan",
+              "description": "Complete area scan",
+              "objective_type": "scan",
+              "target_id": "dm_17_area",
+              "target_position": null,
+              "completed": false,
+              "optional": false,
+              "order": 2,
+              "target_tick": null
+            },
+            {
+              "id": "dm_17_clear",
+              "description": "Neutralise any hostile contacts",
+              "objective_type": "destroy",
+              "target_id": "dm_17_hostiles",
+              "target_position": null,
+              "completed": false,
+              "optional": true,
+              "order": 3,
+              "target_tick": null
+            }
+          ],
+          "waypoint": [
+            38611.6,
+            102918.2
+          ],
+          "waypoint_name": "Patrol Area",
+          "offered_tick": 12850,
+          "deadline_tick": 14685,
+          "completion_deadline_tick": 20121,
+          "accept_deadline": 167.8,
+          "completion_deadline": 727.2,
+          "rewards": {
+            "faction_standing": {
+              "imperial": 10.0
+            },
+            "supplies": {},
+            "intel": [
+              "Sector chart data"
+            ],
+            "credits": 40.0,
+            "crew": 1,
+            "reputation": 5,
+            "description": "40 credits, Imperial standing +10, 1 crew, intel"
+          },
+          "decline_consequences": {
+            "description": "No penalty — request noted."
+          },
+          "failure_consequences": {
+            "faction_standing": {
+              "imperial": -3.0
+            },
+            "description": "Patrol incomplete. Slight standing loss."
+          },
+          "status": "offered",
+          "estimated_difficulty": "easy",
+          "comms_assessment": "",
+          "station_warnings": []
+        }
+      ],
+      "mission_counter": 17,
+      "completed_ids": [],
+      "failed_ids": [],
+      "trap_flags": {}
+    },
+    "janitor": {
+      "buffs": [],
+      "cooldowns": {},
+      "task_counts": {},
+      "sticky_notes": [],
+      "sticky_counter": 0,
+      "intel_boost_remaining": 0.0,
+      "repair_boost_remaining": 0.0,
+      "repair_boost_amount": 0.0,
+      "detect_boarders_remaining": 0.0,
+      "total_tasks_completed": 0
+    },
+    "equipment_modules": {
+      "active_modules": []
+    },
+    "mining": {
+      "mining_active": false,
+      "target_asteroid_id": null,
+      "mining_progress": 0.0,
+      "mining_cooldown": 0.0,
+      "mined_resources": {
+        "fuel": 0.0,
+        "materials": 0.0
+      },
+      "total_extractions": 0
+    },
+    "flag_bridge": {
+      "flag_bridge_active": false,
+      "drawings": [],
+      "drawing_counter": 0,
+      "priority_queue": [],
+      "weapons_override": false
+    },
+    "spinal_mount": {
+      "active": false,
+      "state": "idle",
+      "charge_timer": 0.0,
+      "cooldown_timer": 0.0,
+      "target_id": null,
+      "auth_request_id": null,
+      "auth_counter": 0,
+      "power_draw": 280.0
+    },
+    "carrier_ops": {
+      "active": false,
+      "squadrons": {},
+      "squadron_counter": 0,
+      "cap_zone": null,
+      "scramble_active": false,
+      "scramble_queue": [],
+      "scramble_timer": 0.0
+    },
+    "medical_ship": {
+      "active": false,
+      "rescue_beacon": false,
+      "surgical_theatre": false,
+      "triage_ai": false
+    },
+    "loadout": {},
+    "vendors": {
+      "vendors": [],
+      "vendor_counter": 0
+    },
+    "negotiation": {
+      "channels": [],
+      "sessions": [],
+      "channel_counter": 0,
+      "session_counter": 0,
+      "bundle_counts": {},
+      "bluff_blocked": {},
+      "combat_active": true
+    },
+    "salvage": {
+      "wrecks": [
+        {
+          "id": "wreck_3",
+          "x": 32000.0,
+          "y": 68000.0,
+          "source_type": "enemy",
+          "source_id": "enemy_2",
+          "enemy_type": "cruiser",
+          "scan_state": "unscanned",
+          "scan_progress": 0.0,
+          "salvage_manifest": [],
+          "booby_trapped": false,
+          "trap_detected": false,
+          "unstable_reactor": false,
+          "reactor_detected": false,
+          "reactor_timer": 0.0,
+          "reactor_armed": false,
+          "salvage_state": "idle",
+          "salvage_queue": [],
+          "current_item_id": null,
+          "salvage_timer": 0.0,
+          "despawn_timer": 317.79999999993584,
+          "created_tick": 0
+        }
+      ],
+      "wreck_counter": 3,
+      "active_salvage_wreck_id": null
+    },
+    "rationing": {
+      "ration_levels": {},
+      "allocation_requests": [],
+      "request_counter": 0,
+      "captain_overrides": [],
+      "last_forecast_time": 1300.0
+    },
+    "game_state": {
+      "tick_count": 13007,
+      "training_last_hint_idx": -1,
+      "applied_sensor_assists": [],
+      "applied_science_medical_assists": [],
+      "applied_science_helm_assists": [],
+      "applied_science_weapons_assists": []
+    }
+  }
+}
