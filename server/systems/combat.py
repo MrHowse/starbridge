@@ -156,6 +156,8 @@ class CombatHitResult:
     damaged_systems: list[tuple[str, float]] = field(default_factory=list)
     casualties: list[CombatCasualty] = field(default_factory=list)
     armour_absorbed: float = 0.0  # damage soaked by armour this hit (v0.07)
+    hull_damage: float = 0.0     # actual hull damage dealt after shields/armour
+    shield_absorbed: float = 0.0  # damage soaked by shields
 
 
 # Map old crew deck names to physical deck numbers for injury generation.
@@ -224,6 +226,8 @@ def apply_hit_to_player(
             ship.armour = max(0.0, ship.armour - 1.0)
 
     result.armour_absorbed = armour_absorbed
+    result.shield_absorbed = absorbed
+    result.hull_damage = hull_damage
 
     # 3. Hull damage + optional system damage roll + crew casualties.
     if hull_damage > 0:

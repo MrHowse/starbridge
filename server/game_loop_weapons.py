@@ -35,6 +35,7 @@ from server.systems.combat import (
 from server.utils.math_helpers import angle_diff, bearing_to, distance, wrap_angle
 import server.game_loop_salvage as glsalv
 import server.game_loop_operations as glops
+import server.telemetry as _telemetry
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -458,12 +459,14 @@ def tick_auto_fire(ship: Ship, world: World, dt: float) -> list[tuple[str, dict]
     gl.log_event("weapons", "beam_fired", {
         "target_id": target.id, "damage": round(dmg, 2), "source": "auto",
     })
+    _telemetry.record_beam_fired(dmg)
 
     if target.hull <= 0.0:
         glsalv.spawn_wreck("enemy", target.id, target.type, target.x, target.y)
         _destroyed_id = target.id
         world.enemies = [e for e in world.enemies if e.id != _destroyed_id]
         gl.log_event("combat", "enemy_destroyed", {"enemy_id": _destroyed_id, "cause": "beam_auto"})
+        _telemetry.record_enemy_destroyed()
         if glcord.on_entity_destroyed(_destroyed_id):
             event_payload["priority_destroyed"] = True
 
@@ -748,12 +751,14 @@ def fire_player_beams(ship: Ship, world: World, beam_frequency: str = "") -> tup
             if _weapons_target == _destroyed_id2:
                 _weapons_target = None
             gl.log_event("combat", "enemy_destroyed", {"enemy_id": _destroyed_id2, "cause": "beam"})
+            _telemetry.record_enemy_destroyed()
             glcord.on_entity_destroyed(_destroyed_id2)
 
         _beam_cooldown = ship.beam_fire_rate
         # C.9: Record weapons fire for emission tracking.
         import server.game_loop_ew as _glew
         _glew.record_weapons_fire("beam")
+        _telemetry.record_beam_fired(dmg)
         return (
             "weapons.beam_fired",
             {
@@ -953,6 +958,7 @@ def _do_fire(
     # C.9: Record weapons fire for emission tracking.
     import server.game_loop_ew as _glew
     _glew.record_weapons_fire("torpedo")
+    _telemetry.record_torpedo_fired()
     # Trim to last 60 seconds.
     _cutoff = _torpedo_fire_times[-1] - 60.0
     while _torpedo_fire_times and _torpedo_fire_times[0] < _cutoff:
@@ -1074,6 +1080,7 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                     for h_enemy in hit_enemies:
                         apply_hit_to_enemy(h_enemy, damage, torp.x, torp.y,
                                            priority_subsystem=glops.get_priority_subsystem(h_enemy.id))
+                        _telemetry.record_torpedo_hit("proximity", h_enemy.id, damage)
                         if h_enemy.hull <= 0.0:
                             glsalv.spawn_wreck("enemy", h_enemy.id, h_enemy.type, h_enemy.x, h_enemy.y)
                             destroyed_ids.append(h_enemy.id)
@@ -1087,6 +1094,7 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                                 "cause": "torpedo",
                                 "torpedo_type": "proximity",
                             })
+                            _telemetry.record_enemy_destroyed()
                     if destroyed_ids:
                         world.enemies = [e for e in world.enemies
                                          if e.id not in destroyed_ids]
@@ -1117,6 +1125,7 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                     else:
                         apply_hit_to_enemy(hit_enemy, damage, torp.x, torp.y,
                                            priority_subsystem=_torp_priority)
+                    _telemetry.record_torpedo_hit(torp_type, hit_enemy.id, damage)
 
                     event: dict = {
                         "torpedo_id": torp.id,
@@ -1157,6 +1166,7 @@ def tick_torpedoes(world: World, ship: Ship | None = None) -> list[dict]:
                             "cause": "torpedo",
                             "torpedo_type": torp_type,
                         })
+                        _telemetry.record_enemy_destroyed()
 
                     events.append(event)
                     dead_torpedo_ids.append(torp.id)
@@ -1217,6 +1227,7 @@ async def handle_enemy_beam_hits(
             )
             combat_damage_events.extend(hit_result.damaged_systems)
             combat_casualties.extend(hit_result.casualties)
+            _telemetry.record_damage_taken(hit_result.hull_damage, hit_result.shield_absorbed)
             gl.log_event("combat", "ship_hit", {
                 "attacker_id": ev.attacker_id,
                 "damage": round(ev.damage, 2),

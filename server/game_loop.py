@@ -259,6 +259,7 @@ import server.game_loop_salvage as glsalv
 import server.game_loop_rationing as glrat
 import server.game_loop_atmosphere as glatm
 import server.game_loop_captain_orders as glcord
+import server.telemetry as _telemetry
 from server.puzzles import PuzzleEngine
 import server.puzzles.sequence_match          # noqa: F401 — registers sequence_match type
 import server.puzzles.circuit_routing         # noqa: F401 — registers circuit_routing type
@@ -799,6 +800,9 @@ async def start(
                 s = _world.sector_grid.sectors[_sid]
                 if s.visibility == SectorVisibility.UNKNOWN:
                     _world.sector_grid.set_visibility(_sid, SectorVisibility.SCANNED)
+
+    # Telemetry: initialise per-player engagement tracking.
+    _telemetry.init(_session_players)
 
     _task = asyncio.create_task(_loop(), name="game_loop")
     logger.info("Game loop started (mission: %s, %d Hz)", mission_id, TICK_RATE)
@@ -1527,6 +1531,7 @@ async def _loop() -> None:
             gl.log_event("security", "boarding_started", {
                 "intruder_count": len(boarding_action.get("intruders", [])),
             })
+            _telemetry.coordination_initiated("boarding_to_security")
             # v0.06.3: Comms intercept — if Comms is crewed, give intel hint.
             if len(_manager.get_by_role("comms")) > 0:
                 await _manager.broadcast_to_roles(
@@ -1625,6 +1630,7 @@ async def _loop() -> None:
                     gl.log_event("sandbox", "crew_casualty", {
                         "deck": sb_evt["deck"], "count": sb_evt["count"],
                     })
+                _telemetry.coordination_initiated("casualty_to_medical")
             elif _sb_type == "start_boarding":
                 if not gls.is_boarding_active():
                     gls.start_boarding(_world.ship.interior, [], sb_evt["intruders"])
@@ -1774,6 +1780,7 @@ async def _loop() -> None:
                 gl.log_event("sandbox", "distress_signal", {
                     "x": _sb_dx, "y": _sb_dy,
                 })
+                _telemetry.coordination_initiated("distress_to_helm")
             elif _sb_type == "spawn_creature":
                 _world.creatures.append(
                     spawn_creature(sb_evt["id"], sb_evt["creature_type"], sb_evt["x"], sb_evt["y"])
@@ -1828,6 +1835,7 @@ async def _loop() -> None:
                     gl.log_event("sandbox", "fire_started", {
                         "room_id": _sf_room, "intensity": _sf_intensity,
                     })
+                    _telemetry.coordination_initiated("fire_to_hazcon")
             elif _sb_type == "sandbox_breach":
                 _sbr_room = sb_evt["room_id"]
                 _sbr_severity = sb_evt["severity"]
@@ -1999,6 +2007,15 @@ async def _loop() -> None:
             await stop()
             return
 
+        # 9.9 Telemetry tick (engagement, coordination, combat, resources, environment, phase).
+        _telemetry.tick(
+            _tick_count, TICK_DT,
+            enemy_count=len(_world.enemies),
+            ship=_world.ship,
+            hull_pct=_world.ship.hull,
+            mission_active=glm.is_mission_active(),
+        )
+
         # 10. Ship state. 11a. World entities. 11b. Sensor contacts.
         await _manager.broadcast(_build_ship_state(_world.ship, _tick_count))
         await _manager.broadcast_to_roles(
@@ -2072,6 +2089,7 @@ async def _loop() -> None:
             )
             gl.log_event("dynamic_mission", _dme["event"], _dme)
             if _dme["event"] == "offered":
+                _telemetry.coordination_initiated("mission_to_comms")
                 _dm_title = _dme.get("title", _dme.get("template", "Unknown"))
                 glops.add_feed_event("MISSION", f"Mission available: {_dm_title}", "info")
         # Broadcast active/offered mission list to captain every tick.
@@ -2186,6 +2204,7 @@ async def _loop() -> None:
                     "results": sensors.build_scan_result(ce),
                 }))
                 gl.log_event("science", "scan_completed", {"entity_id": cid})
+                _telemetry.coordination_initiated("science_scan_to_ops")
                 glops.add_feed_event("SCI", f"SCAN COMPLETE: {cid} — Ready for assessment", "warning")
             # Notify dynamic missions of scan completion.
             gldm.notify_scan_completed(cid)
@@ -2545,6 +2564,7 @@ async def _loop() -> None:
                 if _oc_room_id and _oc_room_id in _world.ship.interior.rooms:
                     glhc.start_fire(_oc_room_id, glhc.OVERCLOCK_FIRE_INTENSITY, _world.ship.interior, _tick_count)
                     gl.log_event("hazard_control", "overclock_fire", {"system": _oc_sys, "room_id": _oc_room_id})
+                    _telemetry.coordination_initiated("engineering_overclock_fire")
                     # C.3.5: Notify Hazard Control of overclock fire.
                     await _manager.broadcast_to_roles(
                         ["hazard_control"],
@@ -2640,6 +2660,7 @@ async def _loop() -> None:
                         "body_region": _cc_inj.body_region,
                         "severity": _cc_inj.severity,
                     })
+                _telemetry.coordination_initiated("casualty_to_medical")
 
         for evt in torpedo_events:
             if evt.get("type") == "pd_intercept":
@@ -2842,11 +2863,14 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         except asyncio.QueueEmpty:
             break
 
+        _telemetry.record_action(msg_type)
+
         if msg_type == "helm.set_heading" and isinstance(payload, HelmSetHeadingPayload):
             if glcord.is_all_stop_active():
                 continue  # ALL STOP — helm locked
             if payload.heading != ship.target_heading:
                 gl.log_debounced("helm", "heading_changed", {"from": round(ship.target_heading, 1), "to": payload.heading})
+                _telemetry.coordination_responded("distress_to_helm")
             ship.target_heading = payload.heading
             _set_training_flag(glm, "helm_heading_set")
         elif msg_type == "helm.set_throttle" and isinstance(payload, HelmSetThrottlePayload):
@@ -2877,6 +2901,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "hazard_control.suppress_local" and isinstance(payload, HazConSuppressLocalPayload):
             glhc.suppress_local(payload.room_id, ship.resources)
             gl.log_event("hazard_control", "suppress_local", {"room_id": payload.room_id})
+            _telemetry.coordination_responded("fire_to_hazcon")
+            _telemetry.coordination_responded("engineering_overclock_fire")
         elif msg_type == "hazard_control.suppress_deck" and isinstance(payload, HazConSuppressDeckPayload):
             glhc.suppress_deck(payload.deck_name, ship.interior, ship.resources)
             gl.log_event("hazard_control", "suppress_deck", {"deck_name": payload.deck_name})
@@ -2889,6 +2915,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "hazard_control.dispatch_fire_team" and isinstance(payload, HazConDispatchFireTeamPayload):
             glhc.dispatch_fire_team(payload.room_id, ship.interior)
             gl.log_event("hazard_control", "dispatch_fire_team", {"room_id": payload.room_id})
+            _telemetry.coordination_responded("fire_to_hazcon")
+            _telemetry.coordination_responded("engineering_overclock_fire")
         elif msg_type == "hazard_control.cancel_fire_team" and isinstance(payload, HazConCancelFireTeamPayload):
             glhc.cancel_fire_team(payload.room_id)
             gl.log_event("hazard_control", "cancel_fire_team", {"room_id": payload.room_id})
@@ -2966,6 +2994,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                 _pt_result = glcord.set_priority_target(payload.entity_id, world)
                 if _pt_result.get("ok"):
                     gl.log_event("captain", "priority_target_set", {"entity_id": payload.entity_id})
+                    _telemetry.coordination_initiated("captain_priority_target")
                 else:
                     events.append(("captain.order_error", {"error": _pt_result.get("reason", "")}))
         elif msg_type == "captain.set_general_order" and isinstance(payload, CaptainSetGeneralOrderPayload):
@@ -2973,6 +3002,9 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                 _go_result = glcord.set_general_order(payload.order, ship, world)
                 if _go_result.get("ok"):
                     gl.log_event("captain", "general_order_set", {"order": payload.order})
+                    _telemetry.coordination_initiated("captain_general_order")
+                    # General orders take effect immediately — auto-respond.
+                    _telemetry.coordination_responded("captain_general_order")
                     if payload.order == "battle_stations":
                         events.append(("ship.alert_changed", {"level": "red"}))
                     elif payload.order == "condition_green":
@@ -3029,11 +3061,15 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
                 denial = glw.try_select_target(payload.entity_id, world)
                 if not denial:
                     gl.log_event("weapons", "target_selected", {"target_id": payload.entity_id})
+                    _telemetry.coordination_responded("captain_priority_target")
+                    _telemetry.coordination_responded("ops_assessment_to_weapons")
                     _set_training_flag(glm, "weapons_target_selected")
                 # Denial payload stored in glw._pending_targeting_denials; broadcast in async loop.
             else:
                 glw.set_target(payload.entity_id)
                 gl.log_event("weapons", "target_selected", {"target_id": payload.entity_id})
+                _telemetry.coordination_responded("captain_priority_target")
+                _telemetry.coordination_responded("ops_assessment_to_weapons")
                 _set_training_flag(glm, "weapons_target_selected")
         elif msg_type == "weapons.fire_beams" and isinstance(payload, WeaponsFireBeamsPayload):
             if glew.is_stealth_engaged():
@@ -3167,6 +3203,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "medical.admit" and isinstance(payload, MedicalAdmitPayload):
             result = glmed.admit_patient(payload.crew_id)
             gl.log_event("medical", "patient_admit", {"crew_id": payload.crew_id, "success": result["success"]})
+            if result.get("success"):
+                _telemetry.coordination_responded("casualty_to_medical")
         elif msg_type == "medical.treat" and isinstance(payload, MedicalTreatPayload):
             result = glmed.start_crew_treatment(payload.crew_id, payload.injury_id, _get_treatment_type(payload.crew_id, payload.injury_id))
             gl.log_event("medical", "treatment_v2_started", {"crew_id": payload.crew_id, "injury_id": payload.injury_id, "success": result["success"]})
@@ -3194,6 +3232,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "security.send_team" and isinstance(payload, SecuritySendTeamPayload):
             gls.send_team(payload.team_id, payload.destination)
             gl.log_event("security", "team_sent", {"team_id": payload.team_id, "destination": payload.destination})
+            _telemetry.coordination_responded("boarding_to_security")
         elif msg_type == "security.set_patrol" and isinstance(payload, SecuritySetPatrolPayload):
             gls.set_team_patrol(payload.team_id, payload.route)
             gl.log_event("security", "patrol_set", {"team_id": payload.team_id, "route": payload.route})
@@ -3289,6 +3328,7 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "comms.decode_signal" and isinstance(payload, CommsDecodeSignalPayload):
             glco.start_decode(payload.signal_id)
             gl.log_event("comms", "decode_started", {"signal_id": payload.signal_id})
+            _telemetry.coordination_responded("mission_to_comms")
         elif msg_type == "comms.respond" and isinstance(payload, CommsRespondPayload):
             if glew.is_stealth_engaged():
                 glew.break_stealth("comms_transmit")
@@ -3411,6 +3451,8 @@ def _drain_queue(ship: Ship, world: World | None = None) -> list[tuple[str, dict
         elif msg_type == "operations.start_assessment" and isinstance(payload, OpsStartAssessmentPayload):
             result = glops.start_assessment(payload.contact_id, _world, _world.ship)
             gl.log_event("operations", "start_assessment", {"contact_id": payload.contact_id, **result})
+            _telemetry.coordination_responded("science_scan_to_ops")
+            _telemetry.coordination_initiated("ops_assessment_to_weapons")
         elif msg_type == "operations.cancel_assessment" and isinstance(payload, OpsCancelAssessmentPayload):
             result = glops.cancel_assessment()
             gl.log_event("operations", "cancel_assessment", result)

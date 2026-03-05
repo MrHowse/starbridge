@@ -100,6 +100,11 @@ def get_mission_engine() -> MissionGraph | None:
     return _mission_engine
 
 
+def is_mission_active() -> bool:
+    """Return True if a mission is currently loaded and running."""
+    return _mission_engine is not None
+
+
 def get_mission_dict() -> dict:
     """Return the currently loaded mission dict (empty if no mission loaded)."""
     return dict(_mission_dict)

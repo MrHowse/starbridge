@@ -92,3 +92,12 @@ def _reset_weapons_state():
     glw.reset()
     yield
     glw.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_telemetry_state():
+    """Reset telemetry module state before each test to prevent leakage."""
+    import server.telemetry as _telemetry
+    _telemetry.reset()
+    yield
+    _telemetry.reset()
