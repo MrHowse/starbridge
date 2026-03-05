@@ -85,6 +85,11 @@ def parse_log(path: str | Path) -> tuple[list[dict], GameReport]:
     """
     events: list[dict] = []
     path = Path(path)
+    if not path.exists():
+        # Try logs/ subdirectory relative to project root.
+        alt = Path(__file__).resolve().parent.parent / "logs" / path.name
+        if alt.exists():
+            path = alt
     with path.open() as f:
         for line in f:
             line = line.strip()
