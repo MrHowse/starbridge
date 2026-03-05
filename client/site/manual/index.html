@@ -42,6 +42,7 @@
   <a href="#s-ew"         class="toc-link toc-link--sub">Electronic Warfare</a>
   <a href="#s-operations"     class="toc-link toc-link--sub">Operations</a>
   <a href="#s-hazard-control" class="toc-link toc-link--sub">Hazard Control</a>
+  <a href="#s-quartermaster" class="toc-link toc-link--sub">Quartermaster</a>
   <a href="#ship-classes"    class="toc-link">3. Ship Classes</a>
   <a href="#difficulty"      class="toc-link">4. Difficulty Levels</a>
   <a href="#environment"     class="toc-link">5. Environment</a>
@@ -166,7 +167,17 @@
             requests nuclear launch. Approve or deny within the countdown window.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <table class="docs-table docs-table--compact">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td class="hi">1 – 6</td><td>Switch viewport (1 Fore, 2 Aft, 3 Port, 4 Starboard, 5 Quad, 6 Map)</td></tr>
+              <tr><td class="hi">H</td><td>Toggle contact highlights on viewports</td></tr>
+              <tr><td class="hi">L</td><td>Toggle contact labels on viewports</td></tr>
+              <tr><td class="hi">Enter</td><td>Submit captain's log entry</td></tr>
+              <tr><td class="hi">F1</td><td>Help overlay</td></tr>
+            </tbody>
+          </table>
           <div class="tip"><strong>Tips:</strong> Set YELLOW when a contact appears on
           sensors; upgrade to RED only when actively firing. Narrate key moments in the
           log — the debrief awards bonus points for detailed records. Watch the shield
@@ -202,7 +213,18 @@
             require navigating through hazard grids. Solve it to unlock a safe path.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <table class="docs-table docs-table--compact">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td class="hi">A / ←</td><td>Turn left 5°</td></tr>
+              <tr><td class="hi">D / →</td><td>Turn right 5°</td></tr>
+              <tr><td class="hi">W / ↑</td><td>Throttle up 5%</td></tr>
+              <tr><td class="hi">S / ↓</td><td>Throttle down 5%</td></tr>
+              <tr><td class="hi">[ / ]</td><td>Zoom out / in on map</td></tr>
+              <tr><td class="hi">F1</td><td>Help overlay</td></tr>
+            </tbody>
+          </table>
           <div class="tip"><strong>Tips:</strong> High throttle plus tight turns bleeds
           speed — you overshoot. Cut throttle before a sharp course change then increase
           again on the new heading. Nebulae don't cause damage but obstruct sensors —
@@ -234,15 +256,26 @@
             <li><strong>System health indicators:</strong> Each system shows current
             health (0–100 HP). Damaged systems operate at reduced efficiency even with
             full power.</li>
-            <li><strong>Shield focus canvas:</strong> Drag the focus point toward the
-            threat direction. Shield energy redistributes across four facings (fore, aft,
-            port, starboard) based on the focus point. Use <strong>LOCK</strong> to freeze
-            the focus and <strong>CENTRE</strong> to reset to an even split.</li>
+            <li><strong>Ship interior view:</strong> Shows rooms with damage, active
+            repair teams, fire, and hazard overlays. Overlay modes cycle through
+            atmosphere, temperature, contamination, structural integrity, and fire.</li>
             <li><strong>Circuit Routing puzzle:</strong> Triggered by mission events.
             Requires routing power through a grid to reconnect severed conduits.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <table class="docs-table docs-table--compact">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td class="hi">1 – 9</td><td>Select system by number</td></tr>
+              <tr><td class="hi">D</td><td>Dispatch first idle repair team to selected system</td></tr>
+              <tr><td class="hi">R</td><td>Recall all active repair teams</td></tr>
+              <tr><td class="hi">B</td><td>Cycle battery mode (standby / charge / discharge)</td></tr>
+              <tr><td class="hi">Tab</td><td>Cycle overlay mode (All / Atmo / Temp / Contam / Struct / Fire)</td></tr>
+              <tr><td class="hi">[ / ]</td><td>Zoom out / in</td></tr>
+              <tr><td class="hi">F1</td><td>Help overlay</td></tr>
+            </tbody>
+          </table>
           <div class="tip"><strong>Tips:</strong> The power budget is strict — if you give
           Shields 150, something else must give up 50. Life Support below 50 power starts
           reducing crew health over time. In heavy combat: raise Shields and Weapons, lower
@@ -304,7 +337,19 @@
             The Captain's tactical map shows the current status.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <table class="docs-table docs-table--compact">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td class="hi">← / →</td><td>Nudge shield focus left / right</td></tr>
+              <tr><td class="hi">↑ / ↓</td><td>Nudge shield focus up / down</td></tr>
+              <tr><td class="hi">X</td><td>Toggle X-axis lock on shield focus</td></tr>
+              <tr><td class="hi">Y</td><td>Toggle Y-axis lock on shield focus</td></tr>
+              <tr><td class="hi">C</td><td>Centre shield focus (reset to even split)</td></tr>
+              <tr><td class="hi">[ / ]</td><td>Zoom out / in on radar</td></tr>
+              <tr><td class="hi">F1</td><td>Help overlay</td></tr>
+            </tbody>
+          </table>
           <div class="tip"><strong>Tips:</strong> Always coordinate with Science before
           engaging — knowing the shield frequency is a 3× swing in effective DPS (1.5×
           match vs 0.5× mismatch). Use Ion torpedoes to stun fast scouts before they
@@ -353,7 +398,18 @@
             events. Tune waveform components to match an incoming transmission.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <table class="docs-table docs-table--compact">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td class="hi">1</td><td>EM scan mode</td></tr>
+              <tr><td class="hi">2</td><td>GRAV scan mode</td></tr>
+              <tr><td class="hi">3</td><td>BIO scan mode</td></tr>
+              <tr><td class="hi">4</td><td>SUB scan mode</td></tr>
+              <tr><td class="hi">[ / ]</td><td>Zoom out / in</td></tr>
+              <tr><td class="hi">F1</td><td>Help overlay</td></tr>
+            </tbody>
+          </table>
           <div class="tip"><strong>Tips:</strong> Run EM mode in combat to reveal shield
           frequencies. Switch to BIO near creatures or during medical emergencies — active
           outbreaks and creatures produce biological signatures. Use BIO to confirm all
@@ -446,9 +502,20 @@
             <li><strong>Crew:</strong> overall ship crew factor percentage.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> ↑/↓ — navigate casualty list ·
-          A — admit · D — discharge · Q — quarantine · S — stabilise ·
-          T — treat · 0–5 — deck filter · F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <table class="docs-table docs-table--compact">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td class="hi">↑ / ↓</td><td>Navigate casualty list</td></tr>
+              <tr><td class="hi">A</td><td>Admit selected crew member</td></tr>
+              <tr><td class="hi">D</td><td>Discharge selected crew member</td></tr>
+              <tr><td class="hi">Q</td><td>Quarantine selected crew member</td></tr>
+              <tr><td class="hi">S</td><td>Stabilise worst injury on selected crew</td></tr>
+              <tr><td class="hi">T</td><td>Treat worst injury on selected crew</td></tr>
+              <tr><td class="hi">0 – 5</td><td>Filter by deck (0 = show all)</td></tr>
+              <tr><td class="hi">F1</td><td>Help overlay</td></tr>
+            </tbody>
+          </table>
           <div class="tip"><strong>Tips:</strong> Stabilise critical crew immediately —
           it costs nothing and stops the death timer. Treat critical before serious,
           serious before moderate. Discharge healed patients promptly to free beds.
@@ -505,8 +572,17 @@
             Blocks pathfinding through the room.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> L — lock door, U — unlock door,
-          Q — quarantine, Tab — cycle teams, F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <table class="docs-table docs-table--compact">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td class="hi">L</td><td>Lock selected room door</td></tr>
+              <tr><td class="hi">U</td><td>Unlock selected room door</td></tr>
+              <tr><td class="hi">Q</td><td>Quarantine selected room</td></tr>
+              <tr><td class="hi">Tab</td><td>Cycle to next marine team</td></tr>
+              <tr><td class="hi">F1</td><td>Help overlay</td></tr>
+            </tbody>
+          </table>
           <div class="tip"><strong>Tips:</strong> Use bulkheads to isolate decks during
           boarding. Set COMBAT alert on threatened decks to halve casualties. Arm crew
           on decks with active boarders. Coordinate with Comms — intercepted boarder
@@ -542,7 +618,8 @@
             linking cipher symbols to numeric values.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay. No station-specific
+          shortcuts — all interaction is mouse-driven.</p>
           <div class="tip"><strong>Tips:</strong> Wrong message type can worsen faction
           relations mid-mission. Listen to NPC responses before hailing again —
           responses arrive 2 seconds after your transmission. The Frequency Matching
@@ -582,9 +659,27 @@
             buoys at their current position (B key).</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> 1-9 select drone, L launch, R recall,
-          W waypoint mode, P patrol route, D deploy decoy, B deploy buoy, E toggle
-          engagement rules, C clear to land, Tab cycle drones, Esc cancel.</p>
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <table class="docs-table docs-table--compact">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td class="hi">1 – 9</td><td>Select drone by index</td></tr>
+              <tr><td class="hi">Tab</td><td>Cycle drone selection</td></tr>
+              <tr><td class="hi">L</td><td>Launch selected hangar drone</td></tr>
+              <tr><td class="hi">R</td><td>Recall selected active drone</td></tr>
+              <tr><td class="hi">W</td><td>Toggle waypoint placement mode</td></tr>
+              <tr><td class="hi">P</td><td>Toggle patrol route mode</td></tr>
+              <tr><td class="hi">Enter</td><td>Confirm patrol route</td></tr>
+              <tr><td class="hi">D</td><td>Toggle decoy deployment mode</td></tr>
+              <tr><td class="hi">B</td><td>Deploy sensor buoy (survey drone)</td></tr>
+              <tr><td class="hi">E</td><td>Toggle engagement rules (weapons free / hold)</td></tr>
+              <tr><td class="hi">T</td><td>Toggle target designation mode</td></tr>
+              <tr><td class="hi">C</td><td>Clear to land</td></tr>
+              <tr><td class="hi">F</td><td>Focus map on selected drone</td></tr>
+              <tr><td class="hi">Space</td><td>Toggle ship / drone centred map</td></tr>
+              <tr><td class="hi">Escape</td><td>Cancel current mode / deselect</td></tr>
+            </tbody>
+          </table>
           <div class="tip"><strong>Tips:</strong> Plan patrol routes that maximise
           coverage within fuel constraints. Recall drones before they reach bingo fuel.
           Rush turnaround to get drones airborne faster, but they launch with partial
@@ -618,7 +713,9 @@
             Successful completion stuns the target for multiple seconds.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay. No station-specific
+          shortcuts — all interaction is mouse-driven (click targets on map, buttons for
+          countermeasures and intrusion).</p>
           <div class="tip"><strong>Tips:</strong> Jam factor maxes out at 80% — beyond
           that, switch focus to a second enemy. Countermeasure charges don't regenerate;
           save them for confirmed torpedo volleys. ECM Suite must have adequate power
@@ -648,12 +745,16 @@
             via the cross-station notification system.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
+          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay. No station-specific
+          shortcuts — use mouse to click contacts for assessment, click objectives to
+          mark, and type advisories in the relay input.</p>
           <div class="tip"><strong>Tips:</strong> Call out shield frequency to Weapons
-          as soon as Science completes a scan. Monitor the objective tracker and warn the
-          Captain if a time-limited objective is about to expire. Your station draws the
-          same sensor data as Captain — if they're busy managing crew, you're their
-          second set of eyes.</div>
+          as soon as Science completes a scan. Use the priority target marker to give
+          Weapons a gold diamond HUD indicator on their radar. Monitor the objective
+          tracker and warn the Captain if a time-limited objective is about to expire.
+          Your station draws the same sensor data as Captain — if they're busy managing
+          crew, you're their second set of eyes. Send advisories to stations that need
+          coordination — they appear as toast notifications.</div>
         </div>
       </div>
 
@@ -661,30 +762,109 @@
       <div id="s-hazard-control" class="station">
         <h3 class="station__heading">HAZARD CONTROL</h3>
         <div class="station-body">
-          <p><em>Role summary:</em> You manage hull damage mitigation. When the ship
-          takes hits, rooms catch fire, decompress, or suffer structural damage. You
-          dispatch repair teams (DCTs) to repair them before the damage spreads.
-          Fire spreads on its own if ignored; decompressed rooms are unrecoverable.</p>
+          <p><em>Role summary:</em> You manage the ship's internal environment — fires,
+          atmosphere, radiation, and structural integrity. When the ship takes hits, rooms
+          catch fire, breach, lose pressure, or suffer structural damage. You dispatch
+          damage control teams (DCTs) and use environmental systems to keep the ship
+          survivable. Hazard Control is the most information-dense station in v0.08.</p>
+
+          <p><strong>Three-Panel Layout</strong></p>
+          <ul>
+            <li><strong>Deck cards (left):</strong> One card per deck showing severity-sorted
+            hazard summary — fires, breaches, atmosphere warnings, structural state. Cards
+            are colour-coded by worst active hazard.</li>
+            <li><strong>Ship interior canvas (centre):</strong> Room map with 6 overlay modes:
+            ALL (combined), ATMO (O₂ / pressure), TEMP (temperature), CONTAM (contamination),
+            STRUCT (structural integrity), and FIRE. Click rooms to select; overlays
+            colour-code rooms by severity.</li>
+            <li><strong>Actions + hazards + log (right):</strong> Context-sensitive action
+            buttons for the selected room, active hazard list, and a state-diff event log
+            showing recent changes.</li>
+          </ul>
+
+          <p><strong>Fire Management</strong></p>
+          <ul>
+            <li>Fires have intensity levels 1–5. Intensity 1–2 is manageable; 3+ causes
+            crew auto-evacuation of the room and rapid spread to adjacent rooms.</li>
+            <li>Dispatch a DCT to suppress fire (8-second cycle). Fire spreads every 20
+            seconds if unattended.</li>
+            <li>Fire consumes O₂ — a sealed room with fire will deplete oxygen, eventually
+            starving the fire but killing anyone inside.</li>
+          </ul>
+
+          <p><strong>Atmosphere Control</strong></p>
+          <ul>
+            <li>Each room tracks O₂, pressure, temperature, and contamination (toxic gas,
+            smoke, biological, chemical).</li>
+            <li>Hull breaches vent atmosphere — minor breaches reduce pressure slowly;
+            major breaches decompress rapidly.</li>
+            <li>Ventilation modes: <strong>Open</strong> (normal air exchange),
+            <strong>Filtered</strong> (scrubs contaminants, slower), <strong>Sealed</strong>
+            (no exchange — isolates the room).</li>
+            <li>Space vent: emergency depressurisation that extinguishes fires and clears
+            contaminants but is lethal to crew in the room.</li>
+            <li>Force fields: temporary seals that block atmosphere loss through breaches.</li>
+          </ul>
+
+          <p><strong>Radiation</strong></p>
+          <ul>
+            <li>Three sources: reactor leaks, shield overload, nuclear torpedo impacts.</li>
+            <li>Four zone tiers (25 / 50 / 75 / 100 rads). Higher tiers cause Engineering
+            efficiency loss, sensor penalties, and crew sickness.</li>
+            <li>Decontamination teams can be dispatched to irradiated rooms.</li>
+          </ul>
+
+          <p><strong>Structural Integrity</strong></p>
+          <ul>
+            <li>Each section (2 rooms per section) has integrity from 100% down through
+            five states: Normal → Stressed → Weakened → Critical → Collapsed.</li>
+            <li>Collapsed sections cascade damage to adjacent sections.</li>
+            <li>Reinforcement (+10% per 30 seconds, max 80%) can be dispatched to
+            weakened sections.</li>
+            <li>Emergency bulkheads seal connections between sections to contain
+            cascading failures.</li>
+          </ul>
+
+          <p><strong>Keyboard shortcuts:</strong> No station-specific shortcuts — all
+          interaction is through the canvas and action buttons. F1 — help overlay.</p>
+          <div class="tip"><strong>Tips:</strong> Prioritise fire over everything else —
+          fire spreads every 20 seconds and consumes O₂. Use the overlay modes to quickly
+          assess ship-wide status: ATMO reveals low-oxygen rooms, STRUCT shows weakening
+          sections. Seal ventilation on contaminated rooms before scrubbing. Coordinate
+          with Security for door locks and Engineering for power to life support. A
+          decompressed room cannot be repaired — seal its connecting doors to prevent
+          further hull loss.</div>
+        </div>
+      </div>
+
+      <!-- Quartermaster -->
+      <div id="s-quartermaster" class="station">
+        <h3 class="station__heading">QUARTERMASTER</h3>
+        <div class="station-body">
+          <p><em>Role summary:</em> You manage the ship's consumable resources — fuel,
+          torpedoes, medical supplies, provisions, repair materials, drone parts, and EW
+          charges. You handle trade negotiations at stations, manage rationing levels, and
+          ensure the ship has what it needs to complete the mission.</p>
 
           <p><strong>Controls</strong></p>
           <ul>
-            <li><strong>Room grid:</strong> Displays all 20 rooms (5 decks × 4 rooms),
-            colour-coded by status: Normal (dim), Damaged (amber), Fire (red),
-            Decompressed (dark).</li>
-            <li><strong>Dispatch DCT:</strong> Select a damaged or burning room and click
-            Dispatch. The DCT begins an 8-second repair cycle. Only one DCT per room.</li>
-            <li><strong>Cancel DCT:</strong> Recalls the team from the selected room,
-            freeing them for a higher-priority location.</li>
-            <li><strong>Active DCTs panel:</strong> Shows all active teams with names,
-            room names, and repair progress bars (0–100%).</li>
+            <li><strong>Resource overview:</strong> Seven resource types with current stock,
+            burn rate, and estimated time to depletion.</li>
+            <li><strong>Rationing controls:</strong> Four levels (Normal, Reduced, Minimal,
+            Emergency) that adjust consumption rates and crew effectiveness multipliers.</li>
+            <li><strong>Trade interface:</strong> When docked, negotiate purchases with
+            station vendors. Six pricing modifiers affect costs; reputation with factions
+            unlocks better deals.</li>
+            <li><strong>Allocation requests:</strong> Other stations can request resource
+            priority; approve or deny from the queue.</li>
           </ul>
 
-          <p><strong>Keyboard shortcuts:</strong> F1 — help overlay.</p>
-          <div class="tip"><strong>Tips:</strong> Prioritise fire over damage — fire
-          spreads every 20 seconds to adjacent rooms and cannot be reversed once a room
-          decompresses. A decompressed room cannot be repaired; seal its connecting doors
-          (via Security) to prevent further hull loss. Keep an eye on all decks, not just
-          the one currently taking hits.</div>
+          <p><strong>Keyboard shortcuts:</strong> No station-specific shortcuts — all
+          interaction is mouse-driven.</p>
+          <div class="tip"><strong>Tips:</strong> Monitor fuel burn rate constantly — running
+          out of fuel mid-mission is an unrecoverable failure. Set rationing to Reduced
+          early in long missions rather than Emergency later. Negotiate at stations when
+          docked — vendor prices vary by faction reputation and supply/demand.</div>
         </div>
       </div>
 
@@ -725,7 +905,7 @@
           <tr>
             <td class="hi">Corvette</td>
             <td>Sentinel-class</td>
-            <td>80</td>
+            <td>90</td>
             <td>10</td>
             <td>4–6</td>
             <td>Balanced entry ship. Good for new crews learning the ropes.</td>
@@ -733,7 +913,7 @@
           <tr>
             <td class="hi">Frigate</td>
             <td>Resolution-class</td>
-            <td>100</td>
+            <td>120</td>
             <td>12</td>
             <td>6–9</td>
             <td>Default class. Full system complement; versatile mission loadout.</td>
@@ -750,7 +930,7 @@
           <tr>
             <td class="hi">Cruiser</td>
             <td>Endeavour-class</td>
-            <td>140</td>
+            <td>180</td>
             <td>16</td>
             <td>8–11</td>
             <td>Heavy combat ship. All weapons systems operate at peak capacity.</td>
@@ -758,7 +938,7 @@
           <tr>
             <td class="hi">Carrier</td>
             <td>Atlas-class</td>
-            <td>120</td>
+            <td>200</td>
             <td>8</td>
             <td>7–12</td>
             <td>Drone carrier. Expanded flight deck and probe stock. Flight Ops focus.</td>
@@ -766,7 +946,7 @@
           <tr>
             <td class="hi">Battleship</td>
             <td>Sovereign-class</td>
-            <td>200</td>
+            <td>300</td>
             <td>20</td>
             <td>10–12</td>
             <td>Maximum firepower and armour. Requires full crew to operate effectively.</td>
@@ -1318,46 +1498,115 @@
     <h2 class="section__heading">9. Keyboard Quick Reference</h2>
     <div class="section-body">
 
-      <p>Starbridge is primarily mouse-driven. The following keyboard shortcuts apply
-      globally across all stations.</p>
+      <p>For a complete printable reference, see the
+      <a href="/client/site/manual/shortcuts.html">Keyboard Shortcut Reference Card</a>.</p>
 
+      <h3 style="margin-top:1rem">Global (all stations)</h3>
       <table class="docs-table">
-        <thead>
-          <tr><th>Key</th><th>Action</th><th>All Stations</th></tr>
-        </thead>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td class="hi">F1</td><td>Open / close help overlay</td><td>Yes</td></tr>
-          <tr><td class="hi">Escape</td><td>Dismiss puzzle overlay / help overlay</td><td>Yes</td></tr>
-          <tr><td class="hi">Tab</td><td>Focus next interactive element</td><td>Yes</td></tr>
-          <tr><td class="hi">Enter / Space</td><td>Activate focused button</td><td>Yes</td></tr>
+          <tr><td class="hi">F1</td><td>Open / close help overlay</td></tr>
+          <tr><td class="hi">Escape</td><td>Dismiss help overlay / puzzle / crew roster</td></tr>
+          <tr><td class="hi">C</td><td>Toggle crew roster overlay</td></tr>
+          <tr><td class="hi">[ / ]</td><td>Zoom out / in (stations with range control)</td></tr>
         </tbody>
       </table>
 
-      <p><strong>Medical station shortcuts:</strong></p>
-      <table class="docs-table">
-        <thead>
-          <tr><th>Key</th><th>Action</th></tr>
-        </thead>
+      <h3 style="margin-top:1rem">Captain</h3>
+      <table class="docs-table docs-table--compact">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td class="hi">1 – 6</td><td>Switch viewport (Fore / Aft / Port / Starboard / Quad / Map)</td></tr>
+          <tr><td class="hi">H</td><td>Toggle highlights</td></tr>
+          <tr><td class="hi">L</td><td>Toggle labels</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1rem">Helm</h3>
+      <table class="docs-table docs-table--compact">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td class="hi">A / ←</td><td>Turn left 5°</td></tr>
+          <tr><td class="hi">D / →</td><td>Turn right 5°</td></tr>
+          <tr><td class="hi">W / ↑</td><td>Throttle up 5%</td></tr>
+          <tr><td class="hi">S / ↓</td><td>Throttle down 5%</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1rem">Weapons</h3>
+      <table class="docs-table docs-table--compact">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td class="hi">← / → / ↑ / ↓</td><td>Nudge shield focus</td></tr>
+          <tr><td class="hi">X / Y</td><td>Toggle X / Y axis lock</td></tr>
+          <tr><td class="hi">C</td><td>Centre shield focus</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1rem">Engineering</h3>
+      <table class="docs-table docs-table--compact">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td class="hi">1 – 9</td><td>Select system</td></tr>
+          <tr><td class="hi">D</td><td>Dispatch repair team</td></tr>
+          <tr><td class="hi">R</td><td>Recall all repair teams</td></tr>
+          <tr><td class="hi">B</td><td>Cycle battery mode</td></tr>
+          <tr><td class="hi">Tab</td><td>Cycle overlay mode</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1rem">Science</h3>
+      <table class="docs-table docs-table--compact">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td class="hi">1 – 4</td><td>Switch scan mode (EM / GRAV / BIO / SUB)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1rem">Medical</h3>
+      <table class="docs-table docs-table--compact">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td class="hi">↑ / ↓</td><td>Navigate casualty list</td></tr>
-          <tr><td class="hi">A</td><td>Admit selected crew member</td></tr>
-          <tr><td class="hi">D</td><td>Discharge selected crew member</td></tr>
-          <tr><td class="hi">Q</td><td>Quarantine selected crew member</td></tr>
-          <tr><td class="hi">S</td><td>Stabilise worst injury on selected crew</td></tr>
-          <tr><td class="hi">T</td><td>Treat worst injury on selected crew</td></tr>
-          <tr><td class="hi">0 – 5</td><td>Filter casualty list by deck (0 = show all)</td></tr>
+          <tr><td class="hi">A / D / Q</td><td>Admit / Discharge / Quarantine</td></tr>
+          <tr><td class="hi">S / T</td><td>Stabilise / Treat</td></tr>
+          <tr><td class="hi">0 – 5</td><td>Filter by deck</td></tr>
         </tbody>
       </table>
 
-      <p>Station-specific text inputs (Helm bearing, Communications contact ID, Captain's
-      log) accept standard keyboard entry. Number fields accept arrow keys to
-      increment/decrement values.</p>
+      <h3 style="margin-top:1rem">Security</h3>
+      <table class="docs-table docs-table--compact">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td class="hi">L / U</td><td>Lock / Unlock door</td></tr>
+          <tr><td class="hi">Q</td><td>Quarantine room</td></tr>
+          <tr><td class="hi">Tab</td><td>Cycle marine teams</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1rem">Flight Operations</h3>
+      <table class="docs-table docs-table--compact">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td class="hi">1 – 9 / Tab</td><td>Select / cycle drones</td></tr>
+          <tr><td class="hi">L / R</td><td>Launch / Recall</td></tr>
+          <tr><td class="hi">W / P</td><td>Waypoint / Patrol mode</td></tr>
+          <tr><td class="hi">D / B</td><td>Deploy decoy / buoy</td></tr>
+          <tr><td class="hi">E / T / C</td><td>Engagement rules / Target mode / Clear to land</td></tr>
+          <tr><td class="hi">F / Space</td><td>Focus on drone / Toggle map centre</td></tr>
+          <tr><td class="hi">Escape</td><td>Cancel mode</td></tr>
+        </tbody>
+      </table>
+
+      <p style="margin-top:1.5rem"><strong>Crew roster overlay (C key).</strong> Available on
+      all stations. When open: F — cycle filter, S — cycle sort, ↑/↓ — navigate list,
+      Enter — expand/collapse, Escape — close.</p>
 
       <p><strong>Role bar navigation.</strong> The bottom strip shows all crew roles and
       who holds them. Click any open role or your own role (shown with a green highlight)
       to navigate to that station's page.</p>
 
-      <p><strong>Accessibility.</strong> The ⚙ widget in the bottom-right corner provides
+      <p><strong>Accessibility.</strong> The settings widget in the bottom-right corner provides
       colour-blind mode (alternative palette) and reduced-motion mode (disables all
       animations). Settings persist across page loads via localStorage.</p>
 

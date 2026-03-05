@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keyboard Shortcuts — STARBRIDGE</title>
+  <link rel="stylesheet" href="/client/site/site.css">
+  <style>
+    @media print {
+      .site-nav, .back-link { display: none !important; }
+      body { background: #fff; color: #000; font-size: 10pt; }
+      .shortcuts-wrap { max-width: 100%; padding: 0; }
+      .sc-section { break-inside: avoid; margin-bottom: 0.5rem; }
+      .sc-table { font-size: 9pt; }
+      .sc-table th, .sc-table td { padding: 2px 6px; border: 1px solid #999; }
+      h1, h2 { color: #000; }
+      h1 { font-size: 16pt; margin-bottom: 4pt; }
+      h2 { font-size: 11pt; margin-top: 8pt; margin-bottom: 2pt; }
+      .sc-section { page-break-inside: avoid; }
+    }
+    @media screen {
+      .shortcuts-wrap {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 4rem;
+      }
+      .sc-section { margin-bottom: 1.5rem; }
+    }
+    .sc-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .sc-table th {
+      text-align: left;
+      padding: 4px 8px;
+      border-bottom: 2px solid #00ff41;
+      color: #00ff41;
+      font-size: 0.85em;
+    }
+    .sc-table td {
+      padding: 3px 8px;
+      border-bottom: 1px solid #1a3a1a;
+    }
+    .sc-table td:first-child {
+      white-space: nowrap;
+      font-weight: bold;
+      color: #00ff41;
+      width: 140px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #00ff41;
+    }
+    .print-btn {
+      float: right;
+      background: #1a3a1a;
+      color: #00ff41;
+      border: 1px solid #00ff41;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.85em;
+    }
+    .print-btn:hover { background: #00ff41; color: #0a0a0a; }
+    h2 { border-bottom: 1px solid #1a3a1a; padding-bottom: 0.25rem; }
+  </style>
+</head>
+<body>
+
+<nav class="site-nav" role="navigation" aria-label="Site navigation">
+  <a href="/" class="site-nav__brand">STARBRIDGE</a>
+  <div class="site-nav__links">
+    <a href="/client/lobby/" class="site-nav__link site-nav__play">PLAY</a>
+    <a href="/manual/"       class="site-nav__link">MANUAL</a>
+    <a href="/faq/"          class="site-nav__link">FAQ</a>
+    <a href="/about/"        class="site-nav__link">ABOUT</a>
+  </div>
+</nav>
+
+<div class="shortcuts-wrap">
+
+<a href="/manual/" class="back-link">&larr; Back to Manual</a>
+<button class="print-btn" onclick="window.print()">PRINT</button>
+
+<h1>Keyboard Shortcuts</h1>
+<p style="margin-bottom:1.5rem;opacity:0.7">STARBRIDGE v0.08 — QUICK REFERENCE</p>
+
+<!-- Global -->
+<div class="sc-section">
+  <h2>GLOBAL (All Stations)</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>F1</td><td>Open / close help overlay</td></tr>
+      <tr><td>Escape</td><td>Close help overlay, puzzle, crew roster, or cancel mode</td></tr>
+      <tr><td>C</td><td>Toggle crew roster overlay</td></tr>
+      <tr><td>[ / ]</td><td>Zoom out / in (stations with map range control)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Crew Roster -->
+<div class="sc-section">
+  <h2>CREW ROSTER (C to open)</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>F</td><td>Cycle filter mode</td></tr>
+      <tr><td>S</td><td>Cycle sort mode</td></tr>
+      <tr><td>&uarr; / &darr;</td><td>Navigate crew list</td></tr>
+      <tr><td>Enter</td><td>Expand / collapse selected</td></tr>
+      <tr><td>Escape</td><td>Close roster</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Captain -->
+<div class="sc-section">
+  <h2>CAPTAIN</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>1 &ndash; 6</td><td>Switch viewport (1 Fore, 2 Aft, 3 Port, 4 Starboard, 5 Quad, 6 Map)</td></tr>
+      <tr><td>H</td><td>Toggle contact highlights</td></tr>
+      <tr><td>L</td><td>Toggle contact labels</td></tr>
+      <tr><td>Enter</td><td>Submit captain's log entry</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Helm -->
+<div class="sc-section">
+  <h2>HELM</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>A / &larr;</td><td>Turn left 5&deg;</td></tr>
+      <tr><td>D / &rarr;</td><td>Turn right 5&deg;</td></tr>
+      <tr><td>W / &uarr;</td><td>Throttle up 5%</td></tr>
+      <tr><td>S / &darr;</td><td>Throttle down 5%</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Weapons -->
+<div class="sc-section">
+  <h2>WEAPONS</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>&larr; / &rarr;</td><td>Nudge shield focus left / right</td></tr>
+      <tr><td>&uarr; / &darr;</td><td>Nudge shield focus up / down</td></tr>
+      <tr><td>X</td><td>Toggle X-axis lock on shield focus</td></tr>
+      <tr><td>Y</td><td>Toggle Y-axis lock on shield focus</td></tr>
+      <tr><td>C</td><td>Centre shield focus (even split)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Engineering -->
+<div class="sc-section">
+  <h2>ENGINEERING</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>1 &ndash; 9</td><td>Select system by number</td></tr>
+      <tr><td>D</td><td>Dispatch first idle repair team to selected system</td></tr>
+      <tr><td>R</td><td>Recall all active repair teams</td></tr>
+      <tr><td>B</td><td>Cycle battery mode (standby / charge / discharge)</td></tr>
+      <tr><td>Tab</td><td>Cycle overlay mode</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Science -->
+<div class="sc-section">
+  <h2>SCIENCE / SENSORS</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>EM scan mode (electromagnetic)</td></tr>
+      <tr><td>2</td><td>GRAV scan mode (gravitational)</td></tr>
+      <tr><td>3</td><td>BIO scan mode (biological)</td></tr>
+      <tr><td>4</td><td>SUB scan mode (subspace)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Medical -->
+<div class="sc-section">
+  <h2>MEDICAL</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>&uarr; / &darr;</td><td>Navigate casualty list</td></tr>
+      <tr><td>A</td><td>Admit selected crew member</td></tr>
+      <tr><td>D</td><td>Discharge selected crew member</td></tr>
+      <tr><td>Q</td><td>Quarantine selected crew member</td></tr>
+      <tr><td>S</td><td>Stabilise worst injury on selected crew</td></tr>
+      <tr><td>T</td><td>Treat worst injury on selected crew</td></tr>
+      <tr><td>0 &ndash; 5</td><td>Filter by deck (0 = show all)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Security -->
+<div class="sc-section">
+  <h2>SECURITY</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>L</td><td>Lock selected room door</td></tr>
+      <tr><td>U</td><td>Unlock selected room door</td></tr>
+      <tr><td>Q</td><td>Quarantine selected room</td></tr>
+      <tr><td>Tab</td><td>Cycle to next marine team</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Communications -->
+<div class="sc-section">
+  <h2>COMMUNICATIONS</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td colspan="2" style="opacity:0.6">No station-specific shortcuts. All interaction is mouse-driven.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Flight Operations -->
+<div class="sc-section">
+  <h2>FLIGHT OPERATIONS</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>1 &ndash; 9</td><td>Select drone by index</td></tr>
+      <tr><td>Tab</td><td>Cycle drone selection</td></tr>
+      <tr><td>L</td><td>Launch selected hangar drone</td></tr>
+      <tr><td>R</td><td>Recall selected active drone</td></tr>
+      <tr><td>W</td><td>Toggle waypoint placement mode</td></tr>
+      <tr><td>P</td><td>Toggle patrol route mode</td></tr>
+      <tr><td>Enter</td><td>Confirm patrol route</td></tr>
+      <tr><td>D</td><td>Toggle decoy deployment mode</td></tr>
+      <tr><td>B</td><td>Deploy sensor buoy (survey drone)</td></tr>
+      <tr><td>E</td><td>Toggle engagement rules (weapons free / hold)</td></tr>
+      <tr><td>T</td><td>Toggle target designation mode</td></tr>
+      <tr><td>C</td><td>Clear to land</td></tr>
+      <tr><td>F</td><td>Focus map on selected drone</td></tr>
+      <tr><td>Space</td><td>Toggle ship-centred / drone-centred map</td></tr>
+      <tr><td>Escape</td><td>Cancel current mode / deselect</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Electronic Warfare -->
+<div class="sc-section">
+  <h2>ELECTRONIC WARFARE</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td colspan="2" style="opacity:0.6">No station-specific shortcuts. Click targets on map; use buttons for countermeasures and intrusion.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Operations -->
+<div class="sc-section">
+  <h2>OPERATIONS</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td colspan="2" style="opacity:0.6">No station-specific shortcuts. Click contacts to assess; type advisories in relay input.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Hazard Control -->
+<div class="sc-section">
+  <h2>HAZARD CONTROL</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td colspan="2" style="opacity:0.6">No station-specific shortcuts. All interaction through canvas and action buttons.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Quartermaster -->
+<div class="sc-section">
+  <h2>QUARTERMASTER</h2>
+  <table class="sc-table">
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td colspan="2" style="opacity:0.6">No station-specific shortcuts. All interaction is mouse-driven.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /shortcuts-wrap -->
+
+</body>
+</html>

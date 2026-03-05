@@ -1,8 +1,8 @@
 # STARBRIDGE
 
-**Cooperative multiplayer bridge crew simulator — v0.01**
+**Cooperative multiplayer bridge crew simulator — v0.08**
 
-5–6 players connect via web browsers on a local network, each taking a distinct role aboard a starship. No single player can succeed alone — the fun comes from communication, coordination, and creative problem-solving under pressure.
+3–12 players connect via web browsers on a local network, each taking a distinct role aboard a starship. No single player can succeed alone — the fun comes from communication, coordination, and creative problem-solving under pressure.
 
 Inspired by [Artemis Spaceship Bridge Simulator](https://www.artemisspaceshipbridge.com/), rebuilt as a modern web application with zero setup friction.
 
@@ -38,44 +38,63 @@ python run.py
 
 ### Connect
 
-1. The server prints a URL like `http://192.168.1.100:8666/client/lobby/`
+1. The server prints a URL like `http://192.168.1.100:8666/`
 2. Share this URL with your crew
-3. Everyone opens it in their browser and enters a callsign
-4. Choose roles, select a mission, launch, and save the galaxy
+3. Everyone opens it in their browser and clicks PLAY
+4. Enter a callsign, choose roles, select a mission, launch
 
 ---
 
-## Roles
+## Roles (13 Stations)
 
 | Role | Summary |
 |------|---------|
-| **Captain** | Overview of all systems. Sets alert level (shifts all stations to green/yellow/red). Makes strategic calls. Controls nothing directly. |
-| **Helm** | Steers the ship. Manages speed and heading. Executes manoeuvres. |
-| **Weapons** | Targets enemies. Fires beams and torpedoes. Manages shield balance. |
-| **Engineering** | Distributes power across six systems. Repairs damage. Overclocks under pressure. |
-| **Science** | Scans contacts. Identifies threats and weaknesses. Triangulates signals. |
-| **Viewscreen** | Display-only role for a shared TV/projector. Shows the forward view. |
+| **Captain** | Overview of all systems. Sets alert level, maintains the log, authorises nuclear launches. |
+| **Helm** | Steers the ship. Speed, heading, evasive manoeuvres, docking approach. |
+| **Weapons** | Targets enemies. Fires beams and torpedoes. Manages shield focus. |
+| **Engineering** | Distributes power across nine systems. Dispatches repair teams. |
+| **Science** | Scans contacts. Four scan modes (EM, GRAV, BIO, SUB). Triangulates signals. |
+| **Medical** | Treats individual crew injuries. Triage, surgery, quarantine. |
+| **Security** | Internal defence. Marine teams, door control, boarding response. |
+| **Communications** | Decodes signals, manages faction diplomacy, hails contacts. |
+| **Flight Ops** | Launches and directs drones — scout, combat, rescue, survey, ECM. |
+| **Electronic Warfare** | Jams enemy sensors, runs intrusion attacks, deploys countermeasures. |
+| **Operations** | Analyses threats, coordinates crew, tracks mission objectives. |
+| **Hazard Control** | Manages fires, atmosphere, radiation, and structural integrity. |
+| **Quartermaster** | Manages resources, supplies, rationing, and trade. |
 
 ---
 
-## Missions
+## Ship Classes (7)
 
-| Mission | Description |
-|---------|-------------|
-| **Sandbox** | Free play. No objectives. Enemies spawn continuously. |
-| **First Contact** | Patrol, scan the hostile scout, destroy all contacts, return to base. |
-| **Defend the Station** | Repel three enemy waves before they destroy Station Kepler. |
-| **Search and Rescue** | Triangulate a distress signal, navigate the asteroid field, extend shields around the damaged vessel, escort them home. |
+| Class | Hull | Crew | Notes |
+|-------|------|------|-------|
+| Scout | 60 | 3–4 | Fast and light |
+| Corvette | 90 | 4–6 | Good for new crews |
+| Frigate | 120 | 6–9 | Default balanced class |
+| Medical Ship | 100 | 5–8 | Enhanced medical capacity |
+| Cruiser | 180 | 8–11 | Heavy combat |
+| Carrier | 200 | 7–12 | Expanded flight deck |
+| Battleship | 300 | 10–12 | Maximum firepower |
+
+---
+
+## Documentation
+
+- **Manual**: `/manual/` — full station guides, mechanics, shortcuts
+- **FAQ**: `/faq/` — common questions answered
+- **About**: `/about/` — version history and credits
+- **Shortcut Reference**: `/client/site/manual/shortcuts.html` — printable keyboard shortcuts
 
 ---
 
 ## Game Flow
 
-1. **Lobby** — Players connect, enter callsigns, claim roles, host selects a mission and clicks Launch
-2. **Briefing** — Mission name and briefing text appear on all stations (15s auto-dismiss, click to skip)
+1. **Lobby** — Players connect, enter callsigns, claim roles, host selects mission + ship class + difficulty
+2. **Briefing** — Mission objectives shown with 30-second countdown
 3. **Mission** — Stations coordinate in real time; objectives update as goals are met
-4. **End** — Victory or defeat overlay appears on all stations with duration and hull stats, plus a Return to Lobby button
-5. **Repeat** — Host can launch a new mission immediately from the lobby
+4. **Debrief** — Per-station stats, awards, key moments, Captain's Replay
+5. **Repeat** — Return to lobby for the next mission
 
 ---
 
@@ -84,6 +103,7 @@ python run.py
 - **Server**: Python / FastAPI / asyncio / WebSockets (10 Hz game loop)
 - **Client**: Vanilla HTML5 / Canvas / ES Modules (no framework, no build step)
 - **Aesthetic**: Wire-frame vector graphics — Battlezone / DEFCON / Alien ship computer style
+- **Tests**: 6,831 passing (pytest + pytest-asyncio)
 
 ---
 
@@ -92,34 +112,6 @@ python run.py
 ```bash
 python -m pytest
 ```
-
-v0.01 ships with **331 passing tests** covering the server, missions, AI, combat, and sensors.
-
----
-
-## Debug Endpoints
-
-While the server is running you can use these HTTP endpoints:
-
-```
-GET  /                               — Health check
-POST /debug/damage?system=hull&amount=40  — Deal damage to a system
-POST /debug/spawn_enemy?type=cruiser      — Spawn an enemy near the player
-POST /debug/start_game?mission_id=sandbox — Force-start without a lobby
-GET  /debug/ship_status                   — Current ship state as JSON
-```
-
-Set `STARBRIDGE_DEBUG=false` to disable these before public deployment.
-
----
-
-## Architecture Notes
-
-- **One session per server process** — designed for LAN play with friends
-- **No database** — all state lives in memory; game resets on server restart
-- **10 Hz game loop** — asyncio task; clients render at 60 fps via interpolation
-- **WebSocket envelope** — `{ "type": "category.event", "payload": {...} }`
-- **Role-based broadcasts** — helm/engineering get full world data; weapons/science get sensor-filtered contacts
 
 ---
 

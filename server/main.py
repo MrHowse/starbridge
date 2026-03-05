@@ -265,7 +265,7 @@ async def health_check() -> dict[str, str]:
         "name": "Starbridge",
         "version": "0.0.1",
         "status": "online",
-        "phase": "v0.04",
+        "phase": "v0.08",
     }
 
 
@@ -294,7 +294,7 @@ async def api_status() -> dict:
         "player_count": player_count,
         "mission_name": mission_name,
         "version": "0.0.1",
-        "phase": "v0.04",
+        "phase": "v0.08",
     }
 
 

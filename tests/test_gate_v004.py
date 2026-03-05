@@ -183,10 +183,10 @@ class TestEditorEndpointsGate:
         assert r.status_code == 200
         assert "missions" in r.json()
 
-    def test_health_check_phase_v004(self):
+    def test_health_check_phase(self):
         r = client.get("/health")
         assert r.status_code == 200
-        assert r.json()["phase"] == "v0.04"
+        assert r.json()["phase"] == "v0.08"
 
 
 # ---------------------------------------------------------------------------

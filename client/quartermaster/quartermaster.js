@@ -30,6 +30,14 @@ import {
 import { SoundBank } from '../shared/audio.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+
+registerHelp([
+  { selector: '#resource-list',    text: 'Resource overview — current levels of fuel, provisions, ammunition, medical supplies, repair parts, DC supplies, and drone parts.', position: 'right' },
+  { selector: '#ration-controls',  text: 'Rationing controls — set ration level (emergency/reduced/normal/generous) to balance consumption and crew effectiveness.', position: 'right' },
+  { selector: '#vendor-list',      text: 'Trade interface — browse and purchase from nearby vendors when docked at a station.', position: 'left' },
+  { selector: '#salvage-list',     text: 'Salvage targets — assess and extract resources from nearby wrecks and derelicts.', position: 'left' },
+]);
 
 // ---------------------------------------------------------------------------
 // DOM references
@@ -187,5 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initRoleBar(send, 'quartermaster');
   SoundBank.init();
   wireButtonSounds(SoundBank);
+  initHelpOverlay();
   renderRationButtons();
 });

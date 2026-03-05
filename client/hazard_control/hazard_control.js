@@ -28,6 +28,14 @@ import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
 import { createRenderScheduler, guardInteraction } from '../shared/render_scheduler.js';
 import { markPending, applyPending } from '../shared/action_feedback.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+
+registerHelp([
+  { selector: '#hc-deck-list',    text: 'Deck cards — severity-sorted status of each deck showing fires, breaches, atmosphere, and structural integrity.', position: 'right' },
+  { selector: '#hc-canvas',       text: 'Interior map — canvas overview of the ship interior. Click a room or connection to select it for actions.', position: 'left' },
+  { selector: '#hc-actions',      text: 'Action panel — contextual actions for the selected room or connection (dispatch teams, seal bulkheads, vent rooms, etc.).', position: 'left' },
+  { selector: '#hc-overlay-bar',  text: 'Overlay mode — switch between ALL, ATMO, TEMP, CONTAM, STRUCT, and FIRE views on the interior map.', position: 'below' },
+]);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1342,6 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCrewRoster(send);
   SoundBank.init();
   wireButtonSounds(SoundBank);
+  initHelpOverlay();
 
   // Canvas click handler
   _canvas?.addEventListener('click', handleCanvasClick);

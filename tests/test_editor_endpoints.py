@@ -326,8 +326,8 @@ def test_start_position_sets_ship_coords() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_health_check_phase_v004() -> None:
+def test_health_check_phase_v008() -> None:
     with TestClient(app) as client:
         response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["phase"] == "v0.04"
+    assert response.json()["phase"] == "v0.08"

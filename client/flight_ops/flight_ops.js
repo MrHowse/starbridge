@@ -15,6 +15,14 @@ import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
 import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+
+registerHelp([
+  { selector: '#fo-map-panel',     text: 'Tactical map — shows drone positions, waypoints, mission routes, and sensor coverage. Click to set waypoints.', position: 'right' },
+  { selector: '#fo-drone-cards',   text: 'Drone cards — active drone status with fuel/hull/ammo bars and action buttons.', position: 'left' },
+  { selector: '.fo-hangar-section', text: 'Hangar — drones undergoing maintenance, refuelling, or rearming. Shows turnaround progress.', position: 'left' },
+  { selector: '.fo-expendables-section', text: 'Expendables — deploy decoys and sensor buoys from available stock.', position: 'left' },
+]);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -106,6 +114,7 @@ let _prevHangarStructKey = '';
 
 SoundBank.init();
 wireButtonSounds(SoundBank);
+initHelpOverlay();
 initRoleBar(send, 'flight_ops');
 initCrewRoster(send);
 

@@ -21,6 +21,14 @@ import '../shared/audio_ambient.js';
 import '../shared/audio_events.js';
 import { wireButtonSounds } from '../shared/audio_ui.js';
 import { RangeControl, STATION_RANGES } from '../shared/range_control.js';
+import { registerHelp, initHelpOverlay } from '../shared/help_overlay.js';
+
+registerHelp([
+  { selector: '#ew-canvas',            text: 'ECM tactical map — ship at centre with enemy contacts and active jam range circle. Click a contact to set as jam target.', position: 'right' },
+  { selector: '.ew-ecm-status',        text: 'Jam target — current jam target and jam strength gauge. Click an enemy card to select a new target.', position: 'left' },
+  { selector: '.ew-cm-section',        text: 'Countermeasures — toggle active countermeasures and monitor charge level.', position: 'left' },
+  { selector: '.ew-intrusion-section',  text: 'System intrusion — select an enemy system and launch a network intrusion puzzle to disable it.', position: 'left' },
+]);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -78,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCrewRoster(send);
   SoundBank.init();
   wireButtonSounds(SoundBank);
+  initHelpOverlay();
 
   // Canvas click — select jam target
   canvas.addEventListener('click', (e) => {
